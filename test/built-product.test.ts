@@ -7,13 +7,13 @@ import { createHash } from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- Prove refusal precedes worker setup in a tiny real Vitest run.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { afterEach, expect, test } from 'vitest';
-import { assertBuiltTestFolders, folderMapInput, folderFlags, readBuiltShardfile, retainFolderInputs, selectBuiltTestFolders } from '../scripts/built-folder.mjs';
-import { captureFolderInputs, folderInputKey, folderToolchainKey, publishFolderInputs, recordBundle } from '../scripts/shardfile-inputs.mjs';
-import { mapTilesHash } from '../scripts/map-hash.mjs';
-import { InputHashMemo } from '../scripts/bake-input-hashes.mjs';
-import { shardfileValidationRevision } from '../scripts/shardfile-validation-revision.mjs';
-import { pruneShardfileCache } from '../scripts/shardfile-cache.mjs';
-import {PUSH_PROFILE} from '../scripts/push-budget.mjs';
+import { assertBuiltTestFolders, folderMapInput, folderFlags, readBuiltShardfile, retainFolderInputs, selectBuiltTestFolders } from '../src/scripts/built-folder.mjs';
+import { captureFolderInputs, folderInputKey, folderToolchainKey, publishFolderInputs, recordBundle } from '../src/scripts/shardfile-inputs.mjs';
+import { mapTilesHash } from '../src/scripts/map-hash.mjs';
+import { InputHashMemo } from '../src/scripts/bake-input-hashes.mjs';
+import { shardfileValidationRevision } from '../src/scripts/shardfile-validation-revision.mjs';
+import { pruneShardfileCache } from '../src/scripts/shardfile-cache.mjs';
+import {PUSH_PROFILE} from '../src/scripts/push-budget.mjs';
 
 const owned: string[] = [];
 afterEach(() => { for (const root of owned.splice(0)) rmSync(root, { recursive: true, force: true }); });
@@ -128,7 +128,7 @@ test('partial cache entries and corrupt sealed input receipts refuse without bui
 
 test('selected suites reuse only current products and aggregate missing prerequisites once', async () => {
   const f = await fixture();
-  write(f.root, 'scripts/test-folders.json', JSON.stringify({
+  write(f.root, 'src/scripts/test-folders.json', JSON.stringify({
     'test/current.test.ts': [f.name], 'test/other.test.ts': ['other', f.name], 'test/pure.test.ts': [],
   }));
   expect(() => assertBuiltTestFolders(f.root, ['test/current.test.ts', 'test/pure.test.ts'], f.options)).not.toThrow();
@@ -146,7 +146,7 @@ test('selected suites reuse only current products and aggregate missing prerequi
 
 test('product-suite preflight retains exact-SHA CI admission', async () => {
   const f = await fixture(), sha = 'a'.repeat(40);
-  write(f.root, 'scripts/test-folders.json', JSON.stringify({ 'test/current.test.ts': [f.name] }));
+  write(f.root, 'src/scripts/test-folders.json', JSON.stringify({ 'test/current.test.ts': [f.name] }));
   write(f.root, f.source, 'changed'); write(f.root, `out/${f.name}/shard.json`, '{}');
   expect(() => assertBuiltTestFolders(f.root, ['test/current.test.ts'], { cacheRoot: f.cacheRoot, env: { WS_TEST_PRODUCTS_SHA: sha, GITHUB_SHA: sha } })).not.toThrow();
   expect(() => assertBuiltTestFolders(f.root, ['test/current.test.ts'], { cacheRoot: f.cacheRoot, env: { WS_TEST_PRODUCTS_SHA: sha, GITHUB_SHA: 'b'.repeat(40) } })).toThrow('Missing current products');
@@ -154,11 +154,11 @@ test('product-suite preflight retains exact-SHA CI admission', async () => {
 
 test('real Vitest refuses missing products before loading worker setup or suite code', async () => {
   const f = await fixture();
-  write(f.root, 'scripts/test-folders.json', JSON.stringify({ 'test/product.test.ts': [f.name] }));
+  write(f.root, 'src/scripts/test-folders.json', JSON.stringify({ 'test/product.test.ts': [f.name] }));
   write(f.root, f.source, 'changed');
   write(f.root, 'test/product.test.ts', "throw new Error('suite must not load');");
   write(f.root, 'test/setup.mjs', "import fs from 'node:fs';fs.writeFileSync('worker-started','yes');");
-  write(f.root, 'vitest.config.mts', `import {DurationSequencer} from ${JSON.stringify(resolve('scripts/vitest-shard.ts'))};export default {root:${JSON.stringify(f.root)},test:{include:['test/product.test.ts'],setupFiles:['test/setup.mjs'],sequence:{sequencer:DurationSequencer}}};`);
+  write(f.root, 'vitest.config.mts', `import {DurationSequencer} from ${JSON.stringify(resolve('src/scripts/vitest-shard.ts'))};export default {root:${JSON.stringify(f.root)},test:{include:['test/product.test.ts'],setupFiles:['test/setup.mjs'],sequence:{sequencer:DurationSequencer}}};`);
   expect(() => execFileSync(process.execPath, [resolve('node_modules/vitest/vitest.mjs'), 'run', '--config', resolve(f.root, 'vitest.config.mts')], {
     cwd: f.root, env: { ...fixtureEnvironment(), WS_TEST_COHORT:undefined, WILDSHARD_SHARDFILE_CACHE: f.cacheRoot, WS_TEST_PRODUCTS_SHA: '', GITHUB_SHA: '' }, stdio: 'pipe', timeout: 10_000, maxBuffer: 1_048_576,
   })).toThrow('Missing current products author');
@@ -167,13 +167,13 @@ test('real Vitest refuses missing products before loading worker setup or suite 
 
 test.each(['local-related', 'ci-related', 'focused', 'all-blocked', 'local-commit', 'ci-commit', 'push-related'] as const)('real Vitest product coverage: %s', async mode => {
   const f=await fixture();
-  write(f.root,'scripts/test-folders.json',JSON.stringify({'test/product.test.ts':[f.name]}));
+  write(f.root,'src/scripts/test-folders.json',JSON.stringify({'test/product.test.ts':[f.name]}));
   write(f.root,f.source,'changed');
   write(f.root,'source.ts','export const value=1;');write(f.root,'other.ts','export const value=1;');
   write(f.root,'test/pure.test.ts',`import {test,expect} from 'vitest';import {value} from '../${mode==='all-blocked'?'other':'source'}';test('pure runs',()=>expect(value).toBe(1));`);
   write(f.root,'test/product.test.ts',"import '../source';throw new Error('product suite must not load');");
   write(f.root,'test/setup.mjs',"import fs from 'node:fs';fs.writeFileSync('worker-started','yes');");
-  write(f.root,'vitest.config.mts',`import {DurationSequencer} from ${JSON.stringify(resolve('scripts/vitest-shard.ts'))};export default {root:${JSON.stringify(f.root)},test:{include:['test/*.test.ts'],setupFiles:['test/setup.mjs'],sequence:{sequencer:DurationSequencer}}};`);
+  write(f.root,'vitest.config.mts',`import {DurationSequencer} from ${JSON.stringify(resolve('src/scripts/vitest-shard.ts'))};export default {root:${JSON.stringify(f.root)},test:{include:['test/*.test.ts'],setupFiles:['test/setup.mjs'],sequence:{sequencer:DurationSequencer}}};`);
   const args=mode==='focused'||mode.endsWith('-commit')?['run','test/pure.test.ts','test/product.test.ts']:['related','--run','source.ts'];
   const result=spawnSync(process.execPath,[resolve('node_modules/vitest/vitest.mjs'),...args,'--config',resolve(f.root,'vitest.config.mts')],{
     cwd:f.root,env:{...fixtureEnvironment(),WS_PUSH_GATE_PROFILE:mode==='push-related'?PUSH_PROFILE:undefined,WS_TEST_COHORT:undefined,CI:mode.startsWith('ci-')?'1':'',GITHUB_ACTIONS:'',WS_COMMIT_RELATED_TOKEN:mode.endsWith('-commit')?'fixture':undefined,WILDSHARD_SHARDFILE_CACHE:f.cacheRoot,WS_TEST_PRODUCTS_SHA:'',GITHUB_SHA:'',NO_COLOR:'1'},
@@ -183,7 +183,7 @@ test.each(['local-related', 'ci-related', 'focused', 'all-blocked', 'local-commi
   if(mode==='local-related'||mode==='local-commit'){
     expect(result.status,result.stdout+result.stderr).toBe(0);expect(result.stdout).toContain('1 passed');
     expect(result.stderr).toContain('skipping 1 product suites (CI still runs them): test/product.test.ts');
-    expect(result.stderr).toContain('python3 scripts/heavy-lane.py build -- node scripts/build-shardfiles.mjs --reuse --shard=author');
+    expect(result.stderr).toContain('python3 src/scripts/heavy-lane.py build -- node scripts/build-shardfiles.mjs --reuse --shard=author');
     expect(existsSync(resolve(f.root,'worker-started'))).toBe(true);
   }else{
     expect(result.status).not.toBe(0);
@@ -198,13 +198,13 @@ test.each([
   ['product-free',false],['product-free',true],['products',false],['products',true],
 ] as const)('real CI cohort %s with recorded durations %s',async(cohort,measured)=>{
   const f=await fixture();
-  write(f.root,'scripts/test-folders.json',JSON.stringify({'test/product.test.ts':[f.name]}));
+  write(f.root,'src/scripts/test-folders.json',JSON.stringify({'test/product.test.ts':[f.name]}));
   if(cohort==='product-free')write(f.root,f.source,'missing-current-product');
   const timings=resolve(f.root,'timings');mkdirSync(timings,{recursive:true});
   if(measured)write(f.root,'timings/timings.json',JSON.stringify({version:1,run:'1',sha:'a'.repeat(40),measuredAt:0,full:{'test/product.test.ts':50,'test/pure.test.ts':1},ring1:{}}));
   for(const name of ['pure','product'])write(f.root,`test/${name}.test.ts`,
     `import {test} from 'vitest';import {writeFileSync} from 'node:fs';test('${name}',()=>writeFileSync('${name}-ran','yes'));`);
-  write(f.root,'vitest.config.mts',`import {DurationSequencer} from ${JSON.stringify(resolve('scripts/vitest-shard.ts'))};export default {root:${JSON.stringify(f.root)},test:{include:['test/*.test.ts'],sequence:{sequencer:DurationSequencer}}};`);
+  write(f.root,'vitest.config.mts',`import {DurationSequencer} from ${JSON.stringify(resolve('src/scripts/vitest-shard.ts'))};export default {root:${JSON.stringify(f.root)},test:{include:['test/*.test.ts'],sequence:{sequencer:DurationSequencer}}};`);
   const result=spawnSync(process.execPath,[resolve('node_modules/vitest/vitest.mjs'),'run','--shard=1/1','--config',resolve(f.root,'vitest.config.mts')],{
     cwd:f.root,env:{...fixtureEnvironment(),CI:'1',WS_TIMINGS_DIR:timings,WS_TEST_COHORT:cohort,WILDSHARD_SHARDFILE_CACHE:f.cacheRoot,WS_TEST_PRODUCTS_SHA:'',GITHUB_SHA:'',NO_COLOR:'1'},
     encoding:'utf8',timeout:15_000,maxBuffer:1_048_576,

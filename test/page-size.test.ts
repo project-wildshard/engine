@@ -6,7 +6,7 @@ import {dirname, join, resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Run the CLI as the release receipt does.
 import {spawnSync} from 'node:child_process';
 import {afterEach, expect, test} from 'vitest';
-import {PAGE_LIMITS, classify, formatPageSize, gatePage, pageSize} from '../scripts/page-size.mjs';
+import {PAGE_LIMITS, classify, formatPageSize, gatePage, pageSize} from '../src/scripts/page-size.mjs';
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, {recursive: true, force: true}); });
@@ -98,14 +98,14 @@ test('a map is a map wherever it sits; a shard folder is named by slug, short na
 
 test('the CLI prints the table, or JSON, and refuses a folder that is not a page', () => {
   const root = fixture();
-  const table = spawnSync(process.execPath, ['scripts/page-size.mjs', root], {encoding: 'utf8'});
+  const table = spawnSync(process.execPath, ['src/scripts/page-size.mjs', root], {encoding: 'utf8'});
   expect(table.status, table.stderr).toBe(0);
   expect(table.stdout).toContain('carried builds: 1 (deploy-chunks.json)');
   expect(table.stdout).toMatch(/\| {3}S7 shard art mounts \| 0\.0 \| 7 \|/u);
-  const json = spawnSync(process.execPath, ['scripts/page-size.mjs', root, '--json'], {encoding: 'utf8'});
+  const json = spawnSync(process.execPath, ['src/scripts/page-size.mjs', root, '--json'], {encoding: 'utf8'});
   expect(JSON.parse(json.stdout).total.files).toBe(Object.keys(TREE).length);
   const empty = mkdtempSync(resolve('tmp/page-size-empty-')); roots.push(empty);
-  const refused = spawnSync(process.execPath, ['scripts/page-size.mjs', empty], {encoding: 'utf8'});
+  const refused = spawnSync(process.execPath, ['src/scripts/page-size.mjs', empty], {encoding: 'utf8'});
   expect(refused.status).not.toBe(0);
   expect(refused.stderr).toContain('holds no index.html');
 });

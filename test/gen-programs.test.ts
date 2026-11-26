@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve only repository source and fixture files.
 import { dirname, resolve } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { generationPlan, hasProjectGenerator } from '../scripts/gen-programs.mjs';
+import { generationPlan, hasProjectGenerator } from '../src/scripts/gen-programs.mjs';
 
 const owned: string[] = [];
 afterEach(() => { for (const root of owned.splice(0)) rmSync(root, { recursive: true, force: true }); });

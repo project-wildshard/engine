@@ -7,7 +7,7 @@ import { resolve } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
 import * as ts from '@typescript/typescript6';
 import { parseManifestMetadata } from '@wildshard/format/minimap';
-import { authoredManifestSource } from '../scripts/authored-manifest.mjs';
+import { authoredManifestSource } from '../src/scripts/authored-manifest.mjs';
 import { fixtureManifest } from './fixtures/manifest-metadata';
 
 const root=mkdtempSync(resolve('tmp','entry-styles-'));

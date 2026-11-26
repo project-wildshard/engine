@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Read the committed calibration table.
 import {readFileSync} from 'node:fs';
 import {expect,test} from 'vitest';
-import {fitLine,fitHost,parseCalibration,compareWithProbe,median,KINDS} from '../scripts/memory/calibration.mjs';
+import {fitLine,fitHost,parseCalibration,compareWithProbe,median,KINDS} from '../src/scripts/memory/calibration.mjs';
 
 const MB=1e6;
 const reading=(kind:string,run:number,askedMB:number,roles:Record<string,number>,got=askedMB*MB)=>({host:'webkit',kind,run,askedMB,gotBytes:got,unit:'bytes',roles});
@@ -48,7 +48,7 @@ test('the probe comparison reads the table at 256 MB over none, in the probe rol
 });
 
 test('the committed table matches the schema, names every kind it fitted and holds three hosts',()=>{
-  const table=parseCalibration(JSON.parse(readFileSync(new URL('../scripts/memory/calibration.json',import.meta.url),'utf8')));
+  const table=parseCalibration(JSON.parse(readFileSync(new URL('../src/scripts/memory/calibration.json',import.meta.url),'utf8')));
   expect(Object.keys(table.hosts).sort()).toEqual(['chromium','simulator','webkit']);
   for(const host of Object.values(table.hosts)) {
     for(const [kind,row] of Object.entries(host.kinds)) {

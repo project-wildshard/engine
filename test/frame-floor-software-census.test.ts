@@ -1,9 +1,9 @@
 import {expect, test} from 'vitest';
-import {frameFloorSoftwareCensus} from '../scripts/frame-floor-args.mjs';
-import {frameFloorDrawReport, frameFloorDrawMarkdown, frameFloorDrawConsole, type FloorDrawRecord} from '../scripts/frame-floor-draw-report.mjs';
-import {assertFrameFloorRenderer} from '../scripts/frame-floor-report-phase.mjs';
+import {frameFloorSoftwareCensus} from '../src/scripts/frame-floor-args.mjs';
+import {frameFloorDrawReport, frameFloorDrawMarkdown, frameFloorDrawConsole, type FloorDrawRecord} from '../src/scripts/frame-floor-draw-report.mjs';
+import {assertFrameFloorRenderer} from '../src/scripts/frame-floor-report-phase.mjs';
 import {assessDrawBudget} from '../src/client/engine/core/drawBudget';
-import {gridFloorRuntimeFailure} from '../scripts/frame-floor-grid.mjs';
+import {gridFloorRuntimeFailure} from '../src/scripts/frame-floor-grid.mjs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Execute the maintained controller without a browser/build.
 import {readFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Isolate the real software branch and its explicit test-owned loans.
@@ -75,7 +75,7 @@ test('wrong backend/resolution, missing pairs, foreign pose and pre-throttle fra
 });
 
 async function softwareController(failure?: 'ready' | 'sample' | 'unload') {
-  const source = readFileSync('scripts/frame-floor.mjs', 'utf8');
+  const source = readFileSync('src/scripts/frame-floor.mjs', 'utf8');
   const start = source.indexOf('async function measureShard('), end = source.indexOf('\n/** Long tasks inside', start);
   if (start === -1 || end === -1) throw new Error('Missing maintained shard controller');
   const events: string[] = [];

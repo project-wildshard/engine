@@ -1,5 +1,5 @@
 // CHUNK-PARAM-REMOVAL CP12 (meta plan, J522): the bytes of a Zone Select tap, with no imports, so the title
-// (titleArrival.ts `setTitleArrival`) and the harness (`scripts/zone-entry.mjs` `enterZone`) write the same record and
+// (titleArrival.ts `setTitleArrival`) and the harness (`src/scripts/zone-entry.mjs` `enterZone`) write the same record and
 // can't drift. A tool enters a zone the way a player does: this record in the tab, then a bare `/`.
 
 /** The modes a tap carries (titleArrival.ts `TitleArrivalMode`). */

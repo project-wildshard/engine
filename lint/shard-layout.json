@@ -47,7 +47,7 @@
     "generators/": "build-time source that emits admitted JSON, WASM and named assets; never shipped as runtime TypeScript",
     "bake/": "the shard's manual Node commands: an author runs them to rewrite committed bytes, and no build does. They stay out of generators/ because maps hash it",
     "behaviour/": "AssemblyScript entity and director scripts",
-    "assets/": "source assets consumed by the build; assets/public/ holds files gen copies to public/assets/<slug>/ (scripts/shard-public.mjs)",
+    "assets/": "source assets consumed by the build; assets/public/ holds files gen copies to public/assets/<slug>/ (src/scripts/shard-public.mjs)",
     "blender/": "the shard's retained Blender build sources and offline rig checks (build-time only; optional)",
     "test/": "optional source tests; never copied into the shipped product",
     "look/": "authored data, source assets and generated outputs; executable TypeScript belongs in generators/",

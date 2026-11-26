@@ -1,6 +1,6 @@
 // Pine Hollow's witness tape in plain Node (no browser, DOM shim, renderer or active application): the day's legs, Hale's
 // watch, the Ghost Stag's walk and the Antler King's fight, by tick commands alone (witness.ts):
-//   node --import ./scripts/sim-node-loader.mjs test/proof/pine-hollow/tape.mjs
+//   node --import ./src/scripts/sim-node-loader.mjs test/proof/pine-hollow/tape.mjs
 // run.mjs owns the canonical recorded/checkpointed witness. This CLI diagnoses the full command tape.
 // oxlint-disable-next-line import/no-nodejs-modules -- Fail the native witness if browser globals are present.
 import assert from 'node:assert/strict';

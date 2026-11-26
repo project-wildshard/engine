@@ -5,7 +5,7 @@
  *
  * Every named place is a Set (M12, Jake 2026-09-30): a shard's discovery list names its places, and each one's
  * set says so with `place: '<slug>/<place id>'`. The set lists the models placed there; the place's welded ground stays
- * world. scripts/check-models.mjs fails a named place no set names.
+ * world. src/scripts/check-models.mjs fails a named place no set names.
  *
  *   const yurts = place(yurt, camp.yurts, { ctx, draw: 'merged' }), props = place(cauldron, camp.props, { ctx, draw: 'instanced' });
  *   placeSet({ id: 'example/spring-camp', name: 'Spring camp', file: 'content/world/camp.ts', members: [yurts, props] });

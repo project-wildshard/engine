@@ -18,7 +18,7 @@ import { roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
 import { RoomBot } from './fixtures/dedicated/roomBot';
 
 // SHARD-COMPAT C2 (J28, J91): the worker runs its shards and a road crossing from server packs alone. The origin is a release's, written
-// by the cook's own writers (`scripts/server-origin.mjs`: each shard's server pack and the catalogue's grid pack, from the bake's strips).
+// by the cook's own writers (`src/scripts/server-origin.mjs`: each shard's server pack and the catalogue's grid pack, from the bake's strips).
 // Every room reads its shard through the pack reader and the road reads its strips from the grid pack, so no built product, `public/` or
 // in-tree grid file is read while the world runs. Staging's 2-worker table, as GC15 (3): a walker leaves Driftwood on its road, is held
 // at Nalati's gate (ZONE-ENTRY ZE6), and walks back.
@@ -31,9 +31,9 @@ afterEach(async () => { for (const row of bots.splice(0)) row.drop(); await benc
 beforeAll(() => {
   work = mkdtempSync(join(ROOT, 'tmp', 'c2-packs-'));
   const grid = join(work, 'grid'), origin = join(work, 'origin');
-  const baked = spawnSync(process.execPath, ['--import', './scripts/bake-loader.mjs', 'scripts/bake-grid-seams.mjs', grid, '--collision-only'], { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  const baked = spawnSync(process.execPath, ['--import', './src/scripts/bake-loader.mjs', 'src/scripts/bake-grid-seams.mjs', grid, '--collision-only'], { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   expect(baked.status, baked.stderr).toBe(0);
-  const made = spawnSync(process.execPath, ['scripts/server-origin.mjs', origin, BUILD, ...CELLS.map(slug => `${slug}=${builtFolder(slug)}`), `--grid=${grid}`, '--fast-encode'], { cwd: ROOT, encoding: 'utf8' });
+  const made = spawnSync(process.execPath, ['src/scripts/server-origin.mjs', origin, BUILD, ...CELLS.map(slug => `${slug}=${builtFolder(slug)}`), `--grid=${grid}`, '--fast-encode'], { cwd: ROOT, encoding: 'utf8' });
   expect(made.status, made.stderr).toBe(0);
   expect(JSON.parse(made.stdout.trim().split('\n').at(-1) ?? '{}')).toMatchObject({ shards: CELLS, grid: true });
   // q1 parts (`--fast-encode`): the readers decode any Brotli, and a CI test job has no q11 encode cache (123.9 s hosted, run 45129449633).

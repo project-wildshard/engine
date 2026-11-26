@@ -5,7 +5,7 @@ import {runInNewContext} from 'node:vm';
 import {expect, test} from 'vitest';
 
 function poseSource(): string {
-  const text = readFileSync(new URL('../scripts/physics-baseline.mjs', import.meta.url), 'utf8');
+  const text = readFileSync(new URL('../src/scripts/physics-baseline.mjs', import.meta.url), 'utf8');
   const section = text.indexOf('// ── poses ──');
   const marker = 'const r = await page.evaluate(';
   const start = text.indexOf(marker, section) + marker.length;

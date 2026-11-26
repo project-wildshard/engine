@@ -37,7 +37,7 @@ beforeAll(() => {
 afterAll(() => { rmSync(scratch, {recursive: true, force: true}); });
 
 function worker(build: string, store: PackStore): ReturnType<typeof createCookWorker> {
-  const launcher: JobLauncher = {root, execPath: process.execPath, loader: join(root, 'scripts/bake-loader.mjs'), script, wrap: [], limits: {seconds: 30, memoryMB: 2048, heapMB: 1024}};
+  const launcher: JobLauncher = {root, execPath: process.execPath, loader: join(root, 'src/scripts/bake-loader.mjs'), script, wrap: [], limits: {seconds: 30, memoryMB: 2048, heapMB: 1024}};
   return createCookWorker({build, store, launcher, serverPacks: join(scratch, 'server'), scratch: join(scratch, 'work'), source: {heads: () => Promise.resolve([]), download: hash => Promise.resolve(new TextEncoder().encode(hash === hashOf('one') ? 'one' : 'two'))}});
 }
 

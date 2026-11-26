@@ -1,7 +1,7 @@
 // SENTRY-TRIAGE S13 (WILDSHARD-GAME-8H, opus-sentry 2026-11-17): a GPU-process restart on an online page went to the title.
 // GpuRecovery asks the grid session to prepare a recovery before it reloads; on a wire, `bindWire` suppresses the page's own
 // checkpoints (the server's saves are the session's), so `prepareRecovery` refused and the reload went to `/` without
-// `?glreload`. Proved on staging v0.1.34 by scripts/gpu-recovery-proof.mjs: desktop Chromium on Driftwood landed on the title.
+// `?glreload`. Proved on staging v0.1.34 by src/scripts/gpu-recovery-proof.mjs: desktop Chromium on Driftwood landed on the title.
 // On a wire a recovery needs only where this page stands; offline the region checkpoint must still land first.
 import { installCatalogueFixture } from './fixtures/bootSetup';
 import { expect, test, vi } from 'vitest';

@@ -235,7 +235,7 @@ export interface WorkerClientReport {
   owned: Readonly<Record<string, number>>; sky: number | null; day: number | null;
   /** What this page drew of what it only hears, by name. */
   drawn: Readonly<Record<string, number>>;
-  /** EG-15: every view word the server said to this page, by name: what `drawn` is held against (scripts/fight-page-census.mjs). */
+  /** EG-15: every view word the server said to this page, by name: what `drawn` is held against (src/scripts/fight-page-census.mjs). */
   heard: Readonly<Record<string, number>>;
   /** Of those, the words for a view this page hasn't built (`wirePage.unbuilt`): not drawn, and not dark. */
   offstage: Readonly<Record<string, number>>;

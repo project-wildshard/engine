@@ -6,7 +6,7 @@ import { serverStepLabel } from '../shardfile/serverRoute';
 
 /** LS7 (J188): a Load row's bar share is its measured seconds, never a range or a floor. One calibrated profile: the
  *  data-only shardfile path, Sunscar Dunes, phone tier (iPhone 16 Pro viewport, 4x CPU, 12.8 Mbit/s), headless Chromium,
- *  each row's own timeline ms at ready (`scripts/loading-card-proof.mjs --shard=sunscar-dunes --throttle --strict
+ *  each row's own timeline ms at ready (`src/scripts/loading-card-proof.mjs --shard=sunscar-dunes --throttle --strict
  *  --dump`, its `-rows.json`; build 616462d, 2026-11-08), at the timeline's 0.1 ms resolution. A row that did not run
  *  there (state todo, 0 ms) has weight 0. `modules` is the exception: its row starts at document t0, so its row ms
  *  (8677.1) repeats the Start phase. Its weight is only its Load-phase stretch, the `game-stage:modules` span in the
@@ -24,7 +24,7 @@ const SHARDFILE_MEASURED_SECONDS: Readonly<Record<string, number>> = {
 
 /** LS8 (J188): the native and runtime world stages (Driftwood, Pine, Nalati and Nine still build theirs in TypeScript),
  *  measured the same way: Driftwood Isle, the same phone profile and headless Chromium, its `-rows.json` from
- *  `scripts/loading-card-proof.mjs --shard=driftwood-isle --throttle --dump` (build d0f800b-mw9lffqd with the creature
+ *  `src/scripts/loading-card-proof.mjs --shard=driftwood-isle --throttle --dump` (build d0f800b-mw9lffqd with the creature
  *  warm-up and FIRST_DRAW_NARROW, 2026-11-09), at 0.1 ms. `modules` is its `game-stage:modules` span, 685 ms, as above.
  *  The first frame is most of this boot there: SwiftShader builds each pipeline on the CPU. */
 const NATIVE_MEASURED_SECONDS: Readonly<Record<string, number>> = {

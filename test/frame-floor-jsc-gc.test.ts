@@ -5,8 +5,8 @@ import {execFileSync} from 'node:child_process';
 import {mkdtempSync, mkdirSync, writeFileSync, rmSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Keep the owned filesystem fixture under repository scratch.
 import {join} from 'node:path';
-import {JSC_GC_SETTINGS, prepareJscGcEnvironment} from '../scripts/frame-floor-jsc-gc.mjs';
-import {validateFrameFloorArgs} from '../scripts/frame-floor-args.mjs';
+import {JSC_GC_SETTINGS, prepareJscGcEnvironment} from '../src/scripts/frame-floor-jsc-gc.mjs';
+import {validateFrameFloorArgs} from '../src/scripts/frame-floor-args.mjs';
 
 function fixture() {
   const values = new Map<string,string>(), calls: string[] = [];
@@ -95,7 +95,7 @@ code=sys.argv[2]
 sys.argv=['-c',*sys.argv[3:]]
 exec(code)
 `,{mode:0o755});
-    const module=new URL('../scripts/frame-floor-jsc-gc.mjs',import.meta.url).href;
+    const module=new URL('../src/scripts/frame-floor-jsc-gc.mjs',import.meta.url).href;
     const code=`const m=await import(${JSON.stringify(module)});console.log(JSON.stringify(m.jscGcProcessIds('fixture')));`;
     expect(execFileSync(process.execPath,['--input-type=module','-e',code],{
       cwd:scratch,encoding:'utf8',env:{...process.env,PATH:`${bin}:${process.env['PATH'] ?? ''}`},

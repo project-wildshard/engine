@@ -1,5 +1,5 @@
 import {expect, test} from 'vitest';
-import {nativeBodyBytes} from '../scripts/phone-loading/native-body';
+import {nativeBodyBytes} from '../src/scripts/phone-loading/native-body';
 
 test('an available native body never consults cache metadata or re-fetches', async () => {
   const calls: string[] = [];

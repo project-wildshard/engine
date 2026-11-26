@@ -1,10 +1,10 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The test reads the committed workflows and build step.
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { budgetTable, judgeAll, runCli } from '../scripts/budgets/cli.mjs';
-import { readCaps } from '../scripts/budgets/files.mjs';
-import { budgetReport, budgetResultLine, budgetSourceRun, confirmBudgetResults, parseBudgetResults } from '../scripts/budgets/watch.mjs';
-import { checkShardSizes } from '../scripts/shard-size-gate.mjs';
+import { budgetTable, judgeAll, runCli } from '../src/scripts/budgets/cli.mjs';
+import { readCaps } from '../src/scripts/budgets/files.mjs';
+import { budgetReport, budgetResultLine, budgetSourceRun, confirmBudgetResults, parseBudgetResults } from '../src/scripts/budgets/watch.mjs';
+import { checkShardSizes } from '../src/scripts/shard-size-gate.mjs';
 
 // BUDGET-CAPS BC9 (J444): a regression is never a red main or a release hold. ci (and the release train's green-main
 // read of it) checks hard caps only; the 10% check runs in budgets.yml after ci; main-watch names the pusher.
@@ -23,12 +23,12 @@ test('the release gate\'s inputs: a regressed download passes qualification, an 
 test('ci holds no regression check; every build runs its gates hard-only; budgets.yml follows ci and judges', () => {
   const ci = readFileSync('.github/workflows/ci.yml', 'utf8'), budgets = readFileSync('.github/workflows/budgets.yml', 'utf8');
   expect(ci).not.toMatch(/\n {2}memory-ledger-guard:\n/u);
-  expect(ci).not.toContain('scripts/budgets/cli.mjs check');
+  expect(ci).not.toContain('src/scripts/budgets/cli.mjs check');
   expect(budgets).toMatch(/workflow_run:\n {4}workflows: \[ci\]/u);
   expect(budgets).toContain('name: memory-pinned-client');
-  expect(budgets).toContain('node scripts/budgets/cli.mjs check tmp/budgets/measures.json');
-  expect(readFileSync('scripts/app-build-pipeline.mjs', 'utf8')).toMatch(/"scripts\/shard-size-gate\.mjs",\n\s+outDir,\n(?:\s*\/\/.*\n)?\s+"--hard-only",/u);
-  expect(readFileSync('scripts/app-build/chunkReport.mjs', 'utf8')).toContain('hardOnly: true');
+  expect(budgets).toContain('node src/scripts/budgets/cli.mjs check tmp/budgets/measures.json');
+  expect(readFileSync('src/scripts/app-build-pipeline.mjs', 'utf8')).toMatch(/"src\/scripts\/shard-size-gate\.mjs",\n\s+outDir,\n(?:\s*\/\/.*\n)?\s+"--hard-only",/u);
+  expect(readFileSync('src/scripts/app-build/chunkReport.mjs', 'utf8')).toContain('hardOnly: true');
 });
 
 test('a failing check prints one result line a row, which main-watch parses and turns into a fix row for the pusher', () => {

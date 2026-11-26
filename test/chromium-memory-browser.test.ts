@@ -1,7 +1,7 @@
 import {expect,it} from 'vitest';
 import {mkdirSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
-import {devToolsEndpoint, memoryNetworkCommand} from '../scripts/chromium-memory-browser.mjs';
+import {devToolsEndpoint, memoryNetworkCommand} from '../src/scripts/chromium-memory-browser.mjs';
 
 it('caps every Inspector session without mutating events or cache controls',()=>{
   const original={id:7,sessionId:'playwright-page',method:'Network.enable',params:{maxTotalBufferSize:200000000,reportDirectSocketTraffic:true}};

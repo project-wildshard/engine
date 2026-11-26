@@ -36,7 +36,7 @@ const packageAt=(file:string):void=>{
     inputs.set(metadata,undefined);const parent=dirname(at);if(parent===at)return;at=parent;
   }
 };
-const bundle=await build({cwd:root,input:resolve(root,'scripts/cook-job.mjs'),platform:'node',transform:{target:'node24'},plugins:[{
+const bundle=await build({cwd:root,input:resolve(root,'src/scripts/cook-job.mjs'),platform:'node',transform:{target:'node24'},plugins:[{
   name:'fixed-cook-worker',
   resolveId(source){
     if(/^\.\/rapier_wasm3d(?:\.js)?$/u.test(source))return resolve(root,'src/server/engine/physics/rapierBindings.ts');

@@ -39,7 +39,7 @@ describe('FP27c: the catalogue armed word reaches the cook', () => {
   it.each([[true, 'true'], [false, 'false'], [undefined, 'unset']] as const)('the worker gives its job armed %s as COOK_ARMED', async (armed, seen) => {
     const work = scratch(), script = join(work, 'armed-job.mjs');
     writeFileSync(script, `import {writeFileSync} from 'node:fs'; writeFileSync(process.argv[3] + '.result.json', JSON.stringify({refused: 'armed ' + (process.env.COOK_ARMED ?? 'unset')})); process.exit(3);`);
-    const launcher: JobLauncher = {root: process.cwd(), execPath: process.execPath, loader: join(process.cwd(), 'scripts/bake-loader.mjs'), script, wrap: [], limits: {seconds: 60, memoryMB: 2048, heapMB: 1024}};
+    const launcher: JobLauncher = {root: process.cwd(), execPath: process.execPath, loader: join(process.cwd(), 'src/scripts/bake-loader.mjs'), script, wrap: [], limits: {seconds: 60, memoryMB: 2048, heapMB: 1024}};
     const worker = createCookWorker({build: 'b-armed', store: folderStore(join(work, 'store')), source: {heads: () => Promise.resolve([]), download: () => Promise.resolve(bytes)}, launcher, serverPacks: join(work, 'server'), scratch: join(work, 'work')});
     const row = await worker.cook({slug: job.slug, hash, ...(armed === undefined ? {} : {armed})});
     expect(row).toMatchObject({state: 'refused', detail: `armed ${seen}`});

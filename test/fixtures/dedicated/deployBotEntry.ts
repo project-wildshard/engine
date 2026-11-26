@@ -1,7 +1,7 @@
 import { RoomBot } from './roomBot';
 
 // E7.2c, E7.4b: two phones through restarts and a deploy. Each walks, and when the link ends it waits for `/health`, dials the build that names, and says how long it took
-// to move again and how far the stand it was sent back to is from where it last stood. `scripts/room-deploy.mjs` runs it.
+// to move again and how far the stand it was sent back to is from where it last stood. `src/scripts/room-deploy.mjs` runs it.
 const [base = 'ws://127.0.0.1:8790', secondsArg = '60'] = process.argv.slice(2), ends = performance.now() + Number(secondsArg) * 1000, http = base.replace(/^ws/u, 'http'), POLL_MS = 20;
 const rest = (ms: number): Promise<void> => new Promise(resolve => { setTimeout(resolve, ms); });
 interface Stand { readonly x: number; readonly z: number }

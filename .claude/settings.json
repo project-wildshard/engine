@@ -25,6 +25,10 @@
           },
           {
             "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.agents/hooks/guard-hc-send.sh\""
+          },
+          {
+            "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/.agents/hooks/no-pr-guard.mjs\""
           },
           {
@@ -37,15 +41,11 @@
           },
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.agents/hooks/gh-poll-guard.mjs\""
-          },
-          {
-            "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR/.agents/hooks/guard-herdr-prompt.sh\""
-          },
-          {
-            "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/.agents/hooks/active-hours.mjs\" mark"
+          },
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.agents/hooks/gh-poll-guard.mjs\""
           }
         ]
       },

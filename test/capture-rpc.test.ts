@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { captureRpcObserver, type CaptureRpcStage } from '../scripts/parity/capture-rpc.mjs';
+import { captureRpcObserver, type CaptureRpcStage } from '../src/scripts/parity/capture-rpc.mjs';
 
 test('native screenshot stages retain durations while discarding image and page payloads', () => {
   const rows: CaptureRpcStage[] = []; let now = 10;

@@ -3,8 +3,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, ut
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths only.
 import { resolve } from 'node:path';
 import { afterEach, expect, it } from 'vitest';
-import { bakeInputHashes, InputHashMemo } from '../scripts/bake-input-hashes.mjs';
-import { recorderKey, runNativeRecorder } from '../scripts/native-recorder-cache.mjs';
+import { bakeInputHashes, InputHashMemo } from '../src/scripts/bake-input-hashes.mjs';
+import { recorderKey, runNativeRecorder } from '../src/scripts/native-recorder-cache.mjs';
 
 const owned: string[] = [];
 afterEach(() => { for (const root of owned.splice(0)) rmSync(root, { recursive: true, force: true }); });

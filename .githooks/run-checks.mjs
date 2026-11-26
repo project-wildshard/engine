@@ -5,7 +5,7 @@
 //           in parallel under a budget (silent < 5 s, warn 5-8 s, BLOCK
 //           > 8 s; SKIP_BUDGET=1). Skipped when no code or JSON is staged.
 //   push:   the full `check` script (adds knip and the unit tests).
-// The hooks only check; `pnpm lint:fix` / `pnpm format` fix.
+// The hooks only check; `pnpm fix` (or `pnpm lint:fix` / `pnpm format`) fix.
 // Bypass a lane: SKIP_CHECK=1 (last resort; CI still runs it).
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
@@ -41,10 +41,10 @@ if (lane === 'push') {
   if (tag !== null) {
     console.error(`  - release merge-back ${tag}: version and changelog only; release CI already passed`);
     const sha = (process.env.WS_PUSH_REFS ?? '').trim().split(/\s+/u)[1];
-    if (process.env.WS_MAIN_WATCH !== '0' && existsSync(join(root, 'scripts/main-watch.mjs'))) {
+    if (process.env.WS_MAIN_WATCH !== '0' && existsSync(join(root, 'src/scripts/main-watch.mjs'))) {
       const laneName = process.env.WS_LANE_NAME ?? '', pane = process.env.HERDR_PANE_ID ?? '';
       const watchEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
-      spawn(process.execPath, [join(root, 'scripts/main-watch.mjs'), `--follow=${sha}`, '--after-push=300',
+      spawn(process.execPath, [join(root, 'src/scripts/main-watch.mjs'), `--follow=${sha}`, '--after-push=300',
         ...(laneName === '' ? [] : [`--lane=${laneName}`]), ...(pane === '' ? [] : [`--pane=${pane}`])],
       { cwd: root, env: watchEnv, detached: true, stdio: 'ignore' }).unref();
     }
@@ -57,13 +57,13 @@ const pkgDir = root;
 const pkgPath = join(pkgDir, 'package.json');
 const scripts = existsSync(pkgPath) ? (JSON.parse(readFileSync(pkgPath, 'utf8')).scripts ?? {}) : {};
 
-if (lane === 'push' && scripts.check && existsSync(join(root, 'scripts/push-budget.mjs'))) {
+if (lane === 'push' && scripts.check && existsSync(join(root, 'src/scripts/push-budget.mjs'))) {
   const {pushEnvironment}=await import('./push-checks.mjs');
-  const {PUSH_PROFILE,SPLIT_PROFILE}=await import('../scripts/push-budget.mjs');
-  const {pushSelection}=await import('../scripts/push-selection.mjs');
-  const {hostedReleaseProof,releaseTag}=await import('../scripts/release-gate.mjs');
-  const {capturePushTree,readPushProof}=await import('../scripts/push-proof-cache.mjs');
-  const {landMainMode,mainPushed,planBaseRefs,splitRequested}=await import('../scripts/push-local-split.mjs');
+  const {PUSH_PROFILE,SPLIT_PROFILE}=await import('../src/scripts/push-budget.mjs');
+  const {pushSelection}=await import('../src/scripts/push-selection.mjs');
+  const {hostedReleaseProof,releaseTag}=await import('../src/scripts/release-gate.mjs');
+  const {capturePushTree,readPushProof}=await import('../src/scripts/push-proof-cache.mjs');
+  const {landMainMode,mainPushed,planBaseRefs,splitRequested}=await import('../src/scripts/push-local-split.mjs');
   const env = pushEnvironment(Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))));
   // Land marks its own main push. History, secrets, size, the changelog and AGENTS.md already ran above in
   // pre-push. J422's `push` takes the ordinary split gate below, like any main push. FLOW-SIMPLE FS5 deleted the
@@ -71,16 +71,16 @@ if (lane === 'push' && scripts.check && existsSync(join(root, 'scripts/push-budg
   // The marker is read from the hook's own environment: the gate's environment keeps only its allowlist.
   const landMain=landMainMode({...env,WS_LAND_MAIN_PUSH:process.env.WS_LAND_MAIN_PUSH},env.WS_PUSH_REFS);
   // BUILD-MAX EV2 (J288, WL13): a main push from the canonical checkout runs the split gate too
-  // (scripts/push-local-split.mjs MAIN_PUSH_SPLIT); main's own CI runs the full suite and main-watch reports it.
+  // (src/scripts/push-local-split.mjs MAIN_PUSH_SPLIT); main's own CI runs the full suite and main-watch reports it.
   const split=splitRequested(env);
-  // BUILD-MAX EV1 (WL11): the gate checks the pushed commit in a clean copy of it (scripts/push-gate-copy.mjs), so
+  // BUILD-MAX EV1 (WL11): the gate checks the pushed commit in a clean copy of it (src/scripts/push-gate-copy.mjs), so
   // another lane's work in progress in this checkout neither refuses the push nor leaks into the checks.
   for(const key of Object.keys(process.env))if(key.startsWith('GIT_'))Reflect.deleteProperty(process.env,key);
-  const {copyReason,makeGateCopy,pushedCommit}=await import('../scripts/push-gate-copy.mjs');
+  const {copyReason,makeGateCopy,pushedCommit}=await import('../src/scripts/push-gate-copy.mjs');
   const sha=pushedCommit(root,env.WS_PUSH_REFS),why=copyReason(root,sha,env,undefined,landMain==='push');
-  // main-push gated these commits before it took the lock (scripts/main-push-gated.mjs): the push under the lock
+  // main-push gated these commits before it took the lock (src/scripts/main-push-gated.mjs): the push under the lock
   // skips the gate when every outgoing commit carries its mark. Read from the hook's own environment.
-  const pregated=process.env.WS_MAIN_PUSH_GATED==='1'?(await import('../scripts/main-push-gated.mjs')).pregated(root,env.WS_PUSH_REFS):null;
+  const pregated=process.env.WS_MAIN_PUSH_GATED==='1'?(await import('../src/scripts/main-push-gated.mjs')).pregated(root,env.WS_PUSH_REFS):null;
   let copy=null;
   if(pregated===null&&why!==null&&sha!==null){
     console.error(`  - gate in a clean copy of ${sha.slice(0,10)}: ${why}`);
@@ -111,7 +111,7 @@ if (lane === 'push' && scripts.check && existsSync(join(root, 'scripts/push-budg
     }else{
       // A miss owns the lane before generation/static work too.
       const observationArgs=observation?['--observation-kind','release']:[];
-      const child = spawn('python3', ['scripts/heavy-lane.py', 'full-test', '--checkout-scope', ...observationArgs, '--', process.execPath, '.githooks/push-checks.mjs'],
+      const child = spawn('python3', ['src/scripts/heavy-lane.py', 'full-test', '--checkout-scope', ...observationArgs, '--', process.execPath, '.githooks/push-checks.mjs'],
         { cwd: gateRoot, env: { ...env, PWD: gateRoot, WS_PUSH_GATE_PROFILE: 'full-v1', WS_CPU_ADMISSION: '1' }, stdio: 'inherit' });
       process.on('SIGINT', () => child.kill('SIGINT'));
       process.on('SIGTERM', () => child.kill('SIGTERM'));
@@ -122,21 +122,21 @@ if (lane === 'push' && scripts.check && existsSync(join(root, 'scripts/push-budg
     }
     // A gate that regenerated a tracked file (gen:inputs) fails on the copy's dirt; name it, since the copy goes.
     if(code!==0&&copy!==null){
-      const {checkedTreeDirt}=await import('../scripts/push-proof-cache.mjs');
+      const {checkedTreeDirt}=await import('../src/scripts/push-proof-cache.mjs');
       const dirt=checkedTreeDirt(copy.path);
       if(dirt.length>0)console.error(`  !! the gate changed ${dirt.length} file(s) in the copy; regenerate them in your checkout (pnpm gen:inputs) and commit them with your change:\n${dirt.slice(0,10).map(line=>`     ${line}`).join('\n')}`);
     }
   }finally{copy?.remove();}
   // EV2: a green split main push hands main's verdict to main-watch, as land does (LS5). It waits for this SHA to
   // reach origin/main and quits quietly if the push never lands (a lost race).
-  if(code===0&&split&&landMain===null&&sha!==null&&mainPushed(env.WS_PUSH_REFS)&&process.env.WS_MAIN_WATCH!=='0'&&existsSync(join(root,'scripts/main-watch.mjs'))){
+  if(code===0&&split&&landMain===null&&sha!==null&&mainPushed(env.WS_PUSH_REFS)&&process.env.WS_MAIN_WATCH!=='0'&&existsSync(join(root,'src/scripts/main-watch.mjs'))){
     const lane=process.env.WS_LANE_NAME??'',pane=process.env.HERDR_PANE_ID??'';
     try{
       const mainSha=(env.WS_PUSH_REFS??'').split('\n').map(line=>line.trim().split(/\s+/u)).find(row=>row[2]==='refs/heads/main')?.[1]??sha;
-      spawn(process.execPath,[join(root,'scripts/main-watch.mjs'),`--follow=${mainSha}`,'--after-push=300',...(lane===''?[]:[`--lane=${lane}`]),...(pane===''?[]:[`--pane=${pane}`])],
+      spawn(process.execPath,[join(root,'src/scripts/main-watch.mjs'),`--follow=${mainSha}`,'--after-push=300',...(lane===''?[]:[`--lane=${lane}`]),...(pane===''?[]:[`--pane=${pane}`])],
         {cwd:root,env:process.env,detached:true,stdio:'ignore'}).unref();
       console.error(`  - main-watch follows ${sha.slice(0,10)} once it reaches main; main's ci runs the full suite (J249: a red is fixed forward at once)`);
-    }catch(error){console.error(`  !! main-watch not started (${error instanceof Error?error.message:String(error)}); run node scripts/main-watch.mjs by hand`);}
+    }catch(error){console.error(`  !! main-watch not started (${error instanceof Error?error.message:String(error)}); run node src/scripts/main-watch.mjs by hand`);}
   }
   process.exit(code);
 }
@@ -189,7 +189,7 @@ const seconds = (Date.now() - started) / 1000;
 const failed = results.filter((result) => result.code !== 0);
 for (const { name, output } of failed) console.error(`\n  X pnpm ${name} failed:\n${output.trim().replace(/^/gm, '    ')}`);
 if (failed.length) {
-  const fix = lane === 'commit' ? ' (pnpm lint:fix / pnpm format fix most of it)' : '';
+  const fix = lane === 'commit' ? ` (${scripts.fix ? 'pnpm fix fixes' : 'pnpm lint:fix / pnpm format fix'} most of it)` : '';
   console.error(`\n  ${lane} blocked. Fix it${fix}; SKIP_CHECK=1 is a last resort.\n`);
   process.exit(1);
 }

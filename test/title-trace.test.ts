@@ -1,7 +1,7 @@
 import { expect, test, vi } from 'vitest';
 import type { Page } from 'playwright';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
-import { observeTitleCapture, TITLE_TRACE_CATEGORIES, TITLE_TRACE_MAX_RAW_BYTES, TITLE_TRACE_MAX_COMPRESSED_BYTES, type TitleTracePort, type TitleTraceWriter } from '../scripts/parity/title-trace.mjs';
+import { observeTitleCapture, TITLE_TRACE_CATEGORIES, TITLE_TRACE_MAX_RAW_BYTES, TITLE_TRACE_MAX_COMPRESSED_BYTES, type TitleTracePort, type TitleTraceWriter } from '../src/scripts/parity/title-trace.mjs';
 
 function fixture() {
   const prefix = 'nine-title', files = new Map<string, string | Uint8Array>();

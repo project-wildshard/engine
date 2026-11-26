@@ -189,7 +189,7 @@ export function gridStripSetBudget(room: unknown, sources: readonly GridStripSou
 /**
  * Whether a strip set over its room fails the build or is only reported. A shipping build fails. Two builds bake a grid that
  * never ships, so they report: a dev build over the shared staging snapshot (more cells than the pin), and a Ring build,
- * whose catalogue (scripts/pins.ts ringCatalogue, out/.ring-catalogue.json) stands Brasscap road in for every shard the
+ * whose catalogue (src/scripts/pins.ts ringCatalogue, out/.ring-catalogue.json) stands Brasscap road in for every shard the
  * ring leaves out. A release (WS_RELEASE=1) always fails.
  */
 export function gridStripOverRoom(env: Readonly<Record<string, string | undefined>>): 'fail' | 'report' {

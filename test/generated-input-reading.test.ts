@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import ts from '@typescript/typescript6';
 import { expect, test } from 'vitest';
-import { maximumResidentBytes, readingCommands } from '../scripts/generated-input-reading.mjs';
+import { maximumResidentBytes, readingCommands } from '../src/scripts/generated-input-reading.mjs';
 
 test('Mac default-four/eight comparison retains full cold checks and one unpartitioned typed lint', () => {
   const rows = readingCommands();
@@ -12,7 +12,7 @@ test('Mac default-four/eight comparison retains full cold checks and one unparti
   for (const [index, checkers] of [4, 8].entries()) {
     expect(rows[index]?.args).toEqual(['--noEmit', '--incremental', 'false', '--checkers', String(checkers), '-p', 'tsconfig.json']);
   }
-  expect(rows[2]?.args).toEqual(['scripts/lint-all.mjs']);
+  expect(rows[2]?.args).toEqual(['src/scripts/lint-all.mjs']);
   expect(maximumResidentBytes('  456789 maximum resident set size\n')).toBe(456789);
   expect(maximumResidentBytes('time: command refused\n')).toBeNull();
   expect(maximumResidentBytes('0 maximum resident set size\n')).toBeNull();

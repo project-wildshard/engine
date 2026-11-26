@@ -16,7 +16,7 @@
  * ── The rule (no judgement needed) ────────────────────────────────────────────────────────────────────────────────
  *   A model is a file that calls `defineModel(…)`. Every `defineModel` is in the Model Explorer. Nothing else is.
  *   Models live in `src/client/engine/models/` (used by 2+ shards) or `src/shards/<slug>/models/` (one shard's). A shard never
- *   imports another shard's models; `src/client/engine/models/` never imports a shard. `scripts/check-models.mjs` and
+ *   imports another shard's models; `src/client/engine/models/` never imports a shard. `src/scripts/check-models.mjs` and
  *   test/shards/driftwood-isle/models-contract.test.ts enforce it.
  *
  * ── Migrating a builder (one model family per commit) ─────────────────────────────────────────────────────────────
@@ -62,7 +62,7 @@
  *     the model's ONE catalog entry per shard (copies summed over every `place` of it, a tap target on its copies,
  *     VIEW IN WORLD on the nearest real copy).
  *  5. Prove it (the M0 bar): the same draws, triangles, programs and colliders before / after on this shard (the
- *     scene census), the other shards identical, `node scripts/physics-baseline.mjs --no-build --mode=walk` 0 stuck,
+ *     scene census), the other shards identical, `node src/scripts/physics-baseline.mjs --no-build --mode=walk` 0 stuck,
  *     the catalog before / after on the phone. Perf is a hard requirement: never more draws, triangles or GPU ms
  *     than the hand-rolled code it replaces, and nothing allocated per frame.
  *

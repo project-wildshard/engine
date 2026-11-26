@@ -2,7 +2,7 @@
 // (SR4, `consumeGridRecovery`: a bare address, `<html data-resume>`), with the Name prompt over the loading card. The journey proof
 // waited 60 s for a main screen that never came and failed; it now follows the resume as a player would and judges it to play.
 import { expect, test } from 'vitest';
-import { judge, tapJourney } from '../scripts/journey-proof.mjs';
+import { judge, tapJourney } from '../src/scripts/journey-proof.mjs';
 
 function resumingPage(menuAfter = Infinity, address = '') {
   let nameOpen = true, reads = 0, polls = 0;
@@ -55,13 +55,13 @@ function navigatingPage() {
 }
 
 test('a page that reloads during the move check is reported, not thrown', async () => {
-  const { stickMoves, stickProblem } = await import('../scripts/journey-proof.mjs');
+  const { stickMoves, stickProblem } = await import('../src/scripts/journey-proof.mjs');
   expect(await stickMoves(navigatingPage() as never)).toBe(false);
   expect(await stickProblem(navigatingPage() as never)).toMatch(/left play.*navigat.*https:\/\/staging\.wildshard\.io\//u);
 });
 
 test('any other move-check failure still throws', async () => {
-  const { stickProblem } = await import('../scripts/journey-proof.mjs');
+  const { stickProblem } = await import('../src/scripts/journey-proof.mjs');
   const page = { ...navigatingPage(), evaluate: () => Promise.reject(new TypeError('boom')) };
   await expect(stickProblem(page as never)).rejects.toThrow('boom');
 });

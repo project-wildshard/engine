@@ -8,7 +8,7 @@ import type {ChildProcess} from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- Launch the same Node runtime.
 import process from 'node:process';
 import {afterAll,afterEach,expect,it} from 'vitest';
-import {trimFolderCache} from '../scripts/ci-folder-cache.mjs';
+import {trimFolderCache} from '../src/scripts/ci-folder-cache.mjs';
 
 const owned:string[]=[];
 afterEach(()=>{for(const root of owned.splice(0))rmSync(root,{recursive:true,force:true});});
@@ -18,7 +18,7 @@ const CLI_DEADLINE_MS=20_000,TEST_DEADLINE_MS=30_000;
 const children=new Set<ChildProcess>();
 afterAll(()=>{for(const child of children)child.kill('SIGKILL');children.clear();});
 async function runCli(args:readonly string[],env:NodeJS.ProcessEnv):Promise<{status:number|null;stderr:string}> {
-  const child=spawn(process.execPath,['scripts/ci-folder-cache.mjs',...args],{env,stdio:['ignore','ignore','pipe']});
+  const child=spawn(process.execPath,['src/scripts/ci-folder-cache.mjs',...args],{env,stdio:['ignore','ignore','pipe']});
   children.add(child);let stderr='';child.stderr?.setEncoding('utf8').on('data',(chunk:string)=>{stderr+=chunk;});
   const timer=setTimeout(()=>{stderr+=`\nci-folder-cache.mjs passed its ${CLI_DEADLINE_MS} ms deadline; killed`;child.kill('SIGKILL');},CLI_DEADLINE_MS);
   try {return await new Promise((done,fail)=>{child.once('error',fail);child.once('close',(status:number|null)=>{done({status,stderr});});});}
@@ -107,7 +107,7 @@ it('refuses generation-history apply outside the isolated hosted Linux workspace
 // Release CI 45458806208: the refusal above passed its 20 s deadline under load while the CLI loaded the generation
 // prune's module graph it never used. Only --prune-generation may load it, so a refusal or plain trim starts light.
 it('loads the generation prune only for --prune-generation',()=>{
-  const source=readFileSync(resolve('scripts/ci-folder-cache.mjs'),'utf8');
+  const source=readFileSync(resolve('src/scripts/ci-folder-cache.mjs'),'utf8');
   expect(source).not.toMatch(/^import[^\n]*generation-cache-prune/mu);
   expect(source).toContain("await import('./generation-cache-prune.mjs')");
 });

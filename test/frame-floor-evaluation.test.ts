@@ -11,7 +11,7 @@ type Factory = (raw: (expression: string) => Promise<unknown>, observe: (ledger:
 const factory = (value: unknown): value is Factory => typeof value === 'function';
 
 async function evaluation(hooks: Hooks = {}) {
-  const source = readFileSync(new URL('../scripts/frame-floor.mjs', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../src/scripts/frame-floor.mjs', import.meta.url), 'utf8');
   const start = source.indexOf('function evaluator('), end = source.indexOf('\nasync function waitReady(', start);
   if (start === -1 || end <= start) throw new Error('Actual frame-floor evaluator missing');
   let complete: ((value: unknown) => void) | undefined, refuse: ((error: Error) => void) | undefined;

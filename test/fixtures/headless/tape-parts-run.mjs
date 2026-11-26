@@ -76,7 +76,7 @@ try{
   hrtime.bigint=()=>realClock()+31_000_000_000n;
   assert.equal((await idle.verbTapePart(plan('second',[[]]))).commit.tick,2,'a new request has its own unchanged clock');
 }finally{hrtime.bigint=realClock;await idle.dispose();}
-const args=['--import',pathToFileURL(resolve('scripts/sim-node-loader.mjs')).href];
+const args=['--import',pathToFileURL(resolve('src/scripts/sim-node-loader.mjs')).href];
 for(const mode of ['deadline','dispose']){
   const entered=new Int32Array(new SharedArrayBuffer(4));
   const blocked=new TickWorkerHost(new URL('tape-part-blocked-worker.mjs',import.meta.url),{entered:entered.buffer},

@@ -4,7 +4,7 @@ import {mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync
 import {join, resolve} from 'node:path';
 import {expect, test} from 'vitest';
 import {previewServer} from './fixtures/preview-server';
-import {record} from '../scripts/phone-loading/model';
+import {record} from '../src/scripts/phone-loading/model';
 
 // CI21 (J232): the production clean and its refusals moved with the
 // cleaner to api-server (src/server/routes/telemetry-payloads.test.ts,

@@ -35,7 +35,7 @@ process.exitCode=3;`);
   const previous=process.env['WS_CPU_SLOTS'];
   if(grant===undefined)delete process.env['WS_CPU_SLOTS'];else process.env['WS_CPU_SLOTS']=grant;
   try {
-    const outcome=await runJob({root,execPath:process.execPath,loader:join(root,'scripts/bake-loader.mjs'),script,wrap:[],
+    const outcome=await runJob({root,execPath:process.execPath,loader:join(root,'src/scripts/bake-loader.mjs'),script,wrap:[],
       limits:{seconds:5,memoryMB:1024,heapMB:512,...(limit===undefined?{}:{cpuSlots:limit})}},join(work,'job/input.tar'),join(work,'job/out'));
     expect(outcome.kind,outcome.kind==='killed'?outcome.reason:'').toBe('refused');
     if(outcome.kind!=='refused')throw new Error('No real encoder result');

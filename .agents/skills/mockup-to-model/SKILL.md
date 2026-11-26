@@ -30,7 +30,7 @@ model a place, split it first.
 
 ## 0. Before you start
 
-- Claim the ask: run `kit/scripts/ask-new.sh "<Jake's words>"` in the
+- Claim the ask: run `src/scripts/.kit/ask-new.sh "<Jake's words>"` in the
   owning repo's checkout and read its output (parallel sessions claim
   ids in the same second). Keep its Status line true.
 - Read the shard repo's plans (`../shard-<name>/docs/plans/`) and its
@@ -55,16 +55,16 @@ void.
 
 1. Take a live capture at iPhone portrait size, the only size Jake
    reviews at: serve a build
-   (`URL=$(scripts/serve-build.sh --head --shard <slug>)`),
+   (`URL=$(src/scripts/serve-build.sh --head --shard <slug>)`),
    `agent-browser --session <s> set viewport 390 844`, then open
    `${URL}version.json`, run the tap from
-   `node scripts/zone-entry.mjs --init <slug>` there, and open
+   `node src/scripts/zone-entry.mjs --init <slug>` there, and open
    `${URL}?touch&tier=phone&skipintro&nolock&mute=1` (headless, always
    muted; no URL names a zone, J522). Walk or fly to the spot, `screenshot`, and
    `close`.
    - Before you open a browser, check `agent-browser session list` and
      `pgrep -fl chrome-headless-shell`: at most 3 game browsers run on
-     this Mac. Or run inside `scripts/browser-lane.sh`.
+     this Mac. Or run inside `src/scripts/browser-lane.sh`.
 2. Edit the capture into the target:
    - **fast, local:**
      `$SD/scripts/mockup-local.sh --ref <capture.jpg> --prompt-file <p.txt> --out <png>`
@@ -242,8 +242,8 @@ Read `docs/design/blender-practice.md` first.
 
 ### CC0
 
-- Poly Haven: add the id to `scripts/fetch-assets.mjs` and run
-  `node scripts/fetch-assets.mjs`.
+- Poly Haven: add the id to `src/scripts/fetch-assets.mjs` and run
+  `node src/scripts/fetch-assets.mjs`.
 - A heavy photoscan gets an offline LOD
   (`$SD/scripts/simplify-models.mjs`).
 - A kit piece on the toon shard gets a palette snap
@@ -297,11 +297,11 @@ Read `docs/design/blender-practice.md` first.
   `defineModel` is in the Model Explorer, and nothing else is. A
   `pipeline: 'blender'` model names its `source` script.
 - **After any collider change:**
-  - `node scripts/physics-baseline.mjs --no-build --mode=walk` (and
+  - `node src/scripts/physics-baseline.mjs --no-build --mode=walk` (and
     `--trails`): 0 stuck is the bar;
   - if structures moved, re-check the owning shard's navmesh bake.
 - **Check the card** in the Model Explorer (the zone's tap from
-  `node scripts/zone-entry.mjs --init <slug> --mode explore`, then
+  `node src/scripts/zone-entry.mjs --init <slug> --mode explore`, then
   `/?explore=model`):
   - it is under the right tab;
   - the triangles per copy and the draws are what §2 planned;
@@ -343,8 +343,8 @@ Read `docs/design/blender-practice.md` first.
   (*(history)* `art/pine-hollow/round-15-rifle/board.jpg` is the
   pattern).
 - **A spin clip** of about 10 s, when the form is the question:
-  `node scripts/model-spin.mjs --url=<build> --shard=<slug> --models=<id,…> --out=<art path>.mp4`,
-  run inside `scripts/browser-lane.sh` (M9). It turns 1–5 models on the
+  `node src/scripts/model-spin.mjs --url=<build> --shard=<slug> --models=<id,…> --out=<art path>.mp4`,
+  run inside `src/scripts/browser-lane.sh` (M9). It turns 1–5 models on the
   real Model Explorer at phone size. Files over 30 MB silently don't
   arrive.
 - **If it's a taste call,** ship both as a Debug variant:
@@ -366,8 +366,8 @@ Read `docs/design/blender-practice.md` first.
   - Never `git add -A`, stash, or restore anyone else's files.
   - One model family per commit.
 - **Land:** engine code from a plan worktree
-  (`node scripts/worktree.mjs new <slug>`, then
-  `WS_LANE_NAME=<lane> node scripts/land.mjs`, AGENTS.md); a shard
+  (`node src/scripts/.kit/worktree.mjs new <slug>`, then
+  `WS_LANE_NAME=<lane> node src/scripts/.kit/land.mjs`, AGENTS.md); a shard
   repo's model by pathspec commit, `git pull --rebase`, `git push`, and
   watch its CI.
 - **Close the ask:** write the commit and build id into the ask file.

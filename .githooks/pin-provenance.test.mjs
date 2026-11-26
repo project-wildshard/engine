@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { fixtureScratch } from '../test/tooling/owned-scratch.mjs';
+import { fixtureScratch } from '../src/test/.kit/owned-scratch.mjs';
 import { checkPinPush, matchingPlanTips } from './pin-provenance.mjs';
 
 const HOOK = join(dirname(fileURLToPath(import.meta.url)), 'pin-provenance.mjs');
@@ -124,8 +124,8 @@ describe('pin provenance (J375)', () => {
     const text = verdict.problems.join('\n');
     assert.match(text, /changes 1 file\(s\) under test\/pins\/ \(test\/pins\/shardfiles\.json\)/u);
     assert.match(text, /no origin\/plan\/\* branch carries these pins: this is a direct push/u);
-    assert.match(text, /node scripts\/worktree\.mjs new <slug>/u);
-    assert.match(text, /WS_LANE_NAME=<lane> node scripts\/land\.mjs/u);
+    assert.match(text, /node src\/scripts\/\.kit\/worktree\.mjs new <slug>/u);
+    assert.match(text, /WS_LANE_NAME=<lane> node src\/scripts\/\.kit\/land\.mjs/u);
     assert.match(text, /Escape hatch.*ALLOW_PIN_PUSH=1/u);
     assert.equal(checkPinPush({ cwd: w.lane, refs: line(direct, old), ciState: green, env: { ALLOW_PIN_PUSH: '1' } }).ok, true, 'the escape hatch passes');
   });
@@ -190,6 +190,6 @@ describe('pin provenance (J375)', () => {
     const refused = spawnSync(process.execPath, [HOOK], { cwd: w.lane, input: `${line(direct, old)}\n`, encoding: 'utf8', env: { ...ENV, WS_LAND_REPO: 'o/r', PATH: `${bin}:${process.env.PATH}` } });
     assert.equal(refused.status, 1);
     assert.match(refused.stderr, /X push blocked: test\/pins\/ change without a green plan branch \(J375/u);
-    assert.match(refused.stderr, /node scripts\/land\.mjs/u);
+    assert.match(refused.stderr, /node src\/scripts\/\.kit\/land\.mjs/u);
   });
 });

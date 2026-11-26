@@ -106,7 +106,7 @@ function turnOf(pose: Pose, joint: StrikeJoint, out: THREE.Quaternion): THREE.Qu
   }
 }
 
-/** How fast strikes play on this page: 1, or 0 to hold every strike where it is while a proof shoots it (scripts/
+/** How fast strikes play on this page: 1, or 0 to hold every strike where it is while a proof shoots it (src/scripts/
  *  remote-strike-proof.mjs sets it on the page under this key, as othersOnMap.ts keeps its state). */
 const PACE = Symbol.for('wildshard.remoteStrike.pace');
 const pace = (): number => { const set = (globalThis as { [PACE]?: unknown })[PACE]; return typeof set === 'number' && Number.isFinite(set) && set >= 0 ? set : 1; };

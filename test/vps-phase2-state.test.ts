@@ -6,7 +6,7 @@ import { chmodSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, sym
 import { join, resolve } from 'node:path';
 import { expect, test } from 'vitest';
 
-const helper = 'scripts/vps/setup-state.mjs';
+const helper = 'src/scripts/vps/setup-state.mjs';
 const key = '302a300506032b657003210012e17122631777e2a6ad68e2fb4883d856def46f812aa9a3e49d701ed44ad17b';
 const host = 'wildshard.tailb41b20.ts.net';
 function run(args: string[], input?: unknown): ReturnType<typeof spawnSync> {

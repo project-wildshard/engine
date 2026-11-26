@@ -1,7 +1,7 @@
 // Meta STAGING-SMOKE SM4: the old-cache profile hand-off. K1 and K2 leave their profiles in the release store; the next
 // release's K1 and K2 restore the newest pair for the same origin; only the latest pair is kept.
 // The browser run needs two built dists (an older clientVersion first) and runs only by name:
-//   WS_SMOKE_HANDOFF=<old dist>,<new dist> scripts/browser-lane.sh --max 15 pnpm exec vitest run test/staging-smoke-profiles.test.ts
+//   WS_SMOKE_HANDOFF=<old dist>,<new dist> src/scripts/browser-lane.sh --max 15 pnpm exec vitest run test/staging-smoke-profiles.test.ts
 // Both are served on one port in turn (one origin, as staging), and the new one's /version.json raises minClient to its own
 // clientVersion, so the old profile takes J383's forced update.
 // oxlint-disable-next-line import/no-nodejs-modules -- It serves two builds and reads the store.
@@ -11,8 +11,8 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 // oxlint-disable-next-line import/no-nodejs-modules -- As above.
 import { join, resolve } from 'node:path';
 import { expect, test } from 'vitest';
-import { runSmoke } from '../scripts/staging-smoke.mjs';
-import { keepRun, newestProfiles, saveProfiles } from '../scripts/staging-smoke/store.mjs';
+import { runSmoke } from '../src/scripts/staging-smoke.mjs';
+import { keepRun, newestProfiles, saveProfiles } from '../src/scripts/staging-smoke/store.mjs';
 
 const ROOT = resolve('tmp/staging-smoke-profiles-test');
 const HANDOFF = process.env['WS_SMOKE_HANDOFF']?.split(',');
@@ -59,7 +59,7 @@ test('two pairs stay (this release and the one before), a re-run starts from the
 
 /** Serve a dist with the repo's preview server; resolves when it listens. */
 async function serve(dist: string, port: number): Promise<() => void> {
-  const child = spawn('node', ['scripts/preview-server.mjs', '--outDir', dist, '--port', String(port), '--host', '127.0.0.1'], { stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn('node', ['src/scripts/preview-server.mjs', '--outDir', dist, '--port', String(port), '--host', '127.0.0.1'], { stdio: ['ignore', 'pipe', 'pipe'] });
   await new Promise<void>((ready, fail) => {
     child.stdout.on('data', (chunk: Buffer) => { if (chunk.toString().includes(`:${String(port)}/`)) ready(); });
     child.on('exit', code => { fail(new Error(`preview-server exited ${String(code)}`)); });

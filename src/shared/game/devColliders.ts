@@ -9,7 +9,7 @@ import { terrainTileHeight, type TerrainTileData } from '@wildshard/format/terra
  * SHARD-SOURCE AP5 (J347): a watched part's solid boxes, as the dev hook's `swapColliders` hands them to a physics world.
  * The page's world (the player's prediction) and the in-page server's world (the worker, over the harness port) both take
  * them through `swapDevBoxes`, so the two sets never differ. DEVSERVER-only on both sides: each caller reaches this module
- * behind the `__DEVSERVER__` define, so a production bundle drops it (engine `scripts/check-devserver.mjs`).
+ * behind the `__DEVSERVER__` define, so a production bundle drops it (engine `src/scripts/check-devserver.mjs`).
  */
 export interface DevBox {
   readonly centre: readonly [number, number, number];

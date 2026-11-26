@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { drawFrames } from '../scripts/perf/draw-census-page.mjs';
+import { drawFrames } from '../src/scripts/perf/draw-census-page.mjs';
 
 function fixture() {
   const noop = () => undefined;

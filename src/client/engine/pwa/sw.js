@@ -514,11 +514,11 @@ async function pageCopy(href, key) {
   return undefined;
 }
 
-/** DW12: the game's routes (scripts/app-build/isolation.mjs DOCUMENT_ROUTE). Off them, a channel that is not isolated answers
+/** DW12: the game's routes (src/scripts/app-build/isolation.mjs DOCUMENT_ROUTE). Off them, a channel that is not isolated answers
  *  without COOP, so a warm return's stop between boots (/robots.txt) stays COOP-less and WebKit swaps processes back to the game. */
 const DOCUMENT_ROUTE = /^\/(?:index\.html)?$|^\/slug\/[\w-]+\/?$/u;
 const OPENER = 'cross-origin-opener-policy';
-/** DW12: the leave page between two game documents (scripts/app-build/isolation.mjs LEAVE_PAGE, the same bytes): no
+/** DW12: the leave page between two game documents (src/scripts/app-build/isolation.mjs LEAVE_PAGE, the same bytes): no
  *  opener policy, so the next game document starts in a new WebContent. Held here, so it answers offline too. */
 const LEAVE_PATH = '/leave';
 const LEAVE_PAGE = '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="color-scheme" content="dark"><meta name="robots" content="noindex"><style>html,body{margin:0;background:#050810}i{position:fixed;left:0;top:50%;width:30%;height:2px;background:#7fd8ff;animation:s 1s linear infinite}@keyframes s{from{transform:translateX(-100%)}to{transform:translateX(340%)}}</style><script>(()=>{let to="/",gone=0;try{const u=new URL(new URLSearchParams(location.search).get("to")||"/",location.origin);if(u.origin===location.origin&&u.pathname!=="/leave")to=u.pathname+u.search+u.hash}catch{}const go=()=>{if(!gone){gone=1;location.replace(to)}};requestAnimationFrame(()=>requestAnimationFrame(go));setTimeout(go,150)})()</script></head><body><i></i></body></html>';

@@ -1,6 +1,6 @@
 // @vitest-environment node
 import {expect, test} from 'vitest';
-import {goldenScriptPaths} from '../scripts/goldens/native-residency.mjs';
+import {goldenScriptPaths} from '../src/scripts/goldens/native-residency.mjs';
 
 test('goldens bind shared code from this build and exclude carried classes', () => {
   const files = ['b/current/main.js', 'b/c/control-session.js', 'b/c/style.css', 'b/../private.js', 'b/a/../../bad.js'];

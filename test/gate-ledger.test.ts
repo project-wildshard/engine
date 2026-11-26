@@ -1,5 +1,5 @@
 // ONE-FORMAT OF10: every gate in engine src/ is in the ledger (src/shared/game/shardfile/gates.ts), each has a verdict, each
-// dangerous gate names its harm and budget, and docs/GATES.md is current (`node scripts/gates-doc.mjs` regenerates it).
+// dangerous gate names its harm and budget, and docs/GATES.md is current (`node src/scripts/gates-doc.mjs` regenerates it).
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { expect, test } from 'vitest';

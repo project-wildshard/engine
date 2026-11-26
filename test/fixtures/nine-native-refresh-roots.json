@@ -1,7 +1,7 @@
 [
   "package.json",
   "pnpm-lock.yaml",
-  "scripts/bake-output.mjs",
+  "src/scripts/bake-output.mjs",
   "src/sharddev/bake/source-loader.mjs",
   "src/sharddev/bake/image.ts",
   "src/sharddev/bake/worldImage.ts",

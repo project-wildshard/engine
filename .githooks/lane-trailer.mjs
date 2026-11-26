@@ -1,5 +1,5 @@
 // Meta QA 11-25 row 58: every commit made under a lane names it, so main-push and land push only the pushing lane's own
-// commits (scripts/lane-commits.mjs). A commit made under WS_LANE_NAME with no `Lane:` line gets one, in main-push's
+// commits (src/scripts/lane-commits.mjs). A commit made under WS_LANE_NAME with no `Lane:` line gets one, in main-push's
 // shape (M11): its own paragraph just above the final `Assisted-by:` line, or at the end when there is none. Git's
 // merge, fixup, squash and amend messages, and a commit made under no lane name, are left alone.
 import {readFileSync, writeFileSync} from 'node:fs';

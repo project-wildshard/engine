@@ -3,7 +3,7 @@ import { generateKeyPairSync, sign } from 'node:crypto'
 
 import { expect, test } from 'vitest'
 
-import { signedCookRelease } from '../scripts/vps/cook-follow.mjs'
+import { signedCookRelease } from '../src/scripts/vps/cook-follow.mjs'
 
 const key = generateKeyPairSync('ed25519')
 const publicKey = key.publicKey

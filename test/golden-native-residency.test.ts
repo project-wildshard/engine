@@ -3,7 +3,7 @@ import { expect, test } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Temp dist under the checkout's tmp folder.
 import { join } from 'node:path';
-import { buildCodeChunks, heldGoldenResidency } from '../scripts/goldens/native-residency.mjs';
+import { buildCodeChunks, heldGoldenResidency } from '../src/scripts/goldens/native-residency.mjs';
 
 test('a held residency wait still refuses movement and names the before/after state', async () => {
   const globals=new Map(['window','requestAnimationFrame'].map(name=>[name,Object.getOwnPropertyDescriptor(globalThis,name)]));

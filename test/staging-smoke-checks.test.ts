@@ -2,11 +2,11 @@
 // a P0 or P1 is present.
 import { describe, expect, it, test } from 'vitest';
 import {createTempRepo} from '../src/test/helpers/git';
-import {engineRelease} from '../scripts/changelog.mjs';
-import { checkScenario, holds, olderVersion, seatReload, verdictOf } from '../scripts/staging-smoke/checks.mjs';
-import type { ScenarioResult } from '../scripts/staging-smoke/scenarios.mjs';
-import { isThirdPartyBeacon, ownPageErrors } from '../scripts/staging-smoke/thirdParty.mjs';
-import { PAGE_BG, blackWorld, worldStats } from '../scripts/staging-smoke/worldFrame.mjs';
+import {engineRelease} from '../src/scripts/changelog.mjs';
+import { checkScenario, holds, olderVersion, seatReload, verdictOf } from '../src/scripts/staging-smoke/checks.mjs';
+import type { ScenarioResult } from '../src/scripts/staging-smoke/scenarios.mjs';
+import { isThirdPartyBeacon, ownPageErrors } from '../src/scripts/staging-smoke/thirdParty.mjs';
+import { PAGE_BG, blackWorld, worldStats } from '../src/scripts/staging-smoke/worldFrame.mjs';
 
 const BUILD = 'b'.repeat(40);
 const ctx = { release: 'v0.1.34', build: BUILD, version: { build: BUILD, describe: 'v0.1.34', clientVersion: '0.1.34', minClient: '0.1.31' }, lastTimeToPlay: { K3: 10_000 } };

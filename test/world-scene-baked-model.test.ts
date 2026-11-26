@@ -1,4 +1,4 @@
-import { shaderCodeSources } from '../scripts/parity/shader-code.mjs';
+import { shaderCodeSources } from '../src/scripts/parity/shader-code.mjs';
 import { expect, test, vi } from 'vitest';
 import { BufferAttribute, BufferGeometry, Group, Mesh, MeshStandardMaterial, Texture } from 'three';
 import { Scope } from '../src/shared/engine/app/scope';

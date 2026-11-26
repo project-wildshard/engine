@@ -5,8 +5,8 @@ import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- As above.
 import { join, resolve } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
-import { isClean, receiptLine, writeBoard } from '../scripts/staging-smoke/board.mjs';
-import { runSmoke } from '../scripts/staging-smoke.mjs';
+import { isClean, receiptLine, writeBoard } from '../src/scripts/staging-smoke/board.mjs';
+import { runSmoke } from '../src/scripts/staging-smoke.mjs';
 
 const OUT = resolve('tmp/staging-smoke-board-test');
 afterAll(() => { rmSync(OUT, { recursive: true, force: true }); });

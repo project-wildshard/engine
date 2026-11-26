@@ -11,10 +11,10 @@ import { join, relative, resolve } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- As above: the source scan.
 import { readdirSync } from 'node:fs';
 import { afterAll, beforeAll, expect, test } from 'vitest';
-import { holds } from '../scripts/staging-smoke/checks.mjs';
-import { KEYFRAMES } from '../scripts/staging-smoke/scenarios.mjs';
-import { keepRun, lastRelease, releases } from '../scripts/staging-smoke/store.mjs';
-import { changelogBullets, deployVision, judgeArgs, parseVision, visionFindings, visionPass } from '../scripts/staging-smoke/vision.mjs';
+import { holds } from '../src/scripts/staging-smoke/checks.mjs';
+import { KEYFRAMES } from '../src/scripts/staging-smoke/scenarios.mjs';
+import { keepRun, lastRelease, releases } from '../src/scripts/staging-smoke/store.mjs';
+import { changelogBullets, deployVision, judgeArgs, parseVision, visionFindings, visionPass } from '../src/scripts/staging-smoke/vision.mjs';
 
 const ROOT = resolve('tmp/staging-smoke-vision-test');
 const FFMPEG = (() => { try { execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' }); return true; } catch { return false; } })();

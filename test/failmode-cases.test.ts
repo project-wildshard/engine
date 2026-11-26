@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
-import { CASES, rawLeak, selectCases, verdict } from '../scripts/failmode-cases.mjs';
+import { CASES, rawLeak, selectCases, verdict } from '../src/scripts/failmode-cases.mjs';
 
-// FM3: the failure proof's case manifest and verdict (scripts/failmode-proof.mjs runs the cases in a browser).
+// FM3: the failure proof's case manifest and verdict (src/scripts/failmode-proof.mjs runs the cases in a browser).
 test('every catalogue mode 1 to 46 has one case, and every b case sits under a real parent', () => {
   const numeric = CASES.filter(item => item.parent === undefined).map(item => Number(item.mode));
   expect(numeric).toEqual(Array.from({ length: 46 }, (_unused, index) => index + 1));

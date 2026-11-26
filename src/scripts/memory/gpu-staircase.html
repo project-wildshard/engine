@@ -1,0 +1,137 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>gpu staircase</title>
+<style>html,body{margin:0;height:100%;background:#000;overflow:hidden}#c{position:fixed;inset:0;width:100vw;height:100vh;display:block}
+.layer{position:fixed;inset:0;pointer-events:none;background:rgba(20,30,40,.25);color:#fff;font:12px monospace}
+.small{position:fixed;left:8px;width:120px;height:40px;pointer-events:none;background:rgba(20,30,40,.5)}</style>
+<body><canvas id="c"></canvas>
+<script>
+// The GPU feature staircase (meta MEMORY-STRUCTURE STR28): one blank WebGL2 page that holds one GPU feature at a time,
+// read from outside by src/scripts/memory/gpu-staircase.mjs. Every step is one change from the base: a phone-Low canvas
+// (402 x 874 CSS at ratio 1, the game's context attributes from src/client/engine/core/webglStartup.ts) cleared every
+// frame. Served only by the script; it is not in the client build.
+//
+//   canvas=0                 no canvas (the browser floor)
+//   dpr=<n>                  drawing buffer ratio (base 1, phone Low)
+//   aa, alpha, depth, stencil, pdb (preserveDrawingBuffer), desync (0|1) and pp=<powerPreference>: context attributes
+//   verts=<n>&vary=<k>&vt=vec4|float&split=<s>
+//                            each frame draws n vertices (small triangles over the screen, no attributes: gl_VertexID)
+//                            with k live varyings of type vt, in s render passes (a pass ends on a framebuffer change)
+//   targets=<k>&fmt=rgba16f|rgba8|r11f_g11f_b10f|rgb10_a2&tdepth=0|1
+//                            k full-size render targets, each drawn every frame, the last sampled to the canvas
+//   layers=<k>&ltype=wc|hidden|zero|plain|small
+//                            k DOM layers over the canvas: wc full-screen will-change:transform; hidden the same with
+//                            visibility:hidden; zero the same at opacity 0; plain full-screen with no compositing hint;
+//                            small a 120 x 40 will-change:transform box
+//
+// window.__stair = {done, got} once `frames` frames (default 30) have drawn; the loop keeps drawing while it is read.
+const q = new URLSearchParams(location.search), num = (k, d) => (q.has(k) ? Number(q.get(k)) : d), on = (k, d) => (q.has(k) ? q.get(k) === '1' : d);
+const got = { errors: [] }; const state = { done: false, got }; window.__stair = state;
+const fail = (s) => { got.errors.push(String(s)); };
+const layers = num('layers', 0), ltype = q.get('ltype') || 'wc';
+for (let i = 0; i < layers; i++) {
+  const d = document.createElement('div');
+  if (ltype === 'small') { d.className = 'small'; d.style.top = 8 + i * 48 + 'px'; d.style.willChange = 'transform'; }
+  else {
+    d.className = 'layer'; d.textContent = 'layer ' + i;
+    if (ltype !== 'plain') d.style.willChange = 'transform';
+    if (ltype === 'hidden') d.style.visibility = 'hidden';
+    if (ltype === 'zero') d.style.opacity = '0';
+  }
+  document.body.appendChild(d);
+}
+got.layers = layers; got.ltype = ltype;
+const canvas = document.getElementById('c');
+let gl = null;
+if (q.get('canvas') === '0') canvas.remove();
+else {
+  const dpr = num('dpr', 1);
+  canvas.width = Math.floor(innerWidth * dpr); canvas.height = Math.floor(innerHeight * dpr);
+  const attrs = { alpha: on('alpha', true), antialias: on('aa', false), powerPreference: q.get('pp') || 'default', stencil: on('stencil', false),
+    depth: on('depth', true), premultipliedAlpha: true, preserveDrawingBuffer: on('pdb', false), desynchronized: on('desync', false) };
+  gl = canvas.getContext('webgl2', attrs);
+  if (!gl) fail('no webgl2');
+  else { got.buffer = [gl.drawingBufferWidth, gl.drawingBufferHeight]; got.attrs = gl.getContextAttributes(); }
+}
+function program(vs, fs) {
+  const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) fail(gl.getShaderInfoLog(o)); return o; };
+  const p = gl.createProgram(); gl.attachShader(p, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) fail(gl.getProgramInfoLog(p));
+  return p;
+}
+// the vertex pass: n vertices as small triangles hashed over the screen; k varyings, each a distinct function of the id
+const verts = num('verts', 0), vary = num('vary', 0), vt = q.get('vt') || 'vec4', split = Math.max(1, num('split', 1));
+let vprog = null, splitFbo = null;
+if (gl && verts > 0) {
+  const decl = [], set = [], use = [];
+  for (let i = 0; i < vary; i++) {
+    decl.push(`out ${vt} v${i};`);
+    set.push(vt === 'float' ? `v${i}=sin(f*${(1.13 + i * 0.37).toFixed(2)}+${i}.0);` : `v${i}=vec4(sin(f*${(1.13 + i * 0.37).toFixed(2)}),cos(f*${(0.71 + i * 0.29).toFixed(2)}),fract(f*${(0.013 + i * 0.007).toFixed(3)}),${i}.0/16.0);`);
+    use.push(vt === 'float' ? `s.x+=v${i};` : `s+=v${i};`);
+  }
+  const vs = `#version 300 es
+precision highp float;${decl.join('')}
+uniform float t;
+void main(){int id=gl_VertexID;int tri=id/3;int c=id-tri*3;float f=float(tri)+t;
+vec2 cell=fract(vec2(float(tri)*0.6180339,float(tri)*0.7548777));vec2 p=cell*2.0-1.0;
+vec2 o=c==0?vec2(0.0):(c==1?vec2(0.012,0.0):vec2(0.0,0.012));gl_Position=vec4(p+o,0.5,1.0);${set.join('')}}`;
+  const fdecl = decl.map((d) => d.replace('out ', 'in '));
+  const fs = `#version 300 es
+precision mediump float;${fdecl.join('')}out vec4 o;void main(){vec4 s=vec4(0.0);${use.join('')}o=vec4(fract(s.xyz*0.01),1.0);}`;
+  vprog = program(vs, fs);
+  got.verts = verts; got.vary = vary; got.vt = vt; got.split = split;
+  if (split > 1) { // a second framebuffer, so the passes alternate between it and the canvas
+    const tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex); gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, gl.drawingBufferWidth, gl.drawingBufferHeight);
+    splitFbo = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, splitFbo); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
+}
+// render targets: k of one format at the drawing buffer's size, each drawn every frame
+const targets = num('targets', 0), fmt = q.get('fmt') || 'rgba16f', tdepth = on('tdepth', false);
+const fbos = []; let tprog = null, copyProg = null; const ttex = [];
+if (gl && targets > 0) {
+  const ext = gl.getExtension('EXT_color_buffer_float'); const half = gl.getExtension('EXT_color_buffer_half_float');
+  got.colorBufferFloat = Boolean(ext); got.colorBufferHalf = Boolean(half);
+  const F = { rgba16f: gl.RGBA16F, rgba8: gl.RGBA8, r11f_g11f_b10f: gl.R11F_G11F_B10F, rgb10_a2: gl.RGB10_A2 }[fmt];
+  const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+  for (let i = 0; i < targets; i++) {
+    const tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex); gl.texStorage2D(gl.TEXTURE_2D, 1, F, w, h);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    const fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    if (tdepth) { const rb = gl.createRenderbuffer(); gl.bindRenderbuffer(gl.RENDERBUFFER, rb); gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, w, h); gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, rb); }
+    const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER); if (status !== gl.FRAMEBUFFER_COMPLETE) fail(`target ${fmt} incomplete 0x${status.toString(16)}`);
+    fbos.push(fb); ttex.push(tex);
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  const full = 'void main(){vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);uv=p;gl_Position=vec4(p*2.0-1.0,0.0,1.0);}';
+  tprog = program(`#version 300 es\nout vec2 uv;${full}`, `#version 300 es\nprecision mediump float;in vec2 uv;uniform sampler2D s;uniform float t;out vec4 o;void main(){o=vec4(texture(s,uv).rgb*0.5+vec3(uv,fract(t))*1.5,1.0);}`);
+  got.targets = targets; got.fmt = fmt; got.tdepth = tdepth; got.targetSize = [w, h];
+}
+let frame = 0; const frames = num('frames', 30), t0 = performance.now();
+function draw() {
+  const t = (performance.now() - t0) / 1000;
+  if (gl) {
+    for (let i = 0; i < fbos.length; i++) { // each target reads the one before it (the first reads the last)
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbos[i]); gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+      gl.useProgram(tprog); gl.bindTexture(gl.TEXTURE_2D, ttex[(i + fbos.length - 1) % fbos.length]); gl.uniform1f(gl.getUniformLocation(tprog, 't'), t);
+      if (tdepth) gl.clear(gl.DEPTH_BUFFER_BIT);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+    gl.clearColor(0.05, 0.07, 0.1 + 0.05 * Math.sin(t), 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    if (fbos.length > 0) { gl.useProgram(tprog); gl.bindTexture(gl.TEXTURE_2D, ttex[fbos.length - 1]); gl.drawArrays(gl.TRIANGLES, 0, 3); }
+    if (vprog) {
+      gl.useProgram(vprog); gl.uniform1f(gl.getUniformLocation(vprog, 't'), t);
+      const per = Math.floor(verts / split / 3) * 3;
+      for (let s = 0; s < split; s++) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, s % 2 === 1 ? splitFbo : null);
+        gl.drawArrays(gl.TRIANGLES, s * per, per);
+      }
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    }
+  }
+  frame++;
+  if (frame === frames) { if (gl) { const e = gl.getError(); if (e) fail('gl error 0x' + e.toString(16)); } got.frames = frame; got.ms = Math.round(performance.now() - t0); state.done = true; }
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+</script>

@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve only that defining fixture.
 import { resolve } from 'node:path';
-import { authoredManifestSource } from '../scripts/authored-manifest.mjs';
+import { authoredManifestSource } from '../src/scripts/authored-manifest.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const fixture = {

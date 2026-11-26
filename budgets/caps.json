@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "about": "BUDGET-CAPS (meta docs/plans/BUDGET-CAPS-PLAN.md; J439 as amended by J444). Each budget's one hard cap, with the J-number that set it. A hard cap moves only with a new J-number from Jake. A key ending in /* covers every key under it. hard null: no hard cap on record (D3), the baseline alone guards it. target: a line the player is warned at and nothing is refused (J445). kind floor: hard is a minimum. floor: the least rise that counts as a regression for a noisy measure. The baselines are in budgets/baselines.json; node scripts/budgets/cli.mjs check | record | declare.",
+ "about": "BUDGET-CAPS (meta docs/plans/BUDGET-CAPS-PLAN.md; J439 as amended by J444). Each budget's one hard cap, with the J-number that set it. A hard cap moves only with a new J-number from Jake. A key ending in /* covers every key under it. hard null: no hard cap on record (D3), the baseline alone guards it. target: a line the player is warned at and nothing is refused (J445). kind floor: hard is a minimum. floor: the least rise that counts as a regression for a noisy measure. The baselines are in budgets/baselines.json; node src/scripts/budgets/cli.mjs check | record | declare.",
  "caps": {
   "download/phone/*": {
    "hard": 100000000,

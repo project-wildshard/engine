@@ -8,7 +8,7 @@ import {dirname, resolve} from 'node:path';
 import {homedir} from 'node:os';
 import {readTar} from '@wildshard/format/tar';
 import {expect, test} from 'vitest';
-import {readBuiltShardfile} from '../scripts/built-folder.mjs';
+import {readBuiltShardfile} from '../src/scripts/built-folder.mjs';
 import {openShardfile, serverRows} from '../src/cook/game/shardCook';
 import {loadHeadlessFolder} from '../src/server/host/headlessFolder';
 import {createNativeHeadlessResident} from '../src/server/host/headlessRuntime';

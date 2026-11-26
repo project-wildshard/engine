@@ -6,7 +6,7 @@
  * This process holds the credentials and the network and never parses a shardfile. Each cook is a child (`cookJob.ts`)
  * with no credentials in its environment, Node's permission model over files, a heap cap, a resident-memory watch, a
  * wall clock, and `wrap`, the host's prefix that takes its network away (the `wildshard-cook` unit in
- * `scripts/vps/rebuild.sh`). A hostile file can only end its own child.
+ * `src/scripts/vps/rebuild.sh`). A hostile file can only end its own child.
  *
  * Publishing order is the guarantee: parts, then manifests, then the per-build index (J83). A shard is cooked for a build
  * when its index exists, so a killed cook leaves unreferenced parts for garbage collection, and never half a shard. */
@@ -102,7 +102,7 @@ export interface CookIndex {
   /** SA48: the page's admission row for these bytes (`folderVerdict`'s, but for its path), under the validator revision the worker
    *  cooks with (`CookWorkerOptions.validator`). A page whose validator differs, or an index with none, leaves the shard out. */
   readonly verdict?: NonNullable<CookJobReport['receipt']> & {readonly revision: string};
-  /** SHARD-COMPAT SP7: the cook revision (`scripts/cook-revision.ts`) whose code made these bytes, then `+` and the validator
+  /** SHARD-COMPAT SP7: the cook revision (`src/scripts/cook-revision.ts`) whose code made these bytes, then `+` and the validator
    *  revision when the worker had one (`carryKey`). An index with none never carries to another build. */
   readonly cook?: string;
   /** SP7: the build this index was carried from, unchanged but for `build`; absent on an index this build cooked. */
@@ -470,7 +470,7 @@ export const STORE_FULL_ALARM_MS = 86_400_000;
 class PackBudgetError extends Error {
   override readonly name = 'PackBudgetError';
   readonly never: boolean;
-  // Node runs this file strip-only (scripts/cook-worker.mjs, the boundaries unit): no parameter properties.
+  // Node runs this file strip-only (src/scripts/cook-worker.mjs, the boundaries unit): no parameter properties.
   constructor(message: string, never: boolean) { super(message); this.never = never; }
 }
 

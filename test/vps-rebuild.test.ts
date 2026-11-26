@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process'
 // oxlint-disable-next-line import/no-nodejs-modules -- The md5 dpkg records for a conffile.
 import { createHash } from 'node:crypto'
 // MMO-PLAN MP0.1: rebuild.sh's own decisions, read out of the script and run with fake paths. The whole script runs only on a
-// throwaway box (scripts/vps-rebuild-proof.sh), never here and never on the VPS.
+// throwaway box (src/scripts/vps-rebuild-proof.sh), never here and never on the VPS.
 // oxlint-disable-next-line import/no-nodejs-modules -- Read the script without invoking its root entry.
 import {
   mkdirSync,
@@ -17,8 +17,8 @@ import { join, resolve } from 'node:path'
 
 import { afterEach, expect, test } from 'vitest'
 
-const source = readFileSync('scripts/vps/rebuild.sh', 'utf8'),
-  setup = readFileSync('scripts/vps/setup.sh', 'utf8')
+const source = readFileSync('src/scripts/vps/rebuild.sh', 'utf8'),
+  setup = readFileSync('src/scripts/vps/setup.sh', 'utf8')
 function definition(name: string): string {
   const start = source.indexOf(`${name}() {`)
   if (start === -1) throw new Error(`Missing ${name}`)
@@ -170,7 +170,7 @@ test('AUTO-RELEASE AR3: cook.settings wins over cook.env as systemd reads them, 
     expect(source.indexOf(inside), inside).toBeLessThan(end);
   }
   expect(source.indexOf('# --- 4. The cook worker')).toBeGreaterThan(end);
-  expect(spawnSync('bash', ['scripts/vps/rebuild.sh', '--cook', '--check'], { encoding: 'utf8' }).stdout).toContain('Expected no arguments, --check or --cook');
+  expect(spawnSync('bash', ['src/scripts/vps/rebuild.sh', '--cook', '--check'], { encoding: 'utf8' }).stdout).toContain('Expected no arguments, --check or --cook');
 });
 
 test('the staged key is the one setup.sh embeds, read by the same pattern', () => {
@@ -182,7 +182,7 @@ test('the staged key is the one setup.sh embeds, read by the same pattern', () =
     'bash',
     [
       '-c',
-      `HERE=scripts/vps; sed -n 's/^EXPECTED_RELEASE_PUBLIC_KEY=\\([0-9a-f]*\\)$/\\1/p' "$HERE/setup.sh"`,
+      `HERE=src/scripts/vps; sed -n 's/^EXPECTED_RELEASE_PUBLIC_KEY=\\([0-9a-f]*\\)$/\\1/p' "$HERE/setup.sh"`,
     ],
     { encoding: 'utf8' },
   )
@@ -227,7 +227,7 @@ test('the cook worker keeps off the game ports and runs each job without a netwo
   )
   expect(unit).toContain('User=wildshard-cook')
   expect(unit).not.toMatch(/MemoryDenyWriteExecute/u)
-  expect(readFileSync('scripts/cook-worker.mjs', 'utf8')).toContain(
+  expect(readFileSync('src/scripts/cook-worker.mjs', 'utf8')).toContain(
     'env.COOK_PORT ?? 8792',
   )
 })
@@ -260,16 +260,17 @@ test('MS2.4b: the cook reads and enters its root-owned checkout, and git trusts 
   const root = scratch(),
     src = join(root, 'engine')
   // the umask-027 shape: directories 750, files 640, one 600 and one group-writable, and the worker's hash 600
-  mkdirSync(join(src, 'scripts/deep'), { recursive: true, mode: 0o750 })
-  writeFileSync(join(src, 'scripts/cook-worker.mjs'), 'x', { mode: 0o640 })
-  writeFileSync(join(src, 'scripts/deep/private.json'), '{}', { mode: 0o600 })
-  writeFileSync(join(src, 'scripts/deep/shared.json'), '{}', { mode: 0o664 })
+  mkdirSync(join(src, 'src/scripts/deep'), { recursive: true, mode: 0o750 })
+  writeFileSync(join(src, 'src/scripts/cook-worker.mjs'), 'x', { mode: 0o640 })
+  writeFileSync(join(src, 'src/scripts/deep/private.json'), '{}', { mode: 0o600 })
+  writeFileSync(join(src, 'src/scripts/deep/shared.json'), '{}', { mode: 0o664 })
   writeFileSync(join(src, '.wildshard-env'), 'hash', { mode: 0o600 })
   spawnSync('chmod', [
     '750',
     src,
-    join(src, 'scripts'),
-    join(src, 'scripts/deep'),
+    join(src, 'src'),
+    join(src, 'src/scripts'),
+    join(src, 'src/scripts/deep'),
   ])
   const run = (name: string) =>
     spawnSync(
@@ -295,9 +296,9 @@ test('MS2.4b: the cook reads and enters its root-owned checkout, and git trusts 
       { encoding: 'utf8' },
     ).stdout.trim()
   expect(mode(src)).toBe(`750 ${group}`)
-  expect(mode(join(src, 'scripts/deep'))).toBe(`750 ${group}`)
-  expect(mode(join(src, 'scripts/deep/private.json'))).toBe(`640 ${group}`)
-  expect(mode(join(src, 'scripts/deep/shared.json'))).toBe(`644 ${group}`)
+  expect(mode(join(src, 'src/scripts/deep'))).toBe(`750 ${group}`)
+  expect(mode(join(src, 'src/scripts/deep/private.json'))).toBe(`640 ${group}`)
+  expect(mode(join(src, 'src/scripts/deep/shared.json'))).toBe(`644 ${group}`)
   expect(mode(join(src, '.wildshard-env'))).toBe(`600 ${start}`)
 })
 
@@ -311,7 +312,7 @@ test('MS2.4b: pnpm uses a root-owned store outside protected homes', () => {
   expect(source).toContain(
     '--config.ci=false --store-dir "$COOK_PNPM_STORE" --virtual-store-dir "$COOK_PNPM_STORE/v10/links"',
   )
-  expect(source).toContain('"$NODE" scripts/assert-store-layout.mjs')
+  expect(source).toContain('"$NODE" src/scripts/.kit/assert-store-layout.mjs')
   expect(source).toContain('ProtectHome=yes')
 })
 
@@ -378,7 +379,7 @@ test('Caddy is never started by the rebuild, and only the package file or its ow
 })
 
 test('a blank COOK_STORE_DIR means R2, and the template leaves it commented', () => {
-  expect(readFileSync('scripts/cook-worker.mjs', 'utf8')).toContain(
+  expect(readFileSync('src/scripts/cook-worker.mjs', 'utf8')).toContain(
     "env.COOK_STORE_DIR === undefined || env.COOK_STORE_DIR === ''",
   )
   expect(source).toMatch(
@@ -435,5 +436,5 @@ test('FR-A22: the cook runs on CPUs 9-15 at a low weight, never production\'s', 
   expect(unit).toMatch(/^CPUWeight=20$/mu)
   expect(unit).toMatch(/^Nice=10$/mu)
   // production's rooms keep 0-8 to themselves (setup.sh), and 9-15 never reaches into them
-  expect(readFileSync('scripts/vps/setup.sh', 'utf8')).toContain('wildshard-server@production.service.d/cpus.conf <<\'EOF\'\n[Service]\nAllowedCPUs=0-8\n')
+  expect(readFileSync('src/scripts/vps/setup.sh', 'utf8')).toContain('wildshard-server@production.service.d/cpus.conf <<\'EOF\'\n[Service]\nAllowedCPUs=0-8\n')
 })

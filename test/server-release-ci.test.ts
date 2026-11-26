@@ -13,12 +13,12 @@ import { join, resolve } from 'node:path';
 import { S3Client } from '@aws-sdk/client-s3';
 import { afterAll, expect, test } from 'vitest';
 import { createTempRepo } from '../src/test/helpers/git.ts';
-import { bundleDescriptor, releasePublicKey, releaseShards, signRelease } from '../scripts/server-release/sign.mjs';
+import { bundleDescriptor, releasePublicKey, releaseShards, signRelease } from '../src/scripts/server-release/sign.mjs';
 import { GridAssembly } from '../src/shared/game/grid/assembly';
 import { worldCells } from '../src/server/host/dedicated/gridCells';
-import { publishChannel, serverPacksReady } from '../scripts/server-release/publish.mjs';
-import { copyItemCatalogue } from '../scripts/server-release/items.mjs';
-import { preparedReleaseFollows } from '../scripts/server-release/history.mjs';
+import { publishChannel, serverPacksReady } from '../src/scripts/server-release/publish.mjs';
+import { copyItemCatalogue } from '../src/scripts/server-release/items.mjs';
+import { preparedReleaseFollows } from '../src/scripts/server-release/history.mjs';
 import { readReleaseFile } from '../src/server/host/dedicated/releaseFile';
 import { readSignedRelease } from '../src/client/host/online/release';
 import type { ReleaseFile } from '../src/shared/host/releaseRows';
@@ -264,7 +264,7 @@ test('J234: every run signs with main\'s publisher and builds in the source\'s o
   for (const step of ['Build deterministic dedicated bundle', 'Upload immutable bundle to its tag release']) expect(publish.slice(publish.indexOf(step)).split('\n')[1]).toBe('        working-directory: source');
   const sign = publish.slice(publish.indexOf('Sign and advance the channel release file'));
   expect(sign).not.toMatch(/working-directory/u);
-  expect(sign).toContain('node scripts/server-release/publish.mjs');
+  expect(sign).toContain('node src/scripts/server-release/publish.mjs');
 });
 
 test('FS28: signing and client archives queue independently for the exact release', () => {
@@ -334,7 +334,7 @@ globalThis.fetch = async (input, request = {}) => {
 `);
     for (const mode of ['production', 'staging', 'missing', 'foreign']) {
       const staging = mode === 'staging', tag = staging ? `server-staging-${build}` : 'v1.2.3';
-      const result = spawnSync(process.execPath, ['--import', transport, resolve('scripts/server-release/github.mjs'), 'asset', tag, build, archive,
+      const result = spawnSync(process.execPath, ['--import', transport, resolve('src/scripts/server-release/github.mjs'), 'asset', tag, build, archive,
         staging ? 'staging' : 'production'], { cwd: repo.dir, encoding: 'utf8', timeout: 5000,
         env: { PATH: process.env['PATH'], GH_TOKEN: 'fixture', FIXTURE_SHA: build, FIXTURE_MODE: mode } });
       expect(result.error).toBeUndefined();
@@ -354,7 +354,7 @@ test('release refs admit staged and tagged sources while main, dry runs and unre
   const repo = createTempRepo();
   try {
     const base = repo.commit({ 'base.txt': 'main source' }, 'Base source');
-    const sha = repo.commit({ 'scripts/server-release/publish.mjs': '// publisher exists' }, 'Release source');
+    const sha = repo.commit({ 'src/scripts/server-release/publish.mjs': '// publisher exists' }, 'Release source');
     repo.git(['tag', 'v1.2.3', sha]);
     const later = repo.commit({ 'later.txt': 'newer release head' }, 'Later release source');
     const eventPath = join(repo.dir, 'event.json'), output = join(repo.dir, 'outputs'), transport = join(repo.dir, 'transport.mjs');
@@ -377,7 +377,7 @@ globalThis.fetch = async (input) => {
       const branch = mode === 'main' ? 'main' : mode === 'dryrun' ? 'release/dryrun-v1.2.3' : 'release/v1.2.3';
       writeFileSync(eventPath, JSON.stringify({ workflow_run: { id: 1, head_sha: sha, head_branch: branch, event: 'push', status: 'completed', conclusion: 'success', head_repository: { full_name: 'project-wildshard/engine' } } }));
       writeFileSync(output, '');
-      const result = spawnSync(process.execPath, ['--import', transport, resolve(import.meta.dirname, '../scripts/server-release/github.mjs'), 'select'], { cwd: repo.dir, encoding: 'utf8', timeout: 5000,
+      const result = spawnSync(process.execPath, ['--import', transport, resolve(import.meta.dirname, '../src/scripts/server-release/github.mjs'), 'select'], { cwd: repo.dir, encoding: 'utf8', timeout: 5000,
         env: { PATH: process.env['PATH'], GH_TOKEN: 'fixture', FIXTURE_SHA: sha, GITHUB_REPOSITORY: 'project-wildshard/engine', GITHUB_EVENT_NAME: eventName,
           GITHUB_REF: 'refs/heads/main', GITHUB_REF_TYPE: 'tag', GITHUB_REF_NAME: 'v1.2.3', GITHUB_EVENT_PATH: eventPath, GITHUB_OUTPUT: output, ALIGN_BUILD: sha } });
       expect(result.error).toBeUndefined();
@@ -404,7 +404,7 @@ globalThis.fetch = async (input) => {
 test('an already prepared main release finishes explicit staging alignment and asset publication', () => {
   const repo = createTempRepo();
   try {
-    repo.commit({ 'package.json': JSON.stringify({ version: '1.2.2' }), 'scripts/server-release/publish.mjs': '// released publisher' }, 'Main source');
+    repo.commit({ 'package.json': JSON.stringify({ version: '1.2.2' }), 'src/scripts/server-release/publish.mjs': '// released publisher' }, 'Main source');
     const prepared = repo.commit({ 'package.json': JSON.stringify({ version: '1.2.3' }) }, 'chore(release): v1.2.3');
     const later = repo.commit({ 'later.txt': 'main keeps moving' }, 'Ordinary main source');
     repo.git(['update-ref', 'refs/remotes/origin/main', later]);
@@ -427,7 +427,7 @@ globalThis.fetch = async input => {
     const invoke = (sha: string, mode = 'workflow_dispatch'): { status: number | null; stderr: string; output: string } => {
       writeFileSync(output, '');
       writeFileSync(event, JSON.stringify({ workflow_run: { id: 1, head_sha: sha, head_branch: 'main', event: 'push', status: 'completed', conclusion: 'success', head_repository: { full_name: 'project-wildshard/engine' } } }));
-      const result = spawnSync(process.execPath, ['--import', transport, resolve('scripts/server-release/github.mjs'), 'select'], { cwd: repo.dir, encoding: 'utf8', timeout: 5000,
+      const result = spawnSync(process.execPath, ['--import', transport, resolve('src/scripts/server-release/github.mjs'), 'select'], { cwd: repo.dir, encoding: 'utf8', timeout: 5000,
         env: { PATH: process.env['PATH'], GH_TOKEN: 'fixture', FIXTURE_SHA: sha, GITHUB_REPOSITORY: 'project-wildshard/engine', GITHUB_EVENT_NAME: mode, GITHUB_REF: 'refs/heads/main', ALIGN_BUILD: sha, GITHUB_EVENT_PATH: event, GITHUB_OUTPUT: output } });
       return { status: result.status, stderr: result.stderr, output: readFileSync(output, 'utf8') };
     };
@@ -441,7 +441,7 @@ globalThis.fetch = async input => {
     const archive = join(repo.dir, `engine-server-${prepared}.tar.gz`);
     writeFileSync(archive, 'prepared legacy bundle');
     repo.git(['switch', '--detach', prepared]);
-    const asset = spawnSync(process.execPath, ['--import', transport, resolve('scripts/server-release/github.mjs'), 'asset', `server-staging-${prepared}`, prepared, archive, 'staging'],
+    const asset = spawnSync(process.execPath, ['--import', transport, resolve('src/scripts/server-release/github.mjs'), 'asset', `server-staging-${prepared}`, prepared, archive, 'staging'],
       { cwd: repo.dir, encoding: 'utf8', timeout: 5000, env: { PATH: process.env['PATH'], GH_TOKEN: 'fixture', FIXTURE_SHA: prepared } });
     expect(asset.status, asset.stderr).toBe(0);
   } finally { repo.cleanup(); }
@@ -459,7 +459,7 @@ test('the main publisher admits an unmerged release head and refuses unreachable
     repo.git(['switch', 'main']);
     const archive = join(repo.dir, `engine-server-${build}.tar.gz`);
     writeFileSync(archive, 'exact immutable release bundle');
-    const invoke = (channel: string): { status: number | null; stdout: string; stderr: string } => spawnSync(process.execPath, [resolve('scripts/server-release/publish.mjs'), '--check', '--channel', channel, '--build', build,
+    const invoke = (channel: string): { status: number | null; stdout: string; stderr: string } => spawnSync(process.execPath, [resolve('src/scripts/server-release/publish.mjs'), '--check', '--channel', channel, '--build', build,
       '--tag', channel === 'staging' ? `server-staging-${build}` : 'v1.2.3', '--bundle', archive, '--out', join(repo.dir, 'release.json')],
     { cwd: repo.dir, encoding: 'utf8', timeout: 5000, env: { PATH: process.env['PATH'], E7_RELEASE_SIGNING_KEY: pem, E7_RELEASE_PUBLIC_KEY: publicKey,
       E7_RELEASE_SOCKET: 'wss://stage.example.test/', E7_SERVER_SHARDS: 'driftwood-isle', R2_ACCOUNT_ID: 'a'.repeat(32), R2_BUCKET_PACKS: 'wildshard-packs', R2_PACKS_ACCESS_KEY_ID: 'fixture', R2_PACKS_SECRET_ACCESS_KEY: 'fixture' } });

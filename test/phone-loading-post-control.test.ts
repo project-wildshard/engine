@@ -1,6 +1,6 @@
 import {expect, test} from 'vitest';
-import {postControlWindow} from '../scripts/phone-loading/post-control';
-import type {Mark, RequestRow} from '../scripts/phone-loading/model';
+import {postControlWindow} from '../src/scripts/phone-loading/post-control';
+import type {Mark, RequestRow} from '../src/scripts/phone-loading/model';
 
 const task = (start: number, duration: number): Mark => ({name: 'self', start, duration, detail: null});
 const request = (start: number): RequestRow => ({url: `https://game.test/${start}`, start, end: null,

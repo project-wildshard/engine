@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 import { zlibSync, unzlibSync } from 'fflate';
 import { authoredPickups } from '@wildshard/engine/game/generators/pickups';
 import { readFileSync } from 'node:fs';
-import { jsonBytes } from '../../scripts/bake-output.mjs';
+import { jsonBytes } from '../../src/scripts/bake-output.mjs';
 import { liveJson } from './livePin.ts';
 import { parse, object, record, string } from 'valibot';
 import { QuestInteractionTableSchema } from '@wildshard/format/questInteractionSource';

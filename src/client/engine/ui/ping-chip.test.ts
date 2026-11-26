@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // QA-FEEDBACK 11-24 row 36 (Jake, 15:05 Cancún: "server latency and ping as a dev chip somewhere at the top, so fps, memory and
 // server latency"): the dock's ping chip shows the live rooms round trip, and "--" offline, in a preview or on a dropped link.
-// The chips' fit on PAUSE's row before the minimap at 402 x 874 is measured in a real browser: scripts/hud-worst.mjs --check.
+// The chips' fit on PAUSE's row before the minimap at 402 x 874 is measured in a real browser: src/scripts/hud-worst.mjs --check.
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { Scope } from '../../../shared/engine/app/scope';
 import { ROOMS_PING_EVENT, roomsPingMs } from '../net/roomsPing';

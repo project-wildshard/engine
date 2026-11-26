@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths stay under the repository's tmp directory.
 import { dirname, join, resolve } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { finalHash, nameChunksByFinalBytes } from '../scripts/app-build/finalChunkNames.mjs';
+import { finalHash, nameChunksByFinalBytes } from '../src/scripts/app-build/finalChunkNames.mjs';
 
 // main ci 43076662972: Vite writes `__vite__mapDeps` after rolldown hashes the importer, so one file name held two
 // builds' different preload lists. The pass names such a chunk after its final bytes.

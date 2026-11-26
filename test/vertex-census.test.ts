@@ -1,5 +1,5 @@
 import {expect,test} from 'vitest';
-import {familyOf,heaviestPasses,liveVaryings,preprocess,programName,residentCensus} from '../scripts/memory/vertex-census.mjs';
+import {familyOf,heaviestPasses,liveVaryings,preprocess,programName,residentCensus} from '../src/scripts/memory/vertex-census.mjs';
 
 test('the preprocessor keeps the live branch of #if, #ifdef and defined()',()=>{
   const src=['#define USE_UV','#define NUM_LIGHTS 2','#ifdef USE_UV','a','#else','b','#endif','#if NUM_LIGHTS > 0 && defined( USE_UV )','c','#elif 1','d','#endif','#ifndef USE_UV','e','#endif'].join('\n');

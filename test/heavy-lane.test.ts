@@ -11,7 +11,7 @@ with tempfile.TemporaryDirectory(dir=scratch) as work:
  env={k:v for k,v in os.environ.items() if not k.startswith(('WS_HEAVY_','WS_FULL_GATE_','WS_CPU_'))}
  env.update(WS_FULL_GATE_ROOT=str(root),WS_LANE_RECEIPTS=str(root/'receipts'))
  command="const fs=require('node:fs'),p=require('node:path');if(JSON.parse(fs.readFileSync(p.join(process.env.WS_FULL_GATE_ROOT,'full-gate.active.json'))).admissionWaitSeconds!==null)throw Error('Queue inherited a shorter admission timeout');setTimeout(()=>{},100)"
- result=subprocess.run([sys.executable,'scripts/heavy-lane.py','full-gate','--max=.0001','--','node','-e',command],env=env,capture_output=True,text=True,timeout=10)
+ result=subprocess.run([sys.executable,'src/scripts/heavy-lane.py','full-gate','--max=.0001','--','node','-e',command],env=env,capture_output=True,text=True,timeout=10)
  assert result.returncode==0,result.stderr
 `], {encoding: 'utf8', timeout: 15000});
 });
@@ -19,8 +19,8 @@ with tempfile.TemporaryDirectory(dir=scratch) as work:
 test('queue and scheduler deadlines name holders without launching or taking their locks', () => {
   const result = execFileSync('python3', ['-c', `
 import contextlib, fcntl, importlib.util, json, os, pathlib, subprocess, sys, tempfile, time, types
-sys.path.insert(0, str(pathlib.Path('scripts').resolve()))
-spec = importlib.util.spec_from_file_location('heavy_lane', 'scripts/heavy-lane.py')
+sys.path.insert(0, str(pathlib.Path('src/scripts').resolve()))
+spec = importlib.util.spec_from_file_location('heavy_lane', 'src/scripts/heavy-lane.py')
 module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
 assert module.WAIT_SECONDS == 300
 module.WAIT_SECONDS = .02
@@ -54,7 +54,7 @@ with tempfile.TemporaryDirectory(prefix='deadline-test-', dir='tmp') as temporar
  saved_env = dict(os.environ)
  os.environ.clear(); os.environ.update({k:v for k,v in saved_env.items() if not k.startswith('WS_HEAVY_')})
  os.environ['WS_HEAVY_ROOT'] = str(root)
- sys.argv = ['scripts/heavy-lane.py','build','--',sys.executable,'-c',"raise AssertionError('launched queued child')"]
+ sys.argv = ['src/scripts/heavy-lane.py','build','--',sys.executable,'-c',"raise AssertionError('launched queued child')"]
  try:
   assert module.main() == 124
   queue = json.loads((root/'queue.json').read_text())['queue']
@@ -77,8 +77,8 @@ test('three build slots queue FIFO, inherit leases and keep reporting', () => {
   const result = execFileSync('python3', ['-c', `
 import json, os, pathlib, subprocess, sys, tempfile, time
 repo = pathlib.Path.cwd()
-wrapper = str(repo / 'scripts/heavy-lane.py')
-guard = "import {assertHeavyLease as current} from './scripts/heavy-lane-lease.mjs';import {assertHeavyLease as legacy} from './test/fixtures/legacy-heavy-lane-lease.mjs';current('build');legacy('build')"
+wrapper = str(repo / 'src/scripts/heavy-lane.py')
+guard = "import {assertHeavyLease as current} from './src/scripts/heavy-lane-lease.mjs';import {assertHeavyLease as legacy} from './test/fixtures/legacy-heavy-lane-lease.mjs';current('build');legacy('build')"
 with tempfile.TemporaryDirectory(prefix='capacity-test-', dir=repo / 'tmp') as temporary:
  root = pathlib.Path(temporary)
  env = {k: v for k, v in os.environ.items() if not k.startswith(('WS_HEAVY_', 'WS_CPU_'))}
@@ -166,7 +166,7 @@ with tempfile.TemporaryDirectory(prefix='priority-test-', dir=repo / 'tmp') as t
  env['WS_HEAVY_ROOT'] = temporary
  parent = os.getpriority(os.PRIO_PROCESS, 0)
  for kind in ('build',):
-  child = subprocess.run([sys.executable,str(repo/'scripts/heavy-lane.py'),kind,'--',sys.executable,'-c','import os; print(os.getpriority(os.PRIO_PROCESS, 0))'],env=env,capture_output=True,text=True,check=True)
+  child = subprocess.run([sys.executable,str(repo/'src/scripts/heavy-lane.py'),kind,'--',sys.executable,'-c','import os; print(os.getpriority(os.PRIO_PROCESS, 0))'],env=env,capture_output=True,text=True,check=True)
   assert int(child.stdout) == parent, (kind, parent, child.stdout, child.stderr)
 print(json.dumps(True))
 `], { encoding: 'utf8' });
@@ -177,7 +177,7 @@ test('foreground builds keep normal QoS and background builds yield', () => {
   const result = execFileSync('python3', ['-c', `
 import json, runpy
 from unittest.mock import patch
-module = runpy.run_path('scripts/heavy-lane.py')
+module = runpy.run_path('src/scripts/heavy-lane.py')
 launch = module['launch_command']
 command = ['node', 'fixture.mjs']
 with patch.object(module['shutil'], 'which', return_value='/usr/bin/taskpolicy'):
@@ -204,7 +204,7 @@ with tempfile.TemporaryDirectory(prefix='background-build-test-', dir=repo/'tmp'
  root = pathlib.Path(temporary)
  env = {key:value for key,value in os.environ.items() if not key.startswith('WS_HEAVY_')}
  env['WS_HEAVY_ROOT'] = str(root/'leases')
- command = [sys.executable,str(repo/'scripts/heavy-lane.py'),'build','--background','--',sys.executable,'-c',"import os; print(os.environ.get('WS_HEAVY_BACKGROUND'))"]
+ command = [sys.executable,str(repo/'src/scripts/heavy-lane.py'),'build','--background','--',sys.executable,'-c',"import os; print(os.environ.get('WS_HEAVY_BACKGROUND'))"]
  child = subprocess.run(command,env=env,capture_output=True,text=True,check=True)
  assert child.stdout.strip()=='1', child.stdout+child.stderr
 print(json.dumps(True))
@@ -232,7 +232,7 @@ with tempfile.TemporaryDirectory(prefix='store-reservation-test-', dir=repo/'tmp
   str(lock)], stdout=subprocess.PIPE, text=True)
  child = int(owner.stdout.readline())
  owner.kill(); owner.wait()
- build = subprocess.Popen([sys.executable,str(repo/'scripts/heavy-lane.py'),'build','--',sys.executable,'-c',"import pathlib,sys; pathlib.Path(sys.argv[1]).touch()",str(marker)],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+ build = subprocess.Popen([sys.executable,str(repo/'src/scripts/heavy-lane.py'),'build','--',sys.executable,'-c',"import pathlib,sys; pathlib.Path(sys.argv[1]).touch()",str(marker)],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
  queue = root/'leases'/'queue.json'
  def queued():
   try: return any(row.get('pid') == build.pid for row in json.loads(queue.read_text()).get('queue', []))
@@ -260,7 +260,7 @@ with tempfile.TemporaryDirectory(prefix='cpu-reservation-test-', dir=repo/'tmp')
  env['WS_STORE_RESERVATION'] = str(lock)
  marker = root/'ran'
  held = open(lock, 'a+'); fcntl.flock(held, fcntl.LOCK_EX)
- run = subprocess.Popen([sys.executable,str(repo/'scripts/cpu-admission.py'),'run','--slots','1','--capacity','1','--',sys.executable,'-c',"import pathlib,sys; pathlib.Path(sys.argv[1]).touch()",str(marker)],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+ run = subprocess.Popen([sys.executable,str(repo/'src/scripts/cpu-admission.py'),'run','--slots','1','--capacity','1','--',sys.executable,'-c',"import pathlib,sys; pathlib.Path(sys.argv[1]).touch()",str(marker)],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
  queue = root/'cpu'/'queue.json'
  def seen():
   try:
@@ -284,7 +284,7 @@ with tempfile.TemporaryDirectory(prefix='cpu-reservation-test-', dir=repo/'tmp')
 test('a lease whose runner and child are both dead counts as free and is reaped', () => {
   const result = execFileSync('python3', ['-c', `
 import fcntl, importlib.util, json, os, pathlib, subprocess, sys, tempfile, time
-spec = importlib.util.spec_from_file_location('heavy_lane', 'scripts/heavy-lane.py')
+spec = importlib.util.spec_from_file_location('heavy_lane', 'src/scripts/heavy-lane.py')
 module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
 gone = subprocess.Popen([sys.executable, '-c', '0']); gone.wait()
 dead = gone.pid
@@ -311,8 +311,8 @@ with tempfile.TemporaryDirectory(prefix='dead-lease-test-', dir='tmp') as tempor
 test('a heavy slot waits while desktop-gpu.lock is held, and goes on when it is released', () => {
   const result = execFileSync('python3', ['-c', `
 import fcntl, importlib.util, os, pathlib, sys, tempfile
-sys.path.insert(0, str(pathlib.Path('scripts').resolve()))
-spec = importlib.util.spec_from_file_location('heavy_lane', 'scripts/heavy-lane.py')
+sys.path.insert(0, str(pathlib.Path('src/scripts').resolve()))
+spec = importlib.util.spec_from_file_location('heavy_lane', 'src/scripts/heavy-lane.py')
 module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
 for key in ('WS_DESKTOP_GPU_HELD', 'WS_DESKTOP_GPU_WAITED'): os.environ.pop(key, None)
 pathlib.Path('tmp').mkdir(exist_ok=True)

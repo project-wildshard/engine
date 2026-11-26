@@ -5,7 +5,7 @@ import {mkdirSync,mkdtempSync,readFileSync,writeFileSync,rmSync,existsSync} from
 // oxlint-disable-next-line import/no-nodejs-modules -- resolve exact declaration and compiler inputs
 import {resolve} from 'node:path';
 import {expect,test} from 'vitest';
-import {largeJsonInputs,jsonDeclarations,jsonDeclarationInputs} from '../scripts/json-declarations.mjs';
+import {largeJsonInputs,jsonDeclarations,jsonDeclarationInputs} from '../src/scripts/json-declarations.mjs';
 
 test('complete companion types equal native JSON and preserve mutable and negative contracts',()=>{
  mkdirSync('tmp',{recursive:true});const root=mkdtempSync(resolve('tmp/json-declarations-'));

@@ -13,7 +13,7 @@ const owned:string[]=[];
 afterEach(()=>{for(const directory of owned.splice(0))rmSync(directory,{recursive:true,force:true});});
 it('reuses pure normalization across processes and repairs corrupt records',()=>{
   mkdirSync('tmp',{recursive:true});const cache=mkdtempSync(resolve('tmp/compiler-code-cache-'));owned.push(cache);
-  const module=resolve('scripts/compiler-code.mjs');
+  const module=resolve('src/scripts/compiler-code.mjs');
   const run=(source:string)=>{
     const program=`import{createHash}from'node:crypto';import{compilerCodeHash}from${JSON.stringify(module)};
       const bytes=new TextEncoder().encode(process.argv[1]);let reads=0;

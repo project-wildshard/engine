@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 
 async function sampleIntervals(intervals: number[], options: {timeline?: boolean; frameDeltas?: number[]; draws?: number[]; renderMs?: number[]} = {}): Promise<unknown> {
-  const source = readFileSync(new URL('../scripts/frame-floor.mjs', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../src/scripts/frame-floor.mjs', import.meta.url), 'utf8');
   const start = source.indexOf('function sample(n, timeline = false) {');
   const end = source.indexOf('/** the whole-drive sampler', start);
   if (start === -1 || end <= start) throw new Error('Serialized sampler not found');
@@ -60,7 +60,7 @@ test('identifies both endpoint draws without inventing skipped-frame measurement
 });
 
 test('attributes CPU samples on the native navigation clock after a delayed profiler start', () => {
-  const source = readFileSync(new URL('../scripts/frame-floor.mjs', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../src/scripts/frame-floor.mjs', import.meta.url), 'utf8');
   const start = source.indexOf('function summarizeTravelProfile('), end = source.indexOf('\nfunction webkit(', start);
   if (start === -1 || end <= start) throw new Error('CPU attribution function missing');
   const profile = {startTime: 100_000_000, pageNavigationStartUs: 99_000_000,

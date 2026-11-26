@@ -115,7 +115,7 @@ test('every file with a save definition is read by the lock', () => {
   const files: string[] = [];
   const walk = (dir: string): void => { for (const name of readdirSync(dir)) { const path = `${dir}/${name}`; if (statSync(path).isDirectory()) walk(path); else if (path.endsWith('.ts') && !path.endsWith('.test.ts')) files.push(path); } };
   walk('src');
-  const defining = files.filter(path => /scope: ?'(?:global|profile|shard|device|session)'/u.test(readFileSync(path, 'utf8')));
+  const defining = files.filter(path => !path.startsWith('src/scripts/') && /scope: ?'(?:global|profile|shard|device|session)'/u.test(readFileSync(path, 'utf8')));
   expect(defining.filter(path => !READ.has(path) && OUTSIDE[path] === undefined)).toEqual([]);
 });
 

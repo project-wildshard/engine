@@ -35,7 +35,7 @@ export class HeadlessSimulation {
     validateShardfileAssets(shard, assets, bytes => createHash('sha256').update(bytes).digest('hex'), memory, undefined, scriptAdmissionRows(sections), sections);
     for (const report of memory?.reports() ?? []) console.warn(`Headless memory report-only (G433): ${report.id}: ${report.playingBytes} playing bytes`);
     // A source checkout's root. The CLI bundle is stamped src/sdk (scripts/wildshard.mjs), two levels down; this file moves deeper.
-    const checkout = [dirname(createRequire(resolve(import.meta.dirname, 'package.json')).resolve('@wildshard/engine/package.json')), resolve(import.meta.dirname, '../../..'), resolve(import.meta.dirname, '../../../..')].find(root => existsSync(resolve(root, 'scripts/sim-node-loader.mjs')));
+    const checkout = [dirname(createRequire(resolve(import.meta.dirname, 'package.json')).resolve('@wildshard/engine/package.json')), resolve(import.meta.dirname, '../../..'), resolve(import.meta.dirname, '../../../..')].find(root => existsSync(resolve(root, 'src/scripts/sim-node-loader.mjs')));
     const binary = [resolve(import.meta.dirname, 'client/assets/physics/rapier.wasm'), ...checkout === undefined ? [] : [resolve(checkout, 'src/sharddev/dist/client/assets/physics/rapier.wasm'), resolve(checkout, 'public/assets/physics/rapier.wasm'), createRequire(resolve(checkout, 'package.json')).resolve('@dimforge/rapier3d-simd/rapier_wasm3d_bg.wasm')]].find(existsSync);
     if (binary === undefined) throw new Error('SDK physics binary missing; build/pack the SDK before headless validation');
     const admitted = new Map<string, Uint8Array>();
@@ -46,7 +46,7 @@ export class HeadlessSimulation {
     const distributed = existsSync(bundled);
     if (!distributed && checkout === undefined) throw new Error('SDK headless worker missing; build/pack the SDK or use its complete workspace checkout');
     // Source-checkout workers need their own Node hooks; parent Vitest/Vite transforms never cross the isolate boundary.
-    const execArgv = distributed ? [] : ['--import', pathToFileURL(resolve(checkout ?? '', 'scripts/sim-node-loader.mjs')).href];
+    const execArgv = distributed ? [] : ['--import', pathToFileURL(resolve(checkout ?? '', 'src/scripts/sim-node-loader.mjs')).href];
     const runner = new TickWorkerHost(pathToFileURL(distributed ? bundled : resolve(checkout ?? '', 'src/server/host/bake/headlessWorker.ts')), { shard, assets: admitted, binary, sections, ...(snapshot === undefined ? {} : { snapshot }), ...(options.product === undefined ? {} : { product: options.product }) }, shard.serverBudget, execArgv, options.deadline ?? 'runtime');
     try { await runner.initialized(); return new HeadlessSimulation(runner); } catch (error) { await runner.dispose(); throw error; }
   }

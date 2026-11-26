@@ -6,9 +6,9 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { join, resolve } from 'node:path';
 import { afterAll, afterEach, expect, test, vi } from 'vitest';
 import type { TestModule } from 'vitest/node';
-import EngineBudget from '../scripts/engine-ci-budget.ts';
-import { AMBER, amberLine, judgeFile, nextLedger, parseAmber } from '../scripts/test-amber.mjs';
-import { collectTimings, readTimings, writeTimings } from '../scripts/test-timings.mjs';
+import EngineBudget from '../src/scripts/engine-ci-budget.ts';
+import { AMBER, amberLine, judgeFile, nextLedger, parseAmber } from '../src/scripts/test-amber.mjs';
+import { collectTimings, readTimings, writeTimings } from '../src/scripts/test-timings.mjs';
 
 mkdirSync(resolve('tmp'), { recursive: true });
 const scratch = mkdtempSync(resolve('tmp/test-amber-'));

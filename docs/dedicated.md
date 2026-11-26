@@ -5,7 +5,7 @@ workers, PostgreSQL player saves and signed release admission.
 `src/client/host/online` connects the page to that world. Shared release
 rows live in `src/shared/host/releaseRows.ts`.
 
-Build with `node scripts/build-server.mjs --build <id> --out <directory>`.
+Build with `node src/scripts/build-server.mjs --build <id> --out <directory>`.
 Add `--tar <archive>` to emit a release bundle. The directory contains
 `main.mjs`, `cellWorker.mjs`, `rapier.wasm` and SQL migrations. A signed
 release names the build, channel, shards and bundle hash. Its save epoch
@@ -24,7 +24,7 @@ line is the world's: its cell cleans and flood-checks it, and the door
 relays it to every other awake cell (MP4.1). Proximity stays in its cell.
 
 `test/dedicated-*.test.ts` exercises the gateway, rooms, saves and
-release boundary. `scripts/room-deploy.mjs` is a local proof: two bots,
+release boundary. `src/scripts/room-deploy.mjs` is a local proof: two bots,
 a rejected hash, restart onto the retained release, a valid bundle
 change, telemetry and a reported worker crash. It requires two bundles,
 a pack origin, its own work directory, the bundled deploy bot and a
@@ -33,7 +33,7 @@ local PostgreSQL URL. It opens only loopback listeners.
 The `scripts/online-*-proof.mjs` tools preserve E7-PHONES's manual
 browser and phone proofs. They require built pages and booted devices.
 Their presence does not establish physical-phone or VPS proof. The
-scripts under `scripts/vps` are operational inputs for a later sitting;
+scripts under `src/scripts/vps` are operational inputs for a later sitting;
 porting them does not deploy anything.
 
 Jake owns the [VPS setup and private backup steps](vps-setup.md).

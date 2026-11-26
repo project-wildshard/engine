@@ -42,7 +42,7 @@ run/context noise. The historical 2.5/3.2 s singles lack matched load and
 cache controls for estimating a code-attributed difference.
 
 The existing `loading-card-proof.mjs` driver ran through
-`scripts/browser-lane.sh`, with `--grid --dump --browser=<engine>` for
+`src/scripts/browser-lane.sh`, with `--grid --dump --browser=<engine>` for
 travel and `--shard=_template --browser=webkit --strict --dump` for timing.
 Chromium travel additionally retained its strict card verdict. Contexts,
 profiles and owned preview processes were closed after each run.

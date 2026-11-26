@@ -4,7 +4,7 @@
   "files": {
     "scripts/loading-benchmark/capture.mjs": 1,
     "scripts/ota-release.mjs": 4,
-    "scripts/parity/fast-png.mjs": 1,
+    "src/scripts/parity/fast-png.mjs": 1,
     "src/commons/practiceCourse.ts": 1,
     "src/server/game/plugin/brain.ts": 1,
     "src/server/game/population/spawnScript.ts": 5,

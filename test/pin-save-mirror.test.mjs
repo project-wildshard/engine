@@ -6,7 +6,7 @@ import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,existsSync,rmSync} from
 import {join,resolve} from 'node:path';
 import {brotliCompressSync} from 'node:zlib';
 
-const cli=resolve('scripts/pins.ts');
+const cli=resolve('src/scripts/pins.ts');
 for(const mode of ['explicit','fallback','truncated','corrupt','missing','api','api-fallback','api-corrupt'])test(`real save install preserves its identity through ${mode} mirror responses`,async()=>{
   mkdirSync(resolve('tmp'),{recursive:true});
   const root=mkdtempSync(resolve('tmp/pin-save-mirror-'));

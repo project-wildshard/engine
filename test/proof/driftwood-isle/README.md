@@ -3,11 +3,11 @@
 Use Node's real SDK loader and type transform, without browser globals:
 
 ```
-node --import ./scripts/sim-node-loader.mjs test/proof/driftwood-isle/run.mjs checkpoints
-node --import ./scripts/sim-node-loader.mjs test/proof/driftwood-isle/run.mjs record
-node --import ./scripts/sim-node-loader.mjs test/proof/driftwood-isle/run.mjs fresh
-node --import ./scripts/sim-node-loader.mjs test/proof/driftwood-isle/run.mjs reef
-node --import ./scripts/sim-node-loader.mjs test/proof/driftwood-isle/run.mjs zipline
+node --import ./src/scripts/sim-node-loader.mjs test/proof/driftwood-isle/run.mjs checkpoints
+node --import ./src/scripts/sim-node-loader.mjs test/proof/driftwood-isle/run.mjs record
+node --import ./src/scripts/sim-node-loader.mjs test/proof/driftwood-isle/run.mjs fresh
+node --import ./src/scripts/sim-node-loader.mjs test/proof/driftwood-isle/run.mjs reef
+node --import ./src/scripts/sim-node-loader.mjs test/proof/driftwood-isle/run.mjs zipline
 ```
 
 `checkpoints` authors a bounded continuous player-command tape through the checked

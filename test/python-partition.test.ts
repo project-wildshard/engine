@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 test('partitions execute every discovered behavior once and reject invalid or empty groups', () => {
   const result = spawnSync('python3', ['-c', `
 import collections, runpy, types, unittest
-run = runpy.run_path('scripts/test_partition.py')['run_partition']
+run = runpy.run_path('src/scripts/test_partition.py')['run_partition']
 module = types.ModuleType('partition_fixture')
 seen = []
 class Behaviors(unittest.TestCase):

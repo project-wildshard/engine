@@ -57,7 +57,7 @@ function expected(shard: string, common: AssetTables): { want: string[]; engineM
 let root = '', output = '', book: SpawnManifestBook | undefined, common: AssetTables | undefined;
 beforeAll(async () => {
   if (!have) return;
-  // A build root: this checkout's boot tables, baked as scripts/app-build/assetTables.mjs does, the products and public/.
+  // A build root: this checkout's boot tables, baked as src/scripts/app-build/assetTables.mjs does, the products and public/.
   ({ root, output, book, common } = await cookFilesOnly(SHARDS.map(([shard]) => shard), 'download-audio-list'));
 }, 120_000);
 afterAll(() => { if (root !== '') rmSync(root, { recursive: true, force: true }); });

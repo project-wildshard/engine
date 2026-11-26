@@ -19,6 +19,6 @@ FINDING (accepted by wildshard-9), retired: the Template's mounted-lantern GL re
 
 Reproduce derivation (byte-idempotent):
 
-`node scripts/budget-ceilings.mjs --lanes=m5 --reports=budgets/calibration-reports --accept=budgets/ceiling-re-records.json`
+`node src/scripts/budget-ceilings.mjs --lanes=m5 --reports=budgets/calibration-reports --accept=budgets/ceiling-re-records.json`
 
 assessment.json contains every per-pose check and any derived-target breach. Capture reports retain their original pre-acceptance ceilings to preserve the findings. No calibration cost, allocation, frame target or non-approved ceiling was raised.

@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-spec = importlib.util.spec_from_file_location('boot_dist', Path(__file__).resolve().parents[1] / 'scripts/boot-dist.py')
+spec = importlib.util.spec_from_file_location('boot_dist', Path(__file__).resolve().parents[1] / 'src/scripts/boot-dist.py')
 boot = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(boot)
 

@@ -1,7 +1,7 @@
 import {expect, test} from 'vitest';
 import type {Request, Response} from 'playwright';
 import {legacyDouble} from '@wildshard/engine/test/FakeGame';
-import {NativeSizeLedger} from '../scripts/phone-loading/native-sizes';
+import {NativeSizeLedger} from '../src/scripts/phone-loading/native-sizes';
 
 function request(url: string, start = 1000, worker = false, method = 'GET', responseEnd = -1): Request {
   return legacyDouble<Request>({url: () => url, method: () => method,

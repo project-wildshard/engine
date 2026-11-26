@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
 import { build } from 'vite';
-import { assertNoTopLevelAwait, checkNoTopLevelAwait } from '../scripts/app-build/noTopLevelAwait.mjs';
+import { assertNoTopLevelAwait, checkNoTopLevelAwait } from '../src/scripts/app-build/noTopLevelAwait.mjs';
 
 test.each([
   'await ready;',
@@ -40,7 +40,7 @@ const scratch = mkdtempSync(resolve('tmp/top-level-await-'));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 let builds = 0;
 
-/** a real build written to disk, then the app build's post-step over what it wrote (scripts/build-app.mjs) */
+/** a real build written to disk, then the app build's post-step over what it wrote (src/scripts/build-app.mjs) */
 async function compile(entry: string, lazy: string, extra: Readonly<Record<string, string>> = {}, publicFiles: Readonly<Record<string, string>> = {}) {
   const modules: Readonly<Record<string, string>> = { 'virtual:entry': entry, 'virtual:lazy': lazy };
   const outDir = join(scratch, `out-${++builds}`), publicDir = join(scratch, `public-${builds}`);

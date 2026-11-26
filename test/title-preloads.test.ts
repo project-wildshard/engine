@@ -1,6 +1,6 @@
 // PZ18 (meta PAGE-SIZE): the built document preloads the grid page entry's static closure with the entry's own chunks.
 import { expect, test } from 'vitest';
-import { TITLE_PRELOAD_ROOT, titlePreloadFiles, withTitlePreloads } from '../scripts/app-build/titlePreloads.mjs';
+import { TITLE_PRELOAD_ROOT, titlePreloadFiles, withTitlePreloads } from '../src/scripts/app-build/titlePreloads.mjs';
 
 const report = {
   'b/c/rolldown-runtime-a.js': { moduleIds: [], imports: [] },

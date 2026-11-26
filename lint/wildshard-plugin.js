@@ -408,7 +408,7 @@ const layerWalk = (kind) => (context) => {
       if (target?.name === 'commons' && !/^(?:generators|bake|data|quests)\//u.test(shardLocal) && shardLocal !== 'shard.config.ts') report(context, node, `Commons packs are build-time imports: ${source}`);
     }
     if (!target) {
-      if (kind === 'layer' && targetPath.startsWith('src/')) report(context, node, `Import of a file outside the layers: ${source}`);
+      if (kind === 'layer' && targetPath.startsWith('src/') && !targetPath.startsWith('src/scripts/')) report(context, node, `Import of a file outside the layers: ${source}`);
       return;
     }
     const publicAuthor = /^src\/shards\/[^/]+\/(?:shard\.config\.ts$|(?:data|behaviour|quests)\/)/u.test(pathOf(context));
@@ -823,7 +823,7 @@ const globalObject = (raw) => { const n = unwrap(raw); return n?.type === 'Ident
 const shardSandbox = rule('Shard services, globals, settings and assets stay inside their context (E362 AG11)', (context) => {
   const own = layerOf(pathOf(context));
   if (own?.name !== 'shards') return {};
-  // G298: a shard's Node bakers (generators/**/*.mjs) are build tooling that moved in from scripts/; they never ship to the
+  // G298: a shard's Node bakers (generators/**/*.mjs) are build tooling that moved in from src/scripts/; they never ship to the
   // client, so the sandbox (which guards what runs in a ShardContext) doesn't apply to them.
   if (/^src\/shards\/[^/]+\/generators\/.+\.m?js$/u.test(pathOf(context)) || BAKE_COMMAND.test(pathOf(context))) return {};
   const meta = shardWords.shards[own.slug] ?? { settings: [], assets: [] };

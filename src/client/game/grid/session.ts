@@ -644,7 +644,7 @@ export class GridSession {
     this.mapImages = new CellMinimaps(host.scope, async slug => {
       const owner = { allocator: this.allocator, scope: host.scope };
       // J450: the cook's own map of the zone (the home's full size, every other cell's copy), behind an author's look/map; a
-      // build-pinned slug has none here, as its atlas tile is drawn from it (scripts/app-build/worldMapAtlas.ts)
+      // build-pinned slug has none here, as its atlas tile is drawn from it (src/scripts/app-build/worldMapAtlas.ts)
       const size = this.mapImages.fullSized(slug) ? 'full' : 'cell';
       const cooked = placedCookedMap(slug, size) ?? (DEVSERVER
         ? devCookedMap(slug, size, (globalThis as { __WS_DEV_COOKED_MAP__?: unknown }).__WS_DEV_COOKED_MAP__) : undefined);

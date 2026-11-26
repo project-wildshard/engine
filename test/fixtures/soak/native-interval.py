@@ -11,7 +11,7 @@ import unittest
 from unittest.mock import patch
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
-SPEC = importlib.util.spec_from_file_location('phases', ROOT / 'scripts/sim-mem-phases.py')
+SPEC = importlib.util.spec_from_file_location('phases', ROOT / 'src/scripts/sim-mem-phases.py')
 PHASES = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(PHASES)
 

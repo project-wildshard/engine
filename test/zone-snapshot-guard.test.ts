@@ -1,6 +1,6 @@
 // ZONE-SNAPSHOTS ZS1 (J507): the guard refuses each kind of zone snapshot a lane might check in.
 import { describe, expect, it } from 'vitest';
-import { judge, zoneSnapshotOffenders } from '../scripts/zone-snapshot-guard.mjs';
+import { judge, zoneSnapshotOffenders } from '../src/scripts/zone-snapshot-guard.mjs';
 
 const CURRENT = '0.1.0.6';
 const ZONES = ['pine-hollow', 'nalati-grasslands', 'sunscar-dunes'];

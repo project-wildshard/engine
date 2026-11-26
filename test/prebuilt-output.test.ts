@@ -3,7 +3,7 @@ import {spawnSync} from 'node:child_process';
 import {expect, test} from 'vitest';
 
 test('prebuilt release preserves the whole artifact and refuses corrupt or foreign input', () => {
-  const result=spawnSync('python3',['scripts/test_prebuilt_output.py'],{encoding:'utf8',timeout:10_000});
+  const result=spawnSync('python3',['src/scripts/test_prebuilt_output.py'],{encoding:'utf8',timeout:10_000});
   expect(result.error).toBeUndefined();
   expect(result.status,result.stdout+result.stderr).toBe(0);
 });

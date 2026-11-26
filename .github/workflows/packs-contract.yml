@@ -22,9 +22,9 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/ring-setup
-      - run: node scripts/pins.ts install --ring 1
+      - run: node src/scripts/pins.ts install --ring 1
       - name: Real pack reads, cold publication and interruption recovery
-        run: node scripts/packs-contract.mjs tmp/packs-contract
+        run: node src/scripts/packs-contract.mjs tmp/packs-contract
       - name: Keep actual criteria and incomplete failures
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

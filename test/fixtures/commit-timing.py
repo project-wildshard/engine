@@ -12,7 +12,7 @@ import tempfile
 import time
 
 source = Path(sys.argv[1]).resolve()
-wrapper = Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else source / 'scripts/commit.sh'
+wrapper = Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else source / 'src/scripts/.kit/commit.sh'
 wrapper_text = sys.stdin.read() if len(sys.argv) > 2 and sys.argv[2] == '-' else None
 env = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
 with tempfile.TemporaryDirectory(dir=source / 'tmp', prefix='commit-timing-') as temporary:
@@ -28,10 +28,10 @@ with tempfile.TemporaryDirectory(dir=source / 'tmp', prefix='commit-timing-') as
     git('commit', '-qm', 'base')
     (root / 'scripts').mkdir()
     if wrapper_text is None:
-        shutil.copy2(wrapper, root / 'scripts/commit.sh')
+        shutil.copy2(wrapper, root / 'src/scripts/.kit/commit.sh')
     else:
-        (root / 'scripts/commit.sh').write_text(wrapper_text)
-        (root / 'scripts/commit.sh').chmod(0o755)
+        (root / 'src/scripts/.kit/commit.sh').write_text(wrapper_text)
+        (root / 'src/scripts/.kit/commit.sh').chmod(0o755)
     (root / '.githooks').mkdir()
     hook = root / '.githooks/pre-commit'
     hook.write_text('''#!/usr/bin/env python3
@@ -54,7 +54,7 @@ sys.exit(23 if os.environ.get('FIXTURE_REFUSE') else 0)
     (root / 'owned.txt').write_text('queued\n')
     with (root / '.git/commit.lock').open('a') as lease:
         fcntl.flock(lease, fcntl.LOCK_EX)
-        child = subprocess.Popen(['scripts/commit.sh', 'fixture queued', '--', 'owned.txt'],
+        child = subprocess.Popen(['src/scripts/.kit/commit.sh', 'fixture queued', '--', 'owned.txt'],
                                  cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         try:
             ready, _, _ = select.select([child.stdout], [], [], 3)
@@ -77,7 +77,7 @@ sys.exit(23 if os.environ.get('FIXTURE_REFUSE') else 0)
     assert git('show', 'HEAD:owned.txt') == 'queued'
     head = git('rev-parse', 'HEAD')
     (root / 'owned.txt').write_text('refused\n')
-    refused = subprocess.run(['scripts/commit.sh', 'fixture refused', '--', 'owned.txt'],
+    refused = subprocess.run(['src/scripts/.kit/commit.sh', 'fixture refused', '--', 'owned.txt'],
                              cwd=root, env={**env, 'FIXTURE_REFUSE': '1'}, capture_output=True, text=True)
     assert refused.returncode != 0 and git('rev-parse', 'HEAD') == head, refused
     red = metrics(refused.stdout + refused.stderr)
@@ -91,11 +91,11 @@ sys.exit(23 if os.environ.get('FIXTURE_REFUSE') else 0)
     # A broken diagnostic destination never changes an actual commit verdict.
     ledger.unlink()
     ledger.mkdir()
-    passed = subprocess.run(['scripts/commit.sh', 'fixture diagnostic failure', '--', 'owned.txt'],
+    passed = subprocess.run(['src/scripts/.kit/commit.sh', 'fixture diagnostic failure', '--', 'owned.txt'],
                             cwd=root, env=env, capture_output=True, text=True)
     assert passed.returncode == 0 and 'timing log unavailable' in passed.stderr, passed
     (root / 'owned.txt').write_text('still refused\n')
-    failed = subprocess.run(['scripts/commit.sh', 'fixture red diagnostic', '--', 'owned.txt'],
+    failed = subprocess.run(['src/scripts/.kit/commit.sh', 'fixture red diagnostic', '--', 'owned.txt'],
                             cwd=root, env={**env, 'FIXTURE_REFUSE': '1'}, capture_output=True, text=True)
     assert failed.returncode != 0 and 'timing log unavailable' in failed.stderr, failed
     print(json.dumps({'queued': queued, 'refused': red, 'budgetIncludesWait': True, 'hookRedRefuses': True,

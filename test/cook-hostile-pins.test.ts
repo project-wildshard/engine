@@ -33,7 +33,7 @@ for(const seed of seeds)for(const kind of ['section','blob'] as const)test(`dama
     const store=folderStore(join(scratch,'store'));
     const worker=createCookWorker({build:'hostile-pin',store,source:{heads:()=>Promise.resolve([{slug:pin.slug,hash,revision:1}]),download:()=>Promise.resolve(bytes)},
       serverPacks:join(scratch,'server'),scratch:join(scratch,'jobs'),launcher:{root:process.cwd(),execPath:process.execPath,
-        loader:resolve('scripts/bake-loader.mjs'),script:resolve('scripts/cook-job.mjs'),wrap:[],limits:{seconds:5,memoryMB:4096,heapMB:2048}}});
+        loader:resolve('src/scripts/bake-loader.mjs'),script:resolve('src/scripts/cook-job.mjs'),wrap:[],limits:{seconds:5,memoryMB:4096,heapMB:2048}}});
     const result=await worker.cook({slug:pin.slug,hash});
     expect(['refused','failed']).toContain(result.state);expect(await store.list('')).toEqual([]);
   } finally {rmSync(scratch,{recursive:true,force:true});}

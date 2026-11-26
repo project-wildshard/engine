@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { dirname, join, relative, resolve } from 'node:path';
 import { build } from 'vite';
 import { expect, test } from 'vitest';
-import { checkImportMaps, chunkRequests, documentImportMap } from '../scripts/app-build/importMap.mjs';
+import { checkImportMaps, chunkRequests, documentImportMap } from '../src/scripts/app-build/importMap.mjs';
 
 /** The written code files, by URL path. */
 const code = (outDir: string): Set<string> => new Set(readdirSync(outDir, { recursive: true, withFileTypes: true })

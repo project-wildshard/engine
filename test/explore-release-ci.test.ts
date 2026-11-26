@@ -56,7 +56,7 @@ test('the Cloudflare token reaches the steps only from the secret, never argv', 
 // gives its build an hour.
 test('the Explore build gets an hour, and build:game honours it', () => {
   const script = String((JSON.parse(readFileSync('package.json', 'utf8')) as {scripts: Record<string, string>}).scripts['build:game']);
-  expect(script).toMatch(/^python3 scripts\/heavy-lane\.py build --max "\$\{WS_BUILD_MAX_MINUTES:-30\}" -- /u);
+  expect(script).toMatch(/^python3 src\/scripts\/heavy-lane\.py build --max "\$\{WS_BUILD_MAX_MINUTES:-30\}" -- /u);
   const step = workflow.slice(workflow.indexOf('name: Build, upload and check the Explore page'), workflow.indexOf('name: Attach'));
   expect(Number(/WS_BUILD_MAX_MINUTES: '?(\d+)/u.exec(step)?.[1])).toBeGreaterThanOrEqual(60);
   expect(Number(/timeout-minutes: (\d+)/u.exec(workflow)?.[1])).toBeGreaterThanOrEqual(150);

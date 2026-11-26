@@ -11,7 +11,7 @@ import { pathToFileURL } from 'node:url';
 import { afterEach, expect, test } from 'vitest';
 import * as v from 'valibot';
 import { StandaloneCatalogueSchema } from '@wildshard/format/standaloneCatalogue';
-import { borrowGrid, borrowedCells, sameCells, type Cell } from '../scripts/preview-grid.ts';
+import { borrowGrid, borrowedCells, sameCells, type Cell } from '../src/scripts/preview-grid.ts';
 import { catalogueBeforePlacements } from './fixtures/catalogue-before-placements';
 
 const pin = catalogueBeforePlacements;
@@ -73,7 +73,7 @@ test('a cell the staging MMO would refuse is left out: a taken spot, a slug with
 
 /** The tool as the workflow runs it, from this checkout, with GitHub's output files. */
 const tool = (args: readonly string[], env: NodeJS.ProcessEnv, cwd: string): Promise<{ code: number | null; out: string }> => new Promise(done => {
-  const absolute = args.map(arg => /^(?:\.\/)?scripts\//u.test(arg) ? resolve(arg) : arg);
+  const absolute = args.map(arg => /^(?:\.\/)?src\/scripts\//u.test(arg) ? resolve(arg) : arg);
   const child = spawn(process.execPath, absolute, { cwd, env: { PATH: process.env['PATH'], ...env } });
   let out = '';
   child.stdout.on('data', (chunk: Buffer) => { out += chunk.toString(); });
@@ -94,11 +94,11 @@ test('the workflow\'s two calls: a signed staging file reaches the page, news is
   const output = join(root, 'output'), summary = join(root, 'summary'), env = { GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: summary, GITHUB_ACTIONS: 'true' };
   const common = [`--placements=${url('placements.json')}`, `--last=${url('live.json')}`, `--key=${key}`];
 
-  const news = await tool(['scripts/preview-grid.ts', '--news', ...common], env, root);
+  const news = await tool(['src/scripts/preview-grid.ts', '--news', ...common], env, root);
   expect(news.code, news.out).toBe(0);
   expect(readFileSync(output, 'utf8')).toBe('news=true\n');
 
-  const write = await tool(['--import', './scripts/bake-loader.mjs', 'scripts/preview-grid.ts', join(root, 'catalogue.json'), ...common], env, root);
+  const write = await tool(['--import', './src/scripts/bake-loader.mjs', 'src/scripts/preview-grid.ts', join(root, 'catalogue.json'), ...common], env, root);
   expect(write.code, write.out).toBe(0);
   const baked = JSON.parse(readFileSync(join(root, 'catalogue.json'), 'utf8')) as unknown;
   expect(borrowedCells(pin, baked)).toEqual([thinIce]);
@@ -107,20 +107,20 @@ test('the workflow\'s two calls: a signed staging file reaches the page, news is
   // The live preview now shows it: no news. A file under another key is refused by engine's reader, as the MMO refuses it.
   writeFileSync(join(root, 'live.json'), JSON.stringify(baked));
   writeFileSync(output, '');
-  expect((await tool(['scripts/preview-grid.ts', '--news', ...common], env, root)).code).toBe(0);
+  expect((await tool(['src/scripts/preview-grid.ts', '--news', ...common], env, root)).code).toBe(0);
   expect(readFileSync(output, 'utf8')).toBe('news=false\n');
   const other = generateKeyPairSync('ed25519').publicKey.export({ format: 'der', type: 'spki' }).toString('hex');
-  const forged = await tool(['--import', './scripts/bake-loader.mjs', 'scripts/preview-grid.ts', join(root, 'forged.json'), `--placements=${url('placements.json')}`, `--last=${url('live.json')}`, `--key=${other}`], env, root);
+  const forged = await tool(['--import', './src/scripts/bake-loader.mjs', 'src/scripts/preview-grid.ts', join(root, 'forged.json'), `--placements=${url('placements.json')}`, `--last=${url('live.json')}`, `--key=${other}`], env, root);
   expect(forged.out).toContain('bad signature');
   expect(forged.out).toContain('::warning title=preview grid::');
 
   // A live catalogue that can't be read is news only when staging has a cell: no placement file and no live page, no deploy.
   writeFileSync(output, '');
-  expect((await tool(['scripts/preview-grid.ts', '--news', `--placements=${url('absent.json')}`, `--last=${url('absent-live.json')}`, `--key=${key}`], env, root)).code).toBe(0);
+  expect((await tool(['src/scripts/preview-grid.ts', '--news', `--placements=${url('absent.json')}`, `--last=${url('absent-live.json')}`, `--key=${key}`], env, root)).code).toBe(0);
   expect(readFileSync(output, 'utf8')).toBe('news=false\n');
 
   // Staging down: the dead port's fetch fails, and the live preview's cell stays.
-  const down = await tool(['--import', './scripts/bake-loader.mjs', 'scripts/preview-grid.ts', join(root, 'down.json'), '--placements=http://127.0.0.1:9/staging-placements.json', `--last=${url('live.json')}`, `--key=${key}`], env, root);
+  const down = await tool(['--import', './src/scripts/bake-loader.mjs', 'src/scripts/preview-grid.ts', join(root, 'down.json'), '--placements=http://127.0.0.1:9/staging-placements.json', `--last=${url('live.json')}`, `--key=${key}`], env, root);
   expect(down.code, down.out).toBe(0);
   expect(down.out).toContain('::warning title=preview grid::staging\'s grid unreadable');
   expect(down.out).toContain('kept the live preview\'s grid, 1 borrowed cell');

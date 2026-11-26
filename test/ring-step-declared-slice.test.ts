@@ -13,7 +13,7 @@ import {homedir} from 'node:os';
 import {readTar} from '@wildshard/format/tar';
 import {expect, test} from 'vitest';
 import {openShardfile, serverRows} from '../src/cook/game/shardCook';
-import {stepRingFolder} from '../scripts/ring-step-paths';
+import {stepRingFolder} from '../src/scripts/ring-step-paths';
 
 test('a declared server slice steps on its server inputs to the whole head\'s state', async () => {
   mkdirSync('tmp', {recursive: true});

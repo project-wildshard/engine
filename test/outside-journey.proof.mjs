@@ -38,7 +38,7 @@ try {
 await test('outside mode refuses replica, private routing and extra clients before any network work', () => {
   for (const args of [['replica', '--outside-proof'], ['staging', '--outside-proof', '--tailnet'], ['staging', '--outside-proof', '--bots', '2'],
     ['staging', '--outside-proof', '--remote', 'example.invalid'], ['staging', '--outside-proof', '--bots-on-host']]) {
-    const child = spawnSync(process.execPath, ['scripts/mmo-bots.mjs', ...args], {encoding: 'utf8', timeout: 2000});
+    const child = spawnSync(process.execPath, ['src/scripts/mmo-bots.mjs', ...args], {encoding: 'utf8', timeout: 2000});
     assert.notEqual(child.status, 0); assert.match(child.stderr, /outside-proof/u);
   }
 });

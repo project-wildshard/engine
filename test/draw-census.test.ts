@@ -1,7 +1,7 @@
 import { expect, test, vi } from 'vitest';
-import { drawFrames } from '../scripts/perf/draw-census-page.mjs';
-import { nativeSummary, attributionSummary, sampledCpu } from '../scripts/perf/draw-census-report.mjs';
-import { censusSelection, censusEntry } from '../scripts/perf/draw-census-poses.mjs';
+import { drawFrames } from '../src/scripts/perf/draw-census-page.mjs';
+import { nativeSummary, attributionSummary, sampledCpu } from '../src/scripts/perf/draw-census-report.mjs';
+import { censusSelection, censusEntry } from '../src/scripts/perf/draw-census-poses.mjs';
 
 test('census enters by the one ENTER WORLD and refuses a locked card', () => {
   expect(censusEntry('Enter world')).toBe('.ws-menu-play');

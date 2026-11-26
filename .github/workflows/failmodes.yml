@@ -7,9 +7,9 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/failmodes.yml'
-      - 'scripts/failmode-*.mjs'
-      - 'scripts/online-rig*.mjs'
-      - 'scripts/chaos-proxy*.mjs'
+      - 'src/scripts/failmode-*.mjs'
+      - 'src/scripts/online-rig*.mjs'
+      - 'src/scripts/chaos-proxy*.mjs'
       - 'src/client/engine/boot/**'
       - 'src/client/engine/net/**'
       - 'src/client/engine/ui/buildCheck.ts'
@@ -53,13 +53,13 @@ jobs:
       - uses: ./.github/actions/ring-setup
       - name: Install Chromium on the hosted runner
         run: pnpm exec playwright install chromium
-      - run: pnpm exec vitest run test/tooling/failmode-deploy-fixture.test.mjs test/tooling/failmode-results.test.mjs test/failmode-cases.test.ts
+      - run: pnpm exec vitest run src/test/failmode-deploy-fixture.test.mjs src/test/failmode-results.test.mjs test/failmode-cases.test.ts
       - name: Prepare one exact build
         run: |
-          node scripts/scratch-dir.mjs fm11 'Ring 2 browser failure proof'
+          node src/scripts/.kit/scratch-dir.mjs fm11 'Ring 2 browser failure proof'
           flags=()
           if [ "$SELECTION" = all ]; then flags+=(--next); fi
-          node scripts/failmode-proof.mjs --prepare tmp/fm11/build "${flags[@]}"
+          node src/scripts/failmode-proof.mjs --prepare tmp/fm11/build "${flags[@]}"
       - name: Judge the real failure screens
         run: |
           flags=(--engine=chromium --baseline)
@@ -84,7 +84,7 @@ jobs:
           esac
           # browser-lane kills its command after --max minutes (60 by default): the nightly's 55 cases need the job's time,
           # not 60 minutes, or the run dies at case 25 every night (QA 11-25 row 65)
-          scripts/browser-lane.sh --max 190 node scripts/failmode-proof.mjs \
+          src/scripts/browser-lane.sh --max 190 node src/scripts/failmode-proof.mjs \
             tmp/fm11/build/dist tmp/fm11/run tmp/fm11/build/key.json pglite: "${flags[@]}"
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

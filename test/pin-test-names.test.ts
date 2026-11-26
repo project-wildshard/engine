@@ -2,7 +2,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
-import { assertTestsDropped, namingLines, testsNaming } from '../scripts/pin-test-names.ts';
+import { assertTestsDropped, namingLines, testsNaming } from '../src/scripts/pin-test-names.ts';
 
 const scratch = resolve('tmp/pin-test-names');
 mkdirSync(scratch, { recursive: true });

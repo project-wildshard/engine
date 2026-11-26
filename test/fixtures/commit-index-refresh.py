@@ -44,10 +44,10 @@ with tempfile.TemporaryDirectory(dir=source / 'tmp', prefix='commit-refresh-') a
     git('rm', '--cached', '--', 'gone.txt')
     (root / 'scripts').mkdir()
     if wrapper_text is None:
-        shutil.copy2(wrapper, root / 'scripts/commit.sh')
+        shutil.copy2(wrapper, root / 'src/scripts/.kit/commit.sh')
     else:
-        (root / 'scripts/commit.sh').write_text(wrapper_text)
-        (root / 'scripts/commit.sh').chmod(0o755)
+        (root / 'src/scripts/.kit/commit.sh').write_text(wrapper_text)
+        (root / 'src/scripts/.kit/commit.sh').chmod(0o755)
     (root / '.githooks').mkdir()
     hook = root / '.githooks/pre-commit'
     hook.write_text('''#!/usr/bin/env python3
@@ -65,7 +65,7 @@ open('candidate-flags.json','w').write(json.dumps(hidden))
     patch.write_text('--- a/own.txt\n+++ b/own.txt\n@@ -1 +1 @@\n-base\n+ours\n')
     trace = root / 'trace.json'
     start = time.monotonic()
-    result = subprocess.run(['scripts/commit.sh', '--patch', str(patch), 'fixture metadata', '--', 'own.txt'],
+    result = subprocess.run(['src/scripts/.kit/commit.sh', '--patch', str(patch), 'fixture metadata', '--', 'own.txt'],
                             cwd=root, env={**env, 'GIT_TRACE2_EVENT': str(trace)}, capture_output=True, text=True)
     elapsed = (time.monotonic() - start) * 1000
     assert result.returncode == 0, result.stdout + result.stderr

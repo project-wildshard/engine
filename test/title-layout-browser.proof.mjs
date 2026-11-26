@@ -1,5 +1,5 @@
 // Run by name, never in the gated Vitest suite (it needs browsers): CI's e2e job runs it in Chromium.
-//   [WS_TITLE_LAYOUT=<shots dir>] [WS_TITLE_LAYOUT_BROWSERS=chromium,webkit] scripts/browser-lane.sh node --test test/title-layout-browser.proof.mjs
+//   [WS_TITLE_LAYOUT=<shots dir>] [WS_TITLE_LAYOUT_BROWSERS=chromium,webkit] src/scripts/browser-lane.sh node --test test/title-layout-browser.proof.mjs
 // Jake, 2026-11-10, on play.wildshard.io: "The hero is so fucking tiny on the main menu", and the build pill's 40-character
 // commit ran over the logo's D. The real main menu, WHAT'S NEW box and build pill (test/title-layout/page.ts) with the app's
 // stylesheets and fonts, Developer on and an online build's Check connection row: every row the title can show.
@@ -8,10 +8,10 @@ import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, resolve } from 'node:path';
-import { chromium, webkit } from "../scripts/browser-playwright.mjs";
+import { chromium, webkit } from "../src/scripts/browser-playwright.mjs";
 import { build } from 'vite';
-import { engineRelease } from '../scripts/changelog.mjs';
-import { KEYCHAIN_ARGS } from '../scripts/chromium-keychain.mjs';
+import { engineRelease } from '../src/scripts/changelog.mjs';
+import { KEYCHAIN_ARGS } from '../src/scripts/.kit/chromium-keychain.mjs';
 
 const OUT = resolve('tmp/title-layout'), SHOTS = process.env['WS_TITLE_LAYOUT'] ?? resolve('tmp/title-layout-shots');
 const BROWSERS = (process.env['WS_TITLE_LAYOUT_BROWSERS'] ?? 'chromium').split(',');

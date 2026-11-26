@@ -3,7 +3,7 @@ import {createServer, request as httpRequest, type Server} from 'node:http';
 // oxlint-disable-next-line import/no-nodejs-modules -- A raw CONNECT tunnel client, as Chromium sends HTTPS through the link.
 import {connect} from 'node:net';
 import {afterEach, expect, test} from 'vitest';
-import {bucket, startSharedLink, type SharedLink} from '../scripts/phone-loading/link';
+import {bucket, startSharedLink, type SharedLink} from '../src/scripts/phone-loading/link';
 
 const BODY = 200_000, RATE = 1_000_000;
 let origin: Server | undefined, link: SharedLink | undefined;

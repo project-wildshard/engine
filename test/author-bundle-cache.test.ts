@@ -5,9 +5,9 @@ import { resolve } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- A foreign writer must bypass the compiler's declared writes.
 import { execFileSync } from 'node:child_process';
 import { afterEach, expect, test, vi } from 'vitest';
-import { authorBundleCached } from '../scripts/author-bundle-cache.mjs';
-import { captureFolderInputs, folderInputKey, recordBundle, recordResolution } from '../scripts/shardfile-inputs.mjs';
-import { InputHashMemo } from '../scripts/bake-input-hashes.mjs';
+import { authorBundleCached } from '../src/scripts/author-bundle-cache.mjs';
+import { captureFolderInputs, folderInputKey, recordBundle, recordResolution } from '../src/scripts/shardfile-inputs.mjs';
+import { InputHashMemo } from '../src/scripts/bake-input-hashes.mjs';
 
 const owned:string[]=[];
 const scratch=resolve('tmp/codex-pagesize');mkdirSync(scratch,{recursive:true});

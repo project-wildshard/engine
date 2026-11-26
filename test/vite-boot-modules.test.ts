@@ -3,8 +3,8 @@ import { expect, test } from 'vitest';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve that compiler fixture without changing process cwd.
 import { resolve } from 'node:path';
-import { bootModuleFiles, bootModuleGroups, clientFeatureImports, startupImports } from '../scripts/app-build/bootModules';
-import { writtenBundle } from '../scripts/app-build/writtenBundle';
+import { bootModuleFiles, bootModuleGroups, clientFeatureImports, startupImports } from '../src/scripts/app-build/bootModules';
+import { writtenBundle } from '../src/scripts/app-build/writtenBundle';
 
 test('grouped dynamic entries follow their manifest facade and complete implementation', () => {
   mkdirSync('tmp/vite-boot-modules', { recursive: true });

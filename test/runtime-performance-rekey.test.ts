@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
 import { runtimePerformanceSites } from '../lint/runtime-performance.mjs';
-import { comparePlatformList } from '../scripts/check-platform-ratchets.mjs';
+import { comparePlatformList } from '../src/scripts/check-platform-ratchets.mjs';
 
 test('rekeys real edited or moved sites without new kind or row allowance', () => {
   mkdirSync('tmp', { recursive: true });

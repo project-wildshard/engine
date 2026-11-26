@@ -378,7 +378,7 @@
         },
         "capFps": 30,
         "route": "driftwood-fps",
-        "metric": "fenced GPU tail: one frame in 10 is drained by a 1-pixel readPixels, drawn, then waited on by a second readPixels; the 10% trimmed mean of that wait per segment (engine scripts/fps/gpuProbe.mjs; route-bench --fenced-gpu 10 on the phone, measureFps fencedEvery 10 in headless Chromium on ANGLE Metal)",
+        "metric": "fenced GPU tail: one frame in 10 is drained by a 1-pixel readPixels, drawn, then waited on by a second readPixels; the 10% trimmed mean of that wait per segment (engine src/scripts/fps/gpuProbe.mjs; route-bench --fenced-gpu 10 on the phone, measureFps fencedEvery 10 in headless Chromium on ANGLE Metal)",
         "training": [
           "dock spawn",
           "beach",

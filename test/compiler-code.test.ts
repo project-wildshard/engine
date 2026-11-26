@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Hash owned compiler source fixtures.
 import {createHash} from 'node:crypto';
 import {expect,it} from 'vitest';
-import {compilerCodeHash} from '../scripts/compiler-code.mjs';
+import {compilerCodeHash} from '../src/scripts/compiler-code.mjs';
 
 function identity(source:string):string {
   const bytes=new TextEncoder().encode(source),hash=createHash('sha256').update(bytes).digest('hex');

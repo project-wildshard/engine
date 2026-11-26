@@ -10,7 +10,7 @@ import type { StaleBuildNote } from '../saves/staleBuildNote';
 import { admitEvent, agentSampled, emptyLedger, environmentSends, eventFingerprint, parseLedger, WARNING_TRAIL_MAX, type SessionLedger } from './sendPolicy';
 
 declare const __BUILD_ID__: string;
-/** vite.config.ts: package.json's version (scripts/changelog.mjs); absent under Node */
+/** vite.config.ts: package.json's version (src/scripts/changelog.mjs); absent under Node */
 declare const __ENGINE_RELEASE__: { readonly version: string } | undefined;
 
 export interface BrowserErrorTags {

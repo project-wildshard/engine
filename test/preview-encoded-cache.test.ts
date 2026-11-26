@@ -3,7 +3,7 @@ import { brotliDecompressSync, gunzipSync } from 'node:zlib';
 // oxlint-disable-next-line import/no-nodejs-modules -- Read the live input for the native encoder behavior control.
 import { readFile } from 'node:fs/promises';
 import { expect, test } from 'vitest';
-import { createEncodedFileCache } from '../scripts/preview-encoded-cache.mjs';
+import { createEncodedFileCache } from '../src/scripts/preview-encoded-cache.mjs';
 
 function pendingBytes(): { promise: Promise<Buffer>; finish: (bytes: Buffer) => void } {
   let finish: (bytes: Buffer) => void = () => { throw new Error('Uninitialized byte producer'); };
@@ -78,7 +78,7 @@ test('failed encoding remains visible and is not retained or retried implicitly'
 });
 
 test('the native encoder preserves both complete representations', async () => {
-  const file = 'scripts/preview-encoded-cache.mjs';
+  const file = 'src/scripts/preview-encoded-cache.mjs';
   // A live source read tests both encoders without a frozen source/output pin.
   const source = await readFile(file), cache = createEncodedFileCache();
   const br = await cache.get(file, 'current', source.length, 'br');

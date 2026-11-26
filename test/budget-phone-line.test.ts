@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The test reads the source tree for the one copy of the line.
 import { readFileSync, readdirSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { capFor, readCaps } from '../scripts/budgets/files.mjs';
+import { capFor, readCaps } from '../src/scripts/budgets/files.mjs';
 import { PHONE_MEMORY_LOADING_CAP_BYTES } from '../src/shared/engine/core/phoneMemoryCap';
 import { MEMORY_AMBER } from '../src/client/game/grid/budgetOverlay';
 import { PHONE_MEMORY_LINE_BYTES } from '../src/client/game/shardfile/phoneMemoryLine';

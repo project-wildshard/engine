@@ -1,7 +1,7 @@
 // Manual Ring 2: this preserves three real workers, an independent
 // source mirror and fresh compilation. Hosted native preparation can exceed10s.
 // Never register in a commit/push hook. Run after pinned Frostline is prepared:
-// node --import ./scripts/sim-node-loader.mjs --test test/manual/compiled-folder-worker.proof.mjs
+// node --import ./src/scripts/sim-node-loader.mjs --test test/manual/compiled-folder-worker.proof.mjs
 // oxlint-disable-next-line import/no-unassigned-import -- Install deterministic simulation math before loading any runtime.
 import '../../src/shared/engine/core/portableMathFirst';
 // oxlint-disable-next-line import/no-nodejs-modules -- Compare actual source and compiled native outcomes.
@@ -12,8 +12,8 @@ import {constants,cpSync,mkdirSync,mkdtempSync,readFileSync,rmSync,writeFileSync
 import {resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Manual outer-edge proof outside every commit and push hook.
 import test from 'node:test';
-import {holdCpu} from '../../scripts/cpu-admission.mjs';
-import {linkNodeModules} from '../../scripts/link-node-modules.mjs';
+import {holdCpu} from '../../src/scripts/cpu-admission.mjs';
+import {linkNodeModules} from '../../src/scripts/link-node-modules.mjs';
 import {HeadlessSimulation} from '../../src/server/host/headless';
 import {loadHeadlessFolder} from '../../src/server/host/headlessFolder';
 import {folderHeadlessSections} from '../../src/shared/host/headlessSections';

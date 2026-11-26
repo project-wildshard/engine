@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
 import { dirname, join, resolve } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { flagUsers, specifiers, stripOnlyRefusals, trackedEntries } from '../scripts/strip-only.mjs';
+import { flagUsers, specifiers, stripOnlyRefusals, trackedEntries } from '../src/scripts/strip-only.mjs';
 
 // Meta QA 11-25 row 25 (J505): fc0832b52's parameter property in the cook held engine main red for 82 minutes, because
 // Node runs the cook strip-only and the lint override covered only src/*/engine and src/cook. The push gate's
@@ -32,18 +32,18 @@ test('a parameter property outside the cook, reached from a tool Node runs, is r
 
 test('only what the tool loads is judged: a type-only import, generated code in a template string and an unreached file pass', () => {
   const root = checkout({
-    'scripts/gen.mjs': "const code = `render: async () => (await import('../src/client/look.ts')).look()`;\nawait import('./dyn.ts');\n",
+    'src/scripts/gen.mjs': "const code = `render: async () => (await import('../src/client/look.ts')).look()`;\nawait import('./dyn.ts');\n",
     'scripts/dyn.ts': "import type { Meter } from '../src/shared/meter.ts';\nexport const x: Meter | null = null;\n",
     'src/client/look.ts': PROPERTY, 'src/shared/meter.ts': PROPERTY,
   });
   expect(specifiers("import a from './a.ts';\nexport * from \"./b.mjs\";\nconst c = await import('./c.ts');\n")).toEqual(['./a.ts', './b.mjs', './c.ts']);
-  expect(stripOnlyRefusals(root, ['scripts/gen.mjs', 'scripts/dyn.ts'])).toEqual([]);
+  expect(stripOnlyRefusals(root, ['src/scripts/gen.mjs', 'scripts/dyn.ts'])).toEqual([]);
 });
 
 test('a file that still passes the removed transform flag is named; the stored copies of old CI files are not', () => {
   const flag = ['--experimental', 'transform-types'].join('-');
   expect(flagUsers([
-    { path: 'a.yml', text: `run: node ${flag} --import ./scripts/bake-loader.mjs scripts/host.ts out.json\n` },
+    { path: 'a.yml', text: `run: node ${flag} --import ./src/scripts/bake-loader.mjs scripts/host.ts out.json\n` },
     { path: 'test/fixtures/ci-native-cache-v4.yml', text: `run: node ${flag} scripts/ci-native-fixtures.mjs\n` },
     { path: 'c.mjs', text: "spawn(node, ['scripts/plain.ts'])\n" },
   ])).toEqual(['a.yml']);

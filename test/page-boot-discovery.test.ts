@@ -3,7 +3,7 @@ import { expect, test } from 'vitest';
 import { resolve } from 'node:path';
 import { parseManifestMetadata } from '@wildshard/format/minimap';
 import { parseDiscoveryValues } from '@wildshard/format/discoveryValues';
-import { authoredManifestSource } from '../scripts/authored-manifest.mjs';
+import { authoredManifestSource } from '../src/scripts/authored-manifest.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const image = 'data:image/', art = { world: image, models: image, sets: image, practice: image };

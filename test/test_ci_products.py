@@ -46,7 +46,7 @@ class PreparedFolders(unittest.TestCase):
         (cls.root / '.gitignore').write_text(f'{source}/*.generated.ts\npublic/generated.bin\nout/\nnode_modules/\nlint/*.generated.json\n')
         (cls.root / 'scripts').mkdir()
         cls.catalogue = {'producers': {'fixture': [cls.asset, 'public/generated.bin', cls.table]}}
-        (cls.root / 'scripts/source-generation-outputs.json').write_text(json.dumps(cls.catalogue))
+        (cls.root / 'src/scripts/source-generation-outputs.json').write_text(json.dumps(cls.catalogue))
         subprocess.run(['git', '-C', str(cls.root), 'add', '.gitignore'], check=True)
         subprocess.run(['git', '-C', str(cls.root), '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.com', 'commit', '-qm', 'fixture'], check=True)
         cls.sha = products.git(cls.root, 'rev-parse', 'HEAD').decode().strip()
@@ -77,7 +77,7 @@ class PreparedFolders(unittest.TestCase):
         shutil.rmtree(self.root)
         retained = self._testMethodName in self.retained_cases
         shutil.copytree(self.retained_pristine if retained else self.pristine, self.root)
-        self.catalogue = json.loads((self.root / 'scripts/source-generation-outputs.json').read_text())
+        self.catalogue = json.loads((self.root / 'src/scripts/source-generation-outputs.json').read_text())
         self.env = patch.dict(os.environ, {'GITHUB_SHA': self.retained_sha if retained else self.sha, 'GITHUB_RUN_ID': '123'})
         self.env.start()
         self.addCleanup(self.env.stop)
@@ -86,8 +86,8 @@ class PreparedFolders(unittest.TestCase):
     def phase_probe(cls, action):
         repo = Path(__file__).resolve().parents[1]
         probe = f"""
-          import {{InputHashMemo}} from '{(repo/'scripts/bake-input-hashes.mjs').as_uri()}';
-          import {{sourceSnapshotIdentity,publishSourceSnapshot,verifiedSourceSnapshot}} from '{(repo/'scripts/source-input-proof.mjs').as_uri()}';
+          import {{InputHashMemo}} from '{(repo/'src/scripts/bake-input-hashes.mjs').as_uri()}';
+          import {{sourceSnapshotIdentity,publishSourceSnapshot,verifiedSourceSnapshot}} from '{(repo/'src/scripts/source-input-proof.mjs').as_uri()}';
           const root=process.argv[1], action=process.argv[2], memo=new InputHashMemo(root);
           memo.enableSnapshot(file=>file==='public/generated.bin');
           const path=root+'/.cache/generation-phase.json', identity=sourceSnapshotIdentity('CI fixture');
@@ -427,7 +427,7 @@ class PreparedFolders(unittest.TestCase):
         (self.root / 'extra.mjs').write_text("import {writeFileSync} from 'node:fs';writeFileSync('extra-ran','once');")
         if read_product:
             (self.root / 'check.mjs').write_text(f"""
-              import {{readBuiltShardfile}} from '{(repo/'scripts/built-folder.mjs').as_uri()}';
+              import {{readBuiltShardfile}} from '{(repo/'src/scripts/built-folder.mjs').as_uri()}';
               import {{resolve}} from 'node:path';
               import {{existsSync,writeFileSync}} from 'node:fs';
               if(existsSync('absent-cache'))throw new Error('Unexpected local product cache');
@@ -436,7 +436,7 @@ class PreparedFolders(unittest.TestCase):
               writeFileSync('verified-env.json',JSON.stringify({{sha:process.env.WS_TEST_PRODUCTS_SHA,github:process.env.GITHUB_SHA}}));
               writeFileSync('checks-ran','once');
             """)
-        return subprocess.run(['node', 'scripts/ci-checks.mjs', '--prepared', 'node extra.mjs'],
+        return subprocess.run(['node', 'src/scripts/ci-checks.mjs', '--prepared', 'node extra.mjs'],
                               cwd=self.root, text=True, capture_output=True)
 
     def test_prepared_build_reads_restored_product_without_local_recipe_cache(self):
@@ -501,7 +501,7 @@ class PreparedFolders(unittest.TestCase):
         tables = {name: ('export const table=' + json.dumps(name) + ';').encode()
                   for name in ['out/.app/discovery.open-plots.open-plot-fossil-badlands.generated.ts']}
         self.catalogue['producers']['scripts/gen-shards.mjs'] = sorted(tables)
-        (self.root / 'scripts/source-generation-outputs.json').write_text(json.dumps(self.catalogue))
+        (self.root / 'src/scripts/source-generation-outputs.json').write_text(json.dumps(self.catalogue))
         for name, content in tables.items():
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -528,7 +528,7 @@ class PreparedFolders(unittest.TestCase):
     def test_generated_app_tables_are_required_and_no_other_out_path_is_admitted(self):
         required = ['out/.app/discovery.open-plots.open-plot-fossil-badlands.generated.ts']
         self.catalogue['producers']['scripts/gen-shards.mjs'] = required
-        (self.root / 'scripts/source-generation-outputs.json').write_text(json.dumps(self.catalogue))
+        (self.root / 'src/scripts/source-generation-outputs.json').write_text(json.dumps(self.catalogue))
         with self.assertRaisesRegex(ValueError, 'Missing prepared source outputs'):
             products.pack(self.root, generated=True)
         for name in required:
@@ -554,7 +554,7 @@ class PreparedFolders(unittest.TestCase):
         names = [f'out/.app/discovery.open-plots.open-plot-{name}.generated.ts'
                  for name in ('fossil-badlands', 'jungle-ziggurat', 'patchwork-fairground', 'saltwind-lighthouse')]
         self.catalogue['producers']['scripts/gen-shards.mjs'] = names
-        (self.root / 'scripts/source-generation-outputs.json').write_text(json.dumps(self.catalogue))
+        (self.root / 'src/scripts/source-generation-outputs.json').write_text(json.dumps(self.catalogue))
         with self.assertRaisesRegex(ValueError, 'Missing prepared source outputs'):
             products.pack(self.root, generated=True)
         expected = {name: f'export const MANIFEST={{slug:{json.dumps(name)}}};'.encode() for name in names}

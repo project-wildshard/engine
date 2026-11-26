@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest';
-import { assetTableAsset, assetTableBanks, selectedPackTables } from '../scripts/app-build/assetTables.mjs';
+import { assetTableAsset, assetTableBanks, selectedPackTables } from '../src/scripts/app-build/assetTables.mjs';
 import { prepareAssetTables, prepareAssetPackRead, prepareAssetPacks, readAssetTables } from '../src/client/app/assetTables';
 import { installAssetTables, publicBytes } from '../src/shared/engine/boot/tables';
 import { openTitleSettings } from '../src/client/app/titleSettings';

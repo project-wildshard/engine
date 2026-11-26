@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The worker bakes from this checkout's real document and music table.
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { serviceWorkerCore } from '../scripts/app-build/serviceWorker';
+import { serviceWorkerCore } from '../src/scripts/app-build/serviceWorker';
 
 // AUDIO AU3: the title's music is precached with START's shell, so play never streams it and a title offline still has it. The
 // one style left (AU16, J304) is piano; its `title` slot names the file. No other style's music is in the shell.

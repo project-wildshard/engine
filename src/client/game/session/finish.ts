@@ -550,7 +550,7 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     // T2E-1b: a grid page's area is the cell the player is in, not the shell
     area: () => grid === null ? shardArea(slug, app.debug.snapshot()['shardfile'], boot.runtime.hooks.questFlags?.() ?? []) : grid.area() });
   // SHARD-SOURCE AP5 (J347): a DEVSERVER page carries the dev hook sharddev's `watch` page script drives; a production
-  // build's define makes this `false` in this module, so the import and its chunk go (scripts/check-devserver.mjs checks;
+  // build's define makes this `false` in this module, so the import and its chunk go (src/scripts/check-devserver.mjs checks;
   // DEVSERVER imported from grid/menu did not fold across modules and kept the chunk).
   if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__) void import('../devScene/hook').then(dev => dev.installDevHook({ scope: game.levelScope, scene: game.rootScene, physics: () => world.physics,
     look: () => game.look, server: () => window.__workerClientDevColliders ?? null, serverGround: () => window.__workerClientDevGround ?? null,

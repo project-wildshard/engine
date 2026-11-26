@@ -6,7 +6,7 @@ name: shard-sweep
 # starts engine's pin lives only here (by design), so engine sweeps what
 # each shard repo's published.json records: it tags a missing tag with the
 # nightly app and starts shard-pin.yml for a revision engine has not pinned
-# and no pin run has tried. scripts/shard-sweep.mjs; each step checks first.
+# and no pin run has tried. src/scripts/shard-sweep.mjs; each step checks first.
 on:
   schedule:
     - cron: '7,27,47 * * * *'
@@ -49,4 +49,4 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/shard-sweep.mjs
+        run: node src/scripts/shard-sweep.mjs

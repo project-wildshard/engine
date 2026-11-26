@@ -7,7 +7,7 @@ import {resolve} from 'node:path';
 import {createHash} from 'node:crypto';
 import {emptyShardfile} from '@wildshard/engine/host/author';
 import {outputSectionPayloads} from '@wildshard/format/outputFields';
-import {writeEntryBootstrap, writeSpawnManifests} from '../scripts/app-build/appCook';
+import {writeEntryBootstrap, writeSpawnManifests} from '../src/scripts/app-build/appCook';
 import {readSpawnManifest} from '../src/shared/game/shardfile/spawnManifest';
 import {serverPackPart} from '../src/shared/game/shardfile/serverPack';
 import {gridEntryDownloads} from '../src/cook/game/gridEntryDownloads';

@@ -31,7 +31,7 @@ type Leg =
   | { kind: 'winch' }
   | { kind: 'crown' };
 
-/** The route, in the order a player takes it (the waypoints are the walk / board legs of scripts/physics-route.json). */
+/** The route, in the order a player takes it (the waypoints are the walk / board legs of src/scripts/physics-route.json). */
 const GROVE_BRIDGE: readonly Point[] = [[-6, -1], [-14.1, 1.3], [-22.5, 2.1], [-29.4, 2.7], [-36.4, 3.4], [-44.8, 4.1], [-52, 4]];
 const KEEPER_BRIDGE: readonly Point[] = [[-52, 2], [-54.7, -5.9], [-55.4, -17.5], [-56.0, -27.5], [-56.6, -37.5], [-57.3, -49.1], [-57, -58]];
 const ROOST_BRIDGE: readonly Point[] = [[8, -2], [15.3, -3.1], [24.3, -4.9], [31.9, -6.4], [39.5, -7.9], [48.5, -9.7], [56, -14]];

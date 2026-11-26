@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 // oxlint-disable-next-line import/no-nodejs-modules -- Run the look loop's Python checks (capture finding, target jobs).
 import { spawnSync } from 'node:child_process';
-import { captureName, contextOptions, facing, parseCameraFile, parseFlags, resolveCameras, resolveMissing, SHOTS, yawTo } from '../scripts/look-loop/cameras.mjs';
+import { captureName, contextOptions, facing, parseCameraFile, parseFlags, resolveCameras, resolveMissing, SHOTS, yawTo } from '../src/scripts/look-loop/cameras.mjs';
 
 const file = () => parseCameraFile({
   query: 'chunk=brasscap-mesa', fp: { viewport: [390, 844] }, god: { viewport: [1600, 900], topUp: 40, diagUp: 18, diagOut: 24, lookAhead: 8 },
@@ -50,7 +50,7 @@ test('the file is checked and flags are strict', () => {
 });
 
 test('the Python side: capture finding and seed-mode target jobs', () => {
-  const run = spawnSync('python3', ['scripts/look-loop/test_look_loop.py'], { encoding: 'utf8', timeout: 30000 });
+  const run = spawnSync('python3', ['src/scripts/look-loop/test_look_loop.py'], { encoding: 'utf8', timeout: 30000 });
   expect(run.stderr).toMatch(/OK/u);
   expect(run.status).toBe(0);
 });

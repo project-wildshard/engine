@@ -1,11 +1,11 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Check workflow wiring without starting CI.
 import { readFileSync } from 'node:fs';
 import { expect, test, vi } from 'vitest';
-import { armedMemory, comparePhoneFootprint, footprintBootFor, footprintLines, guardZone, judgeFootprint, ledgerZones, parseArmedMemory, phoneFootprint } from '../scripts/memory/armed.mjs';
-import { readCaps } from '../scripts/budgets/files.mjs';
-import { checkReads, ledgerFailure } from '../scripts/memory/ledgerVerdict.mjs';
-import { loadPhoneModel } from '../scripts/memory/phoneModel.mjs';
-import { compareLedger, ledgerBudget } from '../scripts/memory/ratchet.mjs';
+import { armedMemory, comparePhoneFootprint, footprintBootFor, footprintLines, guardZone, judgeFootprint, ledgerZones, parseArmedMemory, phoneFootprint } from '../src/scripts/memory/armed.mjs';
+import { readCaps } from '../src/scripts/budgets/files.mjs';
+import { checkReads, ledgerFailure } from '../src/scripts/memory/ledgerVerdict.mjs';
+import { loadPhoneModel } from '../src/scripts/memory/phoneModel.mjs';
+import { compareLedger, ledgerBudget } from '../src/scripts/memory/ratchet.mjs';
 
 const lines = { playingBytes: 1_000_000_000, loadingBytes: 1_500_000_000 };
 const arm = { armed: '2026-11-18', by: 'fixture', playingBytes: 900_000_000, loadingBytes: 1_300_000_000, evidence: 'fixture' };
@@ -142,7 +142,7 @@ test('CI runs both armed measurement jobs without a job-level bypass, the native
   expect(ledger).toMatch(/\n {4}runs-on:/u);
   expect(native).toContain('runs-on: xcode-27');
   expect(ledger).not.toMatch(/\n {4}continue-on-error:/u);
-  expect(ledger).toContain('node scripts/budgets/cli.mjs check tmp/budgets/measures.json');
+  expect(ledger).toContain('node src/scripts/budgets/cli.mjs check tmp/budgets/measures.json');
   expect(native).not.toContain('continue-on-error');
   // BC11: the native footprint, Nine's ledger and its walk leave their measures in a `budgets` artifact (record --run),
   // and Nine's boot measures from ci's nine-ring1 load are judged in the budgets job.
@@ -152,7 +152,7 @@ test('CI runs both armed measurement jobs without a job-level bypass, the native
 
 test('both native baselines require an online boot', () => {
   for (const mode of ['footprint', 'webkit-ledger']) {
-    const baseline = JSON.parse(readFileSync(new URL(`../scripts/memory/${mode}-ratchet.json`, import.meta.url), 'utf8'));
+    const baseline = JSON.parse(readFileSync(new URL(`../src/scripts/memory/${mode}-ratchet.json`, import.meta.url), 'utf8'));
     expect(baseline).toMatchObject({ mode, boot: 'online', instrument: 'minimal' });
   }
 });

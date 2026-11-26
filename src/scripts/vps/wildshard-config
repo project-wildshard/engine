@@ -1,0 +1,698 @@
+#!/usr/bin/python3 -I
+# MMO-SERVER-PLAN MS3.5 (J266): the agents' one way to change a game server's settings, through sudo with no password.
+#   wildshard-config show <channel>                                 print the channel's settings file
+#   wildshard-config set <channel> <KEY> <value> [<KEY> <value>]... [--production]
+#                                                                   write the settings, restart the channel once, roll back if
+#                                                                   it does not come up healthy
+#   wildshard-config split <channel>                                setup.sh's: move the settings out of <channel>.env, once
+#   wildshard-config cook <tag>                                     AUTO-RELEASE AR4 (J355): move the cook worker to vX.Y.Z and
+#                                                                   the build a signed release names for it; roll back on failure
+#   wildshard-config show cook                                      print the cook worker's tag and build
+#   wildshard-config replica start [--seconds S] [--workers N] [--seats N] [--cells a,b] [--saves memory|postgres]
+#                                   | replica pg-restart [--checkpoint] | replica stop
+#                                                                   MP1.2.d: the cap bench's replica on staging's CPUs, tailnet only;
+#                                                                   E7.4b.b: --saves postgres puts its saves on a scratch cluster that
+#                                                                   pg-restart restarts (never postgresql@16-main)
+#   wildshard-config saves list [--production]                      QA 11-15 row 24: every player's id, name and created_at
+#   wildshard-config saves delete-test <id>... [--production] [--yes]
+#                                                                   a test or bot player's rows, a dry run unless --yes
+#   wildshard-config saves worn                                     FORMAT-PRUNE FP22c: staging's worn-skin keys, counted per
+#                                                                   shard, revision, slot and skin; no player id, read-only
+# Settings live in /etc/wildshard/<channel>.settings (640 root:wildshard-<channel>), which the units read after <channel>.env.
+# Secrets stay in the root-only .env. The dedicated async-upload staging verb writes only its two fixed credentials
+# from stdin; it never prints them. Other verbs never write secrets (they read only the placement rows there, for
+# the pair check below): only the keys in SETTINGS below, each
+# checked by its own rule. A production change needs --production, so no one changes the live world by a slip.
+# The two placement keys (SA33, GC33) go together: the server throws at boot on one without the other, so a `set` that would
+# leave the channel with one is refused before anything is written; set both in one call.
+# Installed root-owned as /usr/local/sbin/wildshard-config by harden.sh; the sudo allowlist names that path only.
+import os, re, subprocess, sys, tempfile, time, urllib.request
+
+# 'metrics' is the channel's METRICS_PORT (SC1's /metrics on 127.0.0.1), the one harden-prometheus.sh scrapes (SC2).
+CHANNELS = {'production': {'port': 8790, 'cpus': 9, 'host': 0, 'metrics': 9790}, 'staging': {'port': 8791, 'cpus': 4, 'host': 1, 'metrics': 9791}}
+# The pages that open the game (engine doorTrust DEFAULT_ALLOWED_ORIGINS); each channel's own is at its 'host' index.
+GAME_HOSTS = ('https://play.wildshard.io', 'https://staging.wildshard.io', 'https://preview.wildshard.io')
+CELL = r'[a-z0-9][a-z0-9-]{0,63}'
+# SA33a: the API's placement key, public half as SPKI DER hex; equal to engine src/scripts/preview-grid.ts PLACEMENT_PUBLIC_KEY (the
+# engine's test holds them equal). Pinned, so an agent can point a channel at the API's own signed file and nothing else.
+PLACEMENT_PUBLIC_KEY = '302a300506032b65700321004afd39342aac6a4de6066cb72e9df54cbd3d4eb522e5e6e175a17954ab98f25e'
+PLACEMENT_PAIR = ('PLACEMENT_URL', 'PLACEMENT_PUBLIC_KEY')
+
+
+def placements(channel):
+    """The one signed placement file a channel reads: the API writes only releases/<channel>-placements.json (SA33a)."""
+    return f'https://packs.wildshard.io/releases/{channel}-placements.json'
+
+# Each allowed key and its rule. Anything else is refused: secrets (SEAT_SECRET, SENTRY_DSN, DATABASE_URL), the trust roots
+# (RELEASE_URL, RELEASE_PUBLIC_KEY, BUNDLE_ORIGIN, PACK_ORIGIN, TELEMETRY_URL, ERRORS_URL) and exposure (HOST, PORT,
+# TRUST_PROXY) are root's, by hand or by a reviewed script. The placement pair is a trust root too, so each takes one
+# exact value (the channel's own file, the API's pinned key) or blank, which the server reads as unset (Jake, 2026-11-13). ALLOWED_ORIGINS may only narrow (MS3.4): a set of the game's three
+# hosts that keeps the channel's own, so an agent can drop a page but never add one or lock its own players out.
+SETTINGS = {
+    'WORLD_CELLS': lambda value, channel: value == 'grid' or (re.fullmatch(f'{CELL}(,{CELL}){{0,63}}', value) is not None
+                                                             and len(set(value.split(','))) == len(value.split(','))),
+    'WORLD_WORKERS': lambda value, channel: re.fullmatch(r'[1-9][0-9]?', value) is not None and int(value) <= CHANNELS[channel]['cpus'],
+    'WORLD_SEATS': lambda value, channel: re.fullmatch(r'[1-9][0-9]{0,3}', value) is not None and int(value) <= 2000,
+    'RECORD_TAG': lambda value, channel: re.fullmatch(r'[A-Za-z0-9._-]{0,64}', value) is not None,
+    'ALLOWED_ORIGINS': lambda value, channel: (set(value.split(',')) <= set(GAME_HOSTS) and len(set(value.split(','))) == len(value.split(','))
+                                               and GAME_HOSTS[CHANNELS[channel]['host']] in value.split(',')),
+    'PLACEMENT_URL': lambda value, channel: value in ('', placements(channel)),
+    'PLACEMENT_PUBLIC_KEY': lambda value, channel: value in ('', PLACEMENT_PUBLIC_KEY),
+    # SC2: the channel's own port, which the box's Prometheus scrapes, or blank (off). The server binds it on 127.0.0.1 only.
+    'METRICS_PORT': lambda value, channel: value in ('', str(CHANNELS[channel]['metrics'])),
+    # MMO-SERVER E7.8a.b1: the measured playtest file (PlaytestFile, PLAYTEST_DIR from the unit), staging only. Production
+    # never writes one: an agent proof runs on staging (J205), and a sitting there is the E7 table's input.
+    'PLAYTEST': lambda value, channel: channel == 'staging' and value in ('0', '1'),
+}
+RULES = {'WORLD_CELLS': "'grid' or comma-separated cell names (a-z, 0-9, -), none twice",
+         'WORLD_WORKERS': 'a whole number from 1 to the channel\'s pinned CPUs (production 9, staging 4)',
+         'WORLD_SEATS': 'a whole number from 1 to 2000', 'RECORD_TAG': 'up to 64 of A-Z a-z 0-9 . _ -',
+         'ALLOWED_ORIGINS': "comma-separated, none twice, from https://play.wildshard.io, https://staging.wildshard.io and "
+                            "https://preview.wildshard.io, keeping the channel's own (production play, staging staging)",
+         'PLACEMENT_URL': "https://packs.wildshard.io/releases/<channel>-placements.json for this channel, or blank",
+         'PLACEMENT_PUBLIC_KEY': f'the API placement key {PLACEMENT_PUBLIC_KEY}, or blank',
+         'METRICS_PORT': "the channel's own metrics port (production 9790, staging 9791), or blank (off)",
+         'PLAYTEST': '0 or 1, on staging only (production never records a playtest file)'}
+
+# The engine's tests hand it a made-up /etc and no systemctl; never as root, so sudo (which drops the environment anyway) cannot.
+TEST = os.geteuid() != 0 and os.environ.get('WILDSHARD_CONFIG_TEST_ROOT')
+ETC = (TEST or '') + '/etc/wildshard'
+
+
+def stop(message, code=1):
+    print(f'stop    {message}', file=sys.stderr)
+    sys.exit(code)
+
+
+def read_rows(path):
+    """KEY=value rows in file order, comments and blanks kept as they are."""
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    except FileNotFoundError:
+        return []
+    except OSError:
+        stop(f'{path} is a link or unreadable')
+    with os.fdopen(fd, encoding='utf-8') as handle:
+        return handle.read().splitlines()
+
+
+def key_of(row):
+    match = re.match(r'^([A-Z_][A-Z0-9_]*)=', row)
+    return match.group(1) if match else None
+
+
+def plain(row):
+    """A row's value as systemd reads it: one pair of matching quotes stripped."""
+    value = row.split('=', 1)[1].strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in '"\'':
+        value = value[1:-1]
+    return value
+
+
+def effective(rows, keys):
+    """What the server reads for these keys: the last assignment wins, as systemd reads it (spaces around the key and =)."""
+    seen = {}
+    for row in rows:
+        match = re.match(r'^\s*([A-Z_][A-Z0-9_]*)\s*=', row)
+        if match and match.group(1) in keys:
+            seen[match.group(1)] = plain(row[match.end() - 1:])
+    return seen
+
+
+def pair_broken(env_rows, settings_rows):
+    """True when the server would start with one placement key and not the other (main.ts throws). The settings file is
+    read after the .env, and a blank value is unset. Only these two keys are read from the .env."""
+    seen = effective(env_rows + settings_rows, PLACEMENT_PAIR)
+    return (seen.get('PLACEMENT_URL', '') == '') != (seen.get('PLACEMENT_PUBLIC_KEY', '') == '')
+
+
+def write_rows(path, rows, channel):
+    """Atomic, never through a link, 640 root:wildshard-<channel>."""
+    folder = os.path.dirname(path)
+    fd, temporary = tempfile.mkstemp(dir=folder, prefix='.wildshard-config.')
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as handle:
+            handle.write('\n'.join(rows) + '\n')
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(temporary, 0o640)
+        if not TEST:
+            import grp
+            os.chown(temporary, 0, grp.getgrnam(f'wildshard-{channel}').gr_gid)
+        os.replace(temporary, path)
+    except BaseException:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+        raise
+
+
+HEADER = ['# MMO-SERVER-PLAN MS3.5 (J266): this channel\'s non-secret settings, read after its .env. Change them with',
+          '# `sudo wildshard-config set <channel> <KEY> <value>`; secrets stay in the .env.']
+
+
+def healthy(channel):
+    """The channel's server is active and answers /health on loopback, within two minutes (a first pull can take a while)."""
+    port = CHANNELS[channel]['port']
+    deadline = time.monotonic() + 120
+    while time.monotonic() < deadline:
+        active = subprocess.run(['/usr/bin/systemctl', 'is-active', '--quiet', f'wildshard-server@{channel}.service']).returncode == 0
+        if active:
+            try:
+                with urllib.request.urlopen(f'http://127.0.0.1:{port}/health', timeout=2) as answer:
+                    if answer.status == 200:
+                        return True
+            except OSError:
+                pass
+        time.sleep(2)
+    return False
+
+
+def running(channel):
+    if TEST:
+        return os.environ.get('WILDSHARD_CONFIG_TEST_RUNNING') == '1'
+    return subprocess.run(['/usr/bin/systemctl', 'is-active', '--quiet', f'wildshard-server@{channel}.service']).returncode == 0
+
+
+def restart(channel):
+    """Restart the server and wait for /health. Only called for a server that was running before the change."""
+    unit = f'wildshard-server@{channel}.service'
+    print(f'doing   restart {unit}')
+    if TEST:
+        return os.environ.get('WILDSHARD_CONFIG_TEST_HEALTHY', '1') == '1'
+    subprocess.run(['/usr/bin/systemctl', 'restart', unit])
+    return healthy(channel)
+
+
+# AUTO-RELEASE AR4 (J355): the cook worker's two non-secret keys. They go to /etc/wildshard/cook.settings (640
+# root:wildshard-cook), which its unit and rebuild.sh read after the root-only cook.env (the notify token and R2 writer keys,
+# never read here), so they win. The build is never the caller's: wildshard-apply's verify reads it from a signed channel
+# release that names the tag, after checking GitHub's tag points at it. rebuild.sh --cook then moves the checkout, installs,
+# restarts the worker and waits for its /health.
+COOK_KEYS = ('COOK_ENGINE_REF', 'WILDSHARD_BUILD')
+COOK_TAG = r'(?:v[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}|server-staging-[0-9a-f]{40})'
+COOK_HEADER = ['# AUTO-RELEASE AR4 (J355): the cook worker\'s engine tag and build, read after cook.env. Change them with',
+               '# `sudo wildshard-config cook <tag>`; the secrets stay in cook.env.']
+CLEAN = {'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'HOME': '/root', 'LANG': 'C.UTF-8'}
+
+
+def helper(name):
+    """A root-owned helper, or the test's stand-in (never as root)."""
+    if TEST:
+        return os.environ.get(f'WILDSHARD_CONFIG_TEST_{name.upper()}', '/nonexistent')
+    return {'apply': '/usr/local/sbin/wildshard-apply', 'rebuild': '/opt/wildshard-vps/rebuild.sh',
+            'replica': '/opt/wildshard-vps/replica.mjs'}[name]
+
+
+def helper_env():
+    if not TEST:
+        return dict(CLEAN)
+    return {**CLEAN, 'PATH': os.environ.get('PATH', CLEAN['PATH']),
+            **{key: value for key, value in os.environ.items() if key.startswith(('WILDSHARD_APPLY_TEST', 'WILDSHARD_CONFIG_TEST'))}}
+
+
+def cook_rebuild():
+    """rebuild.sh's cook step alone, as root, from the root-owned copy. It exits non-zero unless the worker answers /health.
+    It runs in its own session with SIGPIPE and SIGHUP ignored (restore_signals=False keeps them so), so a dropped ssh
+    caller can't kill it halfway through a checkout or an install."""
+    return subprocess.run(['bash' if TEST else '/usr/bin/bash', helper('rebuild'), '--cook'], cwd='/', env=helper_env(),
+                          restore_signals=False, start_new_session=True).returncode == 0
+
+
+def say(line, error=False):
+    """Print, but never let a caller that went away stop a move or its rollback."""
+    try:
+        print(line, file=sys.stderr if error else sys.stdout, flush=True)
+    except OSError:
+        pass
+
+
+def show_cook():
+    rows = [row for row in read_rows(f'{ETC}/cook.settings') if key_of(row) in COOK_KEYS]
+    for row in rows:
+        print(row)
+    if not rows:
+        print('note    no cook.settings: the cook worker runs what cook.env names')
+    return 0
+
+
+def cook(args):
+    if len(args) != 2 or re.fullmatch(COOK_TAG, args[1]) is None:
+        stop('usage: wildshard-config cook vX.Y.Z | server-staging-<sha>')
+    tag, rebuild = args[1], helper('rebuild')
+    try:
+        with open(rebuild, encoding='utf-8') as handle:
+            knows = '[ "$1" = --cook ]' in handle.read()
+    except OSError:
+        knows = False
+    if not knows:
+        stop(f'{rebuild} has no --cook yet: apply a signed tag that carries it first (wildshard-apply <tag> harden)')
+    checked = subprocess.run([helper('apply'), tag, 'verify'], cwd='/', env=helper_env(), capture_output=True, text=True)
+    found = re.search(r'^commit\s+([0-9a-f]{40})$', checked.stdout, re.M)
+    if checked.returncode != 0 or found is None:
+        reason = ((checked.stderr or checked.stdout).strip().splitlines() or ['no commit'])[-1]
+        stop(f'{tag} is not a tag a signed release names: {reason}')
+    commit = found.group(1)
+    # One move at a time, held through the rebuild and any rollback, as `set` holds its channel.
+    import fcntl
+    lock = os.fdopen(os.open(f'{ETC}/.cook.settings.lock', os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600), 'w')
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    # From here on a dropped caller changes nothing: no hangup, no broken pipe, and any failure rolls back.
+    import signal
+    signal.signal(signal.SIGHUP, signal.SIG_IGN)
+    signal.signal(signal.SIGPIPE, signal.SIG_IGN)
+    path = f'{ETC}/cook.settings'
+    before = read_rows(path)
+    rows = [row for row in (list(before) or list(COOK_HEADER)) if key_of(row) not in COOK_KEYS]
+    rows += [f'COOK_ENGINE_REF={tag}', f'WILDSHARD_BUILD={commit}']
+    try:
+        if rows == before:
+            say(f'ok      cook.settings already names {tag}')
+        else:
+            write_rows(path, rows, 'cook')
+            say(f'doing   cook {tag} at {commit}')
+        if cook_rebuild():
+            say(f'ok      the cook worker runs {tag} ({commit[:8]})')
+            return 0
+    except BaseException:
+        pass
+    if rows == before:
+        say(f'stop    the cook worker is not healthy on {tag}: look at journalctl -u wildshard-cook', error=True)
+        return 2
+    # It did not come back: the old tag goes back and is rebuilt, so a bad move never leaves the cook down.
+    if before:
+        write_rows(path, before, 'cook')
+    elif os.path.exists(path):
+        os.unlink(path)
+    say(f'undo    the cook worker did not come up on {tag}; the old tag is back', error=True)
+    if not cook_rebuild():
+        say('stop    the cook worker is not healthy on its old tag either: look at journalctl -u wildshard-cook', error=True)
+        return 2
+    return 1
+
+
+# QA 11-15 row 24 (Jake: "why dont you have an admin tool you can run on the VPS to clean it up yourself"): the agents clear
+# the players their own probes and bots left in a saves database, and nobody else. Staging unless --production; a delete is a
+# dry run unless --yes. Only a name a test or a bot takes can go: a probe's r<N><shard> (r13pine), the live proofs' Agent X,
+# and Bot. Every table with a player_id column loses that player's rows and `player` its row, in one transaction that checks
+# the names again under a row lock; the box journal (tag wildshard-saves) records each delete.
+SAVES_ID = r'[A-Za-z0-9:._-]{1,128}'
+TEST_NAMES = r'r[0-9]+[a-z][a-z0-9-]*|Agent( [A-Za-z0-9]+)+|[Bb]ot([ _-]?[A-Za-z0-9]+)?'
+SAVES_MAX = 50
+SAVES_TABLE = r'[a-z_][a-z0-9_]{0,62}'
+
+
+def psql(channel, sql, variables=None):
+    """Rows (tab-separated fields) from SQL on the channel's saves database, run as postgres. The ids reach it only as psql
+    variables (:'ids'), never inside the SQL text."""
+    if TEST:
+        command = os.environ.get('WILDSHARD_CONFIG_TEST_PSQL', '/nonexistent').split(' ')
+    else:
+        command = ['/usr/sbin/runuser', '-u', 'postgres', '--', '/usr/bin/psql', '--cluster', '16/main', '-d', f'saves_{channel}']
+    command += ['-X', '-q', '-t', '-A', '-F', '\t', '-v', 'ON_ERROR_STOP=1']
+    for key, value in (variables or {}).items():
+        command += ['-v', f'{key}={value}']
+    try:
+        run = subprocess.run(command, input=sql, capture_output=True, text=True, cwd='/', env=helper_env())
+    except OSError as error:
+        stop(f'psql did not start: {error}')
+    if run.returncode != 0:
+        stop(f'psql on saves_{channel} exited {run.returncode}: {(run.stderr.strip().splitlines() or ["no message"])[-1]}')
+    return [line.split('\t') for line in run.stdout.splitlines() if line != '']
+
+
+def journal(line):
+    """One line in the box journal, tag wildshard-saves; the test's stand-in logger instead (never as root)."""
+    logger = os.environ.get('WILDSHARD_CONFIG_TEST_LOGGER') if TEST else '/usr/bin/logger'
+    if logger:
+        subprocess.run([logger, '-t', 'wildshard-saves', '-p', 'auth.notice', '--', line], cwd='/', env=helper_env())
+
+
+# FORMAT-PRUNE FP22c: a worn-skin save is keyed by a weapon's slot (`bow`) until the shard drops `legacySlot`, then by its
+# item (`declared.weapon.longbow`). Before a shard re-ships, this says which keys staging players really wear: one line per
+# shard, revision, slot and skin with its count, read with a plain select and no player id. A worn map sits in a save doc
+# either as JSON or inside a JSON string, so both spellings are matched. Staging only: production is never read this way.
+SAVES_WORN = r"""with worn as (
+  select shard, revision, (regexp_matches(doc::text, '\\?"worn\\?": ?[{]([^{}]*)[}]', 'g'))[1] as body from player_save
+), pairs as (
+  select shard, revision, m[1] as slot, m[2] as skin
+  from worn, regexp_matches(body, '\\?"([^"\\]+)\\?": ?\\?"([^"\\]+)\\?"', 'g') as m
+)
+select shard, revision, slot, skin, count(*) from pairs group by 1, 2, 3, 4 order by 1, 2, 3, 4;"""
+
+
+def saves_worn(production):
+    if production:
+        stop('saves worn reads staging only')
+    total = psql('staging', 'select count(*) from player_save;')
+    rows = psql('staging', SAVES_WORN)
+    print(f'saves_staging: {total[0][0] if total else 0} save rows; worn keys (shard revision slot skin count):')
+    for row in rows:
+        print('  ' + '  '.join(row))
+    return 0
+
+
+def saves(args, production):
+    channel = 'production' if production else 'staging'
+    if args[1:2] == ['list'] and len(args) == 2:
+        for row in psql(channel, "select id, name, to_char(created_at at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') "
+                                 'from player order by created_at, id;'):
+            print('  '.join(row))
+        return 0
+    if args[1:2] == ['worn'] and len(args) == 2:
+        return saves_worn(production)
+    if args[1:2] != ['delete-test']:
+        stop('usage: wildshard-config saves list [--production] | saves worn | saves delete-test <id>... [--production] [--yes]')
+    sure = '--yes' in args
+    ids = [arg for arg in args[2:] if arg != '--yes']
+    if not ids or len(ids) > SAVES_MAX or len(set(ids)) != len(ids):
+        stop(f'name 1 to {SAVES_MAX} player ids, none twice')
+    for player in ids:
+        if re.fullmatch(SAVES_ID, player) is None:
+            stop(f'{player!r} is not a player id (A-Z a-z 0-9 : . _ -)')
+    variables = {'ids': '{' + ','.join(f'"{player}"' for player in ids) + '}', 'names': f'^({TEST_NAMES})$', 'n': str(len(ids))}
+    names = dict(psql(channel, "select id, name from player where id = any(:'ids'::text[]);", variables))
+    missing = [player for player in ids if player not in names]
+    if missing:
+        stop(f'no player {", ".join(missing)} in saves_{channel}; nothing deleted')
+    kept = [f'{player} ({names[player]!r})' for player in ids if re.fullmatch(TEST_NAMES, names[player]) is None]
+    if kept:
+        stop(f'not a test or bot name, so refused: {", ".join(kept)}; nothing deleted')
+    tables = [row[0] for row in psql(channel, "select table_name from information_schema.columns where table_schema = 'public' "
+                                              "and column_name = 'player_id' and table_name <> 'player' order by table_name;")]
+    for table in tables:
+        if re.fullmatch(SAVES_TABLE, table) is None:
+            stop(f'unexpected table name {table!r}; nothing deleted')
+    counts = {}
+    if tables:
+        union = ' union all '.join(f"select '{table}', player_id, count(*) from public.\"{table}\" where player_id = any(:'ids'::text[]) "
+                                   'group by player_id' for table in tables)
+        for table, player, count in psql(channel, union + ';', variables):
+            counts.setdefault(player, []).append(f'{table} {count}')
+    for player in ids:
+        print(f'{"delete" if sure else "would":<7} saves_{channel} {player} {names[player]!r}: {", ".join(counts.get(player, [])) or "no rows"} and its player row')
+    if not sure:
+        print('dry run: nothing deleted; add --yes to delete')
+        return 0
+    # Under a row lock the names are read again, so a player who took a real name since is never deleted.
+    deletes = '\n'.join(f"with gone as (delete from public.\"{table}\" where player_id = any(:'ids'::text[]) returning 1) "
+                        f"select '{table}', count(*) from gone;" for table in tables)
+    done = psql(channel, f"""begin;
+select count(*) = :n as matched from (select id from player where id = any(:'ids'::text[]) and name ~ :'names' for update) locked \\gset
+\\if :matched
+{deletes}
+with gone as (delete from player where id = any(:'ids'::text[]) returning 1) select 'player', count(*) from gone;
+commit;
+\\else
+rollback;
+select 'changed', 0;
+\\endif
+""", variables)
+    if ['changed', '0'] in done:
+        stop('a player changed its name or left while this ran; nothing deleted')
+    summary = ', '.join(f'{table} {count}' for table, count in done)
+    who = os.environ.get('SUDO_USER', 'root')
+    journal(f'saves delete-test saves_{channel} by {who}: ' + ' '.join(f'{player}={names[player]!r}' for player in ids) + f' ({summary})')
+    print(f'ok      saves_{channel} deleted {summary}; the box journal has it (journalctl -t wildshard-saves)')
+    return 0
+
+
+def write_secret_rows(path, rows):
+    """Atomic root-only env update. Never print a credential or accept an arbitrary key."""
+    fd, temporary = tempfile.mkstemp(dir=os.path.dirname(path), prefix='.async-upload.')
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as handle:
+            handle.write('\n'.join(rows) + '\n')
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(temporary, 0o600)
+        if not TEST:
+            os.chown(temporary, 0, 0)
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+# MMO-SERVER MP1.2.d: the cap bench's throwaway replica, on staging's CPUs and the tailnet only; replica.mjs (root-owned in
+# /opt/wildshard-vps, from a signed tag) says how. Bounded here and there: 60 to 3,900 seconds, 1 to 4 workers, 1 to 64 seats,
+# at most 8 cells. It runs in the foreground and its server lines come back on stdout; `replica stop` ends it.
+REPLICA_USAGE = ('usage: wildshard-config replica start [--seconds 60-3900] [--workers 1-4] [--seats 1-64] [--cells a,b] '
+                 '[--saves memory|postgres] | replica pg-restart [--checkpoint] | replica stop')
+
+
+def replica(args):
+    if args[1:] in (['stop'], ['pg-restart'], ['pg-restart', '--checkpoint']):
+        words = args[1:]
+    elif args[1:2] == ['start']:
+        options = {'--seconds': '1800', '--workers': '4', '--seats': '32', '--cells': 'driftwood-isle', '--saves': 'memory'}
+        rest = args[2:]
+        if len(rest) % 2 or any(flag not in options for flag in rest[::2]):
+            stop(REPLICA_USAGE)
+        options.update(zip(rest[::2], rest[1::2]))
+        seconds, workers, seats, cells, saves = (options[flag] for flag in ('--seconds', '--workers', '--seats', '--cells', '--saves'))
+        if (re.fullmatch(r'[0-9]{2,4}', seconds) is None or not 60 <= int(seconds) <= 3900
+                or re.fullmatch(r'[1-4]', workers) is None or re.fullmatch(r'[0-9]{1,2}', seats) is None or not 1 <= int(seats) <= 64
+                or re.fullmatch(f'{CELL}(,{CELL}){{0,7}}', cells) is None or saves not in ('memory', 'postgres')):
+            stop(REPLICA_USAGE)
+        words = ['start', seconds, workers, seats, cells] + (['postgres'] if saves == 'postgres' else [])
+    else:
+        stop(REPLICA_USAGE)
+    node = 'node' if TEST else '/usr/bin/node'
+    sys.stdout.flush()
+    os.execvpe(node, [node, helper('replica'), *words], helper_env())
+
+
+def async_upload(args):
+    """SP22's staging-only credential seam; two fixed secrets arrive on stdin, never argv."""
+    if args != ['async-upload', 'staging']:
+        stop('usage: wildshard-config async-upload staging < private-credentials.json')
+    import json, fcntl
+    try:
+        payload = sys.stdin.read(4097)
+        values = json.loads(payload)
+        if len(payload) > 4096 or not isinstance(values, dict) or set(values) != {'cookKey', 'activationToken'}:
+            raise ValueError()
+        if any(not isinstance(value, str) or re.fullmatch('[0-9a-f]{64}', value) is None for value in values.values()):
+            raise ValueError()
+        if values['cookKey'] == values['activationToken']:
+            raise ValueError()
+    except (ValueError, TypeError):
+        stop('invalid async-upload credential document')
+    lock = os.fdopen(os.open(f'{ETC}/.async-upload.lock', os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600), 'w')
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    paths = [f'{ETC}/staging.env', f'{ETC}/cook.env']
+    before = [read_rows(path) for path in paths]
+    if not all(before) or not running('staging'):
+        stop('async upload needs an installed running staging server and cook env')
+    replacements = [{'COOK_ACTIVATION_TOKEN': values['activationToken']},
+                    {'COOK_SIGNING_KEY': values['cookKey'], 'COOK_STAGING_ACTIVATION_TOKEN': values['activationToken']}]
+    rows = [[row for row in old if key_of(row) not in change] + [f'{key}={value}' for key, value in change.items()]
+            for old, change in zip(before, replacements)]
+    if rows == before:
+        say('ok      staging async credentials already installed')
+        return 0
+    import signal
+    signal.signal(signal.SIGHUP, signal.SIG_IGN)
+    signal.signal(signal.SIGPIPE, signal.SIG_IGN)
+    try:
+        for path, value in zip(paths, rows):
+            write_secret_rows(path, value)
+        if restart('staging') and cook_rebuild():
+            say('ok      staging async credentials installed; production unchanged')
+            return 0
+    except BaseException:
+        pass
+    for path, value in zip(paths, before):
+        write_secret_rows(path, value)
+    restart('staging')
+    cook_rebuild()
+    say('undo    async upload failed health; previous staging/cook credentials restored', error=True)
+    return 2
+
+
+# MMO-OBSERVABILITY OB11 (QA 11-24 rows 62 and 63): the cook's alarms reach Sentry only when cook.env names SENTRY_DSN. A DSN
+# is a secret, so `set` refuses it; this one verb takes exactly one Sentry ingest DSN on stdin (never argv, never printed),
+# writes it into the root-only cook.env, rebuilds the cook step alone and puts the old file back if the worker fails /health.
+SENTRY_DSN = re.compile(r'https://[0-9a-f]{32}@o[0-9]{1,20}\.ingest(?:\.[a-z]{2})?\.sentry\.io/[0-9]{1,20}')
+
+
+def cook_sentry(args):
+    if args == ['cook-sentry', '--test']:
+        return cook_sentry_test()
+    if args != ['cook-sentry']:
+        stop('usage: wildshard-config cook-sentry < dsn.txt | cook-sentry --test')
+    payload = sys.stdin.read(513)
+    dsn = payload.strip()
+    if len(payload) > 512 or SENTRY_DSN.fullmatch(dsn) is None:
+        stop('cook-sentry takes one Sentry ingest DSN on stdin')
+    path = f'{ETC}/cook.env'
+    before = read_rows(path)
+    if not before:
+        stop('cook-sentry needs the installed cook env')
+    rows = [row for row in before if key_of(row) != 'SENTRY_DSN'] + [f'SENTRY_DSN={dsn}']
+    if rows == before:
+        say('ok      the cook already sends its alarms to that Sentry project')
+        return 0
+    import signal
+    signal.signal(signal.SIGHUP, signal.SIG_IGN)
+    signal.signal(signal.SIGPIPE, signal.SIG_IGN)
+    try:
+        write_secret_rows(path, rows)
+        if cook_rebuild():
+            say('ok      cook.env names a Sentry DSN; the cook worker restarted and answers /health')
+            return 0
+    except BaseException:
+        pass
+    write_secret_rows(path, before)
+    cook_rebuild()
+    say('undo    the cook failed health with the DSN; the previous cook.env is back', error=True)
+    return 2
+
+
+def cook_sentry_test():
+    """OB11's proof: one test event to the Sentry project cook.env names, from this box, with the cook's environment and
+    channel tags. Prints only the event id; never the DSN."""
+    import json, urllib.request, uuid, datetime
+    dsn = next((row.split('=', 1)[1] for row in read_rows(f'{ETC}/cook.env') or [] if key_of(row) == 'SENTRY_DSN'), '')
+    match = re.fullmatch(r'https://([0-9a-f]{32})@([a-z0-9.-]+)/([0-9]{1,20})', dsn)
+    if SENTRY_DSN.fullmatch(dsn) is None or match is None:
+        stop('cook.env names no Sentry DSN: run wildshard-config cook-sentry < dsn.txt first')
+    key, host, project = match.groups()
+    event = uuid.uuid4().hex
+    body = {'event_id': event, 'timestamp': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'platform': 'python',
+            'level': 'warning', 'environment': 'cook', 'logger': 'wildshard-config',
+            'message': {'formatted': 'ALARM test: the box cook reaches Sentry (MMO-OBSERVABILITY OB11)'},
+            'tags': {'channel': 'cook', 'proof': 'ob11'}}
+    request = urllib.request.Request(f'https://{host}/api/{project}/store/', data=json.dumps(body).encode(), method='POST',
+                                     headers={'Content-Type': 'application/json',
+                                              'X-Sentry-Auth': f'Sentry sentry_version=7, sentry_key={key}, sentry_client=wildshard-config/1'})
+    if TEST:
+        say(f'would   send test event {event}')
+        return 0
+    try:
+        with urllib.request.urlopen(request, timeout=20) as answer:
+            if answer.status != 200:
+                raise OSError()
+    except OSError:
+        stop('Sentry refused the test event')
+    say(f'ok      test event {event} sent to the cook\'s Sentry project')
+    return 0
+
+
+def main(argv):
+    production = '--production' in argv
+    args = [arg for arg in argv if arg != '--production']
+    if args and args[0] == 'async-upload':
+        return async_upload(args)
+    if args and args[0] == 'cook-sentry':
+        return cook_sentry(args)
+    if args and args[0] == 'saves':
+        return saves(args, production)
+    if args and args[0] == 'replica':
+        return replica(args)
+    if args and args[0] == 'cook':
+        return cook(args)
+    if args[:2] == ['show', 'cook'] and len(args) == 2:
+        return show_cook()
+    if args[:2] == ['set', 'cook']:
+        stop('the cook worker moves with: wildshard-config cook vX.Y.Z')
+    if not args or args[0] not in ('show', 'set', 'split'):
+        stop('usage: wildshard-config show <channel> | set <channel> <KEY> <value> [<KEY> <value>]... [--production] | split <channel> '
+             '| cook vX.Y.Z | show cook | cook-sentry < dsn | cook-sentry --test | replica start|stop | saves list|delete-test ...')
+    verb = args[0]
+    if len(args) < 2 or args[1] not in CHANNELS:
+        stop('the channel is production or staging')
+    channel = args[1]
+    settings_path, env_path = f'{ETC}/{channel}.settings', f'{ETC}/{channel}.env'
+    if verb in ('set', 'split'):
+        # One change at a time per channel, held through publication and rollback: a second caller waits, so neither
+        # overwrites or rolls back the other's change. 600, so VH12's world-readable check never sees it.
+        import fcntl
+        lock = os.fdopen(os.open(f'{ETC}/.{channel}.settings.lock', os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600), 'w')
+        fcntl.flock(lock, fcntl.LOCK_EX)
+
+    if verb == 'show':
+        if len(args) != 2:
+            stop('usage: wildshard-config show <channel>')
+        for row in read_rows(settings_path):
+            if key_of(row) in SETTINGS:
+                print(row)
+        return 0
+
+    if verb == 'split':
+        # Once: the allowed keys move from the .env (where setup.sh first wrote them) to the settings file. Secrets never move.
+        if len(args) != 2:
+            stop('usage: wildshard-config split <channel>')
+        env_rows = read_rows(env_path)
+        # systemd strips one pair of matching quotes; a value that still fails its rule stays in the .env, never dropped.
+        # The last assignment of a key is the one systemd uses; a key moves only if that one passes its rule, and then all of
+        # its rows move, so the precedence never changes (Codex J206).
+        last = {key_of(row): row for row in env_rows if key_of(row) in SETTINGS}
+        keys = {key for key, row in last.items() if SETTINGS[key](plain(row), channel)}
+        moving = [row for row in env_rows if key_of(row) in keys]
+        if not moving:
+            print(f'ok      {env_path} holds no settings')
+            return 0
+        settings_rows = read_rows(settings_path) or list(HEADER)
+        have = {key_of(row) for row in settings_rows}
+        # A value already in the settings file wins: it is read last, so it is the one the server runs with today.
+        settings_rows += [f'{key}={plain(last[key])}' for key in sorted(keys, key=lambda name: list(SETTINGS).index(name)) if key not in have]
+        write_rows(settings_path, settings_rows, channel)
+        write_rows(env_path, [row for row in env_rows if row not in moving], channel)
+        print(f'doing   move {", ".join(sorted(keys))} from {channel}.env to {channel}.settings')
+        return 0
+
+    if len(args) < 4 or len(args) % 2 != 0:
+        stop('usage: wildshard-config set <channel> <KEY> <value> [<KEY> <value>]... [--production]')
+    pairs = list(zip(args[2::2], args[3::2]))
+    keys = [key for key, _ in pairs]
+    if len(set(keys)) != len(keys):
+        stop('each key once per set')
+    for key, value in pairs:
+        if key not in SETTINGS:
+            stop(f'{key} is not a setting an agent may change; allowed: {", ".join(SETTINGS)}')
+        if not SETTINGS[key](value, channel):
+            stop(f'{key} must be {RULES[key]}')
+    if channel == 'production' and not production:
+        stop('a production change needs --production')
+    before = read_rows(settings_path)
+    rows = list(before) or list(HEADER)
+    rows = [row for row in rows if key_of(row) not in keys] + [f'{key}={value}' for key, value in pairs]
+    change = ' '.join(f'{key}={value}' for key, value in pairs)
+    if rows == before:
+        print(f'ok      {channel} already has {change}')
+        return 0
+    # Checked against what the server would read, the .env included, so no restart can boot into main.ts's throw.
+    env_rows = read_rows(env_path)
+    if pair_broken(env_rows, rows):
+        if pair_broken(env_rows, before):
+            stop(f'{channel} already holds only one of PLACEMENT_URL and PLACEMENT_PUBLIC_KEY (in its .env or .settings), so '
+                 'its server cannot start; set both in one call, both set or both blank')
+        stop('PLACEMENT_URL and PLACEMENT_PUBLIC_KEY go together: set both in one call, both set or both blank')
+    placing = effective(env_rows + rows, PLACEMENT_PAIR + ('WORLD_CELLS',))
+    if any(key in PLACEMENT_PAIR for key in keys) and placing.get('PLACEMENT_URL', '') != '' and placing.get('WORLD_CELLS', '').strip() != 'grid':
+        print(f'note    {channel} WORLD_CELLS is not grid, so the server reads no placement file (main.ts)')
+    was_running = running(channel)
+    write_rows(settings_path, rows, channel)
+    print(f'doing   {channel} {change}')
+    if not was_running:
+        # A channel still waiting for its first release keeps its health stub; the setting takes effect when it starts.
+        print(f'skip    wildshard-server@{channel} is not running; {change} takes effect when it starts')
+        return 0
+    if restart(channel):
+        print(f'ok      {channel} is healthy with {change}')
+        return 0
+    # It did not come back: put the old file back and start the old settings, so a bad value never leaves a channel down.
+    if before:
+        write_rows(settings_path, before, channel)
+    else:
+        os.unlink(settings_path)
+    print(f'undo    {channel} was not healthy in two minutes; the old settings are back', file=sys.stderr)
+    if not restart(channel):
+        print(f'stop    {channel} is not healthy on its old settings either: look at journalctl -u wildshard-server@{channel}', file=sys.stderr)
+        return 2
+    return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

@@ -5,8 +5,8 @@ import {join, resolve as resolvePath} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Exercise the production manifest/body HTTP path locally.
 import {createServer} from 'node:http';
 import {expect, test, vi} from 'vitest';
-import {CHUNK, KEEP_PROMOTED, carryPreviousDeploy, channelOrigin, liveDeployBuilds, previousDeployOptional} from '../scripts/app-build/previousDeploy.mjs';
-import {checkServerOutput, standaloneServerFile} from '../scripts/app-build/standaloneOutput.mjs';
+import {CHUNK, KEEP_PROMOTED, carryPreviousDeploy, channelOrigin, liveDeployBuilds, previousDeployOptional} from '../src/scripts/app-build/previousDeploy.mjs';
+import {checkServerOutput, standaloneServerFile} from '../src/scripts/app-build/standaloneOutput.mjs';
 
 test('a deploy carries the kept builds unchanged, but never one past the prune, nor a map', async () => {
   mkdirSync('tmp', {recursive: true}); const root = mkdtempSync(resolvePath('tmp/previous-deploy-'));
@@ -315,7 +315,7 @@ test('a release carries from its own channel, never a vercel.app address (OFF-VE
   expect(channelOrigin(undefined)).toBe('https://play.wildshard.io');
   expect(channelOrigin('')).toBe('https://play.wildshard.io');
   for (const wrong of ['constructor', 'wildshard-singleplayer.vercel.app']) expect(() => channelOrigin(wrong)).toThrow(/WS_CHANNEL/u);
-  const pipeline = readFileSync('scripts/app-build-pipeline.mjs', 'utf8');
+  const pipeline = readFileSync('src/scripts/app-build-pipeline.mjs', 'utf8');
   expect(pipeline).not.toMatch(/vercel\.app|VERCEL_ENV/u);
   expect(pipeline).toContain('process.env.WS_RELEASE === "1"');
 });

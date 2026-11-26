@@ -17,7 +17,7 @@ test('riding metadata imports without constructing the later rename grapheme seg
     const second = cleanMountName('  ka<ra>   jorga<script>  ', 10);
     console.log(JSON.stringify({imported, invalid, afterInvalid, first, afterFirst, second, constructed}));
   `;
-  const result = spawnSync(process.execPath, ['--import', resolve('scripts/sim-node-loader.mjs'), '--input-type=module', '-e', source], {
+  const result = spawnSync(process.execPath, ['--import', resolve('src/scripts/sim-node-loader.mjs'), '--input-type=module', '-e', source], {
     encoding: 'utf8', timeout: 20_000,
   });
   expect(result.error).toBeUndefined();

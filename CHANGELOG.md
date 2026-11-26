@@ -10,7 +10,7 @@ The helper writes this section, version and stamps on `release/vX.Y.Z`
 (J360/J362; meta RELEASE-BRANCHES). After staging proofs, `--finish`
 tags that exact green head; after publication, `--merge-back` brings
 it into main while other lanes continue landing.
-`scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
+`src/scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
 ## v0.1.92 (2026-11-25)

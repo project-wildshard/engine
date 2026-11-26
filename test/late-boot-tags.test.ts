@@ -1,10 +1,10 @@
 import { expect, test } from 'vitest';
-import { lateBootTags, stampBuildHtml } from '../scripts/app-build/buildIdentity.mjs';
+import { lateBootTags, stampBuildHtml } from '../src/scripts/app-build/buildIdentity.mjs';
 
 /** FIRST-OPEN-PROGRESS (QA-FEEDBACK 2026-11-16 row 17): Jake's cold Home Screen open of v0.1.29 showed iOS's still launch
  * image for 10 s and the shell's moving bar for a tenth of a second, because iOS holds that image until `load` and every
  * bundle tag held `load` back. The title document's bundle tags now wait in an inert template: written back in place in a
- * browser tab, added after `load` on a Home Screen launch. scripts/first-open-progress-proof.mjs proves it on a real
+ * browser tab, added after `load` on a Home Screen launch. src/scripts/first-open-progress-proof.mjs proves it on a real
  * build (WebKit 402x874, cold, shaped line): `load` before the first bundle request when standalone. */
 const MODULE = '<script type="module" crossorigin src="/b/abc1234-x/main-AAAA.js"></script>';
 const PRELOADS = ['<link rel="modulepreload" crossorigin href="/b/c/entry-BBBB.js">', '<link rel="modulepreload" crossorigin href="/b/c/shared-CCCC.js">'];

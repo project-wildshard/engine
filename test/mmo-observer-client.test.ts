@@ -4,8 +4,8 @@ import {chmodSync,existsSync,lstatSync,mkdirSync,readFileSync,rmSync,symlinkSync
 import {spawnSync} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
 import {resolve,join} from 'node:path';
-import {observerArguments,observerIdentities,runObserver} from '../scripts/mmo-release-observer.mjs';
-import {observerCommand} from '../scripts/mmo-observer-client.mjs';
+import {observerArguments,observerIdentities,runObserver} from '../src/scripts/mmo-release-observer.mjs';
+import {observerCommand} from '../src/scripts/mmo-observer-client.mjs';
 
 const cleanups:(()=>void|Promise<void>)[]=[];
 afterEach(async()=>{for(const cleanup of cleanups.splice(0).reverse())await cleanup();});

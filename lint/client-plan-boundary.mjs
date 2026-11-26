@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import ts from '@typescript/typescript6';
-import { formatSource } from '../scripts/format-package.mjs';
+import { formatSource } from '../src/scripts/format-package.mjs';
 
 /** Follow referenced schema declarations, including the compiled feature registry's required sections.
  * Unrelated legacy schemas in the same file are not part of the client plan's API. */

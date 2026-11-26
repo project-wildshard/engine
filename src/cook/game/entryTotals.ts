@@ -265,7 +265,7 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
     for (const table of [shardRows.phone, shardRows.desktop]) for (const row of [...table.entry, ...table.whole]) {
       const stable = half.stableKey(row.url); if (stable !== undefined) stableKeys.set(row.url, stable);
     }
-    // DL22: the shard's recorded pre-control reads (scripts/record-fence-reads.mjs), mapped to this product's hashes.
+    // DL22: the shard's recorded pre-control reads (src/scripts/record-fence-reads.mjs), mapped to this product's hashes.
     const fencePath = join(root, 'src/shards', directory, 'fence-reads.json');
     let fenceAssets: readonly string[] = [];
     if (existsSync(fencePath)) {
@@ -283,14 +283,14 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
       const owners = identityFiles(assetIdentities(urls, packParts(), refs, {digests: assetDigests, sources: bundlerSources()}));
       const ambiguous = shell.filter(identity => (owners.get(identity)?.length ?? 0) > 1);
       if (ambiguous.length > 0) throw new Error(`${fencePath} lists ${ambiguous.length} identities naming more than one file of this build `
-        + `(${ambiguous.slice(0, 3).join(', ')}); re-record with scripts/record-fence-reads.mjs`);
+        + `(${ambiguous.slice(0, 3).join(', ')}); re-record with src/scripts/record-fence-reads.mjs`);
       const byIdentity = new Map<string, string>();
       for (const [identity, named] of owners) { const only = named[0]; if (named.length === 1 && only !== undefined) byIdentity.set(identity, only); }
       fenceAssets = [...new Set(shell.flatMap(identity => { const url = byIdentity.get(identity); return url === undefined ? [] : [url]; }))];
       const unresolved = [...resolved.unresolved.filter(row => !row.startsWith('ref:')), ...shell.filter(identity => !byIdentity.has(identity))];
       // A stale entry fails the build (sp-x8's review): skipping it would quietly bring back an on-demand fetch.
       if (unresolved.length > 0) throw new Error(`${fencePath} lists ${unresolved.length} files this build no longer has `
-        + `(${unresolved.slice(0, 3).join(', ')}); re-record with scripts/record-fence-reads.mjs`);
+        + `(${unresolved.slice(0, 3).join(', ')}); re-record with src/scripts/record-fence-reads.mjs`);
     }
     // AUDIO AU1: the same recordings on every tier and flow: LOAD reads them before control on all of them.
     const bootAudio = assetTables === undefined ? [] : shardBootAudio(sections, assetTables, half.mountRows('phone', 'entry').map(row => row.url), directory);

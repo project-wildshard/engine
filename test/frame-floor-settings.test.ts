@@ -1,9 +1,9 @@
 import { expect, test, vi } from 'vitest';
 // oxlint-disable-next-line import/no-nodejs-modules -- execute the serialized Safari init in isolated storage contexts
 import { runInNewContext } from 'node:vm';
-import { frameFloorSettingsCode, resetFrameFloorDebug, assertFrameFloorFixture, frameFloorBootstrapHtml, frameFloorGameNavigationCode, traceFrameFloorFixtureWrites } from '../scripts/frame-floor-settings.mjs';
-import { saveFixtureCode } from '../scripts/debug-settings.mjs';
-import { validateFrameFloorArgs } from '../scripts/frame-floor-args.mjs';
+import { frameFloorSettingsCode, resetFrameFloorDebug, assertFrameFloorFixture, frameFloorBootstrapHtml, frameFloorGameNavigationCode, traceFrameFloorFixtureWrites } from '../src/scripts/frame-floor-settings.mjs';
+import { saveFixtureCode } from '../src/scripts/debug-settings.mjs';
+import { validateFrameFloorArgs } from '../src/scripts/frame-floor-args.mjs';
 
 test('quiet requires one explicit Simulator surface before any build', () => {
   expect(() => validateFrameFloorArgs(['--surface=sim', '--quiet'])).not.toThrow();

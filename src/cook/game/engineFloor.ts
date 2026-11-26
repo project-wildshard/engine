@@ -5,7 +5,7 @@
 import {readFileSync} from 'node:fs';
 import {engineFloorRefusal} from '@wildshard/format/engine-floor';
 
-/** scripts/build-server.mjs: package.json's version in a server bundle; unset when the cook runs from the checkout. */
+/** src/scripts/build-server.mjs: package.json's version in a server bundle; unset when the cook runs from the checkout. */
 declare const __ENGINE_VERSION__: string | undefined;
 let own: string | undefined;
 

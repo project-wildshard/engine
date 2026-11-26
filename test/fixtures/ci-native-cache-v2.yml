@@ -42,28 +42,28 @@
           name: native-fixtures
           path: tmp/ci-native-fixtures
       - name: Restore source-host native constructor inputs
-        run: node --experimental-transform-types --import ./scripts/sim-node-loader.mjs scripts/ci-native-fixtures.mjs restore
+        run: node --experimental-transform-types --import ./src/scripts/sim-node-loader.mjs scripts/ci-native-fixtures.mjs restore
       - name: Pre-read native Chrome (post-read warmed)
         if: matrix.group == 'escape-titan'
         run: |
           mkdir -p tmp/ci-native-escape
-          node scripts/warm-native-chrome.mjs > tmp/ci-native-escape/warm-read.json
+          node src/scripts/warm-native-chrome.mjs > tmp/ci-native-escape/warm-read.json
           cat tmp/ci-native-escape/warm-read.json
       - name: Run the original native Escape controls alone
         if: matrix.group == 'escape-titan'
-        run: python3 scripts/ci-fail-fast.py -- python3 scripts/heavy-lane.py check -- pnpm exec vitest run test/tooling/parity/browser-escape.test.mjs --config scripts/vitest-native-escape.config.ts --maxWorkers=1 --bail=0 --reporter=default --reporter=json --outputFile=tmp/ci-native-escape/results.json
+        run: python3 scripts/ci-fail-fast.py -- python3 src/scripts/heavy-lane.py check -- pnpm exec vitest run src/test/parity/browser-escape.test.mjs --config src/scripts/vitest-native-escape.config.ts --maxWorkers=1 --bail=0 --reporter=default --reporter=json --outputFile=tmp/ci-native-escape/results.json
       - name: Run the complete Titan file without sibling workers
         if: ${{ !cancelled() && steps.native-inputs.outcome == 'success' && matrix.group == 'escape-titan' }}
-        run: python3 scripts/ci-fail-fast.py -- python3 scripts/heavy-lane.py check -- pnpm exec vitest run test/nalati-titan-verbs.test.ts --config scripts/vitest-native-escape.config.ts --maxWorkers=1 --bail=0 --reporter=default --reporter=json --outputFile=tmp/ci-native-escape/sim-results.json
+        run: python3 scripts/ci-fail-fast.py -- python3 src/scripts/heavy-lane.py check -- pnpm exec vitest run test/nalati-titan-verbs.test.ts --config src/scripts/vitest-native-escape.config.ts --maxWorkers=1 --bail=0 --reporter=default --reporter=json --outputFile=tmp/ci-native-escape/sim-results.json
       - name: Run independent native routes without sibling workers
         if: ${{ !cancelled() && steps.native-inputs.outcome == 'success' && matrix.group == 'native-routes' }}
-        run: python3 scripts/ci-fail-fast.py -- python3 scripts/heavy-lane.py check -- pnpm exec vitest run test/driftwood-optional-verbs.test.ts test/driftwood-trade-verbs.test.ts test/nalati-patrol-verbs.test.ts test/physics-nalati-headless.test.ts test/nalati-chapter-binding.test.ts test/nalati-discovery-verbs.test.ts test/native-runtime-observation.test.ts --config scripts/vitest-native-escape.config.ts --maxWorkers=1 --bail=0 --reporter=default --reporter=json --outputFile=tmp/ci-native-escape/sim-results.json
+        run: python3 scripts/ci-fail-fast.py -- python3 src/scripts/heavy-lane.py check -- pnpm exec vitest run test/driftwood-optional-verbs.test.ts test/driftwood-trade-verbs.test.ts test/nalati-patrol-verbs.test.ts test/physics-nalati-headless.test.ts test/nalati-chapter-binding.test.ts test/nalati-discovery-verbs.test.ts test/native-runtime-observation.test.ts --config src/scripts/vitest-native-escape.config.ts --maxWorkers=1 --bail=0 --reporter=default --reporter=json --outputFile=tmp/ci-native-escape/sim-results.json
       - name: Run native story tapes without sibling workers
         if: ${{ !cancelled() && steps.native-inputs.outcome == 'success' && matrix.group == 'stories-qara' }}
-        run: python3 scripts/ci-fail-fast.py -- python3 scripts/heavy-lane.py check -- pnpm exec vitest run test/pine-quest-verbs.test.ts test/pine-door-continuation.test.ts test/driftwood-story-verbs.test.ts test/sky-progression-verbs.test.ts test/nalati-qara-verbs.test.ts --config scripts/vitest-native-escape.config.ts --maxWorkers=1 --bail=0 --reporter=default --reporter=json --outputFile=tmp/ci-native-escape/sim-results.json
+        run: python3 scripts/ci-fail-fast.py -- python3 src/scripts/heavy-lane.py check -- pnpm exec vitest run test/pine-quest-verbs.test.ts test/pine-door-continuation.test.ts test/driftwood-story-verbs.test.ts test/sky-progression-verbs.test.ts test/nalati-qara-verbs.test.ts --config src/scripts/vitest-native-escape.config.ts --maxWorkers=1 --bail=0 --reporter=default --reporter=json --outputFile=tmp/ci-native-escape/sim-results.json
       - name: Run the complete earned chapter-one tape alone
         if: ${{ !cancelled() && steps.native-inputs.outcome == 'success' && matrix.group == 'chapter-one' }}
-        run: python3 scripts/ci-fail-fast.py -- python3 scripts/heavy-lane.py check -- pnpm exec vitest run test/nalati-chapter-one.test.ts --config scripts/vitest-native-escape.config.ts --maxWorkers=1 --bail=0 --reporter=default --reporter=json --outputFile=tmp/ci-native-escape/sim-results.json
+        run: python3 scripts/ci-fail-fast.py -- python3 src/scripts/heavy-lane.py check -- pnpm exec vitest run test/nalati-chapter-one.test.ts --config src/scripts/vitest-native-escape.config.ts --maxWorkers=1 --bail=0 --reporter=default --reporter=json --outputFile=tmp/ci-native-escape/sim-results.json
       - name: Publish exact failure paths
         if: failure()
         uses: actions/upload-artifact@v4
@@ -88,7 +88,7 @@
   # snapshots retain their behaviour fallback. The same existing job runs beside
   # prepare (same checkout, cache and generation), so prepare's path is unchanged.
   # Shards read these snapshots only when their generated tree hashes the same
-  # (scripts/ci-generated-manifest.sh); otherwise they compute, as off CI.
+  # (src/scripts/ci-generated-manifest.sh); otherwise they compute, as off CI.
   fixtures:
     if: github.event_name == 'push' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -201,11 +201,11 @@
           restore-keys: |
             preparation-v4-${{ runner.os }}-${{ runner.arch }}-node24-
             preparation-v3-${{ runner.os }}-${{ runner.arch }}-node24-
-      - run: python3 scripts/ci-fail-fast.py -- node scripts/gen.mjs --reuse
+      - run: python3 scripts/ci-fail-fast.py -- node src/scripts/gen.mjs --reuse
         if: steps.admission.outputs.run == 'true'
       - name: Publish source-host native constructor inputs
         if: steps.admission.outputs.run == 'true'
-        run: node --experimental-transform-types --import ./scripts/sim-node-loader.mjs scripts/ci-native-fixtures.mjs build
+        run: node --experimental-transform-types --import ./src/scripts/sim-node-loader.mjs scripts/ci-native-fixtures.mjs build
       - uses: actions/upload-artifact@v4
         if: steps.admission.outputs.run == 'true'
         with:
@@ -222,8 +222,8 @@
           WS_VITEST_MAX_WORKERS: '3'
         run: |
           mkdir -p tmp/ci-fixtures
-          bash scripts/ci-generated-manifest.sh > tmp/ci-generated.sha256
-          if ! WS_FIXTURE_SNAPSHOT_WRITE="$PWD/tmp/ci-fixtures" pnpm exec vitest run --config scripts/vitest-fixture-snapshots.config.ts test/fixture-snapshots; then
+          bash src/scripts/ci-generated-manifest.sh > tmp/ci-generated.sha256
+          if ! WS_FIXTURE_SNAPSHOT_WRITE="$PWD/tmp/ci-fixtures" pnpm exec vitest run --config src/scripts/vitest-fixture-snapshots.config.ts test/fixture-snapshots; then
             echo '::warning::A fixture snapshot writer failed; shards compute that fixture'
           fi
           cp tmp/ci-generated.sha256 tmp/ci-fixtures/generated.sha256
@@ -309,7 +309,7 @@
           name: native-fixtures
           path: tmp/ci-native-fixtures
       - name: Restore source-host native constructor inputs
-        run: node --experimental-transform-types --import ./scripts/sim-node-loader.mjs scripts/ci-native-fixtures.mjs restore
+        run: node --experimental-transform-types --import ./src/scripts/sim-node-loader.mjs scripts/ci-native-fixtures.mjs restore
       - uses: actions/download-artifact@v4
         with:
           name: vitest-plan
@@ -326,14 +326,14 @@
             zstd -d --long=30 -c test-fixtures.tar.zst | tar -C tmp/ci-fixtures -xf -
             rm test-fixtures.tar.zst
           fi
-          if [ -f tmp/ci-fixtures/generated.sha256 ] && bash scripts/ci-generated-manifest.sh | cmp -s - tmp/ci-fixtures/generated.sha256; then
+          if [ -f tmp/ci-fixtures/generated.sha256 ] && bash src/scripts/ci-generated-manifest.sh | cmp -s - tmp/ci-fixtures/generated.sha256; then
             ls tmp/ci-fixtures
           else
             echo '::warning::Fixture snapshots do not match this generated tree; shards compute them'
             rm -f tmp/ci-fixtures/*.v8
           fi
       # CI7: one duration-packed wave includes every product and source suite.
-      - run: python3 scripts/ci-fail-fast.py -- python3 scripts/heavy-lane.py check -- pnpm exec vitest run --config scripts/vitest-ci.config.ts --shard=${{ matrix.shard }}/12 --bail=0 --reporter=default --reporter=json --reporter=./scripts/vitest-timings.ts --outputFile=tmp/ci-vitest/results.json
+      - run: python3 scripts/ci-fail-fast.py -- python3 src/scripts/heavy-lane.py check -- pnpm exec vitest run --config src/scripts/vitest-ci.config.ts --shard=${{ matrix.shard }}/12 --bail=0 --reporter=default --reporter=json --reporter=./src/scripts/vitest-timings.ts --outputFile=tmp/ci-vitest/results.json
         env:
           VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}
           WS_TEST_PRODUCTS_SHA: ${{ github.sha }}

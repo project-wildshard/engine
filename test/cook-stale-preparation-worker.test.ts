@@ -54,7 +54,7 @@ test('the cook worker cooks a stale preparation in its bounded child, and its in
   const worker = (build: string, renderer?: string, sidecars?: string): ReturnType<typeof createCookWorker> => createCookWorker({build, store: folderStore(join(root, 'worker-store')),
     source: {heads: () => Promise.resolve([{slug, hash, revision: 1}]), download: () => Promise.resolve(tarball)},
     serverPacks: join(root, 'worker-server'), scratch: join(root, 'worker-jobs'), log: line => { lines.push(line); },
-    launcher: {root: process.cwd(), execPath: process.execPath, loader: resolve('scripts/bake-loader.mjs'), get script() { if (entry === undefined) throw new Error('Missing fixed cook entry'); return entry.script; }, wrap: [],
+    launcher: {root: process.cwd(), execPath: process.execPath, loader: resolve('src/scripts/bake-loader.mjs'), get script() { if (entry === undefined) throw new Error('Missing fixed cook entry'); return entry.script; }, wrap: [],
       limits: {seconds: 50, memoryMB: 4096, heapMB: 2048}, ...(renderer === undefined ? {} : {renderer}), ...(sidecars === undefined ? {} : {sidecars})}});
   const stale = await worker('moved', MOVED).cook({slug, hash});
   expect(stale, lines.join('\n')).toMatchObject({state: 'cooked', preparation: 'stale'});

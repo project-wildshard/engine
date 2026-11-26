@@ -17,7 +17,7 @@ let database: Promise<IDBDatabase | null> | undefined;
 
 /** QA-FEEDBACK-2026-11-23 row 8 (Jake: *"its only frozen and really fucking slow when doing a version upgrade or update"*): the
  *  store was keyed by the deploy, so every update decoded and assembled the whole Home again. It is keyed by the code that
- *  builds Home geometry instead (scripts/home-geometry-revision.mjs, stamped on every document as
+ *  builds Home geometry instead (src/scripts/home-geometry-revision.mjs, stamped on every document as
  *  `__WS_HOME_GEOMETRY_REVISION__`), so an update that leaves that code alone restores the Home. A document without the
  *  stamp (a dev page, an older build's) keys by its build, as before. */
 export function homeGeometryCode(revision: unknown, build: string): string {

@@ -7,9 +7,9 @@ import { tmpdir } from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- the same
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { pruneStalePinProducts, stalePinFolders } from '../scripts/pins-reuse.mjs';
+import { pruneStalePinProducts, stalePinFolders } from '../src/scripts/pins-reuse.mjs';
 
-// gen:inputs stamps public/ (scripts/app-build/gen.ts), where the pins publish their products' mounts. A tree installed
+// gen:inputs stamps public/ (src/scripts/app-build/gen.ts), where the pins publish their products' mounts. A tree installed
 // before a pin bump and rebased past it kept Far Reach revision 1's mounts, and every land from it put 21 rows back in the
 // boot stamps (2026-11-14). stalePinFolders names such products, and gen:inputs refuses to stamp until `pnpm pins` runs.
 let root = '';

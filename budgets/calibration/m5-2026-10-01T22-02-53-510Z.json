@@ -5,7 +5,7 @@
   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Max, Unspecified Version)",
   "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
   "pixels": 1405392,
-  "source": "budgets/calibration.json (scripts/calibrate.mjs)",
+  "source": "budgets/calibration.json (src/scripts/calibrate.mjs)",
   "phone": {
     "ratio": 10,
     "source": "docs/tasks/asks/E283.md; hot phone:M5 ≈10× (cool ≈6×)",

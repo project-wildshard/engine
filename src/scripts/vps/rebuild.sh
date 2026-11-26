@@ -1,0 +1,715 @@
+#!/usr/bin/env bash
+# MMO-PLAN MP0.1: a blank Ubuntu 24.04 box to a serving Wildshard host, and safe to run again. In order:
+#   1. Phase 1: packages (Node 24, apt PostgreSQL 16 (J180), rclone, Tailscale, Caddy left off), the users, PostgreSQL's
+#      local-socket settings, role and saves databases, ops.env and the staged release public key.
+#   2. harden.sh (VPS-HARDENING-PLAN). Its --check reads every row (VH1); its apply step comes with VH3 to VH15, so today it skips.
+#   3. setup.sh, Phase 2: env files, units, health stubs and the tailnet-only Serve routes (no Funnel, MS8). It needs the box on the tailnet.
+#   4. The cook worker (C4): an engine checkout at a tag, its user, its AppArmor allowance and its unit. It needs cook.env.
+#      sudo bash rebuild.sh        do what is missing. Exit 0 is done; exit 2 is waiting for one of Jake's inputs
+#      bash rebuild.sh --check     change nothing and say what it would do; protected state says `cannot verify`
+#      sudo bash rebuild.sh --cook step 4 alone (AUTO-RELEASE AR3): `wildshard-config cook <tag>` runs it as root after
+#                                  writing cook.settings, whose COOK_ENGINE_REF and WILDSHARD_BUILD win over cook.env's
+# Keep this beside the other src/scripts/vps files. docs/vps-setup.md, "Rebuild from nothing", has the steps around it.
+# HARD STOP (Jake, 2026-11-09): this never runs on the old VPS. Nothing there is rebuilt until OPENCLAW-EXTRACT's OX10
+# is signed, so a host that still holds OpenClaw, Coolify, clawdbot or Ollama state is refused in both modes.
+# Port 443 and `rooms.wildshard.io` are Jake's, after VPS-HARDENING VH16 (J179): Caddy is installed and left off.
+set -euo pipefail
+# Under pipefail a pipeline's `grep -q` exits at its first match and can SIGPIPE the writer, failing a check whose line
+# was there (engine aecc059f5, harden.sh). Pipelines end in `matches`, a grep that reads all its input.
+matches() { grep "$@" >/dev/null; }
+CHECK=0 COOK_ONLY=0 PHASE2=0
+if [ "$#" = 1 ] && [ "$1" = --check ]; then CHECK=1
+elif [ "$#" = 1 ] && [ "$1" = --cook ]; then COOK_ONLY=1
+elif [ "$#" != 0 ]; then printf 'stop   Expected no arguments, --check or --cook\n'; exit 1; fi
+HERE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+ETC=/etc/wildshard HOME_DIR=/var/lib/wildshard SYSTEMD=/etc/systemd/system
+PG_VERSION=16 NODE=/usr/bin/node NODE_MAJOR=24 PNPM=pnpm@10.34.9
+KEY_DIR=/home/raynos/wildshard-e7 KEY_FILE=/home/raynos/wildshard-e7/release-public-key.hex
+COOK_ENV=/etc/wildshard/cook.env COOK_STATE=/etc/wildshard/cook-release.env COOK_HOME=/var/lib/wildshard-cook COOK_SRC=/opt/wildshard/engine COOK_LIB=/usr/local/lib/wildshard-cook
+COOK_PNPM_STORE=/var/lib/wildshard-pnpm-store
+COOK_GROUP=wildshard-cook
+COOK_SETTINGS=/etc/wildshard/cook.settings
+# 8790 and 8791 are the game's loopback ports; the cook worker's own default was 8791 too.
+COOK_PORT=8792
+ENGINE_GIT=https://github.com/project-wildshard/engine.git
+# What the old box holds and a fresh image doesn't (OPENCLAW-EXTRACT's survey, 2026-11-09). A glob covers every home.
+LIVE_MARKERS=(/home/clawdbot /home/matt /var/snap/ollama /var/lib/docker/volumes/coolify-db /data/coolify /home/*/.openclaw /home/*/.config/systemd/user/openclaw-gateway.service)
+PG_CHANGED=0 WAITING=()
+say() { printf '%-6s %s\n' "$1" "$2"; }
+wait_for() { WAITING+=("$1"); say wait "$1"; }
+
+# --- The hard stop, before anything else, in both modes.
+live_box() {
+  local marker found=()
+  for marker in "${LIVE_MARKERS[@]}"; do if [ -e "$marker" ] || [ -L "$marker" ]; then found+=("$marker"); fi; done
+  if [ "${#found[@]}" = 0 ]; then return 1; fi
+  say stop "This host still holds the old box's data: ${found[*]}"
+  say stop 'MP0.1 runs only on a fresh image, after OPENCLAW-EXTRACT OX10 is signed and the Hetzner rebuild (VPS-HARDENING VH2)'
+  return 0
+}
+if live_box; then exit 3; fi
+
+metadata_ok() { [ "$(stat -c '%a %U:%G' "$1" 2>/dev/null)" = "$2 $3" ]; }
+repair_metadata() {
+  if metadata_ok "$1" "$2" "$3"; then return; fi
+  if [ "$CHECK" = 1 ]; then say would "repair metadata $1"; return; fi
+  if ! { chmod "$2" "$1" && chown "$3" "$1"; }; then say stop "Cannot repair metadata $1"; exit 1; fi
+}
+# Run `make` unless `have` says it is already so.
+step() {
+  local what=$1 have=$2 make=$3
+  if "$have"; then say ok "$what"
+  elif [ "$CHECK" = 1 ]; then say would "$what"
+  else say doing "$what"; "$make"; fi
+}
+# Write stdin to a path unless it already says that. Returns 0 if it wrote, or would have.
+put() {
+  local path=$1 mode=$2 owner=$3 text temporary
+  text=$(cat)
+  if [ -r "$path" ] && [ "$(cat "$path")" = "$text" ]; then repair_metadata "$path" "$mode" "$owner"; say ok "$path"; return 1; fi
+  if [ "$CHECK" = 1 ]; then say would "write $path"; return 0; fi
+  say doing "write $path"
+  mkdir -p "$(dirname "$path")" || exit 1
+  temporary=$(umask 077; mktemp "$(dirname "$path")/.rebuild.XXXXXX") || exit 1
+  if ! { printf '%s\n' "$text" > "$temporary" && chmod "$mode" "$temporary" && chown "$owner" "$temporary" && mv -f -- "$temporary" "$path"; }; then
+    rm -f -- "$temporary"; say stop "Cannot publish $path"; exit 1
+  fi
+}
+# A file that exists is someone's, and only its metadata is repaired.
+put_once() {
+  local path=$1 mode=$2 owner=$3
+  if [ -f "$path" ]; then cat >/dev/null; repair_metadata "$path" "$mode" "$owner"; say ok "$path"; return 1; fi
+  if put "$path" "$mode" "$owner"; then return 0; fi
+}
+pg() { runuser -u postgres -- psql --cluster "$PG_VERSION/main" -v ON_ERROR_STOP=1 -qtAc "$1"; }
+installed() { dpkg-query -W -f='${Status}' "$1" 2>/dev/null | matches 'ok installed'; }
+# The value of NAME= in an env file, or nothing.
+env_value() { sed -n "s/^$2=//p" "$1" 2>/dev/null | tail -n 1; }
+# The cook worker starts only once its env file names a build, an API, a token and one store (R2's four rows or a folder).
+cook_env_complete() {
+  local file=$1 name
+  # The signed staging release supplies the ref and build. cook.env has credentials only.
+  for name in COOK_NOTIFY_TOKEN; do [ -n "$(env_value "$file" "$name")" ] || return 1; done
+  if [ -n "$(env_value "$file" COOK_STORE_DIR)" ]; then return 0; fi
+  for name in R2_ACCOUNT_ID R2_BUCKET_PACKS R2_PACKS_ACCESS_KEY_ID R2_PACKS_SECRET_ACCESS_KEY; do [ -n "$(env_value "$file" "$name")" ] || return 1; done
+}
+# AUTO-RELEASE AR3 (J355) writes an explicit tag and build to cook.settings. It wins over staging's signed follow state,
+# which wins over legacy cook.env values, exactly as the service's EnvironmentFile order does.
+cook_value() {
+  if [ -r "$COOK_SETTINGS" ] && grep -q "^$2=" "$COOK_SETTINGS"; then env_value "$COOK_SETTINGS" "$2"
+  elif [ -r "$COOK_STATE" ] && grep -q "^$2=" "$COOK_STATE"; then env_value "$COOK_STATE" "$2"
+  else env_value "$1" "$2"; fi
+}
+# Caddy's package ships a page on port 80. Only that file, byte for byte as dpkg recorded it, or this script's own
+# placeholder is replaced; any other file is VH9's and is never touched.
+CADDY_PLACEHOLDER="# MMO-PLAN MP0.1: Caddy is installed and off. VPS-HARDENING VH9 writes this file, and port 443 opens by Jake's hand
+# after VH16's pre-open gate (J179). Until then nothing is served."
+caddy_default() {
+  local file=/etc/caddy/Caddyfile shipped
+  [ -f "$file" ] || return 0
+  [ "$(cat "$file")" = "$CADDY_PLACEHOLDER" ] && return 0
+  shipped=$(dpkg-query -W -f='${Conffiles}\n' caddy 2>/dev/null | awk -v f="$file" '$1 == f { print $2 }')
+  [ -n "$shipped" ] && [ "$(md5sum < "$file" | cut -d' ' -f1)" = "$shipped" ]
+}
+wait_http() {
+  local url=$1 attempt
+  for ((attempt=1; attempt<=60; attempt++)); do
+    if curl -fsS --connect-timeout 1 --max-time 2 "$url" >/dev/null 2>&1; then return 0; fi
+    sleep 1
+  done
+  return 1
+}
+
+# --- Before anything
+if [ "$CHECK" = 0 ] && [ "$(id -u)" != 0 ]; then say stop 'Run with sudo, or pass --check'; exit 1; fi
+# AUTO-RELEASE AR3: one rebuild at a time, whichever way it was started (a full run, --cook from wildshard-config cook,
+# wildshard-apply <tag> rebuild), so two never move the cook's checkout or install into it at once.
+if [ "$CHECK" = 0 ]; then exec 9>/run/wildshard-rebuild.lock; flock 9; fi
+REQUIRED=(setup.sh setup-state.mjs pull.mjs dump.sh restore-check.sh uptime.sh health-stub.mjs wildshard-config wildshard-apply.mjs wildshard-agent.pub)
+if [ "$COOK_ONLY" = 1 ]; then REQUIRED=(cook-follow.mjs); fi
+for name in "${REQUIRED[@]}"; do
+  if [ ! -f "$HERE/$name" ]; then say stop "$name must sit beside rebuild.sh"; exit 1; fi
+done
+# The one trusted public key lives in setup.sh; this stages a copy of it, never another.
+EXPECTED_KEY=''
+if [ "$COOK_ONLY" = 0 ]; then
+  EXPECTED_KEY=$(sed -n 's/^EXPECTED_RELEASE_PUBLIC_KEY=\([0-9a-f]*\)$/\1/p' "$HERE/setup.sh")
+  if ! [[ "$EXPECTED_KEY" =~ ^302a300506032b6570032100[0-9a-f]{64}$ ]]; then say stop 'Cannot read the release public key from setup.sh'; exit 1; fi
+fi
+# shellcheck source=/dev/null
+. /etc/os-release
+if [ "${VERSION_CODENAME:-}" != noble ]; then say stop "Written for Ubuntu 24.04 (noble), and this is ${PRETTY_NAME:-unknown}"; exit 1; fi
+if [ "$(uname -m)" != x86_64 ]; then say warn "The VPS is x86_64, and this is $(uname -m)"; fi
+# The plan's CPU split (E7.2, MP1.8) needs the VPS's 16 cores. A smaller box runs Postgres and the cook worker unpinned,
+# since AllowedCPUs naming only absent CPUs stops a unit from starting at all.
+# FAST-RELEASE FR-A22: the cook also takes staging's CPUs (9-12); see its unit.
+CPUS=$(nproc) SHARED_CPUS='AllowedCPUs=13-15' COOK_CPUS='AllowedCPUs=9-15'
+if [ "$CPUS" -lt 16 ]; then
+  say warn "The units' AllowedCPUs assume 16 cores, and this has $CPUS"
+  SHARED_CPUS="# AllowedCPUs=13-15 needs 16 cores; this box has $CPUS" COOK_CPUS="# AllowedCPUs=9-15 needs 16 cores; this box has $CPUS"
+fi
+
+# AUTO-RELEASE AR3: --cook is step 4 alone; the box already has what steps 1 to 3 make.
+if [ "$COOK_ONLY" = 0 ]; then
+# --- 1. Packages
+APT_UPDATED=0
+apt_update() { if [ "$APT_UPDATED" = 0 ]; then apt-get update -qq; APT_UPDATED=1; fi; }
+# An apt source: its key, dearmored, and its one line. Re-fetched only when missing.
+source_ok() { [ -s "/usr/share/keyrings/$1.gpg" ] && [ -f "/etc/apt/sources.list.d/$1.list" ] && [ "$(cat "/etc/apt/sources.list.d/$1.list")" = "$3" ]; }
+make_source() {
+  local name=$1 key=$2 line=$3 temporary
+  install -d -m 755 /usr/share/keyrings
+  temporary=$(mktemp)
+  curl -fsSL "$key" -o "$temporary"
+  if grep -q 'BEGIN PGP' "$temporary"; then gpg --batch --yes --dearmor -o "/usr/share/keyrings/$name.gpg" "$temporary"; else install -m 644 "$temporary" "/usr/share/keyrings/$name.gpg"; fi
+  rm -f "$temporary"; chmod 644 "/usr/share/keyrings/$name.gpg"
+  printf '%s\n' "$line" > "/etc/apt/sources.list.d/$name.list"
+  APT_UPDATED=0
+}
+apt_source() {
+  local name=$1 key=$2 line=$3
+  if source_ok "$name" "$key" "$line"; then say ok "apt source $name"
+  elif [ "$CHECK" = 1 ]; then say would "add apt source $name"
+  else say doing "add apt source $name"; make_source "$name" "$key" "$line"; fi
+}
+BASE_PACKAGES=(ca-certificates curl gnupg git iproute2 openssl openssh-server procps util-linux sudo)
+missing() { local name; for name in "$@"; do installed "$name" || printf '%s ' "$name"; done; }
+have_base() { [ -z "$(missing "${BASE_PACKAGES[@]}")" ]; }
+# shellcheck disable=SC2046 # One word a package.
+make_base() { apt_update; DEBIAN_FRONTEND=noninteractive apt-get install -y -qq $(missing "${BASE_PACKAGES[@]}"); }
+step "base tools: ${BASE_PACKAGES[*]}" have_base make_base
+
+apt_source nodesource https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
+  "deb [signed-by=/usr/share/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main"
+apt_source tailscale "https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg" \
+  'deb [signed-by=/usr/share/keyrings/tailscale.gpg] https://pkgs.tailscale.com/stable/ubuntu noble main'
+apt_source caddy https://dl.cloudsmith.io/public/caddy/stable/gpg.key \
+  'deb [signed-by=/usr/share/keyrings/caddy.gpg] https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main'
+
+PACKAGES=(nodejs "postgresql-$PG_VERSION" "postgresql-client-$PG_VERSION" rclone tailscale age)
+have_packages() { [ -z "$(missing "${PACKAGES[@]}")" ]; }
+# shellcheck disable=SC2046 # One word a package.
+make_packages() { apt_update; DEBIAN_FRONTEND=noninteractive apt-get install -y -qq $(missing "${PACKAGES[@]}"); }
+step "packages: ${PACKAGES[*]}" have_packages make_packages
+# Caddy installs with its starts refused, so its default page never listens on port 80.
+have_caddy() { installed caddy; }
+# A policy-rc.d already there is the box's, and goes back afterwards.
+make_caddy() {
+  local policy=/usr/sbin/policy-rc.d saved=/usr/sbin/policy-rc.d.wildshard-saved status=0
+  apt_update
+  if [ -e "$policy" ] || [ -L "$policy" ]; then mv -f -- "$policy" "$saved"; fi
+  # Put the box's policy back however this ends, an interrupt included.
+  trap 'rm -f -- /usr/sbin/policy-rc.d; if [ -e /usr/sbin/policy-rc.d.wildshard-saved ] || [ -L /usr/sbin/policy-rc.d.wildshard-saved ]; then mv -f -- /usr/sbin/policy-rc.d.wildshard-saved /usr/sbin/policy-rc.d; fi' EXIT INT TERM
+  printf '#!/bin/sh\nexit 101\n' > "$policy"; chmod 755 "$policy"
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq caddy || status=$?
+  rm -f -- "$policy"
+  if [ -e "$saved" ] || [ -L "$saved" ]; then mv -f -- "$saved" "$policy"; fi
+  trap - EXIT INT TERM
+  if [ "$status" != 0 ]; then say stop 'Cannot install caddy'; exit 1; fi
+}
+step 'caddy, installed and not started' have_caddy make_caddy
+if [ "$CHECK" = 0 ] || [ -x "$NODE" ]; then
+  if ! "$NODE" --version 2>/dev/null | matches -E "^v(2[4-9]|[3-9][0-9])\."; then say stop "The server needs Node $NODE_MAJOR or newer at $NODE"; exit 1; fi
+  say ok "node $("$NODE" --version)"
+fi
+
+# Caddy stays off until VH9 writes its file and VH16 passes; port 443 is opened by Jake's hand (J179).
+if installed caddy && caddy_default; then
+  if put /etc/caddy/Caddyfile 644 root:root <<<"$CADDY_PLACEHOLDER"; then :; fi
+  if systemctl is-enabled --quiet caddy.service 2>/dev/null || systemctl is-active --quiet caddy.service; then
+    if [ "$CHECK" = 1 ]; then say would 'stop and disable caddy until VH9'
+    else say doing 'stop and disable caddy until VH9'; systemctl disable --now --quiet caddy.service; fi
+  else say ok 'caddy is off'; fi
+elif installed caddy; then say ok 'caddy has its VH9 file; left as it is'; fi
+
+# Joining the tailnet is Jake's (J175). Phase 2 reads the node's name and owns its tailnet-only Serve routes.
+tailnet_up() { tailscale status --json 2>/dev/null | "$NODE" -e 'let s="";for await(const b of process.stdin)s+=b;const j=JSON.parse(s);process.exit(j.BackendState==="Running"&&typeof j.Self?.DNSName==="string"?0:1)' --input-type=module 2>/dev/null; }
+if [ "$CHECK" = 0 ] && installed tailscale; then systemctl enable --now --quiet tailscaled.service; fi
+
+# --- The users and their folders
+have_admin() { id raynos >/dev/null 2>&1; }
+make_admin() { useradd --create-home --shell /bin/bash --groups sudo raynos; }
+step 'admin user raynos (sudo)' have_admin make_admin
+# A fresh Hetzner image lets root in by key. raynos gets the same keys, once.
+if id raynos >/dev/null 2>&1 && [ -s /root/.ssh/authorized_keys ] && [ ! -s /home/raynos/.ssh/authorized_keys ]; then
+  if [ "$CHECK" = 1 ]; then say would 'give raynos root'"'"'s SSH keys'
+  else
+    say doing 'give raynos root'"'"'s SSH keys'
+    install -d -m 700 -o raynos -g raynos /home/raynos/.ssh
+    install -m 600 -o raynos -g raynos /root/.ssh/authorized_keys /home/raynos/.ssh/authorized_keys
+  fi
+fi
+if [ "$(id -u)" = 0 ] && id raynos >/dev/null 2>&1 && [ "$(passwd -S raynos | awk '{print $2}')" != P ]; then
+  say next 'raynos has no password yet: run `passwd raynos` for sudo and the Hetzner console (VH3 break-glass)'
+fi
+have_user() { id wildshard >/dev/null 2>&1 && getent group wildshard >/dev/null; }
+make_user() { useradd --system --user-group --home-dir "$HOME_DIR" --shell /usr/sbin/nologin wildshard; }
+step 'user wildshard' have_user make_user
+# VPS-HARDENING VH11: each channel runs as its own user, so a staging bug cannot reach production's saves. Both are in the
+# wildshard group, which only lets them into the shared roots.
+have_channel_user() { id "wildshard-$CHANNEL" >/dev/null 2>&1 && id -nG "wildshard-$CHANNEL" | tr ' ' '\n' | matches -x wildshard; }
+make_channel_user() {
+  if id "wildshard-$CHANNEL" >/dev/null 2>&1; then usermod -aG wildshard "wildshard-$CHANNEL"
+  else useradd --system --user-group --groups wildshard --home-dir "$HOME_DIR/$CHANNEL" --shell /usr/sbin/nologin "wildshard-$CHANNEL"; fi
+}
+for CHANNEL in production staging; do step "user wildshard-$CHANNEL" have_channel_user make_channel_user; done
+FOLDERS=("$HOME_DIR" "$HOME_DIR/production" "$HOME_DIR/staging" "$HOME_DIR/packs" "$HOME_DIR/dumps" "$HOME_DIR/logs")
+have_folders() {
+  local path
+  for path in "${FOLDERS[@]}"; do [ -d "$path" ] || return 1; done
+  metadata_ok "$HOME_DIR" 750 wildshard:wildshard && [ -d "$ETC" ] && metadata_ok "$ETC" 750 root:wildshard
+}
+# The channel folders' owners, and everything inside them, are Phase 2's (setup.sh, VH11, no-follow); this only makes them.
+make_folders() {
+  install -d -m 750 -o wildshard -g wildshard "$HOME_DIR"
+  local path; for path in "${FOLDERS[@]}"; do [ -d "$path" ] || install -d -m 750 -o wildshard -g wildshard "$path"; done
+  install -d -m 750 -o root -g wildshard "$ETC"
+}
+step 'folders' have_folders make_folders
+
+# --- PostgreSQL: local socket only (Q92), and the CPUs it shares with the cook worker (E7.2)
+if [ "$(id -u)" != 0 ]; then say 'cannot verify' 'PostgreSQL settings, role and saves databases (needs sudo)'
+elif ! pg_lsclusters --no-header 2>/dev/null | awk -v version="$PG_VERSION" '$1==version && $2=="main" {found=1} END {exit !found}'; then
+  if [ "$CHECK" = 1 ]; then say would "need PostgreSQL $PG_VERSION/main"; else say stop "Missing PostgreSQL $PG_VERSION/main after install"; exit 1; fi
+else
+  if put "/etc/postgresql/$PG_VERSION/main/conf.d/wildshard.conf" 644 postgres:postgres <<'EOF'
+# E7.2b: local socket only. Nothing reaches this database over TCP.
+listen_addresses = ''
+EOF
+  then PG_CHANGED=1; fi
+  if put "$SYSTEMD/postgresql@.service.d/wildshard.conf" 644 root:root <<EOF
+[Service]
+$SHARED_CPUS
+EOF
+  then PG_CHANGED=1; fi
+  if [ "$CHECK" = 0 ]; then
+    systemctl daemon-reload
+    # A fresh box has no saves yet, so this one restart is free. Phase 2 refuses a pending restart, and never restarts.
+    if [ "$PG_CHANGED" = 1 ] || [ "$(pg 'select exists (select 1 from pg_settings where pending_restart)' 2>/dev/null)" = t ]; then
+      say doing "restart postgresql@$PG_VERSION-main"; systemctl restart "postgresql@$PG_VERSION-main.service"
+    fi
+    systemctl enable --quiet postgresql.service
+    # VH11: one login role per channel, owning its one database; nobody else may connect to it. OS user wildshard-<channel>
+    # maps to role wildshard_<channel> by peer and pg_ident, over the local socket only.
+    have_db() { [ "$(pg "select 1 from pg_database where datname = '$1'")" = 1 ]; }
+    # step() takes names, so these read the loop's CHANNEL, ROLE and DB.
+    have_role() { [ "$(pg "select 1 from pg_roles where rolname = '$ROLE'")" = 1 ]; }
+    make_role() { pg "create role $ROLE login"; }
+    have_channel_db() {
+      have_db "$DB" && [ "$(pg "select pg_get_userbyid(datdba) from pg_database where datname = '$DB'")" = "$ROLE" ] \
+        && [ "$(pg "select has_database_privilege('public', '$DB', 'CONNECT')")" = f ]
+    }
+    # A box from before VH11 has its database under the one shared role: hand it, and every object in it, to the channel's.
+    make_channel_db() {
+      if ! have_db "$DB"; then runuser -u postgres -- createdb --cluster "$PG_VERSION/main" -O "$ROLE" "$DB"; fi
+      pg "alter database $DB owner to $ROLE"
+      if [ "$(pg "select 1 from pg_roles where rolname = 'wildshard'")" = 1 ]; then
+        runuser -u postgres -- psql --cluster "$PG_VERSION/main" -v ON_ERROR_STOP=1 -qtAc "reassign owned by wildshard to $ROLE" "$DB"
+      fi
+      pg "revoke connect, temporary on database $DB from public"
+    }
+    # A box from before VH11 hands its saves over with nothing using them: the servers, their pull timers (which would start
+    # them again) and the dump all stop before any ownership moves, and the hand-over waits until none is active. Phase 2
+    # (setup.sh) starts them again as their own users.
+    if [ "$(pg "select 1 from pg_roles where rolname = 'wildshard'")" = 1 ]; then
+      QUIET=(wildshard-pull@production.timer wildshard-pull@staging.timer wildshard-dump.timer
+        wildshard-pull@production.service wildshard-pull@staging.service wildshard-dump.service
+        wildshard-server@production.service wildshard-server@staging.service)
+      say doing 'stop the servers, their pull timers and the dump for the VH11 hand-over'
+      systemctl stop "${QUIET[@]}" 2>/dev/null || true
+      for name in "${QUIET[@]}"; do
+        if systemctl is-active --quiet "$name"; then say stop "$name is still active; the VH11 hand-over did not start"; exit 1; fi
+      done
+    fi
+    # The restore check's own role: it owns only the scratch database and is no superuser (restore-check.sh).
+    ROLE=wildshard_restore
+    step "postgres role $ROLE" have_role make_role
+    for CHANNEL in production staging; do
+      ROLE=wildshard_$CHANNEL DB=saves_$CHANNEL
+      step "postgres role $ROLE" have_role make_role
+      step "database $DB, owned by $ROLE alone" have_channel_db make_channel_db
+    done
+    # The shared role from before VH11 goes once it owns nothing.
+    if [ "$(pg "select 1 from pg_roles where rolname = 'wildshard'")" = 1 ]; then
+      say doing 'drop the shared role wildshard (VH11)'
+      for DB in saves_production saves_staging; do runuser -u postgres -- psql --cluster "$PG_VERSION/main" -qtAc 'drop owned by wildshard' "$DB"; done
+      pg 'drop role wildshard'
+    fi
+    if put "/etc/postgresql/$PG_VERSION/main/pg_ident.conf" 640 postgres:postgres <<'EOF'
+# VPS-HARDENING VH11: each channel's OS user is its database role.
+# MAPNAME   SYSTEM-USERNAME        PG-USERNAME
+wildshard   wildshard-production   wildshard_production
+wildshard   wildshard-staging      wildshard_staging
+wildshard   postgres               wildshard_restore
+EOF
+    then PG_RELOAD=1; fi
+    if put "/etc/postgresql/$PG_VERSION/main/pg_hba.conf" 640 postgres:postgres <<'EOF'
+# VPS-HARDENING VH11: the local socket only, by peer. postgres administers; each channel reaches its own saves; nothing else.
+# TYPE  DATABASE          USER                   METHOD
+local   all               postgres               peer
+local   saves_production  wildshard_production   peer map=wildshard
+local   saves_staging     wildshard_staging      peer map=wildshard
+local   saves_restore_check wildshard_restore    peer map=wildshard
+local   all               all                    reject
+EOF
+    then PG_RELOAD=1; fi
+    if [ "${PG_RELOAD:-0}" = 1 ]; then say doing "reload postgresql@$PG_VERSION-main"; systemctl reload "postgresql@$PG_VERSION-main.service"; fi
+  else say would 'check the role and both saves databases'; fi
+fi
+
+# --- ops.env: the dump's and the uptime check's settings. Blank runs both locally; Jake fills it (MP0.2, MP0.3).
+if [ "$(id -u)" != 0 ] && [ -d "$ETC" ] && [ ! -x "$ETC" ]; then say 'cannot verify' "$ETC/ops.env (needs sudo)"
+elif put_once "$ETC/ops.env" 600 root:root <<'EOF'
+# E7.8: the nightly dump and the uptime check. Both run with these blank: the dump stays on this disk, and a stopped server only logs.
+# Where a stopped server is told. Any URL taking a POSTed line, such as https://ntfy.sh/<a long random topic>
+ALERT_URL=
+# J252: the wildshard-server project's Sentry DSN, so the dump checks in to the Crons monitor wildshard-dump. Blank skips it.
+SENTRY_CRON_DSN=
+# VH13: the age public key the dump is encrypted to. Its private half stays off the box. Blank leaves the dump unencrypted.
+AGE_RECIPIENT=
+# The private bucket, for example r2:wildshard-backups. Blank keeps dumps local.
+BACKUP_REMOTE=
+RCLONE_CONFIG_R2_TYPE=s3
+RCLONE_CONFIG_R2_PROVIDER=Cloudflare
+RCLONE_CONFIG_R2_NO_CHECK_BUCKET=true
+RCLONE_CONFIG_R2_ENDPOINT=
+RCLONE_CONFIG_R2_ACCESS_KEY_ID=
+RCLONE_CONFIG_R2_SECRET_ACCESS_KEY=
+EOF
+then :; fi
+
+# --- The staged release public key Phase 2 checks: raynos's, not group or world writable, equal to setup.sh's.
+if id raynos >/dev/null 2>&1; then
+  if [ ! -d "$KEY_DIR" ]; then
+    if [ "$CHECK" = 1 ]; then say would "make $KEY_DIR"; else install -d -m 755 -o raynos -g raynos "$KEY_DIR"; fi
+  fi
+  if put "$KEY_FILE" 644 raynos:raynos <<<"$EXPECTED_KEY"; then :; fi
+else say would "stage $KEY_FILE once raynos exists"; fi
+
+# --- 2. Hardening, when VPS-HARDENING has written it
+if [ -f "$HERE/harden.sh" ]; then
+  if [ "$CHECK" = 1 ]; then say run 'harden.sh --check'; bash "$HERE/harden.sh" --check || say warn 'harden.sh --check reports drift'
+  else say run 'harden.sh'; bash "$HERE/harden.sh"; fi
+else say skip 'harden.sh is not written yet (VPS-HARDENING-PLAN); it must pass VH16 before port 443'; fi
+
+# --- 3. Phase 2, once the box is on the tailnet
+if ! tailnet_up; then
+  if [ "$CHECK" = 1 ] && [ ! -x "$NODE" ]; then say would 'run setup.sh once Tailscale is installed and up'
+  else wait_for 'Tailscale is not logged in: run `sudo tailscale up --ssh`, then run rebuild.sh again (Phase 2 needs the node name)'; fi
+elif [ "$CHECK" = 1 ]; then
+  say run 'setup.sh --check'
+  if bash "$HERE/setup.sh" --check; then PHASE2=1; else say warn 'setup.sh --check reports what Phase 2 would change'; fi
+else
+  say run 'setup.sh (Phase 2)'
+  bash "$HERE/setup.sh"
+  PHASE2=1
+fi
+fi # COOK_ONLY: --cook skips steps 1 to 3
+
+# --- 4. The cook worker (C4, J28): its own user, an engine checkout it can read and not write, and its unit.
+have_cook_user() { id wildshard-cook >/dev/null 2>&1 && getent group wildshard-cook >/dev/null; }
+make_cook_user() { useradd --system --user-group --home-dir "$COOK_HOME" --shell /usr/sbin/nologin wildshard-cook; }
+step 'user wildshard-cook' have_cook_user make_cook_user
+COOK_FOLDERS=("$COOK_HOME" "$COOK_HOME/scratch" "$COOK_HOME/server" "$COOK_HOME/store" "$COOK_HOME/verdicts")
+have_cook_folders() { local path; for path in "${COOK_FOLDERS[@]}"; do [ -d "$path" ] && metadata_ok "$path" 750 wildshard-cook:wildshard-cook || return 1; done; }
+make_cook_folders() { install -d -m 750 -o wildshard-cook -g wildshard-cook "${COOK_FOLDERS[@]}"; }
+step 'cook folders' have_cook_folders make_cook_folders
+# GVS G9: pnpm must not choose /root's store (hidden by ProtectHome), and the
+# cook account must only read the packages root installed. Keep the whole tree
+# below a root-owned parent so the worker cannot replace a path the installer uses.
+cook_store_unreadable() {
+  find "$COOK_PNPM_STORE" ! -type l \( ! -user root -o ! -group "$COOK_GROUP" -o ! -perm -g+r -o -perm -g+w -o -perm -o+w \
+    -o \( -type d ! -perm -g+x \) \) -print -quit
+}
+have_cook_store() { [ -d "$COOK_PNPM_STORE" ] && [ -z "$(cook_store_unreadable)" ]; }
+make_cook_store() {
+  install -d -m 750 -o root -g "$COOK_GROUP" "$COOK_PNPM_STORE"
+  find "$COOK_PNPM_STORE" ! -type l -exec chown root:"$COOK_GROUP" {} +
+  find "$COOK_PNPM_STORE" ! -type l -exec chmod g+rX,g-w,o-w {} +
+}
+step "cook pnpm store $COOK_PNPM_STORE" have_cook_store make_cook_store
+if [ "$(id -u)" != 0 ] && [ -d "$ETC" ] && [ ! -x "$ETC" ]; then say 'cannot verify' "$COOK_ENV (needs sudo)"
+elif put_once "$COOK_ENV" 600 root:root <<'EOF'
+# C4: the cook worker. Its signed staging release chooses its engine tag and build.
+# Only credentials belong here; run rebuild.sh again after filling them.
+# The bearer token api-server's notify call sends (J30). The same value goes in api-server's settings.
+COOK_NOTIFY_TOKEN=
+# SP22 enables these parent-only credentials with wildshard-config async-upload staging.
+COOK_SIGNING_KEY=
+COOK_STAGING_ACTIVATION_TOKEN=
+# Where packs go: the four R2 rows, or, on a scratch box only, COOK_STORE_DIR (a folder under /var/lib/wildshard-cook).
+R2_ACCOUNT_ID=
+R2_BUCKET_PACKS=wildshard-packs
+R2_PACKS_ACCESS_KEY_ID=
+R2_PACKS_SECRET_ACCESS_KEY=
+# COOK_STORE_DIR=/var/lib/wildshard-cook/store
+EOF
+then :; fi
+
+# Ubuntu 24.04 refuses unprivileged user namespaces to unconfined programs, and each cook runs in one with no network.
+# The worker gets its own copy of unshare and one AppArmor profile that allows exactly that copy.
+have_cook_wrap() { [ -x "$COOK_LIB/unshare" ] && cmp -s /usr/bin/unshare "$COOK_LIB/unshare" && metadata_ok "$COOK_LIB/unshare" 750 root:wildshard-cook; }
+make_cook_wrap() {
+  install -d -m 755 -o root -g root "$COOK_LIB"
+  install -m 750 -o root -g wildshard-cook /usr/bin/unshare "$COOK_LIB/unshare"
+}
+step "cook job wrap $COOK_LIB/unshare" have_cook_wrap make_cook_wrap
+RESTRICTED=$(sysctl -n kernel.apparmor_restrict_unprivileged_userns 2>/dev/null || printf 0)
+if [ "$RESTRICTED" = 1 ]; then
+  if put /etc/apparmor.d/wildshard-cook-unshare 644 root:root <<EOF
+# MP0.1: the cook worker's jobs each run in a user and network namespace of their own (C4). Only this copy may make one.
+abi <abi/4.0>,
+include <tunables/global>
+profile wildshard-cook-unshare $COOK_LIB/unshare flags=(unconfined) {
+  userns,
+  include if exists <local/wildshard-cook-unshare>
+}
+EOF
+  then if [ "$CHECK" = 0 ]; then apparmor_parser -r /etc/apparmor.d/wildshard-cook-unshare; fi; fi
+else say ok 'unprivileged user namespaces are not restricted here; no AppArmor profile needed'; fi
+
+# Meta QA 11-24 row 43 (MA13, SHARD-COMPAT SP1b5b): the record pass's tools beside the cook, root's and read-only to it.
+# The recorder is the author's own `wildshard prepare` (@wildshard/cli, pinned here) with its Playwright WebKit; the
+# preparation client is the one the staging release built from this very commit (so the recording names the cook's
+# renderer). One client folder, unpacked over itself per build: a script never deletes (J358), so old builds' hashed
+# assets stay until an agent removes them by hand. The record runs in the job's namespace with only loopback up
+# (lo-up), since `wildshard prepare` serves its page on 127.0.0.1.
+RECORDER_CLI=0.4.34 RECORDER_PLAYWRIGHT=1.65.0 RECORDER="$COOK_LIB/recorder" NPM=/usr/bin/npm
+PREPARATION="$COOK_LIB/preparation-client" PREPARATION_ORIGIN=https://github.com/project-wildshard/engine/releases/download
+have_recorder() { [ "$(cat "$RECORDER/.installed" 2>/dev/null)" = "$RECORDER_CLI $RECORDER_PLAYWRIGHT" ] && [ -x "$RECORDER/node_modules/.bin/wildshard" ]; }
+make_recorder() {
+  install -d -m 750 -o root -g "$COOK_GROUP" "$RECORDER"
+  (cd "$RECORDER" && HOME=/root "$NPM" install --no-save --no-audit --no-fund --ignore-scripts --prefix "$RECORDER" \
+    "@wildshard/cli@$RECORDER_CLI" "playwright@$RECORDER_PLAYWRIGHT") || return 1
+  PLAYWRIGHT_BROWSERS_PATH="$RECORDER/browsers" HOME=/root "$RECORDER/node_modules/.bin/playwright" install --with-deps webkit || return 1
+  printf '%s %s\n' "$RECORDER_CLI" "$RECORDER_PLAYWRIGHT" > "$RECORDER/.installed"
+  chgrp -hR "$COOK_GROUP" "$RECORDER" && chmod -R g+rX,g-w,o-rwx "$RECORDER"
+}
+have_preparation() { [ "$(cat "$PREPARATION/.installed" 2>/dev/null)" = "$COOK_BUILD" ] && [ -f "$PREPARATION/index.html" ]; }
+make_preparation() {
+  local archive status
+  install -d -m 750 -o root -g "$COOK_GROUP" "$PREPARATION"
+  archive=$(mktemp "$COOK_LIB/.preparation.XXXXXX") || return 1
+  curl -fsSL --retry 3 -o "$archive" "$PREPARATION_ORIGIN/server-staging-$COOK_BUILD/preparation-client.tar.gz" \
+    && tar -xzf "$archive" -C "$PREPARATION" && printf '%s\n' "$COOK_BUILD" > "$PREPARATION/.installed"
+  status=$?; rm -f -- "$archive"; [ "$status" = 0 ] || return 1
+  chgrp -hR "$COOK_GROUP" "$PREPARATION" && chmod -R g+rX,g-w,o-rwx "$PREPARATION"
+}
+if put "$COOK_LIB/lo-up" 750 "root:$COOK_GROUP" <<'EOF'
+#!/bin/sh
+# MA13: inside the record's own network namespace, bring loopback up for `wildshard prepare`'s local page, then run it.
+ip link set lo up && exec "$@"
+EOF
+then :; fi
+
+COOK_REF='' COOK_BUILD='' COOK_READY=0
+cook_follow() {
+  if [ "$CHECK" = 1 ]; then "$NODE" "$HERE/cook-follow.mjs" --check --env "$ETC/staging.env" --state "$COOK_STATE"
+  else "$NODE" "$HERE/cook-follow.mjs" --env "$ETC/staging.env" --state "$COOK_STATE"; fi
+}
+if [ -r "$COOK_ENV" ] && cook_env_complete "$COOK_ENV"; then
+  if cook_follow; then
+    COOK_REF=$(cook_value "$COOK_ENV" COOK_ENGINE_REF)
+    COOK_BUILD=$(cook_value "$COOK_ENV" WILDSHARD_BUILD)
+    [ -n "$COOK_REF" ] && [ -n "$COOK_BUILD" ] && COOK_READY=1
+  else
+    wait_for 'The signed staging release did not supply a usable cook ref and build; the cook stays off'
+  fi
+fi
+if [ "$COOK_READY" = 0 ]; then
+  if [ -r "$COOK_ENV" ] || [ "$CHECK" = 0 ]; then wait_for "Fill $COOK_ENV (notify token and R2 or a folder), then run rebuild.sh again"
+  elif [ "$(id -u)" = 0 ]; then say would "wait for $COOK_ENV to be filled"
+  else say 'cannot verify' "$COOK_ENV (needs sudo)"; fi
+fi
+
+# The checkout: CI's sparse set, at the tag, installed once per commit. No package's
+# install script runs as root here; the cook needs none.
+org_git() { env GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=url.https://github.com/project-wildshard/.insteadOf GIT_CONFIG_VALUE_0=git@github.com:project-wildshard/ \
+  GIT_CONFIG_KEY_1=url.https://github.com/project-wildshard/.insteadof GIT_CONFIG_VALUE_1=ssh://git@github.com/project-wildshard/ "$@"; }
+cook_commit() { git -c safe.directory="$COOK_SRC" -C "$COOK_SRC" rev-parse HEAD 2>/dev/null; }
+have_cook_source() {
+  [ -f "$COOK_SRC/.wildshard-installed" ] && [ "$(cat "$COOK_SRC/.wildshard-installed")" = "$COOK_REF $COOK_BUILD" ] \
+    && [ "$(cook_commit)" = "$COOK_BUILD" ] \
+    && [ "$(git -c safe.directory="$COOK_SRC" -C "$COOK_SRC" rev-parse "$COOK_REF^{commit}" 2>/dev/null)" = "$COOK_BUILD" ]
+}
+# pnpm 10 versions the store (`<store-dir>/v10`) and keeps the global virtual store at `<that>/links`, which
+# src/scripts/.kit/assert-store-layout.mjs checks; `$COOK_PNPM_STORE/links` failed it, so v0.1.23's cook move rolled back.
+make_cook_source() {
+  install -d -m 755 -o root -g root "$(dirname "$COOK_SRC")"
+  if [ ! -d "$COOK_SRC/.git" ]; then
+    git clone --quiet --no-checkout --filter=blob:none "$ENGINE_GIT" "$COOK_SRC"
+    git -C "$COOK_SRC" sparse-checkout set --no-cone '/*' '!/progress/' '!/art/' '!/sources/'
+  fi
+  git -c safe.directory="$COOK_SRC" -C "$COOK_SRC" fetch --quiet --tags origin
+  if [ "$(git -c safe.directory="$COOK_SRC" -C "$COOK_SRC" rev-parse "$COOK_REF^{commit}" 2>/dev/null)" != "$COOK_BUILD" ]; then say stop "The signed release's $COOK_REF does not resolve to $COOK_BUILD"; exit 1; fi
+  rm -f "$COOK_SRC/.wildshard-installed"
+  git -c safe.directory="$COOK_SRC" -C "$COOK_SRC" checkout --quiet --force --detach "$COOK_BUILD"
+  (cd "$COOK_SRC" && org_git env CI=1 HOME=/root COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack "$PNPM" install --frozen-lockfile --ignore-scripts --config.confirmModulesPurge=false --config.ci=false --store-dir "$COOK_PNPM_STORE" --virtual-store-dir "$COOK_PNPM_STORE/v10/links")
+  (cd "$COOK_SRC" && "$NODE" src/scripts/.kit/assert-store-layout.mjs)
+  printf '%s %s\n' "$COOK_REF" "$COOK_BUILD" > "$COOK_SRC/.wildshard-installed"
+  chmod -R go-w "$COOK_SRC"
+}
+# MMO-SERVER MS2.4b: root clones under the box's umask 027, so the checkout came out 750 root:root and the cook, its own user,
+# could not enter its WorkingDirectory (200/CHDIR). Root keeps owning it; the cook's group reads and traverses, and neither the
+# group nor anyone else writes. The worker's own hash of cook.env stays root's. Symlinks (pnpm's) carry no mode of their own.
+cook_unreadable() {
+  find "$COOK_SRC" -name .wildshard-env -prune -o ! -type l \( ! -group "$COOK_GROUP" -o ! -perm -g+r -o -perm -g+w -o -perm -o+w \
+    -o \( -type d ! -perm -g+x \) \) -print -quit
+}
+have_cook_read() { [ -d "$COOK_SRC" ] && [ -z "$(cook_unreadable)" ]; }
+make_cook_read() {
+  find "$COOK_SRC" -name .wildshard-env -prune -o -exec chgrp -h "$COOK_GROUP" {} + || return 1
+  find "$COOK_SRC" -name .wildshard-env -prune -o ! -type l -exec chmod g+rX,g-w,o-w {} +
+}
+COOK_SOURCE_CHANGED=0
+if [ "$COOK_READY" = 1 ]; then
+  if [ "$CHECK" = 0 ] && ! have_cook_source; then COOK_SOURCE_CHANGED=1; fi
+  step "cook source $COOK_SRC at $COOK_REF" have_cook_source make_cook_source
+  if [ "$CHECK" = 0 ] && ! have_cook_read; then COOK_SOURCE_CHANGED=1; fi
+  step "cook source readable by $COOK_GROUP" have_cook_read make_cook_read
+  step "cook pnpm store readable by $COOK_GROUP" have_cook_store make_cook_store
+  step "cook recorder @wildshard/cli $RECORDER_CLI with WebKit" have_recorder make_recorder
+  step "cook preparation client for $COOK_BUILD" have_preparation make_preparation
+fi
+# What the running worker last read of cook.env, signed follow state and cook.settings, as a hash in its root-owned checkout.
+# A changed value restarts it; absent optional files preserve the legacy cook.env-only hash. While cook.settings names both
+# keys it wins (cook_value), so the follow timer's new staging state changes nothing the worker runs and restarts nobody.
+cook_settings_pin() {
+  [ -r "${COOK_SETTINGS:-}" ] && grep -q '^COOK_ENGINE_REF=.' "$COOK_SETTINGS" && grep -q '^WILDSHARD_BUILD=.' "$COOK_SETTINGS"
+}
+cook_env_hash() {
+  {
+    cat "$COOK_ENV"
+    if [ -r "${COOK_STATE:-}" ] && ! cook_settings_pin; then cat "$COOK_STATE"; fi
+    if [ -r "${COOK_SETTINGS:-}" ]; then cat "$COOK_SETTINGS"; fi
+  } | sha256sum | cut -d' ' -f1
+}
+
+if put "$SYSTEMD/wildshard-cook.service" 644 root:root <<EOF
+[Unit]
+Description=Wildshard cook worker (C4): api-server's notices in, packs out
+After=network-online.target
+Wants=network-online.target
+# It starts only once rebuild.sh has the checkout and a complete cook.env.
+ConditionPathExists=$COOK_SRC/.wildshard-installed
+
+[Service]
+User=wildshard-cook
+Group=wildshard-cook
+WorkingDirectory=$COOK_SRC
+EnvironmentFile=$COOK_ENV
+EnvironmentFile=$COOK_STATE
+# AUTO-RELEASE AR3: explicit engine ref/build read after signed state and credentials, so they win. Optional.
+EnvironmentFile=-$COOK_SETTINGS
+# The catalogue is public configuration, not cook.env state.
+Environment=WILDSHARD_API_URL=https://api.wildshard.io
+# MS2.4b: the checkout is root's and the worker runs git in it as wildshard-cook, which git refuses ("dubious ownership")
+# unless the path is a safe.directory. Set here, not in a gitconfig the worker's home would have to hold.
+Environment=GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0=$COOK_SRC
+Environment=COOK_PORT=$COOK_PORT
+Environment=COOK_HOST=127.0.0.1
+Environment=COOK_SCRATCH=$COOK_HOME/scratch
+Environment=COOK_SERVER_PACKS=$COOK_HOME/server
+Environment=COOK_OUTBOX=$COOK_HOME/verdicts
+# SHARD-COMPAT SP1b-T: every job reads its shard's cook preparation sidecar from here; the record pass writes them once
+# the unit names a recorder below (COOK_RECORDER, COOK_PREPARATION_CLIENT, COOK_RECORD_CANARY).
+Environment=COOK_SIDECARS=$COOK_HOME/sidecars
+# MA13: the recorder, its WebKit and this build's preparation client (installed above), the canary that records first,
+# and the record's sandbox: the job's namespace with loopback up. The boot recook waits for the pass (cook-worker serve).
+Environment='COOK_RECORDER=["$RECORDER/node_modules/.bin/wildshard"]'
+Environment=COOK_PREPARATION_CLIENT=$PREPARATION
+Environment=PLAYWRIGHT_BROWSERS_PATH=$RECORDER/browsers
+Environment=COOK_RECORD_CANARY=brasscap-mesa
+Environment='COOK_RECORD_WRAP=["$COOK_LIB/unshare","--user","--map-root-user","--net","$COOK_LIB/lo-up"]'
+Environment=COOK_STAGING_ACTIVATION_URL=http://127.0.0.1:8791
+# Each job's prefix: a user and network namespace of its own, so nothing that reads a shardfile has a route out. The single
+# quotes keep the JSON's double quotes, which systemd would otherwise strip.
+Environment='COOK_JOB_WRAP=["$COOK_LIB/unshare","--user","--map-root-user","--net"]'
+# A wrap that can't make its namespace fails here, once, and not in every cook.
+ExecStartPre=$COOK_LIB/unshare --user --map-root-user --net /bin/true
+ExecStart=$NODE --import ./src/scripts/bake-loader.mjs src/scripts/cook-worker.mjs serve
+Restart=on-failure
+RestartSec=5
+# Every job is a child, so these hold for all of them at once. FAST-RELEASE FR-A22 (11-25): on Postgres's 13-15 alone a job
+# encoded with 2 lanes (COOK_CPU_SLOTS 3, less one) and Pine cooked in 849 s against 258 s on the MacBook's 6, while the box
+# sat at a load of 0.12. The cook also takes staging's 9-12 (7 CPUs: 6 lanes), at a fifth of the default weight and nice
+# 10, so staging rooms and Postgres win any contention. Production's 0-8 stay its own.
+$COOK_CPUS
+CPUWeight=20
+Nice=10
+# FAST-RELEASE FR-A25 (11-25): 12G -> 8G, harden's drop-in (VH7) value. 12G came with this unit on 11-10 (MP0.1) and never
+# held: harden's drop-in overrides it (4G, then 5G, then FR-A22's 8G; the box reads 8589934592). One value in both files
+# lets the release check the running unit against this one (release-cook.mjs).
+MemoryMax=8G
+TasksMax=512
+LimitCORE=0
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ReadWritePaths=$COOK_HOME
+
+[Install]
+WantedBy=multi-user.target
+EOF
+then COOK_UNIT_CHANGED=1; else COOK_UNIT_CHANGED=0; fi
+
+if put "$SYSTEMD/wildshard-cook-follow.service" 644 root:root <<EOF
+[Unit]
+Description=Follow staging's signed release for the Wildshard cook
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=$COOK_ENV
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/bin/bash $COOK_LIB/rebuild.sh --cook
+EOF
+then COOK_FOLLOW_UNIT_CHANGED=1; else COOK_FOLLOW_UNIT_CHANGED=0; fi
+if put "$SYSTEMD/wildshard-cook-follow.timer" 644 root:root <<'EOF'
+[Unit]
+Description=Check staging's signed release for the Wildshard cook every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+then COOK_TIMER_CHANGED=1; else COOK_TIMER_CHANGED=0; fi
+
+if [ "$CHECK" = 0 ]; then
+  install -d -m 755 -o root -g root "$COOK_LIB"
+  if [ "$HERE" != "$COOK_LIB" ]; then
+    install -m 750 -o root -g root "$HERE/rebuild.sh" "$COOK_LIB/rebuild.sh"
+    install -m 750 -o root -g root "$HERE/cook-follow.mjs" "$COOK_LIB/cook-follow.mjs"
+  fi
+  systemctl daemon-reload
+  systemctl enable --now --quiet wildshard-cook-follow.timer
+  if [ "$COOK_READY" = 1 ]; then
+    if systemctl is-active --quiet wildshard-cook.service && [ "$COOK_UNIT_CHANGED" = 0 ] && [ "$COOK_SOURCE_CHANGED" = 0 ] \
+      && [ "$(cat "$COOK_SRC/.wildshard-env" 2>/dev/null)" = "$(cook_env_hash)" ]; then say ok 'cook worker running'
+    else
+      say doing 'start the cook worker'; systemctl enable --quiet wildshard-cook.service; systemctl restart wildshard-cook.service
+      (umask 077; cook_env_hash > "$COOK_SRC/.wildshard-env")
+    fi
+    if wait_http "http://127.0.0.1:$COOK_PORT/health"; then say ok "cook worker answers on 127.0.0.1:$COOK_PORT"
+    else say stop 'The cook worker is not answering /health; see journalctl -u wildshard-cook'; exit 1; fi
+  fi
+fi
+
+# --- What is left, if anything
+if [ "$PHASE2" = 1 ] && [ "$CHECK" = 0 ]; then
+  for channel in production staging; do
+    port=$([ "$channel" = production ] && printf 8790 || printf 8791)
+    if wait_http "http://127.0.0.1:$port/health"; then say ok "$channel answers /health on 127.0.0.1:$port"
+    else say warn "$channel is not answering /health on 127.0.0.1:$port yet"; fi
+  done
+fi
+if [ "${#WAITING[@]}" != 0 ]; then say waiting "${#WAITING[@]} input(s) above; everything else is done"; exit 2; fi
+if [ "$CHECK" = 1 ]; then say check 'Read-only pass complete'; exit 0; fi
+if [ "$COOK_ONLY" = 1 ]; then say done 'Cook follow complete'; else say done 'Rebuild complete: Phase 1, Phase 2 and the cook worker'; fi

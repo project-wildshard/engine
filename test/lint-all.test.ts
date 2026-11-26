@@ -7,7 +7,7 @@ import { resolve } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Run the fixture's pinned CLI with the current runtime.
 import { env, execPath } from 'node:process';
 import { expect, test } from 'vitest';
-import { lintEnvironment } from '../scripts/lint-tools.mjs';
+import { lintEnvironment } from '../src/scripts/lint-tools.mjs';
 
 test('one typed process covers the complete selection and propagates failure', () => {
   mkdirSync('tmp', { recursive: true });
@@ -15,10 +15,10 @@ test('one typed process covers the complete selection and propagates failure', (
   const binary = resolve(fixture, 'node_modules/oxlint/bin'), calls = resolve(fixture, 'calls.txt');
   mkdirSync(binary, { recursive: true });
   writeFileSync(resolve(binary, '../package.json'), JSON.stringify({ type: 'module' }));
-  const runner = resolve(fixture, 'scripts/lint-all.mjs');
-  mkdirSync(resolve(runner, '..'));
-  writeFileSync(runner, readFileSync('scripts/lint-all.mjs', 'utf8'));
-  writeFileSync(resolve(fixture, 'scripts/lint-tools.mjs'), readFileSync('scripts/lint-tools.mjs', 'utf8'));
+  const runner = resolve(fixture, 'src/scripts/lint-all.mjs');
+  mkdirSync(resolve(runner, '..'), { recursive: true });
+  writeFileSync(runner, readFileSync('src/scripts/lint-all.mjs', 'utf8'));
+  writeFileSync(resolve(fixture, 'src/scripts/lint-tools.mjs'), readFileSync('src/scripts/lint-tools.mjs', 'utf8'));
   const nativeEnvironment = lintEnvironment();
   const files = Array.from({ length: 1025 }, (_, index) => resolve(fixture, `source ${index}.ts`));
   for (const file of files) writeFileSync(file, 'export const value = 0;');
@@ -94,7 +94,7 @@ finish();const poll=setInterval(finish,25);setTimeout(()=>{clearInterval(poll);w
   for(const [index,statuses]of [[0,0],[7,0],[0,9],[7,9]].entries()){
    const [types,lint]=statuses;if(types===undefined || lint===undefined)throw new Error('Missing status');
    const cwd=resolve(root,`case-${index}`);mkdirSync(cwd);
-   const run=spawnSync('bash',[resolve('scripts/typecheck-lint.sh')],{cwd,encoding:'utf8',env:{...env,PATH:`${resolve(root,'bin')}:${env['PATH']??''}`,TYPE_STATUS:String(types),LINT_STATUS:String(lint)}});
+   const run=spawnSync('bash',[resolve('src/scripts/typecheck-lint.sh')],{cwd,encoding:'utf8',env:{...env,PATH:`${resolve(root,'bin')}:${env['PATH']??''}`,TYPE_STATUS:String(types),LINT_STATUS:String(lint)}});
    expect(run.status,run.stdout+run.stderr).toBe(types || lint);
    const trace=readFileSync(resolve(cwd,'trace.txt'),'utf8').trim().split('\n');
    expect(trace.slice(0,2).every(line=>line.includes(':start:'))).toBe(true);

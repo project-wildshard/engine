@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { splitKtx2 } from '../scripts/ktx2-tables.mjs';
+import { splitKtx2 } from '../src/scripts/ktx2-tables.mjs';
 
 test('KTX2 ownership keeps default asset roots, custom globs and the engine remainder', () => {
   const map = { phone: {

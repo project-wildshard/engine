@@ -2,8 +2,8 @@ import path from 'node:path'
 
 import { defineConfig, devices } from '@playwright/test'
 
-import { KEYCHAIN_ARGS } from '../../../scripts/chromium-keychain.mjs'
-import { T1_SHARDS } from '../../../scripts/t1-shards.mjs'
+import { KEYCHAIN_ARGS } from '../../scripts/.kit/chromium-keychain.mjs'
+import { T1_SHARDS } from '../../scripts/t1-shards.mjs'
 
 const E2E_PORT = Number(process.env['WS_T1_PORT'])
 if (!Number.isInteger(E2E_PORT) || E2E_PORT < 1 || E2E_PORT > 65_535) {
@@ -53,7 +53,7 @@ export default defineConfig({
     process.env['WS_T1_PREVIEW_OWNED'] === '1'
       ? []
       : {
-          command: `node scripts/preview-server.mjs --port ${String(E2E_PORT)} --outDir "${process.env['WS_T1_BUILD_DIR'] ?? 'dist'}" --telemetry-dir tmp/${process.env['WS_LANE_NAME'] ?? 't1-e2e'}/t1/telemetry`,
+          command: `node src/scripts/preview-server.mjs --port ${String(E2E_PORT)} --outDir "${process.env['WS_T1_BUILD_DIR'] ?? 'dist'}" --telemetry-dir tmp/${process.env['WS_LANE_NAME'] ?? 't1-e2e'}/t1/telemetry`,
           cwd: process.cwd(),
           url: `${BASE_URL}/version.json`,
           reuseExistingServer: false,

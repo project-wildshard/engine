@@ -6,7 +6,7 @@
  * handlers, worker and socket messages, the DOM observers, promise reactions) that runs `TASK_STAMP_MIN_MS` or more, and a
  * 10 ms probe timer records how late it fired, and a WeakRef sentinel it renews says when a collection ran: a late probe with no stamp is main-thread work nothing here wraps (a
  * collection, style and layout, an `await` continuation); an on-time probe in a long frame is a frame the main thread did
- * not hold up. The bench reads `window.__wsTaskStamp` (scripts/memory/iphone/census.mjs). Off by default, debug only: the
+ * not hold up. The bench reads `window.__wsTaskStamp` (src/scripts/memory/iphone/census.mjs). Off by default, debug only: the
  * wrappers are installed once at page start, in the first page script (client/app/identity.ts).
  */
 import { jsonSlot } from '../saves/slots';

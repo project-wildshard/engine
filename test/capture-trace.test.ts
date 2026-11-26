@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest';
 import type { BrowserContext, Page } from 'playwright';
-import { beginCaptureTrace, registerCaptureTrace, screenshotTraceStages } from '../scripts/parity/capture-trace.mjs';
+import { beginCaptureTrace, registerCaptureTrace, screenshotTraceStages } from '../src/scripts/parity/capture-trace.mjs';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 
 const lines=(rows:object[])=>rows.map(row=>JSON.stringify(row)).join('\n');

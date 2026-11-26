@@ -5,14 +5,14 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { openCellWorld } from '../src/server/host/standalone/cellWorld';
 import { SaveStore } from '../src/shared/engine/saves/store';
-import { chunkCopyKey, colliderInventory, MEASURED_SHAPES, ownerGroup, sideParityDiff, SIDE_PARITY_SHARDS } from '../scripts/side-parity.mjs';
+import { chunkCopyKey, colliderInventory, MEASURED_SHAPES, ownerGroup, sideParityDiff, SIDE_PARITY_SHARDS } from '../src/scripts/side-parity.mjs';
 import { builtFolder, runtimeAssets } from './fixtures/engine-lift/folder';
 
 // SERVER-PARITY SS1 (meta docs/plans/SERVER-PARITY-PLAN.md). The page stands the player on colliders it builds live from the
 // product; the room simulates the colliders `openCellWorld` builds. NET-LAG NL5 (f5424420) was a gap between the two: the page
 // stood on Driftwood's rope-bridge planks, the room had none, and a room player fell through. This boots each pinned shard the
 // way a room does and diffs its colliders, grouped by owner, against the page's (test/side-parity.page.json, recorded from the
-// production bundle by `node scripts/side-parity.mjs --record`). A page-only or cosmetic owner needs a reason in
+// production bundle by `node src/scripts/side-parity.mjs --record`). A page-only or cosmetic owner needs a reason in
 // test/side-parity.allow.json; a shard with a known open gap lists it under `known` with its plan row, so CI stays green while
 // the row is open and goes red if the gap changes or closes unrecorded.
 
@@ -64,7 +64,7 @@ test('a server name the shard declares the same as the page\'s still needs its s
 describe('side parity: the page and the room build the same gameplay colliders', { concurrent: false }, () => {
   for (const slug of SIDE_PARITY_SHARDS) test(slug, async () => {
     const rows = page.shards[slug];
-    if (rows === undefined) throw new Error(`${slug} has no recorded page half: node scripts/side-parity.mjs --record --shard=${slug}`);
+    if (rows === undefined) throw new Error(`${slug} has no recorded page half: node src/scripts/side-parity.mjs --record --shard=${slug}`);
     const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), shard = product.shardfile;
     const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
     const world = await openCellWorld({ instance: slug }, { shard, product, assets: runtimeAssets(product, directory), rapier }, undefined,

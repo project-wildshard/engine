@@ -46,9 +46,9 @@ import { DEV_CONTROL_PATH, devRoute } from './devControl';
 import { rawServerPlan } from '@wildshard/engine/game/shardfile/serverPlan';
 
 declare const __BUILD_ID__: string;
-/** scripts/build-server.mjs: true only for `--dev`, the local dev server (MEMORY-STRUCTURE STR4). */
+/** src/scripts/build-server.mjs: true only for `--dev`, the local dev server (MEMORY-STRUCTURE STR4). */
 declare const __DEVSERVER__: boolean;
-/** scripts/build-server.mjs: package.json's version, the Sentry release (S8). */
+/** src/scripts/build-server.mjs: package.json's version, the Sentry release (S8). */
 declare const __ENGINE_VERSION__: string | undefined;
 const need = (name: string): string => { const value = process.env[name]; if (value === undefined || value === '') throw new Error(`The server needs ${name}`); return value; };
 const log = (line: Record<string, unknown>): void => { console.info(JSON.stringify(line)); };

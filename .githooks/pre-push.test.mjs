@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ENV, ok, roots, sandbox } from './test-helpers.mjs';
+import { ENV, nameHatches, ok, roots, sandbox } from './test-helpers.mjs';
 
 describe('pre-push hook', () => {
   const MSG = ok('feat: add files');
@@ -40,7 +40,7 @@ describe('pre-push hook', () => {
     const box = withRemote();
     box.write('old.ts', token());
     box.git(['add', 'old.ts']);
-    box.git(['commit', '-q', '--no-verify', '-m', MSG]);
+    box.git(['commit', '-q', '--no-verify', '-m', nameHatches(MSG, { ALLOW_SECRET: '1' })]);
     assert.equal(box.push({ ALLOW_SECRET: '1' }).status, 0);
     box.git(['switch', '-q', '-c', 'plan/foo']);
     box.git(['commit', '-q', '--allow-empty', '--no-verify', '-m', MSG]);
@@ -61,7 +61,7 @@ describe('pre-push hook', () => {
     const box = withRemote();
     box.write('old.ts', token());
     box.git(['add', 'old.ts']);
-    box.git(['commit', '-q', '--no-verify', '-m', MSG]);
+    box.git(['commit', '-q', '--no-verify', '-m', nameHatches(MSG, { ALLOW_SECRET: '1' })]);
     assert.equal(box.push({ ALLOW_SECRET: '1' }).status, 0);
     box.commit({ 'new.txt': 'n\n' }, MSG);
     const result = box.push();

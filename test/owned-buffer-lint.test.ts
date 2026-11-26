@@ -1,7 +1,7 @@
 import {expect,test} from 'vitest';
 import {parseSync} from 'vite';
 import {bufferPath,bufferSites,OWNED_BUFFER_SCOPE} from '../lint/owned-buffer.mjs';
-import {countBufferDebt} from '../scripts/memory/owned-buffer-debt.mjs';
+import {countBufferDebt} from '../src/scripts/memory/owned-buffer-debt.mjs';
 import debt from '../lint/owned-buffer-debt.json' with {type:'json'};
 
 function sites(source:string):number{

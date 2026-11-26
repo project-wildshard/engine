@@ -7,7 +7,7 @@
 import { existsSync } from 'node:fs';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import { build } from 'vite';
-import { webkit } from '../scripts/browser-playwright.mjs';
+import { webkit } from '../src/scripts/browser-playwright.mjs';
 
 type Browser = Awaited<ReturnType<typeof webkit.launch>>;
 let browser: Browser | null = null, bundle = '';

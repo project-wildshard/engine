@@ -44,7 +44,7 @@ concurrency:
   # publication run. Ordinary push/PR ordering retains its existing group.
   # CIQ1 (meta HOW-WE-BUILD, J222's burst coalescing): main pushes share one group. GitHub keeps the running run and
   # only the newest pending one, so a burst of N main pushes costs at most two full runs, not N; the newest covers
-  # every commit before it (the descendant-green rule: scripts/main-watch.mjs reads a cancel as superseded, never red,
+  # every commit before it (the descendant-green rule: src/scripts/main-watch.mjs reads a cancel as superseded, never red,
   # and main-watch reads actual commit ancestry, independently of reports). One group per SHA ran 131 of 2026-11-13's 135 main pushes
   # in full (a land rebases, so exact reuse rarely fires): 39 % of the org's runner time in the 15:00-18:00 Cancun
   # burst, when lands queued 15-25 min behind the 20-job cap. Releases run on their own release/vX.Y.Z ref
@@ -56,7 +56,7 @@ concurrency:
 jobs:
   # Every packed job gates itself, so its shares start independently: a docs-only push runs only job 1's docs
   # checks.
-  # A job that runs its packed share says so in its step "Run this job's packed share"; scripts/ci-proof-jobs.mjs
+  # A job that runs its packed share says so in its step "Run this job's packed share"; src/scripts/ci-proof-jobs.mjs
   # counts a run as a code proof only when every share ran that step green. T1 consumes its producer's build in that same job.
   tests:
     runs-on: ubuntu-latest
@@ -95,7 +95,7 @@ jobs:
         run: echo "WS_CI_JOB_OWN_FROM_MS=$(date +%s%3N)" >> "$GITHUB_ENV"
       - name: Enforce quarantine admission dates and the 48-hour cap
         if: matrix.job == 1
-        run: node scripts/test-quarantine.mjs --check-history
+        run: node src/scripts/test-quarantine.mjs --check-history
       - name: Scan the complete incoming history
         if: matrix.job == 1
         env:
@@ -108,7 +108,7 @@ jobs:
           base="$BASE_SHA"
           if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch && "$GITHUB_REF" == refs/heads/main && "$base" =~ ^0+$ ]]; then
             # A main dispatch has no before SHA. Reuse only a proved ancestor whose scan passed.
-            proved="$(node scripts/ci-selection.mjs --history-base)"
+            proved="$(node src/scripts/ci-selection.mjs --history-base)"
             if [[ -n "$proved" ]]; then base="$proved"; fi
           fi
           case "$GITHUB_REF:$base" in
@@ -118,7 +118,7 @@ jobs:
           printf 'refs/heads/main %s refs/heads/main %s\n' "$GITHUB_SHA" "$base" | node .githooks/check-push.mjs
       - name: Require this version's changelog section (Jake, 2026-11-10)
         if: matrix.job == 1
-        run: node scripts/changelog.mjs check --at="$GITHUB_SHA"
+        run: node src/scripts/changelog.mjs check --at="$GITHUB_SHA"
       # SHARD-DELETE DEL9: the pins and both release variables name only slugs the live catalogue lists (a deleted shard
       # leaves it). Offline half: test/pins-catalogue.test.ts. An API outage warns, never reds.
       - name: Refuse a pinned or released slug the API catalogue no longer lists
@@ -126,12 +126,12 @@ jobs:
         env:
           E7_STAGING_SHARDS: ${{ vars.E7_STAGING_SHARDS }}
           E7_PRODUCTION_SHARDS: ${{ vars.E7_PRODUCTION_SHARDS }}
-        run: node scripts/pins-catalogue.ts check
+        run: node src/scripts/pins-catalogue.ts check
       # Meta QA 11-25 row 42: a run that resolved Node 24 still refuses an org package whose engines.node leaves out a
       # Node that engine's range lets another workflow pick (format 0.79.2's <25 broke server-release on Node 26).
       - name: Refuse an org package whose Node range misses engine's
         if: matrix.job == 1
-        run: node scripts/node-ranges.mjs
+        run: node src/scripts/node-ranges.mjs
       - name: Stop job 1's own-checks clock
         if: matrix.job == 1
         run: echo "WS_CI_JOB_OWN_MS=$(( $(date +%s%3N) - WS_CI_JOB_OWN_FROM_MS ))" >> "$GITHUB_ENV"
@@ -140,7 +140,7 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.before || github.event.pull_request.base.sha || '0000000000000000000000000000000000000000' }}
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci-selection.mjs
+        run: node src/scripts/ci-selection.mjs
       # A docs-only push still runs lint, format, the committed asks, agent parity and any test that reads a changed
       # doc (EV9), once.
       - if: steps.paths.outputs.docs == 'true' && matrix.job == 1
@@ -150,7 +150,7 @@ jobs:
       - if: steps.paths.outputs.docs == 'true' && matrix.job == 1
         env:
           DOCS_TESTS: ${{ steps.paths.outputs.docs_tests }}
-        run: bash scripts/ci-static.sh docs
+        run: bash src/scripts/ci-static.sh docs
       - id: code
         if: steps.paths.outputs.docs != 'true'
         run: echo "run=true" >> "$GITHUB_OUTPUT"
@@ -165,7 +165,7 @@ jobs:
         if: matrix.job == 1
         env:
           BASE_SHA: ${{ github.event.before || github.event.pull_request.base.sha || '' }}
-        run: node scripts/fingerprints.ts --base "${BASE_SHA:-HEAD~1}" || true
+        run: node src/scripts/fingerprints.ts --base "${BASE_SHA:-HEAD~1}" || true
       # BROWSER-TESTS-BENCH BB2/BB5 (J231): e2e's headless shell and products' Chromium, cached by Playwright version.
       - id: playwright
         if: steps.code.outputs.run == 'true'
@@ -199,7 +199,7 @@ jobs:
         if: steps.code.outputs.run == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/test-timings.mjs pick --before="$WS_CI_EXCLUSION_AT"
+        run: node src/scripts/test-timings.mjs pick --before="$WS_CI_EXCLUSION_AT"
       - if: steps.code.outputs.run == 'true' && steps.timings.outputs.key != ''
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
@@ -210,10 +210,10 @@ jobs:
         if: steps.code.outputs.run == 'true' && steps.timings.outputs.key == ''
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/test-timings.mjs fetch --strict --before="$WS_CI_EXCLUSION_AT"
+        run: node src/scripts/test-timings.mjs fetch --strict --before="$WS_CI_EXCLUSION_AT"
       - name: Plan the smallest useful shards from actual discovery
         if: steps.code.outputs.run == 'true'
-        run: node scripts/engine-ci-plan.ts --ordinary-workers=3
+        run: node src/scripts/engine-ci-plan.ts --ordinary-workers=3
       # The packed static unit shellchecks the agent hook scripts at this exact version
       # (.agents/hooks/test/shellcheck.test.mjs refuses any other on CI).
       # Meta HOW-WE-BUILD MR6: hosted runners are Linux/X64, the Mac mini's VM
@@ -235,7 +235,7 @@ jobs:
         if: steps.code.outputs.run == 'true'
         env:
           RING_RECORD: ${{ inputs.record && 'true' || 'false' }}
-        run: node scripts/ci-pack.mjs --jobs=9 --job=${{ matrix.job }} --concurrency=2 --units=static,e2e,plan-proofs,tests,products
+        run: node src/scripts/ci-pack.mjs --jobs=9 --job=${{ matrix.job }} --concurrency=2 --units=static,e2e,plan-proofs,tests,products
       - name: Retain actual membership, budget and timing evidence
         if: always() && steps.code.outputs.run == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -283,19 +283,19 @@ jobs:
           if-no-files-found: ignore
       - name: Record every shard's wall-budget verdict, artifact upload included (J193)
         if: always() && steps.code.outputs.run == 'true'
-        run: node scripts/ci-pack.mjs --check-walls --job=${{ matrix.job }}
+        run: node src/scripts/ci-pack.mjs --check-walls --job=${{ matrix.job }}
       # TEMPLATE-E2E T1E-2a: products already built Ring 1. Export those
       # exact bytes plus Brasscap's product, read by POI and memory-server probes.
       - name: Bundle the shared Template suite build
         if: steps.pack.outputs.products == 'true'
         run: |
-          WS_LANE_NAME=template-e2e-ci node scripts/scratch-dir.mjs template-e2e-ci "Shared Ring-1 client and Brasscap product"
+          WS_LANE_NAME=template-e2e-ci node src/scripts/.kit/scratch-dir.mjs template-e2e-ci "Shared Ring-1 client and Brasscap product"
       - name: Read the actual Template qualification receipts
         id: t1-policy
         if: steps.pack.outputs.products == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/t1-qualification.mjs
+        run: node src/scripts/t1-qualification.mjs
       # TR-4: four suites on one runner each hit their 120 s budget (run
       # 44461160109: A-D all killed at 130 s). Each suite takes its own runner
       # again, consuming these exact bytes; -h stores pinned links as files.
@@ -354,7 +354,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/ring-setup
       - name: Own the suite scratch folder
-        run: node scripts/scratch-dir.mjs template-e2e-ci "Template suite shard"
+        run: node src/scripts/.kit/scratch-dir.mjs template-e2e-ci "Template suite shard"
       # TR-4b: run 44497363007's C sat 9 min in this 229 MB download until the job's 10 min ran out (a stalled blob
       # read; the other suites took seconds). Bound it and fetch once more.
       - id: products
@@ -374,9 +374,9 @@ jobs:
         run: |
           tar -xf tmp/template-e2e-ci/products.tar
           rm tmp/template-e2e-ci/products.tar
-          bash scripts/ci-playwright-install.sh --only-shell chromium
+          bash src/scripts/ci-playwright-install.sh --only-shell chromium
       - name: Run this Template suite (report-only until qualified)
-        run: node scripts/t1-ci-proof.mjs
+        run: node src/scripts/t1-ci-proof.mjs
       - name: Keep the actual exit and wall
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -411,7 +411,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/ring-setup
       - name: Install headless Chromium
-        run: bash scripts/ci-playwright-install.sh --only-shell chromium
+        run: bash src/scripts/ci-playwright-install.sh --only-shell chromium
       - name: Browse, fly and inspect in Explore
         run: pnpm test:t1
       - name: Keep failing Explore traces
@@ -447,7 +447,7 @@ jobs:
       - id: paths
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci-selection.mjs
+        run: node src/scripts/ci-selection.mjs
       - id: code
         if: steps.paths.outputs.docs != 'true'
         run: echo "run=true" >> "$GITHUB_OUTPUT"
@@ -455,10 +455,10 @@ jobs:
         uses: ./.github/actions/ring-setup
       - name: Own the benchmark scratch folder
         if: steps.code.outputs.run == 'true'
-        run: node scripts/scratch-dir.mjs nine-ring1 'NB6 pinned Nine load and street ratchet'
+        run: node src/scripts/.kit/scratch-dir.mjs nine-ring1 'NB6 pinned Nine load and street ratchet'
       - name: Build full pinned Nine
         if: steps.code.outputs.run == 'true'
-        run: node scripts/nine-ring1.mjs build
+        run: node src/scripts/nine-ring1.mjs build
       - name: Archive the exact measured client
         if: steps.code.outputs.run == 'true'
         run: tar -cf tmp/nine-ring1/client.tar -C tmp/nine-ring1/preview dist
@@ -494,7 +494,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/ring-setup
       - name: Own the benchmark scratch folder
-        run: node scripts/scratch-dir.mjs nine-ring1 'NB6 exact client observation'
+        run: node src/scripts/.kit/scratch-dir.mjs nine-ring1 'NB6 exact client observation'
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: nine-ring1-client
@@ -504,9 +504,9 @@ jobs:
           mkdir -p tmp/nine-ring1/preview
           tar -xf tmp/nine-ring1/client.tar -C tmp/nine-ring1/preview
           rm tmp/nine-ring1/client.tar
-          bash scripts/ci-playwright-install.sh chromium
+          bash src/scripts/ci-playwright-install.sh chromium
       - name: Refuse this load regression
-        run: node scripts/nine-ring1.mjs boot
+        run: node src/scripts/nine-ring1.mjs boot
       - name: Keep Nine measurements and stock boot evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -538,7 +538,7 @@ jobs:
       - name: Read the shared memory policy
         id: memory-policy
         run: |
-          armed=$(node --input-type=module -e 'import {armedMemory} from "./scripts/memory/armed.mjs"; console.log(armedMemory().zones.size > 0)')
+          armed=$(node --input-type=module -e 'import {armedMemory} from "./src/scripts/memory/armed.mjs"; console.log(armedMemory().zones.size > 0)')
           printf 'armed=%s\n' "$armed" >> "$GITHUB_OUTPUT"
       # Retain the full ledger's verified q11 parts and input-addressed
       # phone texture encodes. Both are used before the artifact upload.
@@ -547,7 +547,7 @@ jobs:
         continue-on-error: true
         env:
           CODEC_INPUTS: ${{ hashFiles('src/cook/game/spawnParts.ts', 'src/cook/game/astc6Wasm.ts') }}
-          PART_INPUTS: ${{ hashFiles('test/pins/shardfiles.json', 'test/pins/catalogue.json', 'test/pins/assets.json', 'src/cook/game/entryDownloads.ts', 'src/cook/game/entryTotals.ts', 'src/cook/game/shardCook.ts', 'scripts/app-build/appCook.ts') }}
+          PART_INPUTS: ${{ hashFiles('test/pins/shardfiles.json', 'test/pins/catalogue.json', 'test/pins/assets.json', 'src/cook/game/entryDownloads.ts', 'src/cook/game/entryTotals.ts', 'src/cook/game/shardCook.ts', 'src/scripts/app-build/appCook.ts') }}
         run: |
           codec=$(node -p 'process.versions.brotli')
           [[ "$codec" =~ ^[0-9]+(\.[0-9]+)+$ ]] || exit 1
@@ -568,16 +568,16 @@ jobs:
       - name: Build every production pin
         id: ledger-client
         run: |
-          node scripts/scratch-dir.mjs memory-ledger 'EM35 full pinned ledger'
-          if ! node scripts/pins.ts install; then
+          node src/scripts/.kit/scratch-dir.mjs memory-ledger 'EM35 full pinned ledger'
+          if ! node src/scripts/pins.ts install; then
             echo 'Pinned input install failed. Retrying once.' >&2
-            node scripts/pins.ts install
+            node src/scripts/pins.ts install
           fi
-          node scripts/gen.mjs --inputs-only
-          python3 scripts/heavy-lane.py build -- node scripts/build-app.mjs --mode preview --outDir tmp/memory-ledger/preview/dist
+          node src/scripts/gen.mjs --inputs-only
+          python3 src/scripts/heavy-lane.py build -- node src/scripts/build-app.mjs --mode preview --outDir tmp/memory-ledger/preview/dist
       - name: Archive the full pinned preview
         run: |
-          products=$(node --input-type=module -e 'import {armedMemory} from "./scripts/memory/armed.mjs"; console.log([...armedMemory().zones].join("\n"))')
+          products=$(node --input-type=module -e 'import {armedMemory} from "./src/scripts/memory/armed.mjs"; console.log([...armedMemory().zones].join("\n"))')
           server_inputs=(out/.app/grid-collision)
           while IFS= read -r zone; do
             if [[ -n "$zone" ]]; then server_inputs+=("out/$zone"); fi
@@ -639,7 +639,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/ring-setup
-      - run: node scripts/scratch-dir.mjs nine-ring1 'EM35 Nine SwiftShader checkpoint'
+      - run: node src/scripts/.kit/scratch-dir.mjs nine-ring1 'EM35 Nine SwiftShader checkpoint'
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: nine-ring1-client
@@ -648,8 +648,8 @@ jobs:
         run: |
           mkdir -p tmp/nine-ring1/preview
           tar -xf tmp/nine-ring1/client.tar -C tmp/nine-ring1/preview
-          bash scripts/ci-playwright-install.sh chromium
-          node scripts/nine-ring1.mjs diagnose-ledger-nine
+          bash src/scripts/ci-playwright-install.sh chromium
+          node src/scripts/nine-ring1.mjs diagnose-ledger-nine
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -685,7 +685,7 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.before || github.event.pull_request.base.sha || '0000000000000000000000000000000000000000' }}
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci-selection.mjs
+        run: node src/scripts/ci-selection.mjs
       - id: code
         if: steps.paths.outputs.docs != 'true'
         run: echo "run=true" >> "$GITHUB_OUTPUT"
@@ -711,7 +711,7 @@ jobs:
           restore-keys: ring1-spawn-parts-br-
       - name: Cook, attach, and play the same bytes
         if: steps.code.outputs.run == 'true'
-        run: node scripts/ci-pack.mjs --jobs=1 --job=1 --units=boundaries
+        run: node src/scripts/ci-pack.mjs --jobs=1 --job=1 --units=boundaries
       - name: Keep the report
         if: always() && steps.code.outputs.run == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

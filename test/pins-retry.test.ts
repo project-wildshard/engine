@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
 import { join, resolve } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { fetchPinnedPublicAssets, pinnedPublicAssets } from '../scripts/pin-assets.ts';
+import { fetchPinnedPublicAssets, pinnedPublicAssets } from '../src/scripts/pin-assets.ts';
 
 const servers: Server[] = [], folders: string[] = [];
 afterEach(() => {
@@ -75,7 +75,7 @@ test('a pinned public asset: a 503 is tried again, a 404 falls back to the API, 
 
 /** pins.ts's stderr once it exits. */
 const pinsTool = (cwd: string, env: NodeJS.ProcessEnv, ...args: readonly string[]): Promise<string> => new Promise(done => {
-  const child = spawn(process.execPath, [resolve('scripts/pins.ts'), ...args], { cwd, env });
+  const child = spawn(process.execPath, [resolve('src/scripts/pins.ts'), ...args], { cwd, env });
   let stderr = '';
   child.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
   child.on('close', () => { done(stderr); });

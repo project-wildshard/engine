@@ -3,8 +3,8 @@ import {existsSync,mkdirSync,mkdtempSync,readFileSync,rmSync,statSync,symlinkSyn
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve only this proof's owned files.
 import {resolve} from 'node:path';
 import {expect,test} from 'vitest';
-import {captureFolderInputs,inputRecorderPlugin,folderInputKey,recordBundle} from '../scripts/shardfile-inputs.mjs';
-import {InputHashMemo} from '../scripts/input-hash-memo.mjs';
+import {captureFolderInputs,inputRecorderPlugin,folderInputKey,recordBundle} from '../src/scripts/shardfile-inputs.mjs';
+import {InputHashMemo} from '../src/scripts/input-hash-memo.mjs';
 import {build} from 'vite';
 
 test('a real author bundle retains its receipt after ordinary parent-directory probes',async()=>{

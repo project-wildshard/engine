@@ -52,6 +52,6 @@ export function audioReportTable(rows: readonly AudioReportRow[]): string {
 }
 
 /** The machine line for a row over the green line, which CI annotates and main-watch reads (`parseAudioAmber` in
- *  scripts/test-amber.mjs). A row over the red line is still AMBER here (J295): `level=red` only says how far. */
+ *  src/scripts/test-amber.mjs). A row over the red line is still AMBER here (J295): `level=red` only says how far. */
 export const audioAmberLine = (row: AudioReportRow): string =>
   `AMBER audio shard=${row.shard} tier=${row.tier} bytes=${row.audioBytes} budget=${AUDIO_LINES.greenBytes} red=${AUDIO_LINES.redBytes} level=${row.level}`;

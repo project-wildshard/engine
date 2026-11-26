@@ -1,6 +1,6 @@
-// The staging proofs excuse exactly MS7 D7's rooms /health lines and read MP2.4 tagged Names (scripts/staging-proof-lines.mjs).
+// The staging proofs excuse exactly MS7 D7's rooms /health lines and read MP2.4 tagged Names (src/scripts/staging-proof-lines.mjs).
 import { describe, expect, it } from 'vitest';
-import { chatLinePattern, guardStagingSockets, isPlayerName, isRoomsHealthLine, playerNameSource, roomsHealthURL, splitRoomsHealthLines } from '../scripts/staging-proof-lines.mjs';
+import { chatLinePattern, guardStagingSockets, isPlayerName, isRoomsHealthLine, playerNameSource, roomsHealthURL, splitRoomsHealthLines } from '../src/scripts/staging-proof-lines.mjs';
 
 const health = 'https://rooms-staging.wildshard.io/health';
 

@@ -3,8 +3,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Own only the explicit fixture files.
 import { dirname, resolve } from 'node:path';
 import { expect, test } from 'vitest';
-import { staticAssetHashes } from '../scripts/app-build/assetHashes';
-import { changedContentNamed } from '../scripts/app-build/gen';
+import { staticAssetHashes } from '../src/scripts/app-build/assetHashes';
+import { changedContentNamed } from '../src/scripts/app-build/gen';
 
 test('static keys include fonts, codecs and icons and change only for changed bytes', () => {
   mkdirSync('tmp', { recursive: true }); const root = mkdtempSync(resolve('tmp/static-keys-'));

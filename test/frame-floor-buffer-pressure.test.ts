@@ -1,7 +1,7 @@
 import {expect, test} from 'vitest';
 // oxlint-disable-next-line import/no-nodejs-modules -- native realm-isolated probe regression, no browser
 import {createContext, runInContext} from 'node:vm';
-import {BUFFER_PRESSURE_SCRIPT} from '../scripts/frame-floor-buffer-pressure.mjs';
+import {BUFFER_PRESSURE_SCRIPT} from '../src/scripts/frame-floor-buffer-pressure.mjs';
 
 function fixture() {
   let now = 100;

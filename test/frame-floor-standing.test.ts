@@ -1,6 +1,6 @@
 import {expect, test} from 'vitest';
-import {frameFloorStanding} from '../scripts/frame-floor-standing.mjs';
-import {validateFrameFloorArgs} from '../scripts/frame-floor-args.mjs';
+import {frameFloorStanding} from '../src/scripts/frame-floor-standing.mjs';
+import {validateFrameFloorArgs} from '../src/scripts/frame-floor-args.mjs';
 
 const pose = {name: 'road-entry', x: 0, y: 1.7, z: -241, yaw: Math.PI, pitch: 0};
 

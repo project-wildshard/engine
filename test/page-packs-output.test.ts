@@ -4,7 +4,7 @@ import {mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync} from 'node:f
 // oxlint-disable-next-line import/no-nodejs-modules -- The fixture stays under the repo tmp folder.
 import {dirname, join, resolve} from 'node:path';
 import {expect, test} from 'vitest';
-import {r2Packs, serverPackOutputRoot} from '../scripts/page-release/packs.mjs';
+import {r2Packs, serverPackOutputRoot} from '../src/scripts/page-release/packs.mjs';
 
 test('server publication reads the split content folder and keeps joined releases working', () => {
   const parent = resolve('tmp/page-packs-output-test'); mkdirSync(parent, {recursive: true});

@@ -1,5 +1,5 @@
 import {expect,test} from 'vitest';
-import {parseFootprintStream,markSegments,pickWebkitProcesses,pickSimulatorProcesses,roleSum,webkitRole,readFootprints,startSampler} from '../scripts/memory/footprint.mjs';
+import {parseFootprintStream,markSegments,pickWebkitProcesses,pickSimulatorProcesses,roleSum,webkitRole,readFootprints,startSampler} from '../src/scripts/memory/footprint.mjs';
 
 const line=(o:object)=>JSON.stringify(o);
 

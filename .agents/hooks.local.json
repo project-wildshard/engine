@@ -1,0 +1,10 @@
+{
+  "hooks": [
+    {
+      "event": "PreToolUse",
+      "tools": "shell",
+      "script": ".agents/hooks/gh-poll-guard.mjs",
+      "status": "Checking for a GitHub poll faster than once a minute"
+    }
+  ]
+}

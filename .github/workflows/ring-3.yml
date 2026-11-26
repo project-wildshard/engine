@@ -40,8 +40,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: package.json
-      - run: node --test scripts/ring3.proof.ts
-      - run: node scripts/ring3.ts prepare
+      - run: node --test src/scripts/ring3.proof.ts
+      - run: node src/scripts/ring3.ts prepare
       # QA-FEEDBACK-2026-11-23-b row 40 (J505): a Git source archive lacks the ignored *.generated.* build outputs (Dunes and
       # Nalati failed on game/boot/audio.generated). Build the npm archive exactly as npm-publish.yml does, commit each file it
       # holds that Git does not track onto the candidate (ring3-pack.ts refuses if any *.generated.* is still missing), and send
@@ -54,18 +54,18 @@ jobs:
         run: pnpm install --frozen-lockfile --config.ci=false
       - name: Build the npm archive, as npm-publish.yml does
         run: |
-          if ! node scripts/pins.ts install; then
+          if ! node src/scripts/pins.ts install; then
             echo 'Pinned input install failed. Retrying once.' >&2
-            node scripts/pins.ts install
+            node src/scripts/pins.ts install
           fi
-          node scripts/gen.mjs --inputs-only
-          node scripts/build-server.mjs --dev --out dist/dev-server
-          node scripts/npm-artifact.mjs "$RUNNER_TEMP/engine-npm" > tmp/ring3/npm.json
+          node src/scripts/gen.mjs --inputs-only
+          node src/scripts/build-server.mjs --dev --out dist/dev-server
+          node src/scripts/npm-artifact.mjs "$RUNNER_TEMP/engine-npm" > tmp/ring3/npm.json
       - name: Send the packed candidate as ring3/<engine>
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          packed=$(node scripts/ring3-pack.ts "$RING3_ENGINE" tmp/ring3/npm.json)
+          packed=$(node src/scripts/ring3-pack.ts "$RING3_ENGINE" tmp/ring3/npm.json)
           # the checkout's pre-push gate is for main; this ref only carries the archive's build outputs
           git push --force --no-verify --quiet "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "${packed}:refs/heads/ring3/${RING3_ENGINE}"
           echo "RING3_PACKED=${packed}" >> "$GITHUB_ENV"
@@ -94,7 +94,7 @@ jobs:
           permission-actions: write
           permission-issues: write
       - name: Dispatch exact candidates, wait, and file red-shard issues
-        run: node scripts/ring3.ts run
+        run: node src/scripts/ring3.ts run
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
       - name: Publish the release qualification aggregate
@@ -103,7 +103,7 @@ jobs:
           if [ -f tmp/ring3/summary.md ]; then
             cat tmp/ring3/summary.md >> "$GITHUB_STEP_SUMMARY"
           fi
-          node scripts/ring3.ts report
+          node src/scripts/ring3.ts report
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

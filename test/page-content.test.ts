@@ -8,7 +8,7 @@ import {dirname, join, resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- A `.pack.br` part is stored Brotli and read back decoded.
 import {brotliCompressSync, brotliDecompressSync} from 'node:zlib';
 import {afterEach, expect, test} from 'vitest';
-import {COPY_WIDTH, contentBaseOf, contentHeaders, contentKey, contentSet, publishContent, r2Content, r2Copies, readBack, scanContent, type ContentStore, type Put} from '../scripts/page-release/content.mjs';
+import {COPY_WIDTH, contentBaseOf, contentHeaders, contentKey, contentSet, publishContent, r2Content, r2Copies, readBack, scanContent, type ContentStore, type Put} from '../src/scripts/page-release/content.mjs';
 
 const ORIGIN = 'https://play.wildshard.io';
 const scratchRoot = resolve(import.meta.dirname, '../tmp/page-content-test');

@@ -3,7 +3,7 @@ import { expect, test } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Keep the isolated discovery fixture under repository scratch.
 import { join, resolve } from 'node:path';
-import { frameFloorShards } from '../scripts/frame-floor-inventory.mjs';
+import { frameFloorShards } from '../src/scripts/frame-floor-inventory.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 

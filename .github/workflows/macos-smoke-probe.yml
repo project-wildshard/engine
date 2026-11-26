@@ -23,9 +23,9 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/ring-setup
       - name: Own this probe output
-        run: node scripts/scratch-dir.mjs macos-smoke-probe 'TS19 shared product producer'
+        run: node src/scripts/.kit/scratch-dir.mjs macos-smoke-probe 'TS19 shared product producer'
       - name: Build and record the actual Ring 1 products
-        run: node scripts/macos-smoke-probe.mjs prepare
+        run: node src/scripts/macos-smoke-probe.mjs prepare
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: macos-smoke-products
@@ -64,15 +64,15 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/ring-setup
       - name: Own this independent observation
-        run: node scripts/scratch-dir.mjs macos-smoke-probe 'TS19 standard hosted observation'
+        run: node src/scripts/.kit/scratch-dir.mjs macos-smoke-probe 'TS19 standard hosted observation'
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: macos-smoke-products
           path: tmp/macos-smoke-probe
       - name: Install the actual platform browser
-        run: bash scripts/ci-playwright-install.sh chromium
+        run: bash src/scripts/ci-playwright-install.sh chromium
       - name: Observe the stock smoke without changing its assertions
-        run: node scripts/macos-smoke-probe.mjs observe
+        run: node src/scripts/macos-smoke-probe.mjs observe
       - name: Preserve every actual outcome
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

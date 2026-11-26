@@ -1,7 +1,7 @@
 // ENGINE-MEMORY EM25 (design rule 4): the recorder T1's phone world installs on the page and in each worker logs every
 // message whose untransferred buffers reach 64 KB, and never changes what is posted.
 import { afterEach, expect, test } from 'vitest';
-import { CLONE_LIMIT_BYTES, recordClones } from '../scripts/memory/cloneRecorder.mjs';
+import { CLONE_LIMIT_BYTES, recordClones } from '../src/scripts/memory/cloneRecorder.mjs';
 
 interface Row { readonly target: string; readonly bytes: number; readonly buffers: number }
 const saved = { Worker: Reflect.get(globalThis, 'Worker'), MessagePort: Reflect.get(globalThis, 'MessagePort') };

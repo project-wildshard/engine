@@ -3,10 +3,10 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
-import { applyRegister, codeLines, createTreeReader, formatInventory, formatTable, inventory, layerOf, OPTIONS, optionCharges, shardTotals, measure, oneUserLines, folderRootModules, reach, rule, SHELL, SHELL_CONTROL, SHELL_ROOTS, TABLES } from '../scripts/host-ruler.mjs';
+import { applyRegister, codeLines, createTreeReader, formatInventory, formatTable, inventory, layerOf, OPTIONS, optionCharges, shardTotals, measure, oneUserLines, folderRootModules, reach, rule, SHELL, SHELL_CONTROL, SHELL_ROOTS, TABLES } from '../src/scripts/host-ruler.mjs';
 import { builtFolder } from '../src/test/game/builtFolder';
-import { CLIENT_PLAN, clientPlanRoots } from '../scripts/host-ruler/roots.mjs';
-import { NATIVE_ASSEMBLY, NATIVE_HOSTS } from '../scripts/host-ruler/server-roots.mjs';
+import { CLIENT_PLAN, clientPlanRoots } from '../src/scripts/host-ruler/roots.mjs';
+import { NATIVE_ASSEMBLY, NATIVE_HOSTS } from '../src/scripts/host-ruler/server-roots.mjs';
 
 const reader = createTreeReader();
 const plan = clientPlanRoots();
@@ -68,7 +68,7 @@ describe('a product is charged exactly its declared kind', () => {
     expect(lines.get('closure-a')!.lines).toBeGreaterThan(0);
   });
   test('the CLI prints a per-shard one-user-lines table', () => {
-    const out = execFileSync(process.execPath, ['scripts/host-ruler.mjs', '--products', 'test/fixtures/host-ruler/closure-a', 'test/fixtures/host-ruler/closure-b'], { encoding: 'utf8' });
+    const out = execFileSync(process.execPath, ['src/scripts/host-ruler.mjs', '--products', 'test/fixtures/host-ruler/closure-a', 'test/fixtures/host-ruler/closure-b'], { encoding: 'utf8' });
     const report = rule(['test/fixtures/host-ruler/closure-a', 'test/fixtures/host-ruler/closure-b']);
     expect(out.trim()).toBe(formatTable(report));
     expect(out).toMatch(new RegExp(String.raw`\| closure-a +\| +${only('closure-a').length} \| +${report.oneUser.get('closure-a')!.lines} \|`, 'u'));

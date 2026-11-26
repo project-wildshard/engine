@@ -1,5 +1,5 @@
 // SERVER-CELLS (draft, opus-cellmem): one real-socket bot per cell, each asking for its cell in its first word (CHUNK-PARAM CP5, GO7) as a page's
-// Shard select is, walking a ring where it lands. Built and run only by scripts/cell-mem-bench.mjs against its loopback replica.
+// Shard select is, walking a ring where it lands. Built and run only by src/scripts/cell-mem-bench.mjs against its loopback replica.
 //   node cellMemBots.mjs <url> <build> <cell,cell,...> <seconds> <tag> <result.json>
 // Each bot says its own address from 198.18.0.0/15 (RFC 2544), as mmoBotsEntry does, so the door's per-address caps never bind.
 import assert from 'node:assert/strict';

@@ -1,4 +1,4 @@
-// J240 / DEV-SPEED DS21: scripts/land.mjs against real git. A bare repo stands
+// J240 / DEV-SPEED DS21: src/scripts/.kit/land.mjs against real git. A bare repo stands
 // in for GitHub (with protect-main's no-force, no-delete rule as an update
 // hook) and a post-receive hook records every pushed tip. J422 push mode:
 // rebase, the push gate, push main; main-watch, the canonical checkout and
@@ -11,7 +11,7 @@ import { closeSync, existsSync, ftruncateSync, mkdirSync, openSync, readFileSync
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
-import { mainPushArgs, parseArgs } from '../scripts/land.mjs';
+import { mainPushArgs, parseArgs } from '../src/scripts/.kit/land.mjs';
 import { cleanLandFixtures, fixture, prepushLines, type Fixture } from './fixtures/land-git';
 
 afterEach(cleanLandFixtures);
@@ -24,7 +24,7 @@ describe('land (J422): main-watch, the canonical checkout and cleanup after the 
     const f = fixture();
     const wt = f.worktree('foo');
     const marker = join(f.root, 'watch-args.json');
-    f.commit(wt, 'scripts/main-watch.mjs', `import {writeFileSync} from 'node:fs';writeFileSync(${JSON.stringify(marker)},JSON.stringify({argv:process.argv.slice(2),cwd:process.cwd()}));`, 'build: a watcher');
+    f.commit(wt, 'src/scripts/main-watch.mjs', `import {writeFileSync} from 'node:fs';writeFileSync(${JSON.stringify(marker)},JSON.stringify({argv:process.argv.slice(2),cwd:process.cwd()}));`, 'build: a watcher');
     const tip = f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
     const result = f.land(wt);
     expect(result.status, result.stdout).toBe(0);
@@ -229,7 +229,7 @@ describe('land (J422): rebasing onto a moved main', () => {
     f.git(f.repo, ['commit', '--quiet', '-m', 'chore: inputs']);
     f.git(f.repo, ['push', '--quiet', 'origin', 'main']);
     const revision = (cwd: string) => execFileSync(process.execPath, ['--input-type=module', '-e',
-      `import {rendererRevision} from '${resolve('scripts/renderer-revision.mjs')}';console.log(rendererRevision(process.cwd()));`], { cwd, env: f.env, encoding: 'utf8' }).trim();
+      `import {rendererRevision} from '${resolve('src/scripts/renderer-revision.mjs')}';console.log(rendererRevision(process.cwd()));`], { cwd, env: f.env, encoding: 'utf8' }).trim();
     const before = revision(f.repo);
     const wt = f.worktree('foo');
     f.commit(wt, 'src/client/engine/render/feature.ts', 'export const feature = true;', 'feat: add a render input');

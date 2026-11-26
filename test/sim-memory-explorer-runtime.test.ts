@@ -6,7 +6,7 @@ import {runInNewContext} from 'node:vm';
 import {afterEach, expect, test} from 'vitest';
 import {HUD} from '../src/client/engine/ui/HUD';
 
-const source = readFileSync('scripts/sim-memory.mjs', 'utf8');
+const source = readFileSync('src/scripts/sim-memory.mjs', 'utf8');
 function transitionSource(): string {
   const identityStart = source.indexOf('    const identity = async () =>');
   const identityEnd = source.indexOf('    result.identity = await checkIdentity();', identityStart);

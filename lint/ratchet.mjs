@@ -7,10 +7,10 @@ import { debugFlags } from './debug-flags.mjs';
 import { relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { TIME_ALLOW } from './wildshard-plugin.js';
-import { compareCounts, hardRules, requiredGuardRules } from '../scripts/guard-counts.mjs';
+import { compareCounts, hardRules, requiredGuardRules } from '../src/scripts/guard-counts.mjs';
 import { parseSync } from 'vite';
 import { pruneSchemaTypeAllowances } from './schema-types.mjs';
-import { SCHEMA_TYPE_RULE } from '../scripts/ratchet-approval.mjs';
+import { SCHEMA_TYPE_RULE } from '../src/scripts/ratchet-approval.mjs';
 import { fullRatchetFiles } from './ratchet-files.mjs';
 
 const REPO = fileURLToPath(new URL('../', import.meta.url));

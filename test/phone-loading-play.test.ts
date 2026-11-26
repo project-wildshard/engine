@@ -1,5 +1,5 @@
 import {expect, test} from 'vitest';
-import {parsePlayCapture, playReading, type PlayCapture} from '../scripts/phone-loading/play';
+import {parsePlayCapture, playReading, type PlayCapture} from '../src/scripts/phone-loading/play';
 
 /** `fps` drawn frames a second for `seconds`, the frame at `slowAt` (ms after start) taking `slowMs` instead */
 function capture(seconds: number, fps: number, slow?: {at: number; ms: number}): PlayCapture {

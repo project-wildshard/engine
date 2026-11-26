@@ -1,5 +1,5 @@
 // MMO-PLAN MP0.4: the bots' one hard rule (J205): loopback or the staging socket, never production. The bots themselves run
-// only from scripts/mmo-bots.mjs against a replica or staging; this checks the guards they carry without opening a socket.
+// only from src/scripts/mmo-bots.mjs against a replica or staging; this checks the guards they carry without opening a socket.
 // oxlint-disable-next-line import/no-nodejs-modules -- Read the scripts as text.
 import { readFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Run the driver's argument check only.
@@ -9,8 +9,8 @@ import { botCells, botTarget, BOX_REPLICA_SOCKET, SOCKETS_PER_ADDRESS, STAGING_S
 import { interArrival } from './fixtures/dedicated/mmoBotsStats';
 import { RoomBot } from './fixtures/dedicated/roomBot';
 
-const entry = readFileSync('test/fixtures/dedicated/mmoBotsEntry.ts', 'utf8'), driver = readFileSync('scripts/mmo-bots.mjs', 'utf8');
-const proofDrivers = ['scripts/e7-doctor-proof.mjs', 'scripts/e7-live-staging-proof.mjs', 'scripts/e7-voice-staging-proof.mjs'].map(file => readFileSync(file, 'utf8'));
+const entry = readFileSync('test/fixtures/dedicated/mmoBotsEntry.ts', 'utf8'), driver = readFileSync('src/scripts/mmo-bots.mjs', 'utf8');
+const proofDrivers = ['src/scripts/e7-doctor-proof.mjs', 'src/scripts/e7-live-staging-proof.mjs', 'src/scripts/e7-voice-staging-proof.mjs'].map(file => readFileSync(file, 'utf8'));
 
 test('replica cells distribute uneven counts with cell-local peers and refuse unsafe targets', () => {
   const targets = botCells('ws://127.0.0.1:18796/', 5, 'driftwood-isle,nalati-grasslands');
@@ -56,7 +56,7 @@ test('private-route diagnostic is explicit, exact and keeps the one-address seat
   for (const url of [STAGING_SOCKET, 'ws://127.0.0.1:18796/', `${TAILNET_SOCKET}/other`, `${TAILNET_SOCKET}/?x=1`, 'wss://rooms.wildshard.io/']) {
     expect(() => botTarget(url, 'own', 2, true), url).toThrow();
   }
-  const run = spawnSync(process.execPath, ['scripts/mmo-bots.mjs', 'replica', '--tailnet'], { encoding: 'utf8', timeout: 10_000 });
+  const run = spawnSync(process.execPath, ['src/scripts/mmo-bots.mjs', 'replica', '--tailnet'], { encoding: 'utf8', timeout: 10_000 });
   expect(run.status).not.toBe(0);
   expect(run.stderr).toContain('--tailnet is for staging');
   expect(run.stdout).not.toContain('release');
@@ -64,7 +64,7 @@ test('private-route diagnostic is explicit, exact and keeps the one-address seat
 
 test('the driver has two modes, neither of them production, and refuses anything else before the network', () => {
   for (const mode of ['production', 'prod', '']) {
-    const run = spawnSync(process.execPath, ['scripts/mmo-bots.mjs', mode], { encoding: 'utf8', timeout: 10_000 });
+    const run = spawnSync(process.execPath, ['src/scripts/mmo-bots.mjs', mode], { encoding: 'utf8', timeout: 10_000 });
     expect(run.status, mode).toBe(2);
     expect(run.stderr).toContain('usage: mmo-bots.mjs replica|staging');
   }
@@ -99,7 +99,7 @@ test('staging keeps seats for people and checks its build and seats again just b
   expect(Number(/WILDSHARD_STAGING_SEATS: '(\d+)'/u.exec(boxLoad)?.[1]) - 4).toBeGreaterThanOrEqual(8 * 4);
   const seats = driver.indexOf('bots leave'), recheck = driver.indexOf("await stagingRoom('before the first hello')"), bundle = driver.indexOf("spawn(process.execPath, [join(out, 'mmoBots.mjs')");
   expect(seats).toBeGreaterThan(0); expect(seats).toBeLessThan(bundle);
-  expect(recheck).toBeGreaterThan(driver.indexOf("execFileSync(process.execPath, ['scripts/build-server.mjs'")); expect(recheck).toBeLessThan(bundle);
+  expect(recheck).toBeGreaterThan(driver.indexOf("execFileSync(process.execPath, ['src/scripts/build-server.mjs'")); expect(recheck).toBeLessThan(bundle);
   expect(driver).toContain('Staging serves ${before.build}, and its release names ${release.engineBuild}');
 });
 
@@ -134,7 +134,7 @@ test('the replica is stopped on every way out: the end, an error, or a signal', 
 
 test('bots on the host need --remote, dial its loopback with no tunnel, and are told to leave there before the replica stops', () => {
   for (const args of [['--bots-on-host'], ['--remote', 'wildshard-agent', '--bots-on-host', '--bot-cpus', '14;rm']]) {
-    const run = spawnSync(process.execPath, ['scripts/mmo-bots.mjs', 'replica', ...args], { encoding: 'utf8', timeout: 10_000 });
+    const run = spawnSync(process.execPath, ['src/scripts/mmo-bots.mjs', 'replica', ...args], { encoding: 'utf8', timeout: 10_000 });
     expect(run.status, args.join(' ')).not.toBe(0);
     expect(run.stderr).toMatch(/--bots-on-host needs --remote|--bot-cpus are taskset lists/u);
   }
@@ -181,11 +181,11 @@ test("MP1.2.d: the box replica's tailnet door takes forwarded bots, and nothing 
   expect(driver).toContain('url = `ws://${new URL(STAGING_HEALTH).hostname}:${String(REPLICA_PORT)}/`;');
   expect(driver).toMatch(/REPLICA_PORT = 18796;/u);
   for (const args of [['--box', '--remote', 'wildshard'], ['--box', '--workers', '8'], ['--box', '--seats', '65'], ['--box', '--seconds', '3600'], ['--box', '--spread']]) {
-    const run = spawnSync(process.execPath, ['scripts/mmo-bots.mjs', 'replica', ...args], { encoding: 'utf8', timeout: 10_000 });
+    const run = spawnSync(process.execPath, ['src/scripts/mmo-bots.mjs', 'replica', ...args], { encoding: 'utf8', timeout: 10_000 });
     expect(run.status, args.join(' ')).not.toBe(0);
     expect(run.stderr, args.join(' ')).toMatch(/--box is a replica on memory saves|--spread is for a local replica/u);
   }
-  const staging = spawnSync(process.execPath, ['scripts/mmo-bots.mjs', 'staging', '--box'], { encoding: 'utf8', timeout: 10_000 });
+  const staging = spawnSync(process.execPath, ['src/scripts/mmo-bots.mjs', 'staging', '--box'], { encoding: 'utf8', timeout: 10_000 });
   expect(staging.status).not.toBe(0);
 });
 
@@ -193,7 +193,7 @@ test("MP1.2.d: a refused box start never stops another lane's replica", () => {
   // `replica stop` is armed only by this run's own replica line, never before the start is known to be ours.
   expect(driver.split('remoteStop = boxStop').length).toBe(2);
   expect(driver).toContain("if (row.at === 'replica' && box) { boxBuild = String(row.build); remoteStop = boxStop; }");
-  const run = spawnSync(process.execPath, ['scripts/mmo-bots.mjs', 'replica', '--box', '--workers', '1;id'], { encoding: 'utf8', timeout: 10_000 });
+  const run = spawnSync(process.execPath, ['src/scripts/mmo-bots.mjs', 'replica', '--box', '--workers', '1;id'], { encoding: 'utf8', timeout: 10_000 });
   expect(run.status).not.toBe(0);
 });
 
@@ -206,7 +206,7 @@ test('MMO-SERVER E7.4b.c: scratch saves only on the box replica, and one restart
     [['replica', '--box', '--box-saves', 'postgres', '--pg-restart-checkpoint'], '--pg-restart-checkpoint needs --pg-restart-at'],
     [['replica', '--box', '--box-saves', 'postgres', '--seconds', '120', '--pg-restart-at', '60', '--pg-restart-checkpoint'], 'more than 75 s of bot time'],
   ] as const) {
-    const run = spawnSync(process.execPath, ['scripts/mmo-bots.mjs', ...args], { encoding: 'utf8', timeout: 10_000 });
+    const run = spawnSync(process.execPath, ['src/scripts/mmo-bots.mjs', ...args], { encoding: 'utf8', timeout: 10_000 });
     expect(run.status, args.join(' ')).not.toBe(0);
     expect(run.stderr, args.join(' ')).toContain(why);
   }
@@ -221,13 +221,13 @@ test('release-proof bots outlive the lane shell that started them and record any
   expect(driver).toMatch(/if \(releaseProof\) \{\n  process\.on\('SIGHUP'/u);
   expect(driver).toContain("process.once('exit', code => { note({ step: 'exit', code }); });");
   expect(driver).toContain("{ stdio: ['ignore', 'pipe', 'inherit'], detached: releaseProof }");
-  expect(driver).toContain('nohup node scripts/mmo-bots.mjs staging --release-proof');
+  expect(driver).toContain('nohup node src/scripts/mmo-bots.mjs staging --release-proof');
 });
 
 // QA 11-24 row 5 (11-25): 3 release-proof riders plus the train's 2-bot MMO observer asked the door for 5 sockets from one
 // address (4 allowed), and v0.1.91's staging observer never armed its baseline (P2). Riders now leave the observer its 2.
 test('release-proof riders leave the release observer its two sockets', () => {
-  const run = spawnSync(process.execPath, ['scripts/mmo-bots.mjs', 'staging', '--release-proof', '--bots', '3', '--work-dir', 'tmp/x'], { encoding: 'utf8', timeout: 10_000 });
+  const run = spawnSync(process.execPath, ['src/scripts/mmo-bots.mjs', 'staging', '--release-proof', '--bots', '3', '--work-dir', 'tmp/x'], { encoding: 'utf8', timeout: 10_000 });
   expect(run.status).not.toBe(0);
   expect(run.stderr).toContain('--release-proof needs at most 2 bots (the release\'s observer takes 2 of the door\'s 4 per address)');
   expect(driver).toContain("releaseProof ? 2 : mode === 'replica'");

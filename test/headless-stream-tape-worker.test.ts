@@ -9,7 +9,7 @@ import process from 'node:process';
 import {expect,test} from 'vitest';
 
 test('streamed native tape preserves all ticks, terminal ownership, aggregate caps and one global request clock',()=>{
- const child=spawnSync(process.execPath,['--import',pathToFileURL(resolve('scripts/sim-node-loader.mjs')).href,
+ const child=spawnSync(process.execPath,['--import',pathToFileURL(resolve('src/scripts/sim-node-loader.mjs')).href,
   resolve('test/fixtures/headless/stream-tape-run.mjs')],{encoding:'utf8',timeout:60_000});
  expect(child.status,child.stdout+child.stderr).toBe(0);
  expect(child.stdout).toContain('streamed native parity, aggregate budgets, producer failure, disposal and global deadline pass');

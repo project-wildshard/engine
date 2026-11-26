@@ -10,7 +10,7 @@ test('installed own TypeScript keeps enums and parameter properties while foreig
   const parent = resolve('tmp/codex-ms-release');
   mkdirSync(parent, { recursive: true });
   const root = mkdtempSync(join(parent, 'format-runtime-'));
-  const hook = resolve('scripts/format-hook.mjs');
+  const hook = resolve('src/scripts/format-hook.mjs');
   try {
     const own = join(root, 'node_modules/@wildshard/runtime-fixture');
     const foreign = join(root, 'node_modules/foreign-runtime-fixture');

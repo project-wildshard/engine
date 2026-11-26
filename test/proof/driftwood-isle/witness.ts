@@ -11,7 +11,7 @@ import { createHash } from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- Keep native snapshot artefacts compact.
 import { gzipSync, gunzipSync } from 'node:zlib';
 import * as v from 'valibot';
-import { readWitnessManifest, witnessPayloadHashes } from '../../../scripts/witness-checkpoints.mjs';
+import { readWitnessManifest, witnessPayloadHashes } from '../../../src/scripts/witness-checkpoints.mjs';
 import bossRows from '../../../src/shards/driftwood-isle/data/bossEncounter.json' with { type: 'json' };
 import { readNativeQuestSpots } from '@wildshard/engine/game/quest/nativeComposition';
 import { DRIFTWOOD_SPOTS as nativeQuestSpots } from '../../../src/shards/driftwood-isle/generators/spots';

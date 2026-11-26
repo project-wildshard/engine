@@ -12,7 +12,7 @@ test('phone road maps match their painters and contain complete native ASTC 6x6 
   };
   expect(manifest.format).toBe(2);
   const sources = ['src/client/game/grid/roadSurfaceMaps.ts', 'src/client/game/grid/roadGrain.ts',
-    'src/shared/game/grid/roadLayout.ts', 'scripts/bake-road-surfaces.entry.ts', 'scripts/bake-road-surfaces.mjs'];
+    'src/shared/game/grid/roadLayout.ts', 'src/scripts/bake-road-surfaces.entry.ts', 'src/scripts/bake-road-surfaces.mjs'];
   expect(Object.keys(manifest.sourcesSHA256).sort()).toEqual([...sources].sort());
   for (const source of sources) expect(manifest.sourcesSHA256[source], source).toBe(hash(readFileSync(source)));
   expect(manifest.encoder.version).toMatch(/^Basis Universal .+ v[0-9]+\.[0-9]+/u);

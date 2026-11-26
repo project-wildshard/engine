@@ -1,6 +1,6 @@
 import {readFileSync} from 'node:fs';
 import {expect,test} from 'vitest';
-import {parseJetsam,parseSyslog,parseSysmon,jetsamLines,commands,main} from '../scripts/memory/iphone-footprint.mjs';
+import {parseJetsam,parseSyslog,parseSysmon,jetsamLines,commands,main} from '../src/scripts/memory/iphone-footprint.mjs';
 
 const fixture=(name:string)=>readFileSync(new URL(`fixtures/iphone-memory/${name}`,import.meta.url),'utf8');
 

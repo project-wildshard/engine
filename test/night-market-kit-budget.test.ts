@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- The report must work in plain Node, outside Vite.
 import { execFileSync } from 'node:child_process';
 import { afterEach,expect,test } from 'vitest';
-import { readNightMarketKitBudget } from '../scripts/night-market-kit-budget.mjs';
+import { readNightMarketKitBudget } from '../src/scripts/night-market-kit-budget.mjs';
 import { builtFolder } from './fixtures/engine-lift/folder';
 
 const owned: string[] = [];
@@ -27,7 +27,7 @@ test('the Node report reads all 80 sealed tiles and deduplicates their actual pa
   expect(report.uniqueTileClosure.compressed).toBeLessThanOrEqual(report.rows.reduce((sum, row) => sum + row.compressed, 0));
   expect(report.rm8Targets.reportOnly).toBe(true);
   expect(report.basis).toContain('not live memory');
-  const module = new URL('../scripts/night-market-kit-budget.mjs', import.meta.url).href;
+  const module = new URL('../src/scripts/night-market-kit-budget.mjs', import.meta.url).href;
   const program = `import {readNightMarketKitBudget} from ${JSON.stringify(module)}; console.log(readNightMarketKitBudget(${JSON.stringify(folder)}).rows.length);`;
   expect(execFileSync(process.execPath, ['--input-type=module', '-e', program], { encoding: 'utf8' }).trim()).toBe('80');
 });

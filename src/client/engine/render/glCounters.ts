@@ -83,7 +83,7 @@ export class GlCounters implements JournalSink {
 /** The page's counters. */
 export const glCounters: GlCounters = new GlCounters();
 
-/** The ledger's read-out for harnesses (scripts/memory/measure.mjs reads it at each boot checkpoint): GPU counters, the
+/** The ledger's read-out for harnesses (src/scripts/memory/measure.mjs reads it at each boot checkpoint): GPU counters, the
  * RAM kinds the page's attribution ledger observes, and each worker isolate's RAM kinds as `<worker>/<kind>` (EM7), all
  * in bytes. No Developer mode needed. */
 export function memoryCounters(): Record<MemoryDomain | 'workers', Record<string, number>> {

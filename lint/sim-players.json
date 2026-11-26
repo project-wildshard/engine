@@ -1,5 +1,5 @@
 {
- "about": "P1-E5.2a: per-file reads of a one-player SimHost member (`members`, which ended at 0) and leadPlayer binds (`lead`: systems not yet per-player) in non-test source, by type, not by spelling (scripts/check-sim-players.mjs). They never rise.",
+ "about": "P1-E5.2a: per-file reads of a one-player SimHost member (`members`, which ended at 0) and leadPlayer binds (`lead`: systems not yet per-player) in non-test source, by type, not by spelling (src/scripts/check-sim-players.mjs). They never rise.",
  "members": 0,
  "lead": 0,
  "files": {}

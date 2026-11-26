@@ -1,11 +1,11 @@
 // The retained SM5 Chromium profile resumed a world with a restart notice, so waiting only for the title never progressed.
-// WS_SMOKE_BROWSER=1 scripts/browser-lane.sh pnpm exec vitest run test/staging-smoke-recovery.test.ts
+// WS_SMOKE_BROWSER=1 src/scripts/browser-lane.sh pnpm exec vitest run test/staging-smoke-recovery.test.ts
 import { expect, test, vi } from 'vitest';
-import { oldProfileTitle, SEL } from '../scripts/staging-smoke/scenarios.mjs';
-import { KEYCHAIN_ARGS } from '../scripts/chromium-keychain.mjs';
+import { oldProfileTitle, SEL } from '../src/scripts/staging-smoke/scenarios.mjs';
+import { KEYCHAIN_ARGS } from '../src/scripts/.kit/chromium-keychain.mjs';
 
 test.skipIf(process.env['WS_SMOKE_BROWSER'] !== '1')('an old recovery reaches title through its notice, pause and exit controls', async () => {
-  const { chromium } = await import('../scripts/browser-playwright.mjs');
+  const { chromium } = await import('../src/scripts/browser-playwright.mjs');
   const browser = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--use-angle=metal'] });
   try {
     const page = await browser.newPage({ viewport: { width: 402, height: 874 }, hasTouch: true });
@@ -54,7 +54,7 @@ test.skipIf(process.env['WS_SMOKE_BROWSER'] !== '1')('an old recovery reaches ti
 }, 600_000);
 
 test.skipIf(process.env['WS_SMOKE_BROWSER'] !== '1')('an old recovery reselects its control after a reload during a tap', async () => {
-  const { chromium } = await import('../scripts/browser-playwright.mjs');
+  const { chromium } = await import('../src/scripts/browser-playwright.mjs');
   const browser = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--use-angle=metal'] });
   try {
     const page = await browser.newPage({ viewport: { width: 402, height: 874 }, hasTouch: true });
@@ -86,7 +86,7 @@ test.skipIf(process.env['WS_SMOKE_BROWSER'] !== '1')('an old recovery reselects 
 }, 30_000);
 
 test.skipIf(process.env['WS_SMOKE_BROWSER'] !== '1')('an old recovery taps Exit just once while the world returns to title', async () => {
-  const { chromium } = await import('../scripts/browser-playwright.mjs');
+  const { chromium } = await import('../src/scripts/browser-playwright.mjs');
   const browser = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--use-angle=metal'] });
   try {
     const page = await browser.newPage({ viewport: { width: 402, height: 874 }, hasTouch: true });

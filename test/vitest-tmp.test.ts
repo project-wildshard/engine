@@ -11,7 +11,7 @@ test.each(['forks', 'threads'] as const)('%s workers keep every temp file inside
   const report = resolve(root, 'worker.json'), closed = resolve(root, 'closed.json'), config = resolve(root, 'vitest.config.mjs');
   mkdirSync(system); mkdirSync(scoped);
   try {
-    writeFileSync(config, `import {vitestTmpRoot} from ${JSON.stringify(resolve('scripts/vitest-tmp.ts'))};
+    writeFileSync(config, `import {vitestTmpRoot} from ${JSON.stringify(resolve('src/scripts/vitest-tmp.ts'))};
 import {existsSync,writeFileSync} from 'node:fs';
 export default {root:${JSON.stringify(root)},plugins:[vitestTmpRoot(),{name:'observe-close',configureVitest({vitest}){
 vitest.onClose(()=>writeFileSync(${JSON.stringify(closed)},JSON.stringify({exists:existsSync(process.env.WS_VITEST_TMP_DIR),temp:process.env.TMPDIR,compile:process.env.NODE_COMPILE_CACHE})));}}],test:{include:['sample.test.ts'],setupFiles:[],pool:${JSON.stringify(pool)},maxWorkers:1}};`);
@@ -54,7 +54,7 @@ test('original verdict',()=>{const run=process.env.WS_VITEST_TMP_DIR;
 const child=mkdtempSync(join(tmpdir(),'worker-'));writeFileSync(join(child,'payload'),'owned');
 writeFileSync(${JSON.stringify(report)},JSON.stringify({run,temp:tmpdir()}));
 expect(process.env.EXPECT_REFUSAL).toBe('0');});`);
-    const run = (refused: boolean) => spawnSync(process.execPath, [resolve('scripts/vitest-tmp.ts'), 'run', 'sample.test.ts', '--config', config], {
+    const run = (refused: boolean) => spawnSync(process.execPath, [resolve('src/scripts/vitest-tmp.ts'), 'run', 'sample.test.ts', '--config', config], {
       encoding: 'utf8', timeout: 20_000,
       env: { ...process.env, TMPDIR: system, NODE_COMPILE_CACHE: resolve(root, 'compile'), VITEST_TMP_ROOT: scoped, EXPECT_REFUSAL: refused ? '1' : '0' },
     });
@@ -76,7 +76,7 @@ expect(process.env.EXPECT_REFUSAL).toBe('0');});`);
     expect(early.stdout + early.stderr).toContain('original config refusal');
     expect(readdirSync(scoped)).toEqual([]);
     expect(readdirSync(system)).toEqual(['foreign']);
-    const unleased = spawnSync(process.execPath, [resolve('scripts/vitest-tmp.ts'), 'run', '--config', config], {
+    const unleased = spawnSync(process.execPath, [resolve('src/scripts/vitest-tmp.ts'), 'run', '--config', config], {
       encoding: 'utf8', timeout: 20_000,
       env: { ...process.env, TMPDIR: system, VITEST_TMP_ROOT: scoped, WS_HEAVY_ROOT: resolve(root, 'no-lease') },
     });

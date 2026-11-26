@@ -6,7 +6,7 @@ import { existsSync, readdirSync, rmSync } from 'node:fs';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 import { AUDIO_LINES, audioAmberLine, audioLevel, audioReport, audioReportTable, type AudioReportManifest } from '../src/cook/game/audioReport';
 import { readBuiltSpawnManifest } from '../src/cook/game/engineHalf';
-import { parseAudioAmber } from '../scripts/test-amber.mjs';
+import { parseAudioAmber } from '../src/scripts/test-amber.mjs';
 import { cookFilesOnly, type FilesOnlyCook } from './filesOnlyCook';
 
 // A synthetic shard's client manifest: `audio` MB of recordings (own and shared) beside 12 MB of everything else.

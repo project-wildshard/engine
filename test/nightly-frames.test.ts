@@ -1,9 +1,9 @@
 import { afterAll, afterEach, expect, test, vi } from 'vitest';
 import sharp from 'sharp';
-import { frameFailure } from '../scripts/parity/black-frame.mjs';
+import { frameFailure } from '../src/scripts/parity/black-frame.mjs';
 import type { Page } from 'playwright';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
-import { nightlyCapturePixels, nightlyDrawSamples, NIGHTLY_FRAME_LIMIT, NIGHTLY_WALL_MS, observeNightlyFrames } from '../scripts/parity/nightly-frames.mjs';
+import { nightlyCapturePixels, nightlyDrawSamples, NIGHTLY_FRAME_LIMIT, NIGHTLY_WALL_MS, observeNightlyFrames } from '../src/scripts/parity/nightly-frames.mjs';
 
 const watchFrames = (draws: number) => observeNightlyFrames({draws, frames: NIGHTLY_FRAME_LIMIT, wallMs: NIGHTLY_WALL_MS});
 

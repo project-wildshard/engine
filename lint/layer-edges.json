@@ -1,5 +1,5 @@
 {
-  "about": "E362 AG7: cross-layer import counts (scripts/check-graph.mjs). A new pair or a rising count fails; lower with --update.",
+  "about": "E362 AG7: cross-layer import counts (src/scripts/check-graph.mjs). A new pair or a rising count fails; lower with --update.",
   "edges": {
     "commons → sdk": 1,
     "engine → format": 79,

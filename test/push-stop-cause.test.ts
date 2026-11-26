@@ -6,8 +6,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { join, resolve } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
 import { parallelChecks, STUCK_LOAD_CAP, STUCK_RESAMPLE_MS, STUCK_STEP_SECONDS, STUCK_VITEST_SECONDS, stuckExtensionMs, stuckLimitMs } from '../.githooks/push-checks.mjs';
-import { prePushCause } from '../scripts/land.mjs';
-import { gateReport, printGateReport } from '../scripts/gate-report.mjs';
+import { prePushCause } from '../src/scripts/.kit/land.mjs';
+import { gateReport, printGateReport } from '../src/scripts/gate-report.mjs';
 
 test('FL10: a terminal proof refusal wins over passing CPU negative controls', () => {
   const actual = 'Checked tree or runtime changed during the gate; no publication proof, rerun the exact tree';
@@ -77,10 +77,10 @@ test('a finished command whose group the gate may not signal does not end the ga
   expect(result).toMatchObject({ ok: true, results: [{ name: 'gen:inputs', code: 0 }] });
 }, 30_000);
 
-/** An owner shaped like scripts/vitest-tmp.ts: its own broker, its signal handler, its loss handler. */
+/** An owner shaped like src/scripts/vitest-tmp.ts: its own broker, its signal handler, its loss handler. */
 async function owner(work: string, kill: (pid: number, broker: number) => void): Promise<{ code: number | null; output: string }> {
   const file = join(work, 'owner.mjs');
-  writeFileSync(file, `import {startCpuBroker} from ${JSON.stringify(resolve('scripts/cpu-broker.mjs'))};
+  writeFileSync(file, `import {startCpuBroker} from ${JSON.stringify(resolve('src/scripts/cpu-broker.mjs'))};
 const broker=await startCpuBroker({root:${JSON.stringify(join(work, 'cpu'))},capacity:1});
 const stop=async()=>{await broker.close();process.exit(0);};
 process.on('SIGTERM',()=>{broker.expectExit();void stop();});

@@ -5,7 +5,7 @@ import { expect, test } from 'vitest';
 import { prepareAssetDecoders } from '@wildshard/format/shardfileAssets';
 import { validateShardfileFolder } from '@wildshard/format/shardfileValidation';
 import { readTar } from '@wildshard/format/tar';
-import { FORMAT_PRODUCTS, formatTemplate, wholeBrasscapProduct } from '../scripts/pin-format.ts';
+import { FORMAT_PRODUCTS, formatTemplate, wholeBrasscapProduct } from '../src/scripts/pin-format.ts';
 
 const sha256 = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 

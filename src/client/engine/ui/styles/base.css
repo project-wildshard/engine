@@ -1,7 +1,7 @@
 /* ─── Wildshard UI base ─── dark glass, cyan accents, Rajdhani display / JetBrains Mono data ───
    ONLY shared primitives live here: tokens, page resets, .ws-glass / .ws-label / .ws-mono / .ws-display /
    .ws-wordmark / .ws-bar / .ws-progress and the keyframes. Everything else is sculpted per screen in a sibling file with
-   its own class prefix (game.css → ws-game-, menu.css → ws-menu-, …); scripts/check-css.mjs enforces it. */
+   its own class prefix (game.css → ws-game-, menu.css → ws-menu-, …); src/scripts/check-css.mjs enforces it. */
 :root {
   /* top edge of the HUD on phones: 6px from the top of the page. The page never runs under the status bar — not in the
      Safari tab, and not as a home-screen PWA either since E58 dropped viewport-fit=cover (see index.html) — so the inset is

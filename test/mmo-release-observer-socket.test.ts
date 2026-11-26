@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test, vi } from 'vitest';
-import { StagingSocket } from '../scripts/mmo-release-observer.mjs';
+import { StagingSocket } from '../src/scripts/mmo-release-observer.mjs';
 
 const { dial } = vi.hoisted(() => ({ dial: vi.fn() }));
 vi.mock('ws', async () => {

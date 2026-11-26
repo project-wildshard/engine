@@ -7,7 +7,7 @@ import {runInNewContext} from 'node:vm';
 import {expect,test} from 'vitest';
 
 function sample({loseGlobals=false,changeWorld=false,noFrames=false}={}){
- const source=readFileSync('scripts/loading-flow/benchmax.mjs','utf8');
+ const source=readFileSync('src/scripts/loading-flow/benchmax.mjs','utf8');
  const play=source.slice(source.indexOf('// the play: walk'),source.indexOf('// NB5: what the shadow'));
  const begin=/page\.evaluate(?:Handle)?\((`[^`]+`)\)/u.exec(play)?.[1];
  const finishSource=/(?:page|sample)\.evaluate\((`[^`]+`|(?:sample|captured) => \{[\s\S]*?\n {2}\})\)/u.exec(play)?.[1];

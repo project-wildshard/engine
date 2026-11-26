@@ -10,7 +10,7 @@ import {join, resolve} from 'node:path';
 import {afterEach, expect, it} from 'vitest';
 import {recordPorts} from '../src/cook/game/recordPass';
 
-const source = readFileSync('scripts/vps/rebuild.sh', 'utf8');
+const source = readFileSync('src/scripts/vps/rebuild.sh', 'utf8');
 const definition = (name: string): string => {
   const start = source.indexOf(`${name}() {`);
   if (start === -1) throw new Error(`Missing ${name}`);

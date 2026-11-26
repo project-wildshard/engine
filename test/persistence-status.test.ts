@@ -10,7 +10,7 @@ import type { SaveWrite } from '../src/server/host/dedicated/saves/saveStore';
 import { migrate } from '../src/server/host/dedicated/saves/migrate';
 import { openPglite } from './fixtures/pgliteDatabase';
 import { openPg } from '../src/server/host/dedicated/saves/pgDatabase';
-import { ownedPostgres } from '../scripts/online-rig-owned.mjs';
+import { ownedPostgres } from '../src/scripts/online-rig-owned.mjs';
 
 const cleanups: (() => Promise<void> | void)[] = [];
 afterEach(async () => { for (const close of cleanups.splice(0).reverse()) await close(); });

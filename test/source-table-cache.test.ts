@@ -5,7 +5,7 @@ import { dirname, resolve } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Verify environment identity is part of local reuse.
 import { env } from 'node:process';
 import { afterEach, expect, test } from 'vitest';
-import { sourceTablesCached } from '../scripts/source-table-cache.mjs';
+import { sourceTablesCached } from '../src/scripts/source-table-cache.mjs';
 
 const owned: string[] = [];
 afterEach(() => { for (const root of owned.splice(0)) rmSync(root, { recursive: true, force: true }); });
@@ -19,7 +19,7 @@ function fixture() {
   };
   put('src/author.ts', 'original');
   put('public/assets/source.bin', 'original asset');
-  put('scripts/controller.mjs', 'original controller');
+  put('src/scripts/controller.mjs', 'original controller');
   put('package.json', '{}');
   put('.cache/generation-phase.json', '{"seal":"verified original phase"}');
   for (const file of outputs) mkdirSync(dirname(resolve(root, file)), { recursive: true });
@@ -60,7 +60,7 @@ test('binds source, raw assets, negative inventories, phase and environment', as
   const f = fixture();
   await sourceTablesCached(f.root, 'shards-before', f.run);
   for (const [file, value] of [['src/author.ts', 'changed!'], ['public/assets/source.bin', 'different asset'],
-    ['scripts/controller.mjs', 'new controller'], ['src/added.ts', 'new negative input'],
+    ['src/scripts/controller.mjs', 'new controller'], ['src/added.ts', 'new negative input'],
     ['.cache/generation-phase.json', '{"seal":"another verified phase"}']]) {
     if (file === undefined || value === undefined) throw new Error('Missing test input');
     f.put(file, value);
@@ -109,7 +109,7 @@ test('binds boot packs, transport bytes and the installed binary copies', async 
   const files = ['src/client/game/boot/bytes.generated.ts', 'src/client/game/boot/versions.generated.ts',
     'src/client/game/boot/audio.generated.ts', 'src/client/game/boot/packs.generated.ts',
     'public/assets/physics/rapier.wasm', 'public/assets/packs/shard.hash.bin', 'public/basis/r186/basis_transcoder.wasm',
-    'scripts/boot-publication.generated.json'];
+    'src/scripts/boot-publication.generated.json'];
   for (const folder of ['src/client/game/boot', 'src/client/game/shard']) mkdirSync(resolve(f.root, folder), { recursive: true });
   let calls = 0;
   const run = (): void => { calls++; for (const file of files) f.put(file, readFileSync(resolve(f.root, module), 'utf8')); };
@@ -119,7 +119,7 @@ test('binds boot packs, transport bytes and the installed binary copies', async 
   expect(await sourceTablesCached(f.root, 'boot', run)).toBe(false);
   rmSync(resolve(f.root, 'public/assets/packs/shard.hash.bin'));
   expect(await sourceTablesCached(f.root, 'boot', run)).toBe(false);
-  f.put('scripts/boot-publication.generated.json', 'poisoned published facts');
+  f.put('src/scripts/boot-publication.generated.json', 'poisoned published facts');
   expect(await sourceTablesCached(f.root, 'boot', run)).toBe(false);
   expect(calls).toBe(4);
 });

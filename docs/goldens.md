@@ -20,11 +20,11 @@ The harness is engine's; the reference frames are each shard repo's own
 |---|---|---|
 | SHARDFILE goldens | `<shard repo>/art/goldens/shardfile/<nn>-<camera>.jpg` | **The look to hold** (G859, G873 L5). 24 per shard, 22 px label strip on top. |
 | LEGACY goldens | `<shard repo>/art/goldens/legacy/<nn>-<camera>.jpg` | The frozen record of LEGACY (10-28, G843). Never re-captured, never updated. |
-| Cameras | `<shard repo>/art/goldens/cameras24.json` (engine copy: `scripts/perf/cameras24.json`) | 24 cameras: 1–4 CO6, POIs, coverage, 2 aerials, 2 hands. Eye, yaw, pitch, FOV, probe. |
+| Cameras | `<shard repo>/art/goldens/cameras24.json` (engine copy: `src/scripts/perf/cameras24.json`) | 24 cameras: 1–4 CO6, POIs, coverage, 2 aerials, 2 hands. Eye, yaw, pitch, FOV, probe. |
 | Update log | `<shard repo>/art/goldens/README.md` | Source run and every promotion, with its ruling. |
 | Rerun boards | `<shard repo>/art/goldens/runs/<date>-<sha10>-board.jpg` | The ≤ 500 KB board a look change lands with. |
-| Capture | `scripts/goldens/capture.mjs` (engine) | Chromium (or `--engine=webkit`), iPhone 16 Pro portrait, phone tier, 2×, seed 357, midday / clear, HUD hidden. |
-| Board | `scripts/goldens/board.py` (engine) | LEGACY · SHARDFILE · NOW per camera, labels burned in, SSIM, colour-shift flags, ≤ 500 KB board; `--promote`. |
+| Capture | `src/scripts/goldens/capture.mjs` (engine) | Chromium (or `--engine=webkit`), iPhone 16 Pro portrait, phone tier, 2×, seed 357, midday / clear, HUD hidden. |
+| Board | `src/scripts/goldens/board.py` (engine) | LEGACY · SHARDFILE · NOW per camera, labels burned in, SSIM, colour-shift flags, ≤ 500 KB board; `--promote`. |
 | Open plots | `shard-open-plots/art/goldens/<plot>/` | 8 views per plot (`<n>-<view>.jpg`), `cameras.json`, scored `board.jpg`; capture is shard-open-plots' own. |
 
 | Shard repo | Slug |
@@ -60,7 +60,7 @@ pixel-identical.
   those two differ (the plot's own pixels) and shows that mask in a
   SCORED column. A neighbour, the sky or the road never turns a plot red.
 - **The candidate build** is a working-tree build of your change:
-  engine's `scripts/serve-build.sh --shard <slug>`. After landing, a
+  engine's `src/scripts/serve-build.sh --shard <slug>`. After landing, a
   `--head` rerun is a QA check, not a substitute.
 - **Read every panel**: each camera's row, every column. A camera is
   **red** when the NOW frame loses or gains anything against the

@@ -9,16 +9,16 @@ const owned: string[] = [];
 afterEach(() => { for (const path of owned.splice(0)) rmSync(path, { recursive: true, force: true }); });
 function fixture() {
   const root = mkdtempSync(resolve('tmp/native-program-')); owned.push(root);
-  mkdirSync(resolve(root, 'source')); mkdirSync(resolve(root, 'scripts'));
+  mkdirSync(resolve(root, 'source')); mkdirSync(resolve(root, 'src', 'scripts'), { recursive: true });
   writeFileSync(resolve(root, 'source/value.txt'), 'one');
-  writeFileSync(resolve(root, 'scripts/bake-loader.mjs'), '');
+  writeFileSync(resolve(root, 'src/scripts/bake-loader.mjs'), '');
   writeFileSync(resolve(root, 'compiler.mjs'), `
     import fs from 'node:fs';
     const calls=fs.existsSync('calls')?Number(fs.readFileSync('calls','utf8')):0;
     fs.writeFileSync('calls',String(calls+1));
     process.stdout.write(JSON.stringify({value:fs.readFileSync('source/value.txt','utf8'),files:fs.readdirSync('source').sort()}));
   `);
-  const spec = { root, cacheDir: resolve(root, 'cache'), id: 'program', script: 'compiler.mjs', inputs: ['source', 'scripts/bake-loader.mjs'] };
+  const spec = { root, cacheDir: resolve(root, 'cache'), id: 'program', script: 'compiler.mjs', inputs: ['source', 'src/scripts/bake-loader.mjs'] };
   return { root, spec, calls: () => Number(readFileSync(resolve(root, 'calls'), 'utf8')) };
 }
 
@@ -42,7 +42,7 @@ test('a Node option on the construction command stays in its key', async () => {
 
 test('the simulation loader keeps its command and loader bytes in the construction fence', async () => {
   const { root, spec, calls } = fixture();
-  const loader = resolve(root, 'scripts/sim-node-loader.mjs');
+  const loader = resolve(root, 'src/scripts/sim-node-loader.mjs');
   writeFileSync(loader, '');
   mkdirSync(resolve(root, 'lint'));
   writeFileSync(resolve(root, 'lint/sim-schema-leaves.json'), '{}');
@@ -55,7 +55,7 @@ test('the simulation loader keeps its command and loader bytes in the constructi
   writeFileSync(loader, '// changed simulation loader\n');
   expect(await nativeProgramFixture(simulation)).toBe(original);
   expect(calls()).toBe(3);
-  writeFileSync(resolve(root, 'scripts/bake-loader.mjs'), '// original loader remains fenced\n');
+  writeFileSync(resolve(root, 'src/scripts/bake-loader.mjs'), '// original loader remains fenced\n');
   expect(await nativeProgramFixture(simulation)).toBe(original);
   expect(calls()).toBe(4);
   writeFileSync(resolve(root, 'lint/sim-schema-leaves.json'), '{"leaf":true}');
@@ -105,7 +105,7 @@ test('a shared cache never lends a construction from another working directory',
 test('the mandatory loader is an input even when the caller names only its data', async () => {
   const { root, spec, calls } = fixture(), dataOnly = { ...spec, inputs: ['source'] };
   const before = await nativeProgramFixture(dataOnly);
-  writeFileSync(resolve(root, 'scripts/bake-loader.mjs'), '// loader revision\n');
+  writeFileSync(resolve(root, 'src/scripts/bake-loader.mjs'), '// loader revision\n');
   expect(await nativeProgramFixture(dataOnly)).toBe(before); expect(calls()).toBe(2);
 });
 

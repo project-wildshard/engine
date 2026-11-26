@@ -1,0 +1,5 @@
+# Retired (MMO-PLAN MP0.1): src/scripts/vps/rebuild.sh writes and installs the cook worker's unit, wildshard-cook.service.
+# This copy was never installed, and it had two faults the rebuild's container proof found: systemd strips the double
+# quotes out of an unquoted Environment=COOK_JOB_WRAP=[...] value, and the worker's default port was staging's 8791.
+# It stays as a pointer because the pre-commit stamp (renderer-revision.mjs reads HEAD's tree from disk) cannot commit
+# a deleted file under src/scripts/.

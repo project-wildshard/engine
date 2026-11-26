@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 
 import { expect } from '@playwright/test'
 
-import { FLOOR_GRID_ENTER } from '../../../scripts/frame-floor-navigation.mjs'
+import { FLOOR_GRID_ENTER } from '../../scripts/frame-floor-navigation.mjs'
 
 import type { SmokeVec3 } from '../smoke/page-globals.d.ts'
 import type { Page } from '@playwright/test'

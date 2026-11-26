@@ -1,5 +1,5 @@
 import {expect,it} from 'vitest';
-import {zeroPolicyFailures,customSectionsZeroFailures} from '../scripts/check-custom-sections-zero.mjs';
+import {zeroPolicyFailures,customSectionsZeroFailures} from '../src/scripts/check-custom-sections-zero.mjs';
 
 const zero={'custom-sections/total':0};
 it('admits a complete zero census and locks the only custom budget to zero',()=>{

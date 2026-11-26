@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { withLane } from './lane-trailer.mjs';
-import { messageLane } from '../scripts/lane-commits.mjs';
+import { messageLane } from '../src/scripts/lane-commits.mjs';
 
 const TRAILER = 'Assisted-by: Claude:claude-opus-5-5';
 

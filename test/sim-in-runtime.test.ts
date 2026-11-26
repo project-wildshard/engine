@@ -5,7 +5,7 @@ import {mkdtempSync,mkdirSync,writeFileSync,rmSync} from 'node:fs';
 import {dirname,join} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Small source fixture, never an exported checkout.
 import {tmpdir} from 'node:os';
-import {simRuntimeInventory,simRuntimeFailures} from '../scripts/sim-in-runtime.mjs';
+import {simRuntimeInventory,simRuntimeFailures} from '../src/scripts/sim-in-runtime.mjs';
 
 it('tracks value reach through other shard folders, lazy edges and cycles, excluding client/type-only code',()=>{
  const root=mkdtempSync(join(tmpdir(),'sim-runtime-reach-'));

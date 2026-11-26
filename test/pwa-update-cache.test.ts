@@ -3,7 +3,7 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync
 // oxlint-disable-next-line import/no-nodejs-modules -- Paths for the owned static HTTP fixture.
 import { join, resolve } from 'node:path';
 import { expect, test } from 'vitest';
-import { serviceWorkerCore, workerScripts, writeServiceWorker } from '../scripts/app-build/serviceWorker';
+import { serviceWorkerCore, workerScripts, writeServiceWorker } from '../src/scripts/app-build/serviceWorker';
 import { previewServer } from './fixtures/preview-server';
 
 test('worker bootstrap names exact core bytes and changes for same-length edits', () => {

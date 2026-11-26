@@ -9,7 +9,7 @@ import tempfile
 import time
 
 source = Path(sys.argv[1]).resolve()
-wrapper = Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else source / 'scripts/commit.sh'
+wrapper = Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else source / 'src/scripts/.kit/commit.sh'
 before = len(sys.argv) > 3 and sys.argv[3] == 'before'
 env = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
 env.pop('SKIP_ATTRIB', None)
@@ -26,7 +26,7 @@ with tempfile.TemporaryDirectory(dir=source / 'tmp', prefix='commit-message-') a
     git('add', '--', 'own.txt', 'peer.txt')
     git('commit', '-qm', 'base')
     (root / 'scripts').mkdir()
-    shutil.copy2(wrapper, root / 'scripts/commit.sh')
+    shutil.copy2(wrapper, root / 'src/scripts/.kit/commit.sh')
     (root / '.githooks').mkdir()
     shutil.copy2(source / '.githooks/check-commit-message.mjs', root / '.githooks/check-commit-message.mjs')
     hook = root / '.githooks/pre-commit'
@@ -47,7 +47,7 @@ sys.exit(23 if os.environ.get('FIXTURE_RED') else 0)
     index, head = (root / '.git/index').read_bytes(), git('rev-parse', 'HEAD')
     def run(message, extra=None):
         start = time.monotonic()
-        result = subprocess.run(['scripts/commit.sh', message, '--', 'own.txt'],
+        result = subprocess.run(['src/scripts/.kit/commit.sh', message, '--', 'own.txt'],
                                 cwd=root, env={**env, **(extra or {})}, capture_output=True, text=True)
         return result, (time.monotonic() - start) * 1000
     message = 'test(cf1): bad body\n\n' + 'word ' * 16 + '\n\nAssisted-by: Codex:gpt-6.1-sol'

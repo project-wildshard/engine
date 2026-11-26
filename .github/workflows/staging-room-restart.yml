@@ -1,7 +1,7 @@
 # Meta MINI-AUTONOMY MA7a (D7): restart the staging server (every staging room) without a box key on the Mac mini.
 #   gh workflow run staging-room-restart.yml -R project-wildshard/engine -f channel=staging
 # Staging only. `channel` exists so a production ask is refused on the record: the guard and
-# `node scripts/box-ops.mjs restart` both refuse anything but staging before the job joins the tailnet or reads a key.
+# `node src/scripts/box-ops.mjs restart` both refuse anything but staging before the job joins the tailnet or reads a key.
 # The restart is `sudo -n systemctl restart wildshard-server@staging` from the agents' allowlist (MS3.5, J266) and must
 # end `active`. MA7c: once a signed release puts the gate on the box, BOX_SSH_KEY becomes the workflows' own key, which the box forces to wildshard-box-gate (probe and
 # restart-staging only), so even a changed workflow on main cannot restart production with it. Tailscale: see box-probe.yml.
@@ -39,7 +39,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          sparse-checkout: scripts/box-ops.mjs
+          sparse-checkout: src/scripts/box-ops.mjs
           sparse-checkout-cone-mode: false
       - name: Stop before the box without a tailnet client (OPEN QUESTION)
         if: env.TS_OAUTH_CLIENT_ID == ''
@@ -64,7 +64,7 @@ jobs:
       - name: Restart the staging server and wait for active
         shell: bash
         run: |
-          node scripts/box-ops.mjs restart "$CHANNEL" | tee "$RUNNER_TEMP/restart.json"
+          node src/scripts/box-ops.mjs restart "$CHANNEL" | tee "$RUNNER_TEMP/restart.json"
           { echo "### staging-room-restart"; echo '```json'; cat "$RUNNER_TEMP/restart.json"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - name: Forget the key
         if: always()

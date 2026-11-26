@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 import type { CookIndex } from '../src/cook/game/cookWorker';
-import { deterministicCookIndex } from '../scripts/cook-cache-model';
+import { deterministicCookIndex } from '../src/scripts/cook-cache-model';
 
 type Check = NonNullable<CookIndex['check']>;
 function cooked(seconds: number, maxMicros: number, p95Micros: number, samples = 180): CookIndex {

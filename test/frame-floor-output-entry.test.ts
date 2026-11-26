@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest';
-import { floorGridPortalPlan, gridFloorWitnessFailures, readFloorGridEntryways, gridFloorPlans, floorGridEntryRoute, type FloorGridPlan, type FloorGridWitness } from '../scripts/frame-floor-grid.mjs';
+import { floorGridPortalPlan, gridFloorWitnessFailures, readFloorGridEntryways, gridFloorPlans, floorGridEntryRoute, type FloorGridPlan, type FloorGridWitness } from '../src/scripts/frame-floor-grid.mjs';
 
 test('cold home entry selects its return after the outward retirement leg', () => {
   const state = { home: 'home', cells: [

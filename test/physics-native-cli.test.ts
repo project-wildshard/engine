@@ -1,5 +1,5 @@
 import {expect,test} from 'vitest';
-import {assertNativeWalkResult,nativeWalkSelection,nativeWalkTestFiles,runNativePhysicsWalk} from '../scripts/physics-native.mjs';
+import {assertNativeWalkResult,nativeWalkSelection,nativeWalkTestFiles,runNativePhysicsWalk} from '../src/scripts/physics-native.mjs';
 
 test('native route selection preserves explicit leg repetitions and refuses no work',()=>{
   const routes={$doc:'metadata',first:[{name:'bridge'},{name:'stairs'}],second:[{name:'bridge'}]};

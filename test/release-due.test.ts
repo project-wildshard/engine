@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { latestReleaseRef, receiptNeeded, refreshReminderRefs, releaseDue, releaseDueFromRefs, reminderLine, reminderPlist } from '../scripts/release-due.mjs';
+import { latestReleaseRef, receiptNeeded, refreshReminderRefs, releaseDue, releaseDueFromRefs, reminderLine, reminderPlist } from '../src/scripts/release-due.mjs';
 const cutAt = '2026-11-17T15:00:00.000Z', cut = Date.parse(cutAt), hour = 3_600_000;
 const latest = { tag: 'v0.1.36', build: '6'.repeat(40), cutAt, newCommits: 2 };
 describe('the release due window', () => {

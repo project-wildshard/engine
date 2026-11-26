@@ -1,5 +1,5 @@
 // J506 (Jake, 2026-11-23 ~20:55 Cancún): engine's pinned copy of Brasscap Mesa, test/fixtures/corpus/brasscap-mesa/, is
-// `wildshard build` of one shard-brasscap commit, written by scripts/brasscap-export.mjs (never by hand). This test earns
+// `wildshard build` of one shard-brasscap commit, written by src/scripts/brasscap-export.mjs (never by hand). This test earns
 // the copy its place: the folder is exactly what the pin says, every section its index lists is there with the bytes it
 // names, and the build says Brasscap is a player zone (QA-FEEDBACK-2026-11-23-b row 3, "brasscap is not developer only").
 // oxlint-disable-next-line import/no-nodejs-modules -- The pinned folder is files.
@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- The pinned folder is files.
 import { existsSync, readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { listFiles, treeHash } from '../scripts/brasscap-export.mjs';
+import { listFiles, treeHash } from '../src/scripts/brasscap-export.mjs';
 
 const FOLDER = 'test/fixtures/corpus/brasscap-mesa';
 type Pin = { repo: string; commit: string; folder: string; files: number; tree: string;
@@ -22,7 +22,7 @@ test('the Brasscap copy is the pinned build, less only the GLB blobs', (): void 
   const files = listFiles(FOLDER);
   expect(files.filter(file => file.startsWith(pin.omitted.prefix)), 'an omitted file came back').toEqual([]);
   expect(files.length + pin.omitted.files).toBe(pin.files);
-  expect({ files: files.length, tree: treeHash(FOLDER, files) }, 'edited by hand: re-run node scripts/brasscap-export.mjs').toEqual(pin.kept);
+  expect({ files: files.length, tree: treeHash(FOLDER, files) }, 'edited by hand: re-run node src/scripts/brasscap-export.mjs').toEqual(pin.kept);
 });
 
 test("every section Brasscap's index lists is in the copy with the bytes it names", (): void => {

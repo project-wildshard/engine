@@ -1,7 +1,7 @@
 import {expect,test} from 'vitest';
 import {parseSync} from 'vite';
 import {frameAllocSites,frameAllocPath,frameTagged,FRAME_ALLOC_SCOPE} from '../lint/no-frame-alloc.mjs';
-import {countFrameAllocDebt} from '../scripts/memory/frame-alloc-debt.mjs';
+import {countFrameAllocDebt} from '../src/scripts/memory/frame-alloc-debt.mjs';
 import debt from '../lint/no-frame-alloc-debt.json' with {type:'json'};
 
 // MEMORY-STRUCTURE STR21: a function tagged `@frame` allocates nothing each call. The fixture's tagged function holds a

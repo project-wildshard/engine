@@ -8,14 +8,14 @@ import {openSync, readSync, closeSync, existsSync} from 'node:fs';
 import {mkdtemp, rm} from 'node:fs/promises';
 // oxlint-disable-next-line import/no-nodejs-modules -- Keep the browser profile under the repository scratch root.
 import {resolve} from 'node:path';
-import {pressEscape} from '../../scripts/parity/browser-escape.mjs';
-import {nativeChromeExecutable} from '../../scripts/warm-native-chrome.mjs';
+import {pressEscape} from '../../src/scripts/parity/browser-escape.mjs';
+import {nativeChromeExecutable} from '../../src/scripts/warm-native-chrome.mjs';
 import {nativeSocketTemporary} from './native-socket-temp.mjs';
 import {drainNativeBrowser} from './native-browser-drain.mjs';
 import {warmNativeInventory} from './native-process-inventory.mjs';
 import {requestNativeRetention} from './native-retention.mjs';
-import { KEYCHAIN_ARGS } from '../../scripts/chromium-keychain.mjs';
-import {reserveMachineBrowserAdmission} from '../../scripts/browser-machine-loader.mjs';
+import { KEYCHAIN_ARGS } from '../../src/scripts/.kit/chromium-keychain.mjs';
+import {reserveMachineBrowserAdmission} from '../../src/scripts/browser-machine-loader.mjs';
 
 warmNativeInventory();
 const executable = nativeChromeExecutable();

@@ -15,7 +15,7 @@ import {join} from 'node:path';
 import test from 'node:test';
 // oxlint-disable-next-line import/no-nodejs-modules -- Await the actual child process and its unchanged deadline.
 import {promisify} from 'node:util';
-import {holdCpu} from '../../scripts/cpu-admission.mjs';
+import {holdCpu} from '../../src/scripts/cpu-admission.mjs';
 
 await test('the worker-only cold bake retains every plain-grid collision byte', {timeout:180_000}, async()=>{
   for(const slug of ['sunscar-dunes','driftwood-isle','nine-dragon-stack','nalati-grasslands'])
@@ -27,7 +27,7 @@ await test('the worker-only cold bake retains every plain-grid collision byte', 
     /** @param {string} name @param {string[]} [extra] */
     const bake=async(name,extra=[])=>{
       const output=join(scratch,name),started=performance.now();
-      await promisify(execFile)(process.execPath,['--import','./scripts/bake-loader.mjs','scripts/bake-grid-seams.mjs',output,...extra],{maxBuffer:64*1024*1024,timeout:55_000});
+      await promisify(execFile)(process.execPath,['--import','./src/scripts/bake-loader.mjs','src/scripts/bake-grid-seams.mjs',output,...extra],{maxBuffer:64*1024*1024,timeout:55_000});
       return {output,milliseconds:performance.now()-started};
     };
     const collision=await bake('collision',['--collision-only']);

@@ -1,5 +1,5 @@
 import {expect,test} from 'vitest';
-import {parseTileBakePolicy,tileBakeApprovalFailures} from '../scripts/tile-bake-policy.mjs';
+import {parseTileBakePolicy,tileBakeApprovalFailures} from '../src/scripts/tile-bake-policy.mjs';
 
 // The SDK keeps all seven real product/writer cases. Private approval grammar
 // stays with the defining engine policy, without exporting an internal API.

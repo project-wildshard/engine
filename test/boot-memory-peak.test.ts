@@ -1,9 +1,9 @@
 import { expect, test, vi } from 'vitest';
 import { runInNewContext } from 'node:vm';
 import { CRASH_LINE, MEMORY_AMBER } from '../src/client/game/grid/budgetOverlay';
-import { CHROMIUM_TO_PHONE, MEMORY_LINE_BYTES, PHONE_MODEL, alignProcessDumps, bootMemoryLine, TRACE_BUFFER_KB, chromiumToPhone, bootMemoryVerdict, bootPageURL, installBootMemoryProbe, processDumps } from '../scripts/boot-memory-peak.mjs';
-import type { BootSample } from '../scripts/boot-memory-peak.mjs';
-import { phoneFromLedger } from '../scripts/memory/phoneModel.mjs';
+import { CHROMIUM_TO_PHONE, MEMORY_LINE_BYTES, PHONE_MODEL, alignProcessDumps, bootMemoryLine, TRACE_BUFFER_KB, chromiumToPhone, bootMemoryVerdict, bootPageURL, installBootMemoryProbe, processDumps } from '../src/scripts/boot-memory-peak.mjs';
+import type { BootSample } from '../src/scripts/boot-memory-peak.mjs';
+import { phoneFromLedger } from '../src/scripts/memory/phoneModel.mjs';
 
 const name = (pid: number, role: string): unknown => ({ pid, ph: 'M', name: 'process_name', args: { name: role } });
 const dump = (pid: number, id: string, bytes: number): unknown => ({ pid, id, ph: 'v', args: { dumps: { process_totals: { private_footprint_bytes: bytes.toString(16) } } } });

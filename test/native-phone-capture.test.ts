@@ -5,7 +5,7 @@ import {mkdtempSync,mkdirSync,rmSync,readFileSync,existsSync} from 'node:fs';
 import {join} from 'node:path';
 import sharp from 'sharp';
 import {expect,test,vi} from 'vitest';
-import {captureNativePhonePage} from '../scripts/parity/phone-route-browser.mjs';
+import {captureNativePhonePage} from '../src/scripts/parity/phone-route-browser.mjs';
 
 function output(){mkdirSync('tmp',{recursive:true});const root=mkdtempSync('tmp/native-phone-capture-');return {png:join(root,'frame.png'),jpg:join(root,'failure.jpg'),close:()=>{rmSync(root,{recursive:true,force:true});}};}
 

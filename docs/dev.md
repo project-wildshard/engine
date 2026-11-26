@@ -20,9 +20,9 @@ Run from the repo root.
   (SPLIT-REPAIR SR12). A new listener, a producer that left, or a producer
   only tests reach is red: add or fix the row, never the gate.
 - `pnpm test`: `node:test` on `src/**/*.test.ts`, run as .ts by Node's type stripping.
-- `pnpm test:hooks`: the `.githooks/` suite (CI, and pre-commit when hooks change).
+- `pnpm test` (it runs the `.githooks/` suite): the `.githooks/` suite (CI, and pre-commit when hooks change).
 - `pnpm dev`: the game on http://127.0.0.1:4402 with its server as a local Node process
-  (`scripts/dev.mjs`, MEMORY-STRUCTURE STR2/STR3, J414, J419): ring 1's pins, a
+  (`src/scripts/dev.mjs`, MEMORY-STRUCTURE STR2/STR3, J414, J419): ring 1's pins, a
   devserver client build, and the dedicated server on loopback with saves on disk
   in PGlite under `tmp/dev-world/`. The page port stamps each document with the
   world, so no dev page starts the in-page server worker; only the deployed
@@ -42,15 +42,15 @@ Run from the repo root.
   is ready again in about 12 s. Each run's split is in
   `tmp/e2e/receipt.json`. `bash scripts/e2e-offline.sh` runs it with outbound
   networking denied by macOS.
-- `pnpm lint:fix` / `pnpm format`: the hooks only check; these fix.
+- `pnpm fix` / `pnpm format`: the hooks only check; these fix.
 - `node src/cli/main.ts --help`: the CLI without installing it. `serve [--port n]` starts the server (default 4402).
   The npm bin is `src/cli/engine.mjs`: it loads the format hook so `main.ts` runs from `node_modules`.
 - `pnpm md:wrap`: rewraps Markdown prose to ~72 columns.
-- `kit/scripts/ask-new.sh "<Jake's words>"`: opens an ask (`docs/tasks/asks/README.md`).
-- `scripts/browser-lane.sh node scripts/hud-worst.mjs --base=<url>`: the worst-case HUD, every
+- `src/scripts/.kit/ask-new.sh "<Jake's words>"`: opens an ask (`docs/tasks/asks/README.md`).
+- `src/scripts/browser-lane.sh node src/scripts/hud-worst.mjs --base=<url>`: the worst-case HUD, every
   element any shard shows on at once, screenshotted per browser, size and
   Developer mode, with the layout check (`--check`, `--menu`; A14). The
-  URL is a `scripts/serve-build.sh` build.
+  URL is a `src/scripts/serve-build.sh` build.
 
 ## Progress epochs
 
@@ -64,7 +64,7 @@ match the active epoch before any write or server stop. Keep the root
 and publishes it in `version.json`. Snapshot format versions are separate.
 
 Run the real storage boundary proof explicitly:
-`scripts/browser-lane.sh node --test test/save-epoch-browser.proof.mjs`.
+`src/scripts/browser-lane.sh node --test test/save-epoch-browser.proof.mjs`.
 
 ## Layout
 
@@ -82,7 +82,7 @@ goes in `tmp/<task>/` and is deleted when done.
 - `src/e2e/`: Playwright: the status page, and `smoke/`, the Template 2 smoke.
 - `src/cook/`: shardfile to runtime packs.
 - `src/scripts/check-sides.mjs`: the side rule (`pnpm check:sides`).
-- `kit/scripts/`: repo tooling (asks, md-wrap, lint), plain JS (J329).
+- `src/scripts/.kit/`: repo tooling (asks, md-wrap, lint), plain JS (J329).
 - `docs/`: living docs. `docs/plans/` is the queue, `docs/tasks/asks/`
   the receipts.
 - `project/`: history. `journal/`, `origins/` (the meta-repo plans this
@@ -91,7 +91,7 @@ goes in `tmp/<task>/` and is deleted when done.
 ## Code rules
 
 - TypeScript only, imports with explicit `.ts`/`.tsx` extensions.
-- Every function has an explicit return type. `kit/.oxlintrc.json` denies
+- Every function has an explicit return type. `.oxlintrc.kit.json` denies
   every category (D28); disable a rule only with a one-line reason beside it.
 - Pin dependencies exactly (`.npmrc` has `save-exact=true`).
 - Other Wildshard repos are git dependencies pinned by tag
@@ -105,15 +105,15 @@ goes in `tmp/<task>/` and is deleted when done.
 A plan works in its own worktree (J240, meta DEV-SPEED DS12):
 
 ```sh
-node scripts/worktree.mjs new <slug>   # .worktrees/<slug> on plan/<slug>, from origin/main
+node src/scripts/.kit/worktree.mjs new <slug>   # .worktrees/<slug> on plan/<slug>, from origin/main
 cd .worktrees/<slug>                   # commit here; then land:
-WS_LANE_NAME=<lane> node scripts/land.mjs
+WS_LANE_NAME=<lane> node src/scripts/.kit/land.mjs
 ```
 
 `new` clones the canonical checkout's matching tracked files (APFS, no new
 blocks), installs from pnpm's store offline, runs `pnpm pins` and records
 its steps in `tmp/worktree-setup.json`. Every repo tool skips `.worktrees/`
-(`scripts/worktree-ignore.mjs`, DS11).
+(`src/scripts/.kit/worktree-ignore.mjs`, DS11).
 
 ## Git hooks
 
@@ -150,7 +150,7 @@ The client model owner hashes only the supplied Uint8Array byte span,
 including Node Buffer subclasses backed by a larger allocation. Shared
 models stay live until their last Scope retires; late owners decode anew.
 Run the native client-data proof explicitly, outside hooks:
-`node --import ./scripts/bake-loader.mjs
+`node --import ./src/scripts/bake-loader.mjs
 --test test/ci/entry-model-values.proof.mjs` as one command. It uses the
 renderer-capable author loader, not the simulation loader or a browser.
 CI runs all three real geometry/lifetime/refusal/span cases with 9.5 s
@@ -158,7 +158,7 @@ timeout and complete-body elapsed limits. No production socket is used.
 
 ## Quest dialogue home lifetime
 
-Run `node --import ./scripts/bake-loader.mjs --test test/ci/quest-home-lifetime.proof.mjs`.
+Run `node --import ./src/scripts/bake-loader.mjs --test test/ci/quest-home-lifetime.proof.mjs`.
 CI runs these two cases explicitly; local hooks and Vitest discovery do
 not add them. Happy DOM supplies the complete page environment; this is
 not a renderer, road-travel or phone-layout claim.
@@ -176,7 +176,7 @@ browser, renderer, server or live socket.
 
 ## Hover movement contract
 
-Run `node --import ./scripts/bake-loader.mjs --test test/ci/hover-boost.proof.mjs`.
+Run `node --import ./src/scripts/bake-loader.mjs --test test/ci/hover-boost.proof.mjs`.
 Three CI-only cases stay outside hooks and Vitest inventory. They use the
 real Player, actual pointer input, native Rapier and encoded client/server
 commands. Fixed expected speeds come from displacement, not a tuning
@@ -202,8 +202,8 @@ partial SDK-row qualification; it cannot stand in for the full nightly.
 ## Native exchange edges
 
 Install the two ordinary pinned products with
-`node scripts/pins.ts install driftwood-isle pine-hollow`, then run
-`node --import ./scripts/sim-node-loader.mjs --test test/ci/net-exchange.proof.mjs`.
+`node src/scripts/pins.ts install driftwood-isle pine-hollow`, then run
+`node --import ./src/scripts/sim-node-loader.mjs --test test/ci/net-exchange.proof.mjs`.
 CI runs both cases explicitly, outside hooks and Vitest discovery. Each
 9.5-second timeout and elapsed assertion includes native product loading,
 real physics, network input and cleanup.
@@ -221,7 +221,7 @@ browser, forced health or synthetic reward is used.
 ## Native loadout contracts
 
 After the same two pinned products are installed, run
-`node --import ./scripts/sim-node-loader.mjs --test test/ci/native-loadout.proof.mjs`.
+`node --import ./src/scripts/sim-node-loader.mjs --test test/ci/native-loadout.proof.mjs`.
 CI runs these three cases explicitly; hooks and Vitest do not discover
 them. Each 9.5-second bound includes loading, physics and cleanup.
 
@@ -243,7 +243,7 @@ choice wins when the same command also collects the rifle.
 ## Keyed sky clock contracts
 
 After the ordinary Pine product install, run
-`node --import ./scripts/sim-node-loader.mjs --test test/ci/keyed-sky-clock.proof.mjs`.
+`node --import ./src/scripts/sim-node-loader.mjs --test test/ci/keyed-sky-clock.proof.mjs`.
 Three explicit CI-only cases retain independent authored sky/weather
 numbers, the actual pinned day checkpoint suffix and strict data
 admission. Each timeout and complete-body elapsed guard stays 9.5 s.
@@ -255,7 +255,7 @@ waiting file is retained until its owner reviews the complete mapping.
 ## Interaction placement owner contracts
 
 After the two ordinary Driftwood and Pine pin installs, run
-`node --import ./scripts/sim-node-loader.mjs --test test/ci/interaction-placement.proof.mjs`.
+`node --import ./src/scripts/sim-node-loader.mjs --test test/ci/interaction-placement.proof.mjs`.
 Three explicit CI-only cases borrow actual quest progress, native floor
 queries and public model/frame ports. A real, in-reach NetRoom greeting
 unlocks both the authored lever condition and stock chest; out-of-reach
@@ -271,7 +271,7 @@ installed binding/reader counterpart. The original duplicate stays.
 ## Weather continuation owner contracts
 
 After the ordinary Pine and Nalati pin installs, run
-`node --import ./scripts/sim-node-loader.mjs --test test/ci/weather-legacy.proof.mjs test/ci/weather-continuation.proof.mjs`.
+`node --import ./src/scripts/sim-node-loader.mjs --test test/ci/weather-legacy.proof.mjs test/ci/weather-continuation.proof.mjs`.
 Explicit CI-only cases map all seven original waiting-file laws. The
 legacy file runs in its own native-math process: old v1 saves and exact
 recorded tails remain unchanged (the 19,200-output port oracle left with
@@ -293,7 +293,7 @@ product, old test, pin, live service or image changes.
 
 ## Runtime render preparation contracts
 
-Run `node --import ./scripts/bake-loader.mjs --test test/ci/runtime-render-preparation.proof.mjs`.
+Run `node --import ./src/scripts/bake-loader.mjs --test test/ci/runtime-render-preparation.proof.mjs`.
 Six explicit CI-only cases enter a valid data product through the actual
 RuntimePageSession, plan admission and strings.register feature. The
 public product reader and render promise are borrowed loader boundaries;
@@ -313,7 +313,7 @@ runtime, pins and generated tables remain untouched.
 ## Climate wire owner contracts
 
 After ordinary Pine/Nalati pin installs, run
-`node --import ./scripts/bake-loader.mjs --test test/ci/net-climate.proof.mjs`.
+`node --import ./src/scripts/bake-loader.mjs --test test/ci/net-climate.proof.mjs`.
 Eight explicit CI-only cases map all nine original groups. Actual local
 Rapier hosts, NetRooms, NetClients and lossless loopback packets carry
 day/weather acts and authoritative rows. The sky is a real shipped
@@ -334,7 +334,7 @@ none runs in hooks or Vitest, and no old SDK file or runtime changes.
 ## Independent quest seat contracts
 
 Install the ordinary Driftwood and Pine pins, then run
-`node --import ./scripts/sim-node-loader.mjs --test test/ci/quest-seats.proof.mjs`.
+`node --import ./src/scripts/sim-node-loader.mjs --test test/ci/quest-seats.proof.mjs`.
 These three explicit CI cases stay outside hooks and Vitest discovery.
 Each complete case, including native world load and cleanup, retains a
 9.5-second timeout and elapsed guard.
@@ -352,7 +352,7 @@ until owner review approves retirement.
 ## Native item-frame continuation
 
 Install the ordinary Driftwood and Pine pins, then run
-`node --import ./scripts/sim-node-loader.mjs --test test/ci/native-item-frame.proof.mjs`.
+`node --import ./src/scripts/sim-node-loader.mjs --test test/ci/native-item-frame.proof.mjs`.
 Three explicit CI cases preserve every original item-frame assertion:
 ordered released input loans and reused arrays, all three ranged legacy
 continuations, contacts and RNG over 1,500 ticks, actual mid-stream native
@@ -371,7 +371,7 @@ No runtime, tuning, pin, reward or test deadline changes here.
 ## Declared input and cosmetic migration
 
 Install the existing Pine and Nine pins, then run
-`node --import ./scripts/bake-loader.mjs --test test/ci/declared-input.proof.mjs`.
+`node --import ./src/scripts/bake-loader.mjs --test test/ci/declared-input.proof.mjs`.
 Eight explicit CI-only cases preserve all nine inherited groups. Actual
 input commands respect mode, item and flags, inherited keys, closed
 visibility and scope retirement. Admission rejects executable getters
@@ -390,7 +390,7 @@ inherited SDK file stays excluded and retained for its owner to retire.
 
 ## Local failure proxy
 
-`node scripts/chaos-proxy.mjs --work=tmp/chaos-owned` opens only loopback
+`node src/scripts/chaos-proxy.mjs --work=tmp/chaos-owned` opens only loopback
 listeners: page 18791, world 18792 and optional TLS world 18793. Its default
 upstreams are page 18798, world 18797 and signed release 18799. Supply both
 `--tls-cert=<owned PEM>` and `--tls-key=<owned private PEM>` for TLS. Tests
@@ -428,7 +428,7 @@ Backpressure pauses both native sources and healing reevaluates both.
 Shutdown and parent EOF retire only owned listeners, sockets, timers and
 the exclusively created token path.
 
-Run `node --test scripts/chaos-proxy-proof.mjs` explicitly. It uses the real
+Run `node --test src/scripts/chaos-proxy-proof.mjs` explicitly. It uses the real
 CLI, HTTP/WebSocket/TLS upstreams and native byte/close observations. All
 13 faults, seeded controls, token/config/bind refusal, healing and parent
 EOF run under ten seconds. This manual/Ring 2 proof never enters pre-push;
@@ -450,7 +450,7 @@ retirement. Partial failures publish neither map and release their claim.
 Reproduce the assets through the browser lane, with owned scratch:
 
 ```
-scripts/browser-lane.sh node scripts/bake-road-surfaces.mjs \
+src/scripts/browser-lane.sh node src/scripts/bake-road-surfaces.mjs \
   --scratch=tmp/<lane>/road-bake --out=public/assets/grid-road
 ```
 
@@ -463,7 +463,7 @@ goldens are required before landing a changed format.
 ## Worker engine determinism (Ring 2 report)
 
 Run `WILDSHARD_RING=1 node --import
-./scripts/sim-node-loader.mjs scripts/determinism/report.ts` as one command.
+./src/scripts/sim-node-loader.mjs src/scripts/determinism/report.ts` as one command.
 It reads ordinary installed pins (three products and five server slices),
 serves their exact admitted server bytes, and compares a real 48-tick walk
 in Node and a dedicated WebKit worker. Each tick compares the full public
@@ -487,8 +487,8 @@ browser version/user agent; the Chromium control cannot close it.
 
 ## Earned declared journeys (TC7)
 
-Run `node scripts/pins.ts install template`, then
-`node --import ./scripts/sim-node-loader.mjs
+Run `node src/scripts/pins.ts install template`, then
+`node --import ./src/scripts/sim-node-loader.mjs
 --test test/ci/declared-journeys.proof.mjs` as one command.
 CI invokes it explicitly; hooks and Vitest discovery do not add it.
 The pinned Template walks the hut door, kills the blob and earns its quest.
@@ -509,7 +509,7 @@ Dunes' complete story and the per-slice host-wake bar remain separate.
 
 ### API validator identity (TC39 / AP-16)
 
-`node scripts/api-health.ts` reads the exact resolved shard-format package
+`node src/scripts/api-health.ts` reads the exact resolved shard-format package
 from `pnpm-lock.yaml` and compares it with `/api/health` on the deployed
 API. The manifest's caret lower bound and the shard schema version are
 different identities. A missing, malformed or unreachable health response
@@ -525,7 +525,7 @@ Artifacts last fourteen days. A green job alone proves neither result.
 Run the real HTTP integration proof explicitly after a frozen install:
 
 ```sh
-TC39_INSTALLED_FORMAT=1 node --test --test-timeout=10000 scripts/api-health.proof.ts
+TC39_INSTALLED_FORMAT=1 node --test --test-timeout=10000 src/scripts/api-health.proof.ts
 ```
 
 That environment flag requires the lock resolution to match the installed
@@ -554,7 +554,7 @@ counts; child output and workflow colour do not.
 The one-bot command is:
 
 ```sh
-node scripts/mmo-bots.mjs staging --outside-proof --bots 1 --seconds 60 --keep --work-dir tmp/tc45-outside/live
+node src/scripts/mmo-bots.mjs staging --outside-proof --bots 1 --seconds 60 --keep --work-dir tmp/tc45-outside/live
 ```
 
 This mode refuses replicas, SSH, tailnet, extra clients and a signed
@@ -567,7 +567,7 @@ admitted. A failed/superseded live run cannot count as a complete proof.
 Run the fast real-gateway observation explicitly:
 
 ```sh
-node --import ./scripts/sim-node-loader.mjs --test --test-timeout=10000 test/outside-journey.proof.mjs
+node --import ./src/scripts/sim-node-loader.mjs --test --test-timeout=10000 test/outside-journey.proof.mjs
 ```
 
 The four cases stay outside hooks. Earliest admission review is November

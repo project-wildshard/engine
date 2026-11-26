@@ -1,12 +1,12 @@
-// Run explicitly through scripts/browser-lane.sh; never a commit or push hook.
+// Run explicitly through src/scripts/browser-lane.sh; never a commit or push hook.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { rolldown } from 'rolldown';
 import { resolve as resolvePath } from 'node:path';
-import { chromium, webkit, devices } from "../scripts/browser-playwright.mjs";
+import { chromium, webkit, devices } from "../src/scripts/browser-playwright.mjs";
 // e5ac68ca put this import inside the bundled page entry, where the Chromium launch never saw it (WR8b).
-import { KEYCHAIN_ARGS } from '../scripts/chromium-keychain.mjs';
+import { KEYCHAIN_ARGS } from '../src/scripts/.kit/chromium-keychain.mjs';
 
 const entry = resolvePath('epoch-proof-entry.ts');
 const compiler = await rolldown({ input: entry, platform: 'browser', transform: { define: { 'import.meta.env': '{"DEV":false,"PROD":true,"MODE":"production"}' } }, plugins: [{ name: 'epoch-proof-entry', resolveId(id) { if (id === entry) return entry; return null; }, load(id) { if (id === entry) return `

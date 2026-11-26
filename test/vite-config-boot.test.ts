@@ -12,7 +12,7 @@ test('the bundled Vite generator config imports discovery without loading the pr
   const root = mkdtempSync(resolve('tmp/vite-config-boot/discovery-'));
   try {
     const path = resolve(root, 'vite.config.ts');
-    writeFileSync(path, `import * as generator from ${JSON.stringify(resolve('scripts/app-build/gen.ts'))}; export default { define: { GENERATOR_EXPORTS: JSON.stringify(Object.keys(generator).sort()) } };`);
+    writeFileSync(path, `import * as generator from ${JSON.stringify(resolve('src/scripts/app-build/gen.ts'))}; export default { define: { GENERATOR_EXPORTS: JSON.stringify(Object.keys(generator).sort()) } };`);
     const loaded = await loadConfigFromFile({ command: 'build', mode: 'production' }, path, root, 'silent', undefined, 'bundle');
     expect(loaded?.config.define?.['GENERATOR_EXPORTS']).toBe(JSON.stringify([
       'assetIndex', 'assetVersionRows', 'audioTableSource',
@@ -28,16 +28,16 @@ function bootFacts(module: string, name: string): string {
   const root = mkdtempSync(resolve('tmp/vite-config-boot/facts-'));
   try {
     const script = `const { ${name} } = await import(${JSON.stringify(resolve(module))}); console.log(JSON.stringify(${name}(${JSON.stringify(root)})));`;
-    const run = spawnSync(process.execPath, ['--no-warnings', '--import', './scripts/bake-loader.mjs', '--input-type=module', '-e', script], { encoding: 'utf8' });
+    const run = spawnSync(process.execPath, ['--no-warnings', '--import', './src/scripts/bake-loader.mjs', '--input-type=module', '-e', script], { encoding: 'utf8' });
     expect(run.status, run.stderr).toBe(0);
     return run.stdout.trim();
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
 test('the build computes tier facts in plain Node, with no page runtime state', () => {
-  expect(bootFacts('scripts/app-build/bootFolderTiers.ts', 'bootTierFolderTotals')).toBe('{}');
+  expect(bootFacts('src/scripts/app-build/bootFolderTiers.ts', 'bootTierFolderTotals')).toBe('{}');
 });
 
 test('the build reads boot facts in plain Node, with no runtime format graph', () => {
-  expect(bootFacts('scripts/app-build/bootFolders.ts', 'bootFolderTotals')).toBe('{}');
+  expect(bootFacts('src/scripts/app-build/bootFolders.ts', 'bootFolderTotals')).toBe('{}');
 });

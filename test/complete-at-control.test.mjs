@@ -3,7 +3,7 @@ import { expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- The CLI's argument refusals run in a child process, before any browser.
 import { spawnSync } from 'node:child_process';
-import { lapLegs, lapPops, splitRequests, splitManifests, spawnMembers, spawnRereads, neighbourSpans, splitByInitiator, NEIGHBOUR_WORK, firstSeconds, profileTop, heapTop } from '../scripts/complete-at-control-snapshot.mjs';
+import { lapLegs, lapPops, splitRequests, splitManifests, spawnMembers, spawnRereads, neighbourSpans, splitByInitiator, NEIGHBOUR_WORK, firstSeconds, profileTop, heapTop } from '../src/scripts/complete-at-control-snapshot.mjs';
 
 // a snapshot's mesh row: [uuid, chain, signature `geometry|positions|indices|material:map:width`, shown, within reach, skinned]
 const row = (id, chain, geometry, map, shown = true, close = true, skinned = false) => [id, chain, `${geometry}|36|0|mat:${map}:256`, shown, close, skinned];
@@ -211,7 +211,7 @@ test('a heap snapshot reads as self size by type and constructor (D227)', () => 
 });
 
 test('--frames is a whole number of seconds, 1 to 600: a window that never ends or fills no bucket refuses (sp-x9, C12)', () => {
-  const run = frames => spawnSync(process.execPath, ['scripts/complete-at-control.mjs', '--base=http://127.0.0.1:1/', '--rev=0000000', '--flow=pine-hollow',
+  const run = frames => spawnSync(process.execPath, ['src/scripts/complete-at-control.mjs', '--base=http://127.0.0.1:1/', '--rev=0000000', '--flow=pine-hollow',
     `--frames=${frames}`, '--heap=on', '--out=tmp/complete-at-control/refused.json'], { encoding: 'utf8', timeout: 20_000 });
   for (const bad of ['Infinity', '0.5', '0', '-3', '601', '1e2', '30s']) {
     const result = run(bad); expect(result.status, bad).toBe(2); expect(result.stderr).toContain('bad --frames');

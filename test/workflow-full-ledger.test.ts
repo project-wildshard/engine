@@ -11,7 +11,7 @@ const DIR = '.github/workflows/';
 const SPAWN_PARTS = 'path: ~/.cache/wildshard/gen/spawn-parts-br';
 // FAST-RELEASE FR-A1: page-release.mjs runs build:game and devserver-client.mjs builds the full client; preview.yml and
 // server-release.yml's devserver-client restored nothing, so neither rule above saw them and both re-encoded cold.
-const FULL_BUILD = /pnpm build:game|scripts\/build-app\.mjs|scripts\/staging-qa\.mjs --local|scripts\/page-release\.mjs|scripts\/devserver-client\.mjs/u;
+const FULL_BUILD = /pnpm build:game|src\/scripts\/build-app\.mjs|src\/scripts\/staging-qa\.mjs --local|src\/scripts\/page-release\.mjs|src\/scripts\/devserver-client\.mjs/u;
 const LEDGER = /full-ledger-spawn-parts-br|steps\.ledger-(?:key|codec)\.outputs\.(?:key|prefix)/u;
 /** A nightly's own save under this commit is a full build too, so it may come first. */
 const SAME_COMMIT_FULL = 'nightly-encodes-${{ github.sha }}';

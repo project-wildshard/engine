@@ -1,7 +1,7 @@
 // Meta STAGING-SMOKE SM1 (J398): the runner and its five scenarios. The browser runs need a browser, so they run only by
 // name, in the browser lane:
-//   WS_SMOKE_BROWSER=1 scripts/browser-lane.sh --max 10 pnpm exec vitest run test/staging-smoke-runner.test.ts
-//   WS_SMOKE_BUILD=http://127.0.0.1:<port> (scripts/serve-build.sh) adds the real local build, K3 to K5 clean.
+//   WS_SMOKE_BROWSER=1 src/scripts/browser-lane.sh --max 10 pnpm exec vitest run test/staging-smoke-runner.test.ts
+//   WS_SMOKE_BUILD=http://127.0.0.1:<port> (src/scripts/serve-build.sh) adds the real local build, K3 to K5 clean.
 // oxlint-disable-next-line import/no-nodejs-modules -- It serves a stub page and reads the run's files.
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- As above.
@@ -11,8 +11,8 @@ import type { AddressInfo } from 'node:net';
 // oxlint-disable-next-line import/no-nodejs-modules -- As above.
 import { join, resolve } from 'node:path';
 import { expect, test } from 'vitest';
-import { parseArgs, runSmoke } from '../scripts/staging-smoke.mjs';
-import { dropLeadingTitle } from '../scripts/staging-smoke/scenarios.mjs';
+import { parseArgs, runSmoke } from '../src/scripts/staging-smoke.mjs';
+import { dropLeadingTitle } from '../src/scripts/staging-smoke/scenarios.mjs';
 
 const OUT = resolve('tmp/staging-smoke-test');
 const BROWSER = process.env['WS_SMOKE_BROWSER'] === '1', BUILD = process.env['WS_SMOKE_BUILD'];

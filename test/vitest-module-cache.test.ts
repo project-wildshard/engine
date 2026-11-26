@@ -53,7 +53,7 @@ test('executes current source and hoisted mock',async()=>{
 
 test('warm typed glob transforms follow file deletion, addition and raw edits',()=>{
  const root=mkdtempSync(resolve('tmp','vitest-glob-cache-')),cache=resolve(root,'cache'),config=resolve(root,'vitest.config.mjs');
- const guard=resolve('scripts/vitest-module-cache.ts');
+ const guard=resolve('src/scripts/vitest-module-cache.ts');
  const run=(names:string,value:string)=>{
   const child=spawnSync(process.execPath,[resolve('node_modules/vitest/vitest.mjs'),'run','sample.test.ts','--config',config],{
    cwd:root,encoding:'utf8',timeout:20000,env:{...process.env,DEBUG:'vitest:cache:fs',EXPECT_NAMES:names,EXPECT_RAW:value,TMPDIR:resolve(root,'temp'),NODE_COMPILE_CACHE:resolve(root,'compile')},stdio:['ignore','pipe','pipe'],

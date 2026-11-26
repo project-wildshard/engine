@@ -10,7 +10,7 @@ import { installCatalogue, installedCatalogue } from '../src/shared/game/grid/ca
 import { PLACEMENT_PUBLIC_KEY, placementsURL } from '../src/shared/game/grid/placementRows';
 import { readPlacementFile } from '../src/server/host/dedicated/placementFile';
 import { placementSlots } from '../src/server/host/dedicated/gridCells';
-import { PLACEMENT_PUBLIC_KEY as PREVIEW_GRID_KEY } from '../scripts/preview-grid';
+import { PLACEMENT_PUBLIC_KEY as PREVIEW_GRID_KEY } from '../src/scripts/preview-grid';
 import { addPlacedCells, learnPlacedCells, placementsOf, readSignedPlacement, type PlacedKeep } from '../src/client/game/grid/placedCells';
 import { installTitleManifests, titleManifests, type TitleManifest } from '../src/client/game/shard/titleList';
 import { titleCards } from '../src/client/game/titleDeck';

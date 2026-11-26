@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
-import { BOOT_STAMPS, ensureBootStamps } from '../scripts/boot-stamps.mjs';
+import { BOOT_STAMPS, ensureBootStamps } from '../src/scripts/boot-stamps.mjs';
 
 const scratch = mkdtempSync(join(process.cwd(), 'tmp', 'dev-control-bundle-'));
 afterAll(() => { rmSync(scratch, { recursive: true, force: true }); });
@@ -12,7 +12,7 @@ afterAll(() => { rmSync(scratch, { recursive: true, force: true }); });
 /** Both entries' text, built into `scratch/<name>`. */
 function built(name: string, dev: boolean): string {
   const out = join(scratch, name);
-  const run = spawnSync(process.execPath, ['scripts/build-server.mjs', '--out', out, ...dev ? ['--dev'] : []], { encoding: 'utf8' });
+  const run = spawnSync(process.execPath, ['src/scripts/build-server.mjs', '--out', out, ...dev ? ['--dev'] : []], { encoding: 'utf8' });
   expect(run.status, run.stderr).toBe(0);
   return readFileSync(join(out, 'main.mjs'), 'utf8') + readFileSync(join(out, 'cellWorker.mjs'), 'utf8');
 }
@@ -42,9 +42,9 @@ test('the npm artifact carries the native dev server and frozen format', () => {
     symlinkSync(realpathSync(join('node_modules', name)), link, 'dir');
   }
   const output = join(staged, 'dist/dev-server');
-  const build = spawnSync(process.execPath, ['scripts/build-server.mjs', '--dev', '--out', output], { encoding: 'utf8' });
+  const build = spawnSync(process.execPath, ['src/scripts/build-server.mjs', '--dev', '--out', output], { encoding: 'utf8' });
   expect(build.status, build.stderr).toBe(0);
-  const pack = spawnSync(process.execPath, [resolve('scripts/npm-artifact.mjs'), join(scratch, 'archives')], { cwd: staged, encoding: 'utf8' });
+  const pack = spawnSync(process.execPath, [resolve('src/scripts/npm-artifact.mjs'), join(scratch, 'archives')], { cwd: staged, encoding: 'utf8' });
   expect(pack.status, pack.stderr).toBe(0);
   const archive = JSON.parse(pack.stdout) as { filename: string; files: { path: string }[] };
   const files = archive.files.map(row => row.path);
@@ -66,7 +66,7 @@ test('the npm artifact carries the native dev server and frozen format', () => {
     expect(readFileSync(join(extracted, 'package', patch)).equals(readFileSync(patch))).toBe(true);
   }
   const nextBuild = '0123456789abcdef0123456789abcdef01234567';
-  const next = spawnSync(process.execPath, [resolve('scripts/npm-artifact.mjs'), join(scratch, 'next'), nextBuild],
+  const next = spawnSync(process.execPath, [resolve('src/scripts/npm-artifact.mjs'), join(scratch, 'next'), nextBuild],
     { cwd: staged, encoding: 'utf8' });
   expect(next.status, next.stderr).toBe(0);
   const nextArchive = JSON.parse(next.stdout) as { filename: string };
@@ -79,7 +79,7 @@ test('the npm artifact carries the native dev server and frozen format', () => {
 }, 30_000);
 
 test('a dev bundle is never packed for a box', () => {
-  const run = spawnSync(process.execPath, ['scripts/build-server.mjs', '--dev', '--out', join(scratch, 'packed'), '--tar', join(scratch, 'packed.tgz')], { encoding: 'utf8' });
+  const run = spawnSync(process.execPath, ['src/scripts/build-server.mjs', '--dev', '--out', join(scratch, 'packed'), '--tar', join(scratch, 'packed.tgz')], { encoding: 'utf8' });
   expect(run.status).not.toBe(0);
   expect(run.stderr).toContain('never packed for a box');
 });

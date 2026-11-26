@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Run the candidate lane recorder in its native Python interpreter.
 import { execFileSync } from 'node:child_process';
 import { expect, test } from 'vitest';
-import source from '../scripts/commit_lane.py?raw';
+import source from '../src/scripts/commit_lane.py?raw';
 
 test('committed lane attribution survives missing runtime metadata', () => {
   expect(execFileSync('python3', ['test/test_commit_lane.py', '--candidate-stdin'], {

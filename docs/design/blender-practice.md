@@ -238,7 +238,7 @@ job for a script. If a human artist ever works on the game:
 
 ## 5. Enforcement (with M8)
 
-One check script, `scripts/check-model-sources.mjs`, run by vitest or CI
+One check script, `src/scripts/check-model-sources.mjs`, run by vitest or CI
 next to the M8 lint rules:
 
 1. Every `defineModel` with `pipeline: 'blender'` has a `source` that
@@ -327,7 +327,7 @@ lanes live in the same files.
    - the cave is world, or a model placed once. M2 decides; its builder
      reads the terrain at the mouth, which argues world;
    - the rifle, knife and arms become Gear. (in the waves)
-8. **The check** (`scripts/check-model-sources.mjs`, §5), the pre-commit
+8. **The check** (`src/scripts/check-model-sources.mjs`, §5), the pre-commit
    `.blend` refusal, `*.blend binary -delta` and `*.blend1` in
    `.gitignore`. It starts with an allowlist of today's gaps: the
    `driftwood-hero` / `driftwood-cc0` outputs whose prop-list names

@@ -14,7 +14,7 @@ import {loadScaledMs} from './fixtures/loadBudget';
 const FENCE_MS=loadScaledMs(20_000);
 
 test('native verb tape matches ordinary ticks and preserves terminal, failure and runtime fences',()=>{
-  const child=spawnSync(process.execPath,['--import',pathToFileURL(resolve('scripts/sim-node-loader.mjs')).href,
+  const child=spawnSync(process.execPath,['--import',pathToFileURL(resolve('src/scripts/sim-node-loader.mjs')).href,
     resolve('test/fixtures/headless/verb-tape-run.mjs')],{encoding:'utf8',timeout:FENCE_MS});
   expect(child.status,child.stdout+child.stderr).toBe(0);
   expect(child.stdout).toContain('native verb tape parity, terminal ownership and runtime refusal pass');

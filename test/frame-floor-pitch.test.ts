@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { floorGridPortalPlan, gridFloorPlans, gridFloorPoses, gridFloorWitnessFailures, type FloorGridState, type FloorGridWitness } from '../scripts/frame-floor-grid.mjs';
+import { floorGridPortalPlan, gridFloorPlans, gridFloorPoses, gridFloorWitnessFailures, type FloorGridState, type FloorGridWitness } from '../src/scripts/frame-floor-grid.mjs';
 
 const state = { home: 'home', cells: [
   { instance: 'home', slug: 'driftwood-isle', cell: [0, 0] as const },

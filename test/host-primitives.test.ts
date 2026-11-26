@@ -7,7 +7,7 @@ import { emptyShardfile } from '../src/shared/host/author';
 import { createShardfileSim } from '../src/server/game/plugin/simulation';
 import { primitivesOf, productPrimitives } from '../src/server/game/shardfile/hostPrimitives';
 import { builtFolder } from '../src/test/game/builtFolder';
-import { folderServerRoots, nativeAssemblyRoots } from '../scripts/host-ruler/server-roots.mjs';
+import { folderServerRoots, nativeAssemblyRoots } from '../src/scripts/host-ruler/server-roots.mjs';
 
 // ONE-FORMAT OF17b1: the server works its primitive list out from the product's sections; no host list ships.
 const base = () => emptyShardfile({ slug: 'primitives-fixture', name: 'Primitives fixture', author: 'Test', revision: 1, seed: 5 });

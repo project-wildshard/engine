@@ -1,13 +1,13 @@
 // J259 (SHARD-PIPELINE SP3): mutation tests for the narrowed renderer fingerprint over this checkout's real tree.
 // A one-line edit to the GLSL emitter or to a file that rewrites three's chunks, and a shader-library bump, each move it;
-// an edit under scripts/, or to client code that writes no shader text, doesn't.
+// an edit under src/scripts/, or to client code that writes no shader text, doesn't.
 // oxlint-disable-next-line import/no-nodejs-modules -- Reads this checkout's committed sources and copies an installed one.
 import {cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Checkout paths.
 import {dirname, resolve} from 'node:path';
 import {describe, expect, it} from 'vitest';
-import {CARRIED_RENDERERS, installedSourceFiles, narrowedRendererHash, publishedRenderer, rendererRevision, SHADER_TEXT} from '../scripts/renderer-revision.mjs';
-import {committedSourceFiles} from '../scripts/source-input-proof.mjs';
+import {CARRIED_RENDERERS, installedSourceFiles, narrowedRendererHash, publishedRenderer, rendererRevision, SHADER_TEXT} from '../src/scripts/renderer-revision.mjs';
+import {committedSourceFiles} from '../src/scripts/source-input-proof.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const paths = committedSourceFiles(root);
@@ -46,8 +46,8 @@ describe('narrowed renderer fingerprint (J259)', () => {
   it('picks up a new file that patches shader text on its own', () => {
     expect(edited('src/client/game/newLook.ts', () => 'material.onBeforeCompile = () => {};', ['src/client/game/newLook.ts'])).not.toBe(base);
   });
-  it('holds for scripts/, the lockfile, tests and client code with no shader text', () => {
-    expect(edited('scripts/gen.mjs', text => `${text}\n// one line\n`)).toBe(base);
+  it('holds for src/scripts/, the lockfile, tests and client code with no shader text', () => {
+    expect(edited('src/scripts/gen.mjs', text => `${text}\n// one line\n`)).toBe(base);
     expect(edited('pnpm-lock.yaml', text => `${text}\n# one line\n`)).toBe(base);
     if (plain === undefined) throw new Error('No committed client file without shader text');
     expect(edited(plain, text => `${text}\n// one line\n`)).toBe(base);

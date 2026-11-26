@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- An actual local Actions API tests source-run artifact selection.
 import {createServer} from 'node:http';
 import {expect,test} from 'vitest';
-import {nineStreetSource} from '../scripts/nine-street-source.mjs';
+import {nineStreetSource} from '../src/scripts/nine-street-source.mjs';
 
 const sha='a'.repeat(40),artifact={name:'nine-ring1-client',expired:false};
 async function withApi(responses,check){

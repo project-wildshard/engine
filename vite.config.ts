@@ -1,27 +1,27 @@
 import { defineConfig } from 'vite';
-import { assetTableAddresses, readAssetTables } from './scripts/app-build/assetTables.mjs';
-import { readGridSeams } from './scripts/app-build/gridSeams.mjs';
+import { assetTableAddresses, readAssetTables } from './src/scripts/app-build/assetTables.mjs';
+import { readGridSeams } from './src/scripts/app-build/gridSeams.mjs';
 import { readFileSync } from 'node:fs';
-import { shardfileValidationRevision } from './scripts/shardfile-validation-revision.mjs';
+import { shardfileValidationRevision } from './src/scripts/shardfile-validation-revision.mjs';
 import { join, basename } from 'node:path';
 import { rapierAlias } from './vite/rapier';
 import { valibotStandardPlugin } from './vite/valibotStandard';
 import { heldShaderStagesPlugin } from './vite/threeHeldShaderStages';
 import { sideBlindProgramsPlugin } from './vite/threeSideBlindPrograms';
-import { viteTmpRoot } from './scripts/vite-tmp.mjs';
-import { assertHeavyLease } from './scripts/heavy-lane-lease.mjs';
-import { buildValidationReceipts } from './scripts/app-build/validationReceipts.mjs';
-import { BUILD_ID_EXPRESSION, VALIDATOR_EXPRESSION, VERDICTS_EXPRESSION, SHARED_CODE_DIRECTORY, codeDirectory } from './scripts/app-build/buildIdentity.mjs';
-import { controlChunkGroups, controlChunkFileName } from './scripts/app-build/controlChunks';
-import { engineRelease } from './scripts/changelog.mjs';
-import { entryStamp } from './scripts/app-build/builtAt.mjs';
-import { worktreeWatchIgnored } from './scripts/worktree-ignore.mjs';
+import { viteTmpRoot } from './src/scripts/.kit/vite-tmp.mjs';
+import { assertHeavyLease } from './src/scripts/heavy-lane-lease.mjs';
+import { buildValidationReceipts } from './src/scripts/app-build/validationReceipts.mjs';
+import { BUILD_ID_EXPRESSION, VALIDATOR_EXPRESSION, VERDICTS_EXPRESSION, SHARED_CODE_DIRECTORY, codeDirectory } from './src/scripts/app-build/buildIdentity.mjs';
+import { controlChunkGroups, controlChunkFileName } from './src/scripts/app-build/controlChunks';
+import { engineRelease } from './src/scripts/changelog.mjs';
+import { entryStamp } from './src/scripts/app-build/builtAt.mjs';
+import { worktreeWatchIgnored } from './src/scripts/.kit/worktree-ignore.mjs';
 
-/** The world map atlas's define, as scripts/app-build/worldMapAtlas.ts baked it before the bundle. */
+/** The world map atlas's define, as src/scripts/app-build/worldMapAtlas.ts baked it before the bundle. */
 function worldMapDefine(): unknown {
   let rows: string;
   try { rows = readFileSync('out/.app/world-map.json', 'utf8'); }
-  catch { throw new Error('Missing out/.app/world-map.json: build the app through scripts/build-app.mjs, which bakes the world map first'); }
+  catch { throw new Error('Missing out/.app/world-map.json: build the app through src/scripts/build-app.mjs, which bakes the world map first'); }
   return (JSON.parse(rows) as { define: unknown }).define;
 }
 
@@ -38,7 +38,7 @@ export default defineConfig(({ mode, command }) => {
     // DF11 (mini-df11g): valibot's Standard Schema glue is built on first read, two fewer heap cells per schema
     // DF8 (mini-df8): a live custom program can hold its shader stages (`debug.programReuse`, off by default); depth and
     // unlit programs can key without side or normals (`debug.programTwins`, mini-dwfps2)
-    plugins: [viteTmpRoot({ janitor: join(process.cwd(), 'scripts/temp-janitor.mjs') }), valibotStandardPlugin(), heldShaderStagesPlugin(), sideBlindProgramsPlugin()],
+    plugins: [viteTmpRoot({ janitor: join(process.cwd(), 'src/scripts/temp-janitor.mjs') }), valibotStandardPlugin(), heldShaderStagesPlugin(), sideBlindProgramsPlugin()],
     // DS11: plan worktrees under .worktrees/ are other checkouts; the dev watcher never follows them
     server: { port: 5173, host: true, watch: { ignored: worktreeWatchIgnored() } },
     // js-payload D2 (Jake): on-phone stacks show Rolldown's mangled names; hidden source maps resolve them on desktop
@@ -50,7 +50,7 @@ export default defineConfig(({ mode, command }) => {
       // The mandatory chunk report measures and gates gzip bytes after this web build.
       assetsDir: code, target: 'es2022', reportCompressedSize: false, chunkSizeWarningLimit: 4000, sourcemap: 'hidden' as const, cssCodeSplit: false, manifest: true,
       // J217 (LD6b): a chunk names its imports by stable import-map keys, not their hashes, so one changed module renames
-      // only its own chunk (scripts/app-build/importMap.mjs checks the map)
+      // only its own chunk (src/scripts/app-build/importMap.mjs checks the map)
       chunkImportMap: true,
       // G221: standalone CLI calibration, never a game-entry or Developer switch.
       rolldownOptions: {
@@ -69,8 +69,8 @@ export default defineConfig(({ mode, command }) => {
     worker: { rolldownOptions: { output: { entryFileNames: `${shared}/[name]-[hash].js`, chunkFileNames: `${shared}/[name]-[hash].js` } } },
     assetsInclude: ['**/*.hdr', '**/*.gltf', '**/*.bin'],
     resolve: { alias: rapierAlias }, // Rapier's wasm-importing module → plain bindings (vite/rapier.ts)
-    define: { __TITLE_ASSET_URLS__: readFileSync('scripts/title-assets.generated.json', 'utf8'), __GRID_SEAM_ASSET__: JSON.stringify(readGridSeams(process.cwd()).address), __BOOT_TABLE_ASSETS__: JSON.stringify(assetTableAddresses(readAssetTables(process.cwd()))), __GRID_MAP_ATLAS__: JSON.stringify(worldMapDefine()), __SHARDFILE_VALIDATOR__: VALIDATOR_EXPRESSION, __SHARDFILE_VERDICTS__: VERDICTS_EXPRESSION, __DEVSERVER__: mode === 'devserver', __PREPARATION_ONLY__: process.env['WILDSHARD_PREPARATION_ONLY'] === '1', __BUILD_ID__: BUILD_ID_EXPRESSION,
-      // Jake 2026-11-10: the title names the engine version and lists its CHANGELOG.md section (scripts/changelog.mjs)
+    define: { __TITLE_ASSET_URLS__: readFileSync('src/scripts/title-assets.generated.json', 'utf8'), __GRID_SEAM_ASSET__: JSON.stringify(readGridSeams(process.cwd()).address), __BOOT_TABLE_ASSETS__: JSON.stringify(assetTableAddresses(readAssetTables(process.cwd()))), __GRID_MAP_ATLAS__: JSON.stringify(worldMapDefine()), __SHARDFILE_VALIDATOR__: VALIDATOR_EXPRESSION, __SHARDFILE_VERDICTS__: VERDICTS_EXPRESSION, __DEVSERVER__: mode === 'devserver', __PREPARATION_ONLY__: process.env['WILDSHARD_PREPARATION_ONLY'] === '1', __BUILD_ID__: BUILD_ID_EXPRESSION,
+      // Jake 2026-11-10: the title names the engine version and lists its CHANGELOG.md section (src/scripts/changelog.mjs)
       __ENGINE_RELEASE__: JSON.stringify(engineRelease(process.cwd())) },
   };
 });

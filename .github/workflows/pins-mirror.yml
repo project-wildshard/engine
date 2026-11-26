@@ -1,12 +1,12 @@
 name: pins-mirror
 
-# Every pin in test/pins/shardfiles.json is on the pins release, which scripts/pins.ts reads before the API. A pin that
+# Every pin in test/pins/shardfiles.json is on the pins release, which src/scripts/pins.ts reads before the API. A pin that
 # reaches main without its mirror copy (open plots, main red 45404606407) is uploaded from the API here; the job fails
 # if any pin is still missing afterwards.
 on:
   push:
     branches: [main]
-    paths: [test/pins/shardfiles.json, scripts/pins-mirror.mjs, .github/workflows/pins-mirror.yml]
+    paths: [test/pins/shardfiles.json, src/scripts/pins-mirror.mjs, .github/workflows/pins-mirror.yml]
   schedule:
     - cron: '17 */6 * * *'
   workflow_dispatch:
@@ -35,4 +35,4 @@ jobs:
       - name: Upload every pin missing from the mirror, then check
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/pins-mirror.mjs --fill
+        run: node src/scripts/pins-mirror.mjs --fill

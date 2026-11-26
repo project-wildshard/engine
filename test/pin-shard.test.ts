@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import {expect, test} from 'vitest';
-import {movePianoStems, movePin, moveSavePin, productMounts} from '../scripts/pin-shard.ts';
+import {movePianoStems, movePin, moveSavePin, productMounts} from '../src/scripts/pin-shard.ts';
 
 const a = 'a'.repeat(64), b = 'b'.repeat(64);
 const pins = {api: 'x', shards: [{slug: 'dunes', revision: 1, hash: a, bytes: 10}, {slug: 'nine', revision: 1, hash: a, bytes: 20}]};
@@ -49,7 +49,7 @@ test('a first pin refuses a slug half pinned', () => {
 test('shard-pin passes a first input through to pin-shard.ts', () => {
   const flow = readFileSync('.github/workflows/shard-pin.yml', 'utf8');
   expect(flow).toMatch(/first:\n\s+description:[^\n]+\n\s+type: boolean/u);
-  expect(flow).toMatch(/node scripts\/pin-shard\.ts "\$SLUG" "\$REVISION" "\$HASH" "\$CHANNEL" \$\{\{ inputs\.first && '--first' \|\| '' \}\}/u);
+  expect(flow).toMatch(/node src\/scripts\/pin-shard\.ts "\$SLUG" "\$REVISION" "\$HASH" "\$CHANNEL" \$\{\{ inputs\.first && '--first' \|\| '' \}\}/u);
 });
 
 test('refuses to move a pin backwards', () => {
@@ -61,19 +61,19 @@ test('refuses to move a pin backwards', () => {
 // refused it ("slice belongs to another head"). The workflow re-cuts a Ring 1 slice and commits it with the pin.
 test('shard-pin re-cuts a Ring 1 slug\'s server slice and commits it with the pin', () => {
   const flow = readFileSync('.github/workflows/shard-pin.yml', 'utf8');
-  const cut = flow.indexOf('node scripts/pins.ts slice'), move = flow.indexOf('node scripts/pin-shard.ts'), commit = flow.indexOf('git commit');
+  const cut = flow.indexOf('node src/scripts/pins.ts slice'), move = flow.indexOf('node src/scripts/pin-shard.ts'), commit = flow.indexOf('git commit');
   expect(move).toBeGreaterThan(-1);
   expect(cut).toBeGreaterThan(move);
   expect(commit).toBeGreaterThan(cut);
-  expect(flow).toMatch(/rings\.json[\s\S]*slices[\s\S]*node scripts\/pins\.ts slice/u);
+  expect(flow).toMatch(/rings\.json[\s\S]*slices[\s\S]*node src\/scripts\/pins\.ts slice/u);
   expect(flow.slice(commit)).toMatch(/-- test\/pins\/shardfiles\.json [^\n]*test\/pins\/slices\.json/u);
 });
 
 test('shard-pin records only the moved Ring 1 product or slice before committing the pin', () => {
   const flow = readFileSync('.github/workflows/shard-pin.yml', 'utf8');
-  const cut = flow.indexOf('node scripts/pins.ts slice');
-  const install = flow.indexOf('node scripts/pins.ts install --ring 1');
-  const record = flow.indexOf('scripts/ring-step.ts --update --only "$SLUG"');
+  const cut = flow.indexOf('node src/scripts/pins.ts slice');
+  const install = flow.indexOf('node src/scripts/pins.ts install --ring 1');
+  const record = flow.indexOf('src/scripts/ring-step.ts --update --only "$SLUG"');
   const commit = flow.indexOf('git commit');
   expect(flow).toMatch(/slice \|\| ring\.products\.includes\(process\.argv\[1\]\)/u);
   expect(install).toBeGreaterThan(cut);

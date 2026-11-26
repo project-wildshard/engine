@@ -3,7 +3,7 @@ import {mkdtempSync, rmSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {expect, test} from 'vitest';
-import {adminToken, channelHeads, journalCommand, main, notifyCommand, notifyToken, revisionOf, tallyJournal} from '../scripts/admin.mjs';
+import {adminToken, channelHeads, journalCommand, main, notifyCommand, notifyToken, revisionOf, tallyJournal} from '../src/scripts/admin.mjs';
 
 const HASH = 'a'.repeat(64), OTHER = 'b'.repeat(64), TOKEN = ['planted', 'notify', 'value', '0123456789'].join('-');
 const catalogue = {shards: [

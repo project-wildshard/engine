@@ -9,7 +9,7 @@ import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFile
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
-import { holdRefusal, namedPaths, openHold, touching } from '../scripts/land-hold.mjs';
+import { holdRefusal, namedPaths, openHold, touching } from '../src/scripts/land-hold.mjs';
 import { cleanLandFixtures, fixture } from './fixtures/land-git';
 
 afterEach(cleanLandFixtures);
@@ -96,7 +96,7 @@ describe('the engine land HOLD (QA 11-25 row 37)', () => {
       writeFileSync(receipts, log(HOLD));
       writeFileSync(join(root, 'a.txt'), 'b\n');
       const env = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))), CI: '', WS_LANE_RECEIPTS: receipts, WS_LANE_NAME: 'opus-x', WS_MAIN_PUSH_PREGATE: '0' };
-      const result = spawnSync(process.execPath, [resolve('scripts/main-push.mjs'), '-m', 'fix: a', 'a.txt'], { cwd: root, env, encoding: 'utf8', timeout: 20_000 });
+      const result = spawnSync(process.execPath, [resolve('src/scripts/.kit/main-push.mjs'), '-m', 'fix: a', 'a.txt'], { cwd: root, env, encoding: 'utf8', timeout: 20_000 });
       expect(result.status, result.stdout + result.stderr).toBe(1);
       expect(result.stderr).toContain('main-push STOP engine land HOLD open');
       expect(git('rev-parse', 'HEAD')).toBe(before);
@@ -105,20 +105,20 @@ describe('the engine land HOLD (QA 11-25 row 37)', () => {
   });
 
   // Row 67 (J505, no freezes): the 11-25 18:57 hold named the red's files; lands elsewhere waited an hour for nothing.
-  const PATH_HOLD = '18:57 UTC saga-builder NOTE HOLD engine: main red run 45676829545 tests (7) test/tooling/push-known-red.test.mjs expects a gate line; lander opus-guard';
-  const RED_NOTE = '18:57 UTC main-watch NOTE RED opus-guard: run 45676829545 a..b tests (7) (test/tooling/push-known-red.test.mjs, scripts/land/gate.mjs)';
+  const PATH_HOLD = '18:57 UTC saga-builder NOTE HOLD engine: main red run 45676829545 tests (7) src/test/push-known-red.test.mjs expects a gate line; lander opus-guard';
+  const RED_NOTE = '18:57 UTC main-watch NOTE RED opus-guard: run 45676829545 a..b tests (7) (src/test/push-known-red.test.mjs, src/scripts/land/gate.mjs)';
 
   test('row 67: a hold binds only pushes touching the paths it and the span\'s red lines name', () => {
     const receipts = log(GREEN, RED_NOTE, PATH_HOLD);
-    expect(openHold(receipts)?.paths).toEqual(['test/tooling/push-known-red.test.mjs', 'scripts/land/gate.mjs']);
+    expect(openHold(receipts)?.paths).toEqual(['src/test/push-known-red.test.mjs', 'src/scripts/land/gate.mjs']);
     const said: string[] = [];
     expect(holdRefusal({ lane: 'opus-x', env: {}, bodies: 'feat: row', receipts, files: ['src/zone/a.ts', 'test/zone.test.ts'], say: line => { said.push(line); } })).toBeNull();
-    expect(said).toEqual(['HOLD open but this push is disjoint from test/tooling/push-known-red.test.mjs, scripts/land/gate.mjs; landing (J505)']);
+    expect(said).toEqual(['HOLD open but this push is disjoint from src/test/push-known-red.test.mjs, src/scripts/land/gate.mjs; landing (J505)']);
     // The same file, a sibling of a named source file, or a directory pathspec above a named path is held.
-    for (const files of [['test/tooling/push-known-red.test.mjs'], ['scripts/land/other.mjs'], ['scripts/'], ['src/a.ts', 'scripts/land/gate.mjs']])
+    for (const files of [['src/test/push-known-red.test.mjs'], ['src/scripts/land/other.mjs'], ['src/scripts/'], ['src/a.ts', 'src/scripts/land/gate.mjs']])
       expect(holdRefusal({ lane: 'opus-x', env: {}, bodies: '', receipts, files }), files.join(',')).toMatch(/^engine land HOLD open/u);
     // A sibling of a named test is not held: tests sit together in one folder.
-    expect(holdRefusal({ lane: 'opus-x', env: {}, bodies: '', receipts, files: ['test/tooling/other.test.mjs'] })).toBeNull();
+    expect(holdRefusal({ lane: 'opus-x', env: {}, bodies: '', receipts, files: ['src/test/other.test.mjs'] })).toBeNull();
     // Unknown files, a hold naming no path, an all-lanes hold, and red lines from before a green all bind as before.
     expect(holdRefusal({ lane: 'opus-x', env: {}, bodies: '', receipts })).toMatch(/^engine land HOLD open/u);
     for (const held of [log(HOLD), log(RED_NOTE, ALL_LANES), log(RED_NOTE, GREEN, HOLD)])
@@ -126,8 +126,8 @@ describe('the engine land HOLD (QA 11-25 row 37)', () => {
   });
 
   test('row 67: paths are repo paths, never URLs, line numbers or bare names', () => {
-    expect(namedPaths('see https://github.com/project-wildshard/engine/actions/runs/1 and scripts/trailer/capture.mjs:31, ./test/a/b.test.ts; cook.ts')).toEqual(['scripts/trailer/capture.mjs', 'test/a/b.test.ts']);
-    expect(touching(['scripts/trailer/party.mjs', 'scripts/other.mjs'], ['scripts/trailer/capture.mjs'])).toEqual(['scripts/trailer/party.mjs']);
+    expect(namedPaths('see https://github.com/project-wildshard/engine/actions/runs/1 and src/scripts/trailer/capture.mjs:31, ./test/a/b.test.ts; cook.ts')).toEqual(['src/scripts/trailer/capture.mjs', 'test/a/b.test.ts']);
+    expect(touching(['src/scripts/trailer/party.mjs', 'src/scripts/other.mjs'], ['src/scripts/trailer/capture.mjs'])).toEqual(['src/scripts/trailer/party.mjs']);
   });
 
   test('row 67: land.mjs lands a push disjoint from the red\'s files through the hold and says so', () => {
@@ -138,6 +138,6 @@ describe('the engine land HOLD (QA 11-25 row 37)', () => {
     const landed = f.land(wt, []);
     expect(landed.status, landed.stdout + landed.stderr).toBe(0);
     expect(f.remoteMain()).toBe(tip);
-    expect(f.read(f.files.receipts)).toContain('HOLD open but this push is disjoint from test/tooling/push-known-red.test.mjs; landing (J505)');
+    expect(f.read(f.files.receipts)).toContain('HOLD open but this push is disjoint from src/test/push-known-red.test.mjs; landing (J505)');
   }, 60_000);
 });

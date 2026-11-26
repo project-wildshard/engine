@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {readFileSync,writeFileSync} from 'node:fs';
 import {join} from 'node:path';
-import {fixtureScratch} from '../test/tooling/owned-scratch.mjs';
-import {runT1Child} from '../scripts/t1-runner.mjs';
+import {fixtureScratch} from '../src/test/.kit/owned-scratch.mjs';
+import {runT1Child} from '../src/scripts/t1-runner.mjs';
 
 test('an owned child ignoring TERM is killed and returns a failed receipt result',async()=>{
  const root=fixtureScratch('t1-runner'),script=join(root,'ignore.mjs'),pidFile=join(root,'pid');

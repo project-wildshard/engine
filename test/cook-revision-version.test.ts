@@ -4,7 +4,7 @@
 import {readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {expect, it} from 'vitest';
-import {cookRevision, revisionBytes} from '../scripts/cook-revision';
+import {cookRevision, revisionBytes} from '../src/scripts/cook-revision';
 
 const root = resolve('.'), pkgPath = resolve(root, 'package.json');
 const real = JSON.parse(readFileSync(pkgPath, 'utf8')) as Record<string, unknown>;

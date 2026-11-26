@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Check workflow cache inputs without starting CI.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { prepareTestBuildTools, selectTestBuildTools } from '../scripts/test-build-tools';
+import { prepareTestBuildTools, selectTestBuildTools } from '../src/scripts/test-build-tools';
 import registry from './build-tools.json' with { type: 'json' };
 
 const fixture = { 'test/native-a.test.ts': ['basis'], 'test/native-b.test.ts': ['basis'] };

@@ -4,8 +4,8 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { TestSpecification } from 'vitest/node';
 import { expect, test } from 'vitest';
-import { PushDurationSequencer } from '../scripts/push-duration-sequencer';
-import { CPU_EXCLUSIVE_TESTS } from '../scripts/vitest-ci-files';
+import { PushDurationSequencer } from '../src/scripts/push-duration-sequencer';
+import { CPU_EXCLUSIVE_TESTS } from '../src/scripts/vitest-ci-files';
 
 const weights: Record<string, number> = { 'test/light.test.ts': 0.1, 'test/cook-worker.test.ts': 30, 'test/nalati-headless-population.test.ts': 20,
   'test/dedicated-hold-expiry.test.ts': 10, 'test/mid.test.ts': 5, ...Object.fromEntries(CPU_EXCLUSIVE_TESTS.map((file, index) => [file, 40 + index])) };

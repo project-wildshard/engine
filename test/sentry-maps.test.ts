@@ -4,11 +4,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths stay under the repository's tmp directory.
 import { dirname, join, resolve } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { mapRoots, SENTRY_CLI, sentryMapPlan, sentryToken } from '../scripts/sentry-maps.mjs';
+import { mapRoots, SENTRY_CLI, sentryMapPlan, sentryToken } from '../src/scripts/sentry-maps.mjs';
 import { browserErrorDist, browserErrorRelease } from '../src/client/engine/telemetry/browserErrors';
 import { WILDSHARD_IDENTITY } from '../src/client/game/identity';
 import preview from '../.github/workflows/preview.yml?raw';
-import workersHost from '../scripts/page-release/hosts/workers.mjs?raw';
+import workersHost from '../src/scripts/page-release/hosts/workers.mjs?raw';
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
@@ -66,11 +66,11 @@ test('the token comes from the environment first, then the private file, else no
 });
 
 test('preview releases through the Workers host, which sends the maps before it strips them, with the Sentry token', () => {
-  expect(preview).toContain('node scripts/page-release.mjs preview build,upload,check,go-live --host=workers');
-  const step = preview.slice(preview.lastIndexOf('- name:', preview.indexOf('scripts/page-release.mjs preview')));
+  expect(preview).toContain('node src/scripts/page-release.mjs preview build,upload,check,go-live --host=workers');
+  const step = preview.slice(preview.lastIndexOf('- name:', preview.indexOf('src/scripts/page-release.mjs preview')));
   expect(step).toContain('SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}');
   expect(step).toContain('CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}');
-  const upload = workersHost.indexOf("'scripts/sentry-maps.mjs', 'dist', '--environment'");
+  const upload = workersHost.indexOf("'src/scripts/sentry-maps.mjs', 'dist', '--environment'");
   expect(upload).toBeGreaterThan(0);
   expect(upload).toBeLessThan(workersHost.indexOf('stripSourceMaps(dist)'));
   expect(SENTRY_CLI).toMatch(/^@sentry\/cli@\d+\.\d+\.\d+$/u);

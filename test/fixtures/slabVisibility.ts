@@ -1,5 +1,5 @@
 import { Box3, Group, Vector3, type Matrix4, type BufferGeometry } from 'three';
-import { tileBoxVisible, type BakeCamera } from '../../scripts/tile-bake-report.mjs';
+import { tileBoxVisible, type BakeCamera } from '../../src/scripts/tile-bake-report.mjs';
 import type { WorldSceneWeld } from '@wildshard/format/worldSceneWeld';
 
 export interface SlabVisibilityBox { box: Box3; triangles: number }

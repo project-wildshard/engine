@@ -37,7 +37,7 @@ beforeAll(() => {
   scratch = mkdtempSync(join(tmpdir(), 'cook-resume-'));
   const script = join(scratch, 'job.mjs');
   writeFileSync(script, JOB);
-  launcher = {root, execPath: process.execPath, loader: join(root, 'scripts/bake-loader.mjs'), script, wrap: [], limits: {seconds: 30, memoryMB: 2048, heapMB: 1024}};
+  launcher = {root, execPath: process.execPath, loader: join(root, 'src/scripts/bake-loader.mjs'), script, wrap: [], limits: {seconds: 30, memoryMB: 2048, heapMB: 1024}};
 });
 afterAll(() => { rmSync(scratch, {recursive: true, force: true}); });
 

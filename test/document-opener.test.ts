@@ -10,7 +10,7 @@ import { request, type IncomingHttpHeaders } from 'node:http';
 // oxlint-disable-next-line import/no-nodejs-modules -- Paths for the owned fixture build.
 import { join, resolve } from 'node:path';
 import { expect, test } from 'vitest';
-import { DOCUMENT_OPENER, documentHeaders, isDocumentRoute, LEAVE_PAGE, withIsolationRule } from '../scripts/app-build/isolation.mjs';
+import { DOCUMENT_OPENER, documentHeaders, isDocumentRoute, LEAVE_PAGE, withIsolationRule } from '../src/scripts/app-build/isolation.mjs';
 import { previewServer } from './fixtures/preview-server';
 
 const HEADERS = '/*\n  Cache-Control: public, max-age=0, must-revalidate\n';
@@ -35,7 +35,7 @@ test('the game routes are the document routes; robots.txt, assets and the doctor
 test('the service worker names the same routes as the page hosts', () => {
   const route = (file: string): string | undefined => /const DOCUMENT_ROUTE = (?<re>\/.+\/u);/u.exec(readFileSync(file, 'utf8'))?.groups?.['re'];
   expect(route('src/client/engine/pwa/sw.js')).toBeDefined();
-  expect(route('src/client/engine/pwa/sw.js')).toBe(route('scripts/app-build/isolation.mjs'));
+  expect(route('src/client/engine/pwa/sw.js')).toBe(route('src/scripts/app-build/isolation.mjs'));
 });
 
 test('the service worker\'s baked document carries the opener policy on every channel, COEP only when isolated', () => {

@@ -5,15 +5,15 @@ import {mkdirSync,mkdtempSync,readFileSync,rmSync,writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve local build fixture paths.
 import {join,resolve} from 'node:path';
 import {expect,test} from 'vitest';
-import {titleAssetTables,titleAssetURLs,writeTitleAssets} from '../scripts/title-assets.mjs';
+import {titleAssetTables,titleAssetURLs,writeTitleAssets} from '../src/scripts/title-assets.mjs';
 import {titleAssetURL} from '../src/client/game/titleAssets';
-import {serviceWorkerCore} from '../scripts/app-build/serviceWorker';
+import {serviceWorkerCore} from '../src/scripts/app-build/serviceWorker';
 
 test('every title URL names its exact original bytes and shell/runtime use the same URL',async()=>{
   const root=process.cwd(),urls=titleAssetURLs(root),tables=titleAssetTables(root);
   expect(Object.keys(urls)).toHaveLength(9); // PZ19: the two heroes' ~30 kB first cuts
   expect(tables['index.html']).toBe(readFileSync('index.html','utf8'));
-  expect(tables['scripts/title-assets.generated.json']).toBe(readFileSync('scripts/title-assets.generated.json','utf8'));
+  expect(tables['src/scripts/title-assets.generated.json']).toBe(readFileSync('src/scripts/title-assets.generated.json','utf8'));
   mkdirSync('tmp',{recursive:true});const out=mkdtempSync(resolve('tmp/title-assets-'));
   try{
     writeTitleAssets(root,out);
@@ -49,13 +49,13 @@ test('every title URL names its exact original bytes and shell/runtime use the s
 test('title source generation refuses stale names, missing markers and stale publication tables',()=>{
   mkdirSync('tmp',{recursive:true});const root=mkdtempSync(resolve('tmp/title-source-'));
   try{
-    mkdirSync(join(root,'public/assets/title'),{recursive:true});mkdirSync(join(root,'scripts'));
+    mkdirSync(join(root,'public/assets/title'),{recursive:true});mkdirSync(join(root,'src/scripts'),{recursive:true});
     const image=join(root,'public/assets/title/hero.jpg'),document=join(root,'index.html');
     writeFileSync(image,'first');writeFileSync(document,'// BEGIN TITLE URLS\n// END TITLE URLS');
     const first=titleAssetTables(root),url=titleAssetURLs(root)['/assets/title/hero.jpg'];
-    const table=first['scripts/title-assets.generated.json'],html=first['index.html'];
+    const table=first['src/scripts/title-assets.generated.json'],html=first['index.html'];
     if(table===undefined||html===undefined)throw new Error('Missing title source outputs');
-    writeFileSync(join(root,'scripts/title-assets.generated.json'),table);
+    writeFileSync(join(root,'src/scripts/title-assets.generated.json'),table);
     writeFileSync(document,html);
     expect(titleAssetTables(root)).toEqual(first);
     writeFileSync(image,'other');

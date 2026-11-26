@@ -2,7 +2,7 @@
 # release, published from Actions so nobody runs it by hand and either machine can start it. It replaces the hand steps in
 # project/journal/2026-11-19-explore-release.md. On a release tag (and on a dispatch naming one) it checks out that tag's
 # commit, waits until staging serves that build, takes staging's own catalogue.json, and releases the Explore Worker
-# (pages/wrangler.jsonc --env explore) with scripts/page-release.mjs in order: build, upload, check (the version URL's
+# (pages/wrangler.jsonc --env explore) with src/scripts/page-release.mjs in order: build, upload, check (the version URL's
 # bytes equal the local build), then `wrangler triggers deploy --env explore` (the explore.wildshard.io custom domain),
 # then go-live. test/explore-release-ci.test.ts holds that order: go-live never runs before check.
 # Explore signs no world, moves no rooms and publishes no server packs.
@@ -88,7 +88,7 @@ jobs:
       - name: Give an older tag's build the same limit
         run: |
           grep -q WS_BUILD_MAX_MINUTES package.json && exit 0
-          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));const s=p.scripts['build:game'];if(!s.startsWith('python3 scripts/heavy-lane.py build -- '))process.exit(1);p.scripts['build:game']=s.replace('build -- ','build --max \"\${WS_BUILD_MAX_MINUTES:-30}\" -- ');fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));const s=p.scripts['build:game'];if(!s.startsWith('python3 src/scripts/heavy-lane.py build -- '))process.exit(1);p.scripts['build:game']=s.replace('build -- ','build --max \"\${WS_BUILD_MAX_MINUTES:-30}\" -- ');fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
           git update-index --skip-worktree package.json
           echo "$TAG predates the knob: build:game patched locally to WS_BUILD_MAX_MINUTES"
       # The Cloudflare token reaches wrangler only through the environment; page-release.mjs redacts it from all output.
@@ -102,7 +102,7 @@ jobs:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_PACKS_ACCESS_KEY_ID: ${{ secrets.R2_PACKS_ACCESS_KEY_ID }}
           R2_PACKS_SECRET_ACCESS_KEY: ${{ secrets.R2_PACKS_SECRET_ACCESS_KEY }}
-        run: node scripts/page-release.mjs explore build,upload,check --catalogue=tmp/explore-release/catalogue.json --content
+        run: node src/scripts/page-release.mjs explore build,upload,check --catalogue=tmp/explore-release/catalogue.json --content
       - name: Attach explore.wildshard.io
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -114,5 +114,5 @@ jobs:
           R2_PACKS_ACCESS_KEY_ID: ${{ secrets.R2_PACKS_ACCESS_KEY_ID }}
           R2_PACKS_SECRET_ACCESS_KEY: ${{ secrets.R2_PACKS_SECRET_ACCESS_KEY }}
         run: |
-          node scripts/page-release.mjs explore go-live --content
+          node src/scripts/page-release.mjs explore go-live --content
           echo "explore.wildshard.io serves $TAG ($(git rev-parse HEAD))" >> "$GITHUB_STEP_SUMMARY"

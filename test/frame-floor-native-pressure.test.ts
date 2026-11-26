@@ -1,7 +1,7 @@
 import {expect, test} from 'vitest';
 // oxlint-disable-next-line import/no-nodejs-modules -- execute the actual pre-boot serialized probe without a browser
 import {runInNewContext} from 'node:vm';
-import {NATIVE_PRESSURE_SCRIPT} from '../scripts/frame-floor-native-pressure.mjs';
+import {NATIVE_PRESSURE_SCRIPT} from '../src/scripts/frame-floor-native-pressure.mjs';
 
 function fixture() {
   let now = 100;

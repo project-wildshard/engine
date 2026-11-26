@@ -10,7 +10,7 @@ import { openPglite } from './fixtures/pgliteDatabase';
 // QA 11-15 row 24: `wildshard-config saves`, the agents' own way to clear a test or bot player from a box's saves database.
 // It runs here as the developer (its test switches never work as root), on the real migrations in PGlite, through the real
 // psql over pglite-socket, so the SQL is the box's. The logger stand-in echoes what the box journal would get.
-const CONFIG = resolve('scripts/vps/wildshard-config');
+const CONFIG = resolve('src/scripts/vps/wildshard-config');
 const psqlThere = spawnSync('psql', ['--version'], { encoding: 'utf8' }).status === 0;
 const closers: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const close of closers.splice(0)) await close(); });

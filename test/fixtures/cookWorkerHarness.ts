@@ -62,7 +62,7 @@ export function useCookHarness(productFolder = join('out', slug)): CookHarness {
     get real() { return ready(real); },
     get files() { return ready(files); },
     get store() { return ready(store); },
-    launcher: (script, limits = {}) => ({root, execPath: process.execPath, loader: join(root, 'scripts/bake-loader.mjs'), get script() { return script ?? ready(prepared).script; }, wrap: [], limits: {seconds: 120, memoryMB: 4096, heapMB: 2048, ...limits}}),
+    launcher: (script, limits = {}) => ({root, execPath: process.execPath, loader: join(root, 'src/scripts/bake-loader.mjs'), get script() { return script ?? ready(prepared).script; }, wrap: [], limits: {seconds: 120, memoryMB: 4096, heapMB: 2048, ...limits}}),
     source: blobs => ({
       heads: () => Promise.resolve([...blobs].map(([hash], row) => ({slug, revision: row + 1, hash}))),
       download: hash => { const bytes = blobs.get(hash); if (bytes === undefined) throw new Error('No such shardfile'); return Promise.resolve(bytes); },

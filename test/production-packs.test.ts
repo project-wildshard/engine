@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { expect, test } from 'vitest';
-import { missingProductionPacks, PRODUCTION_CATALOGUE } from '../scripts/page-release/production-packs.mjs';
+import { missingProductionPacks, PRODUCTION_CATALOGUE } from '../src/scripts/page-release/production-packs.mjs';
 
 const build = 'a'.repeat(40);
 
@@ -21,7 +21,7 @@ test('the production pack check names each advertised head whose exact-build ind
 
 // FR-A19: a staging deploy waits, bounded, for the cook instead of touring a build into 404 packs.
 test('the pack wait passes once every head is cooked, and holds with the missing heads after its limit', async () => {
-  const { waitForPacks } = await import('../scripts/page-release/production-packs.mjs');
+  const { waitForPacks } = await import('../src/scripts/page-release/production-packs.mjs');
   let clock = 0, cooked = 0;
   const read = (url: string): Promise<Response> => {
     if (url.includes('catalogue.json?channel=staging')) return Promise.resolve(Response.json({shards: [{slug: 'brasscap-mesa', hash: 'h1'}, {slug: 'glowfen', hash: 'h2'}]}));

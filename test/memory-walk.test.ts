@@ -1,6 +1,6 @@
 import {expect,test} from 'vitest';
-import {allocationSites,CULLER,frameName,routeFor,walkPeak,WALK_ROUTES} from '../scripts/memory/walk.mjs';
-import {walkSummary} from '../scripts/memory/measure.mjs';
+import {allocationSites,CULLER,frameName,routeFor,walkPeak,WALK_ROUTES} from '../src/scripts/memory/walk.mjs';
+import {walkSummary} from '../src/scripts/memory/measure.mjs';
 
 // MEMORY-STRUCTURE STR18: the walk meter's pure parts. A profile node's self bytes count once, under its own stack; the
 // owner is the innermost engine (`src/`) frame, so a three.js leaf is charged to the engine call that reached it.
@@ -50,8 +50,8 @@ test('routes: Nine walks its streets, every other zone spins; a missing reading 
 });
 
 test('the walk ratchet (BC11): the rate is judged through the verdict and fails only when a re-measure agrees; the bimodal peak is reported',async()=>{
-  const {bimodal,compareWalk,parseWalkBaseline,reportedLines,walkMeasures,walkVerdict}=await import('../scripts/memory/walkRatchet.mjs');
-  const {readCaps}=await import('../scripts/budgets/files.mjs');
+  const {bimodal,compareWalk,parseWalkBaseline,reportedLines,walkMeasures,walkVerdict}=await import('../src/scripts/memory/walkRatchet.mjs');
+  const {readCaps}=await import('../src/scripts/budgets/files.mjs');
   const baseline=parseWalkBaseline({version:3,mode:'walk',boot:'online',zone:'nine-dragon-stack',seconds:60,runs:3,source:'abc',
     peak:{value:200e6,spread:300e6,judged:false,why:'bimodal'}});
   const judging=(rate:number,contentKey='nine-dragon-stack@3')=>({contentKey,budgets:{caps:readCaps(),baselines:{schema:1,about:'',baselines:{
@@ -78,7 +78,7 @@ test('the walk ratchet (BC11): the rate is judged through the verdict and fails 
   expect(bimodal([21e6,294e6,335e6])).toBe(true); expect(bimodal([150e6,160e6,170e6])).toBe(false);
   expect(reportedLines(baseline,read(7e6,294e6),[21e6,294e6,335e6])[0]).toMatch(/not judged: bimodal.*21, 294, 335 MB \(two modes\)/u);
   expect(reportedLines(judged,read(7e6,1),[1])).toEqual([]);
-  // the run's measures, for scripts/budgets/cli.mjs record --run
+  // the run's measures, for src/scripts/budgets/cli.mjs record --run
   expect(walkMeasures(baseline,read(6.5e6,300e6),'nine-dragon-stack@3')).toEqual({'walk/nine-dragon-stack/rate':{value:6.5e6,contentKey:'nine-dragon-stack@3'}});
   // a reading not judged says why; the rate's baseline lives in budgets/baselines.json now
   expect(()=>parseWalkBaseline({...baseline,peak:{value:1,spread:5,judged:false}})).toThrow(/says why/u);
@@ -86,8 +86,8 @@ test('the walk ratchet (BC11): the rate is judged through the verdict and fails 
 });
 
 test('the committed walk baseline parses: Nine, online, its rate recorded in budgets/baselines.json',async()=>{
-  const {walkBaseline}=await import('../scripts/memory/walkRatchet.mjs');
-  const {readBaselines}=await import('../scripts/budgets/files.mjs');
+  const {walkBaseline}=await import('../src/scripts/memory/walkRatchet.mjs');
+  const {readBaselines}=await import('../src/scripts/budgets/files.mjs');
   const baseline=walkBaseline();
   expect(baseline.zone).toBe('nine-dragon-stack');
   expect(baseline.runs).toBeGreaterThanOrEqual(3);

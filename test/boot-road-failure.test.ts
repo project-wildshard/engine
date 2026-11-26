@@ -1,5 +1,5 @@
 import {afterEach, expect, test, vi} from 'vitest';
-import {bootRoadCompletionState, bootRoadFailure} from '../scripts/parity/boot-smoke.mjs';
+import {bootRoadCompletionState, bootRoadFailure} from '../src/scripts/parity/boot-smoke.mjs';
 
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
 afterEach(() => {

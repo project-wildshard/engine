@@ -8,9 +8,9 @@ import unittest
 if '--candidate-stdin' in sys.argv:
     sys.argv.remove('--candidate-stdin')
     POLICY = {'__name__': 'commit_lane_fixture'}
-    exec(compile(sys.stdin.read(), 'scripts/commit_lane.py', 'exec'), POLICY)
+    exec(compile(sys.stdin.read(), 'src/scripts/commit_lane.py', 'exec'), POLICY)
 else:
-    POLICY = runpy.run_path(str(Path(__file__).resolve().parents[1] / 'scripts/commit_lane.py'))
+    POLICY = runpy.run_path(str(Path(__file__).resolve().parents[1] / 'src/scripts/commit_lane.py'))
 
 
 class CommitLane(unittest.TestCase):

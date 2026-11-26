@@ -142,8 +142,8 @@ importers:
         specifier: 5.20261110.1-beta
         version: 5.20261110.1-beta(@types/node@24.13.6)
       npm-bin-deps:
-        specifier: 2.1.0
-        version: 2.1.0
+        specifier: 2.2.0
+        version: 2.2.0
       oxlint:
         specifier: 1.89.0
         version: 1.89.0
@@ -1026,8 +1026,8 @@ packages:
       three:
         optional: true
 
-  npm-bin-deps@2.1.0:
-    resolution: {integrity: sha512-lHzsAszPtclbMFnS+9J/N7KwGpo/vYeA6nMT9lxA8X72SLyEOcaY0F95PSeC9Yo7D8SvXMC9WJH+PQdDBgEQxQ==}
+  npm-bin-deps@2.2.0:
+    resolution: {integrity: sha512-NSmlhxChyX0f3+TiPsSfrx7jTho8JkGtnFtRFjkuBA46NpMib3CW3yrupogAQqaGWwWnDMXMQ0o56xsGLNQU8Q==}
     engines: {node: '>=20'}
     hasBin: true
 
@@ -2232,7 +2232,7 @@ snapshots:
       '@types/three': 0.186.0
       three: 0.186.0
 
-  npm-bin-deps@2.1.0: {}
+  npm-bin-deps@2.2.0: {}
 
   obug@2.2.1: {}
 

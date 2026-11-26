@@ -1,16 +1,16 @@
-// MEMORY-STRUCTURE STR2, STR3 (J414, J419): `pnpm dev`'s page plays on the local Node game server (scripts/dev-world.mjs),
+// MEMORY-STRUCTURE STR2, STR3 (J414, J419): `pnpm dev`'s page plays on the local Node game server (src/scripts/dev-world.mjs),
 // never on the in-page server worker; its saves are on disk, and a server restart leaves the open page in play.
 import { rmSync } from 'node:fs'
 
 import { Client } from 'pg'
 
-import { devices } from '../../../scripts/browser-playwright.mjs'
-import { expect, test as base } from '../../../scripts/browser-test.mjs'
-import { harnessPins, saveFixture } from '../../../scripts/debug-settings.mjs'
-import { openDevWorld } from '../../../scripts/dev-world.mjs'
+import { devices } from '../../scripts/browser-playwright.mjs'
+import { expect, test as base } from '../../scripts/browser-test.mjs'
+import { harnessPins, saveFixture } from '../../scripts/debug-settings.mjs'
+import { openDevWorld } from '../../scripts/dev-world.mjs'
 import { enterBrasscap } from './fixtures.ts'
 
-import type { DevWorld } from '../../../scripts/dev-world.mjs'
+import type { DevWorld } from '../../scripts/dev-world.mjs'
 
 const test = base.extend<object, { readonly dev: DevWorld }>({
   dev: [

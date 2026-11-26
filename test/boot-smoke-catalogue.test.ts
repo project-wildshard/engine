@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test } from 'vitest';
 import { installTitleManifests, type TitleManifest } from '../src/client/game/shard/titleList';
-import { bootCatalogue, bootCases } from '../scripts/parity/boot-smoke.mjs';
+import { bootCatalogue, bootCases } from '../src/scripts/parity/boot-smoke.mjs';
 
 const titleSlot = Symbol.for('game.titleManifests'), worldSlot = Symbol.for('game.shards');
 const saved = new Map<symbol, PropertyDescriptor | undefined>();

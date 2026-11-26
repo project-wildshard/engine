@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { bindFrameBudget, type BudgetControl } from '../scripts/parity/frame-budget.mjs';
+import { bindFrameBudget, type BudgetControl } from '../src/scripts/parity/frame-budget.mjs';
 
 function fixture() {
   let nativeGate = true, serial = 0;

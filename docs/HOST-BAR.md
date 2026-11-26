@@ -69,7 +69,7 @@ has grown the codebase; the hosts earn it back only as more shards adopt them.
 the `users` known when it was written, a `recheck` date (pending and borderline only) and `from`, the old-list line it
 came from. A binding row is more specific than its module's row.
 
-`scripts/host-ruler/register.mjs` reads it and refuses a row whose module is missing, whose binding the module never
+`src/scripts/host-ruler/register.mjs` reads it and refuses a row whose module is missing, whose binding the module never
 names, whose decision id is not in the pinned decision lists the register carries, or whose recheck date is missing or
 misplaced; and it refuses unless the row count equals the source rows minus the listed `merged` and `dropped` ones.
 HR5 migrated it from engine's old pending-users list, chargeback table, host reviews and listed-view list, and

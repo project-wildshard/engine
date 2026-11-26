@@ -6,7 +6,7 @@ import {spawnSync} from 'node:child_process';
 import {mkdirSync,mkdtempSync,rmSync,writeFileSync} from 'node:fs';
 import {expect,test} from 'vitest';
 import * as v from 'valibot';
-import {AUTHOR_BUNDLE_USE_PREFIX,authorBundleUseLine} from '../scripts/author-bundle-usage.mjs';
+import {AUTHOR_BUNDLE_USE_PREFIX,authorBundleUseLine} from '../src/scripts/author-bundle-usage.mjs';
 
 const root=resolve('tmp/usage-source'),cache=resolve('tmp/usage-cache'),namespace='a'.repeat(64),key='b'.repeat(64);
 const env={WS_AUTHOR_BUNDLE_USAGE:'fixture:1'};
@@ -40,8 +40,8 @@ test('real compilation and cache reuse both emit a successful use while failure 
   try {
     const child=resolve(directory,'child.mjs');
     writeFileSync(child,`import fs from 'node:fs';
-import {authorBundleCached} from ${JSON.stringify(resolve('scripts/author-bundle-cache.mjs'))};
-import {recordBundle} from ${JSON.stringify(resolve('scripts/shardfile-inputs.mjs'))};
+import {authorBundleCached} from ${JSON.stringify(resolve('src/scripts/author-bundle-cache.mjs'))};
+import {recordBundle} from ${JSON.stringify(resolve('src/scripts/shardfile-inputs.mjs'))};
 const root=process.env.USAGE_SOURCE,cache=process.env.USAGE_CACHE;
 fs.writeFileSync(root+'/compiler.mjs','export const value=1;');
 const compile=async()=>{const code=fs.readFileSync(root+'/compiler.mjs','utf8');recordBundle({output:[]});return {code,modules:[]};};

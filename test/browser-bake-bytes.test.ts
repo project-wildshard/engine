@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { browserBakeBytes, type ByteRoute, type ByteSinkPage } from '../scripts/bake-output.mjs';
+import { browserBakeBytes, type ByteRoute, type ByteSinkPage } from '../src/scripts/bake-output.mjs';
 
 class Page implements ByteSinkPage {
   pattern = '';

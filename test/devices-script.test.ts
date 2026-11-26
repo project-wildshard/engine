@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { deviceLines, deviceTable } from '../scripts/devices.mjs';
+import { deviceLines, deviceTable } from '../src/scripts/devices.mjs';
 
 // DEVICE-TELEMETRY DT5: the journal reader Jake runs against a door's journal.
 test('the reader finds client.device lines behind journal prefixes and prints them as a table', () => {

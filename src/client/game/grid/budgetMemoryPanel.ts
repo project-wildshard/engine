@@ -1,7 +1,7 @@
 import type { Scope } from '@wildshard/engine/app/scope';
 import { bootMemorySamples } from '@wildshard/engine/boot/bootTrace';
 import type { MemorySnapshot } from '@wildshard/engine/core/memoryAttribution';
-import model from '../../../../scripts/memory/phone-model.json';
+import model from '../../../scripts/memory/phone-model.json';
 import { memorySubsystems, PHONE_MEMORY_BUDGETS, type BudgetLedger, type MemorySubsystem } from '@wildshard/engine/core/memoryBudget';
 import { phoneFromLedger, phoneFromLedgerSample, phoneLedgerSample, type PhoneMemoryRange } from '@wildshard/engine/core/phoneMemoryModel';
 import { memoryRows, type MemoryGrouping, type MemorySort } from './memoryRows';

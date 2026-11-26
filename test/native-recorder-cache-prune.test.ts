@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync }
 // oxlint-disable-next-line import/no-nodejs-modules -- The fixture cache lives in the temp dir.
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { pruneRecorderCache } from '../scripts/native-recorder-cache.mjs';
+import { pruneRecorderCache } from '../src/scripts/native-recorder-cache.mjs';
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });

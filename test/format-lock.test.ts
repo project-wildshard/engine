@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { formatLockFailures, formatTagFailures, isFormatLockInput } from '../scripts/format-lock.mjs';
+import { formatLockFailures, formatTagFailures, isFormatLockInput } from '../src/scripts/format-lock.mjs';
 
 const COMMIT = '711d608bcf30ddaa3a3f1a0cc695ceb35c3ad84a';
 const OBJECT = '0eb7926711350ec0ef13d04c478c7e7a76e9ed1c';

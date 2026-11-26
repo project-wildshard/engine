@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { pairKey, tighten, worse } from '../scripts/grid-crossing-ratchet.mjs';
+import { pairKey, tighten, worse } from '../src/scripts/grid-crossing-ratchet.mjs';
 
 // GRID-CROSSING GC3: a crossing run that worsens any pair past its ratchet fails; the ratchet only tightens.
 const KEY = pairKey('preview', 'chromium-desktop', 'driftwood-isle', 'sunscar-dunes');

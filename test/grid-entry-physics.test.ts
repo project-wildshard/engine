@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { physicsEntryFailures, physicsEntryPierReady } from '../scripts/physics-grid-entry.mjs';
+import { physicsEntryFailures, physicsEntryPierReady } from '../src/scripts/physics-grid-entry.mjs';
 
 const standalone = { registered: { pier: 63, wreck: 21 }, native: { pier: 63, wreck: 21 }, total: 100,
   pier: { y: 0.5, owner: 'pier' }, grid: null };

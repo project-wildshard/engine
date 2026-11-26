@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
-import { assertDomeAnchorReady, domeGroundAnchor, domeWorldCamera, parseDomeCameras } from '../scripts/dome-cameras.mjs';
-import type { FloorGridState } from '../scripts/frame-floor-grid.mjs';
+import { assertDomeAnchorReady, domeGroundAnchor, domeWorldCamera, parseDomeCameras } from '../src/scripts/dome-cameras.mjs';
+import type { FloorGridState } from '../src/scripts/frame-floor-grid.mjs';
 
 // Exact 903baf53bc camera blobs: test fixtures remain present in CI's sparse checkout, unlike art/.
 const manifests = import.meta.glob<unknown>('./fixtures/night-market-domes/*.json', { eager: true, import: 'default' });

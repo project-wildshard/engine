@@ -13,10 +13,10 @@ const dedicatedSpec=(id:string,cacheEnv:string)=>({id,cacheDir:process.env[cache
 afterEach(()=>{vi.unstubAllEnvs();for(const path of owned.splice(0))rmSync(path,{recursive:true,force:true});});
 async function fixture(){
   const root=mkdtempSync(resolve('tmp/native-bundle-'));owned.push(root);
-  mkdirSync(resolve(root,'scripts'));mkdirSync(resolve(root,'source'));
-  writeFileSync(resolve(root,'scripts/bake-loader.mjs'),'');writeFileSync(resolve(root,'source/input.txt'),'original');
+  mkdirSync(resolve(root,'src','scripts'),{recursive:true});mkdirSync(resolve(root,'source'));
+  writeFileSync(resolve(root,'src/scripts/bake-loader.mjs'),'');writeFileSync(resolve(root,'source/input.txt'),'original');
   writeFileSync(resolve(root,'compile.mjs'),`import fs from 'node:fs';fs.appendFileSync('calls','x');process.stdout.write(JSON.stringify({value:fs.readFileSync('source/input.txt','utf8')}));`);
-  const spec={root,id:'test',script:'compile.mjs',inputs:['source','scripts/bake-loader.mjs']};
+  const spec={root,id:'test',script:'compile.mjs',inputs:['source','src/scripts/bake-loader.mjs']};
   const cache=resolve(root,'producer'),text=await nativeProgramFixture({...spec,cacheDir:cache});
   const identity=nativeFixtureIdentity({sha:'a'.repeat(40),run:'123',attempt:'1'});
   return {root,spec,text,identity,wire:packNativeFixtures(identity,[spec],cache),out:resolve(root,'restored')};
@@ -58,7 +58,7 @@ test('every changed source, loader, command and inventory invalidates the origin
   for(const mode of ['source','loader','inventory','script']){
     const f=await fixture();
     if(mode==='source')writeFileSync(resolve(f.root,'source/input.txt'),'changed');
-    if(mode==='loader')writeFileSync(resolve(f.root,'scripts/bake-loader.mjs'),'// changed');
+    if(mode==='loader')writeFileSync(resolve(f.root,'src/scripts/bake-loader.mjs'),'// changed');
     if(mode==='inventory')writeFileSync(resolve(f.root,'source/new.txt'),'new');
     if(mode==='script')writeFileSync(resolve(f.root,'compile.mjs'),'throw Error("changed");');
     expect(()=>restoreNativeFixtures(f.wire,f.identity,[f.spec],f.out)).toThrow('source/tool/host key');

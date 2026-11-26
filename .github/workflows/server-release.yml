@@ -60,7 +60,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           ALIGN_BUILD: ${{ inputs.build }}
-        run: node scripts/server-release/github.mjs select
+        run: node src/scripts/server-release/github.mjs select
 
   publish:
     needs: source
@@ -117,8 +117,8 @@ jobs:
         id: production-play
         working-directory: source
         run: >-
-          node --import ./scripts/bake-loader.mjs
-          scripts/release-prod-play.ts "$SOURCE_SHA" "$RUNNER_TEMP/production-play.json"
+          node --import ./src/scripts/bake-loader.mjs
+          src/scripts/release-prod-play.ts "$SOURCE_SHA" "$RUNNER_TEMP/production-play.json"
       - name: Keep the production play verdict
         if: ${{ !cancelled() && (steps.production-play.outcome == 'success' || steps.production-play.outcome == 'failure') }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -133,7 +133,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node scripts/build-server.mjs --build "$SOURCE_SHA" --out "$RUNNER_TEMP/server"
+          node src/scripts/build-server.mjs --build "$SOURCE_SHA" --out "$RUNNER_TEMP/server"
           tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner -cf - -C "$RUNNER_TEMP/server" . |
             gzip -n > "$RUNNER_TEMP/engine-server-$SOURCE_SHA.tar.gz"
       - name: Validate channel configuration
@@ -147,7 +147,7 @@ jobs:
           R2_PACKS_ACCESS_KEY_ID: ${{ secrets.R2_PACKS_ACCESS_KEY_ID }}
           R2_PACKS_SECRET_ACCESS_KEY: ${{ secrets.R2_PACKS_SECRET_ACCESS_KEY }}
         run: >-
-          node scripts/server-release/publish.mjs --check
+          node src/scripts/server-release/publish.mjs --check
           --channel "$RELEASE_CHANNEL" --build "$SOURCE_SHA" --tag "$RELEASE_TAG"
           --bundle "$RUNNER_TEMP/engine-server-$SOURCE_SHA.tar.gz" --out "$RUNNER_TEMP/release.json" ${ALIGN_FLAG:+"$ALIGN_FLAG"}
       - name: Upload immutable bundle to its tag release
@@ -155,7 +155,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-
-          node scripts/server-release/github.mjs asset
+          node src/scripts/server-release/github.mjs asset
           "$RELEASE_TAG" "$SOURCE_SHA" "$RUNNER_TEMP/engine-server-$SOURCE_SHA.tar.gz" "$RELEASE_CHANNEL"
       # Every channel signs only a build whose server book and parts are on R2 (publish.mjs `serverPacksReady`, J234); otherwise it holds.
       - name: Sign and advance the channel release file
@@ -169,7 +169,7 @@ jobs:
           R2_PACKS_ACCESS_KEY_ID: ${{ secrets.R2_PACKS_ACCESS_KEY_ID }}
           R2_PACKS_SECRET_ACCESS_KEY: ${{ secrets.R2_PACKS_SECRET_ACCESS_KEY }}
         run: >-
-          node scripts/server-release/publish.mjs
+          node src/scripts/server-release/publish.mjs
           --channel "$RELEASE_CHANNEL" --build "$SOURCE_SHA" --tag "$RELEASE_TAG"
           --bundle "$RUNNER_TEMP/engine-server-$SOURCE_SHA.tar.gz" --out "$RUNNER_TEMP/release.json" ${ALIGN_FLAG:+"$ALIGN_FLAG"}
 
@@ -202,8 +202,8 @@ jobs:
       - name: Skip a source from before ENG-16
         id: has
         run: |
-          if [ -f scripts/devserver-client.mjs ]; then echo "build=true" >> "$GITHUB_OUTPUT"; else echo "::notice::$SOURCE_SHA has no scripts/devserver-client.mjs"; fi
-          if grep -q PREPARATION_CLIENT_ASSET scripts/devserver-client.mjs 2>/dev/null; then echo "preparation=true" >> "$GITHUB_OUTPUT"; fi
+          if [ -f src/scripts/devserver-client.mjs ]; then echo "build=true" >> "$GITHUB_OUTPUT"; else echo "::notice::$SOURCE_SHA has no src/scripts/devserver-client.mjs"; fi
+          if grep -q PREPARATION_CLIENT_ASSET src/scripts/devserver-client.mjs 2>/dev/null; then echo "preparation=true" >> "$GITHUB_OUTPUT"; fi
       - if: steps.has.outputs.build == 'true'
         uses: ./.github/actions/ring-setup
         with:
@@ -231,12 +231,12 @@ jobs:
       - name: Build the devserver client
         if: steps.has.outputs.build == 'true'
         run: |
-          node scripts/pins.ts install
-          node scripts/gen.mjs --inputs-only
-          python3 scripts/heavy-lane.py build -- node scripts/devserver-client.mjs --out "$RUNNER_TEMP/devserver-client.tar.gz"
+          node src/scripts/pins.ts install
+          node src/scripts/gen.mjs --inputs-only
+          python3 src/scripts/heavy-lane.py build -- node src/scripts/devserver-client.mjs --out "$RUNNER_TEMP/devserver-client.tar.gz"
       - name: Build the preparation client
         if: steps.has.outputs.preparation == 'true'
-        run: python3 scripts/heavy-lane.py build -- node scripts/devserver-client.mjs --kind preparation --out "$RUNNER_TEMP/preparation-client.tar.gz"
+        run: python3 src/scripts/heavy-lane.py build -- node src/scripts/devserver-client.mjs --kind preparation --out "$RUNNER_TEMP/preparation-client.tar.gz"
       - name: Upload it to the release, once
         if: ${{ !cancelled() && steps.has.outputs.build == 'true' }}
         env:

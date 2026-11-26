@@ -5,12 +5,12 @@ import { tmpdir } from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
 import { join } from 'node:path';
 import { expect, test, vi } from 'vitest';
-import { readBaselines, readCaps } from '../scripts/budgets/files.mjs';
-import { checkLedger, judgeLedger, ledgerFailure, ledgerMeasures, ledgerTotal, reportLedger, zoneContentKey } from '../scripts/memory/ledgerVerdict.mjs';
+import { readBaselines, readCaps } from '../src/scripts/budgets/files.mjs';
+import { checkLedger, judgeLedger, ledgerFailure, ledgerMeasures, ledgerTotal, reportLedger, zoneContentKey } from '../src/scripts/memory/ledgerVerdict.mjs';
 
 // BUDGET-CAPS BC6 (J444): the ledger is judged on a zone's control and peak totals, not 18 subsystem numbers.
 type Phases = Record<'control' | 'peak', Record<string, number>>;
-const ledger = JSON.parse(readFileSync('scripts/memory/ledger-ratchet.json', 'utf8')) as { zones: Record<string, Phases> };
+const ledger = JSON.parse(readFileSync('src/scripts/memory/ledger-ratchet.json', 'utf8')) as { zones: Record<string, Phases> };
 /** A committed zone's ledger as one flat reading (`<phase>.<subsystem>` bytes). */
 function flat(zone: string): Record<string, number> {
   const phases = ledger.zones[zone];
@@ -99,5 +99,5 @@ test('BC7: a ledger run prints one table and appends one table to the job summar
     const written = JSON.parse(readFileSync(join(directory, 'budget-measures.json'), 'utf8')) as { measures: Record<string, { reads: number[] }> };
     expect(written.measures['ledger/driftwood-isle/peak']?.reads).toHaveLength(1);
   } finally { rmSync(directory, { recursive: true, force: true }); }
-  expect(readFileSync('scripts/memory/ci.mjs', 'utf8')).not.toContain('::warning');
+  expect(readFileSync('src/scripts/memory/ci.mjs', 'utf8')).not.toContain('::warning');
 });

@@ -2,7 +2,7 @@
 // REV-BEHIND. A pin of a head with no packs for one build the channel serves waits for the cook, then refuses, naming it.
 import {readFileSync} from 'node:fs';
 import {describe, expect, it} from 'vitest';
-import {headPackGaps, waitForHeadPacks} from '../scripts/pin-packs.mjs';
+import {headPackGaps, waitForHeadPacks} from '../src/scripts/pin-packs.mjs';
 
 const HASH = 'a'.repeat(64), OLD = '1'.repeat(40), NEW = '2'.repeat(40);
 /** A pack store that has the head's index for `cooked` builds only; it records each read. */
@@ -43,8 +43,8 @@ describe('a pin waits for packs on every build its channel serves (QA 11-25 row 
 
   it('shard-pin checks the packs before it moves the pin', () => {
     const flow = readFileSync('.github/workflows/shard-pin.yml', 'utf8');
-    const check = flow.indexOf('run: node scripts/pin-packs.mjs "$SLUG" "$HASH" "$CHANNEL" --wait=40');
+    const check = flow.indexOf('run: node src/scripts/pin-packs.mjs "$SLUG" "$HASH" "$CHANNEL" --wait=40');
     expect(check).toBeGreaterThan(0);
-    expect(flow.indexOf('run: node scripts/pin-shard.ts', check)).toBeGreaterThan(check);
+    expect(flow.indexOf('run: node src/scripts/pin-shard.ts', check)).toBeGreaterThan(check);
   });
 });

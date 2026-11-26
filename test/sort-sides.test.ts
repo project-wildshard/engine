@@ -5,7 +5,7 @@ import {existsSync,mkdirSync,mkdtempSync,rmSync,writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve fixture paths.
 import {dirname,resolve} from 'node:path';
 import {afterEach,expect,test} from 'vitest';
-import {AGENTS_MARKER,appliedTree,headTree,main,planFailures,planSort} from '../scripts/sort-sides.mjs';
+import {AGENTS_MARKER,appliedTree,headTree,main,planFailures,planSort} from '../src/scripts/sort-sides.mjs';
 
 const roots:string[]=[];
 afterEach(()=>{for(const root of roots.splice(0))rmSync(root,{recursive:true,force:true});});
@@ -44,7 +44,7 @@ const sources:Record<string,string>={
   'budgets/a.json':"{}\n",
   'lint/ratchet.json':`${JSON.stringify({'wildshard/rule':{'src/engine/core/view.ts':1,'src/engine/ui/hud.ts':2}},null,2)}\n`,
   'lint/engine-side-edges.json':`${JSON.stringify({files:{'src/engine/ui/hud.ts':{'client → server':1}}},null,1)}\n`,
-  'scripts/check-paths.allow.json':`${JSON.stringify([{path:'../../budgets/a.json',file:'src/game/bake.ts',why:'fixture'}],null,2)}\n`,
+  'src/scripts/check-paths.allow.json':`${JSON.stringify([{path:'../../budgets/a.json',file:'src/game/bake.ts',why:'fixture'}],null,2)}\n`,
   'src/engine/package.json':`${JSON.stringify({name:'@wildshard/engine',exports:{'./core/config':'./core/config.ts','./ui/hud':'./ui/hud.ts'}},null,2)}\n`,
   'src/game/package.json':`${JSON.stringify({name:'@wildshard/game',exports:{'./ui/hud':'./ui/hud.ts'}},null,2)}\n`,
   'src/engine/tsconfig.json':'{}\n',

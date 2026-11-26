@@ -9,7 +9,7 @@ import { request, type IncomingHttpHeaders } from 'node:http';
 // oxlint-disable-next-line import/no-nodejs-modules -- Compare the production quality-3 wire and decode the complete response.
 import { brotliCompressSync, brotliDecompressSync, constants, gunzipSync } from 'node:zlib';
 import { afterAll, beforeAll, expect, test } from 'vitest';
-import { LEAVE_PAGE } from '../scripts/app-build/isolation.mjs';
+import { LEAVE_PAGE } from '../src/scripts/app-build/isolation.mjs';
 import { previewServer } from './fixtures/preview-server';
 
 function wire(url: URL, headers: Record<string, string> = {}, method = 'GET'): Promise<{ status: number; headers: IncomingHttpHeaders; bytes: Buffer }> {
@@ -219,7 +219,7 @@ test('a Range request gets the whole file, 200', async () => {
   expect([response.status, response.bytes.length, response.headers['content-range']]).toEqual([200, 4096, undefined]);
 }, 30_000);
 
-// The local preview server (scripts/preview-server.mjs) replays the build's _headers for `pnpm preview` and e2e.
+// The local preview server (src/scripts/preview-server.mjs) replays the build's _headers for `pnpm preview` and e2e.
 
 test('encoded responses follow file changes and concurrent readers receive complete bodies', async () => {
   mkdirSync(resolve('tmp'), { recursive: true });

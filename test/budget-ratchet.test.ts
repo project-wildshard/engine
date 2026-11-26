@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The test reads the committed ratchet budgets the script rewrites.
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { keptBudgets } from '../scripts/budget-ratchet.mjs';
+import { keptBudgets } from '../src/scripts/budget-ratchet.mjs';
 
 const ratchet: unknown = JSON.parse(readFileSync('lint/ratchet.json', 'utf8'));
 const budgets = (): Record<string, number> => {

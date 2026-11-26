@@ -1,5 +1,5 @@
 // Run by name, never in the gated Vitest suite (it needs browsers): CI's e2e job runs it in Chromium.
-//   [WS_SETTINGS_SHOTS=<shots dir>] scripts/browser-lane.sh node --test test/settings-tabs-browser.proof.mjs
+//   [WS_SETTINGS_SHOTS=<shots dir>] src/scripts/browser-lane.sh node --test test/settings-tabs-browser.proof.mjs
 // J245 (Jake, 2026-11-10: "Settings, let's do A, like the bag. The tabs at the top, 5 tabs. Developer mode is on, 6 tabs"):
 // the real GameMenu (test/settings-tabs/page.ts) on a phone (iPhone, 402 × 874) and a desktop (1440 × 900). Every tab opens
 // from its button, every row lands in the tab this list says (written from meta SETTINGS-REDESIGN-PLAN.md, not read from the
@@ -11,9 +11,9 @@ import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, resolve } from 'node:path';
-import { chromium, devices } from "../scripts/browser-playwright.mjs";
+import { chromium, devices } from "../src/scripts/browser-playwright.mjs";
 import { build } from 'vite';
-import { KEYCHAIN_ARGS } from '../scripts/chromium-keychain.mjs';
+import { KEYCHAIN_ARGS } from '../src/scripts/.kit/chromium-keychain.mjs';
 
 const OUT = resolve('tmp/settings-tabs'), SHOTS = process.env['WS_SETTINGS_SHOTS'] ?? resolve('tmp/settings-tabs-shots');
 /** @type {Readonly<Record<string, string>>} */

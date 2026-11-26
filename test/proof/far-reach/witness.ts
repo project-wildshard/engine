@@ -2,7 +2,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- The committed checkpoints are gzipped snapshot wires.
 import { gunzipSync, gzipSync } from 'node:zlib';
-import { readWitnessManifest } from '../../../scripts/witness-checkpoints.mjs';
+import { readWitnessManifest } from '../../../src/scripts/witness-checkpoints.mjs';
 import * as v from 'valibot';
 import { folderClosureFile } from '../../../src/shared/game/shardfile/shardFolder';
 import { createSimHost, type SimHost } from '../../../src/server/engine/sim';

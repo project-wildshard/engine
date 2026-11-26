@@ -40,7 +40,7 @@ const clean=before=>assert.deepEqual([...folders()].filter(name=>!before.has(nam
 // Terminate the real bounded fixture after its fixed code is ready, while it
 // owns fresh native worker startup. The same SIGTERM path is used at20seconds.
 {
- const before=folders(),child=spawn(process.execPath,['--import',pathToFileURL(resolvePath('scripts/sim-node-loader.mjs')).href,resolvePath('test/fixtures/headless/tape-parts-run.mjs')],{stdio:['ignore','pipe','pipe']});
+ const before=folders(),child=spawn(process.execPath,['--import',pathToFileURL(resolvePath('src/scripts/sim-node-loader.mjs')).href,resolvePath('test/fixtures/headless/tape-parts-run.mjs')],{stdio:['ignore','pipe','pipe']});
  let stdout='',stderr='';child.stdout.on('data',chunk=>{stdout+=chunk;});child.stderr.on('data',chunk=>{stderr+=chunk;});
  const closed=new Promise((resolve,reject)=>{child.once('error',reject);child.once('close',(code,signal)=>{resolve({code,signal});});});
  try{

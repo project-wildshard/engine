@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { doctorEpochOK, doctorRowsOK } from '../scripts/doctor-proof-rows.mjs';
+import { doctorEpochOK, doctorRowsOK } from '../src/scripts/doctor-proof-rows.mjs';
 
 test('Doctor admits matching signed progress epochs and refuses mismatched or malformed ones', () => {
   expect(doctorEpochOK(1, 1)).toBe(true);

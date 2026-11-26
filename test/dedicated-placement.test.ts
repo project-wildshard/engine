@@ -232,7 +232,7 @@ test('a placed cell whose worker fails to boot opens nothing and ends nobody', {
 
 // SA47: a new author's slug is in no build's book; the cook (MMO-SERVER MS2.4) writes its server pack beside its parts and names it in
 // `index/<build>/<hash>.json`. The origin here is the cook's store on disk: Thin Ice's pack cooked by the rig's own writer
-// (`scripts/server-origin.mjs`, the cook's `cookShardServerPack`), moved out of the book and into an index, as the cook lays it out.
+// (`src/scripts/server-origin.mjs`, the cook's `cookShardServerPack`), moved out of the book and into an index, as the cook lays it out.
 const BUILD = 'sa47', HASH = 'c'.repeat(64), ROOT = resolve(import.meta.dirname, '..');
 let work = '', origin = '', thinIce: ServerPack | undefined;
 const fresh = (): PackReads => ({ fetched: 0, fetchedBytes: 0, cached: 0, refused: 0 });
@@ -242,7 +242,7 @@ const book = (withSlug: boolean): void => { write(serverPackBookPath(BUILD), { b
 const options = (): PackReaderOptions => ({ origin: pathToFileURL(`${origin}/`).href, cache: join(work, 'cache') });
 beforeAll(() => {
   work = mkdtempSync(join(ROOT, 'tmp', 'sa47-')); origin = join(work, 'origin');
-  const made = spawnSync(process.execPath, ['scripts/server-origin.mjs', origin, BUILD, `${PLACED.slug}=${builtFolder(PLACED.slug)}`, `--grid=${join(work, 'no-grid')}`], { cwd: ROOT, encoding: 'utf8' });
+  const made = spawnSync(process.execPath, ['src/scripts/server-origin.mjs', origin, BUILD, `${PLACED.slug}=${builtFolder(PLACED.slug)}`, `--grid=${join(work, 'no-grid')}`], { cwd: ROOT, encoding: 'utf8' });
   expect(made.status, made.stderr).toBe(0);
   const cooked = JSON.parse(readFileSync(join(origin, serverPackBookPath(BUILD)), 'utf8')) as { shards: Record<string, ServerPack> };
   thinIce = cooked.shards[PLACED.slug];

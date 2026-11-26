@@ -2,7 +2,7 @@
   "audit": {
     "sourceRevision": "9c2ce301302cb030c780d0d560a968dff7150150",
     "candidate": "Static-fabric tile port with approved portable-math collider epsilons and deliberate checkpoint recapture.",
-    "command": "node --import ./scripts/sim-node-loader.mjs test/proof/nine-dragon-stack/run.mjs all",
+    "command": "node --import ./src/scripts/sim-node-loader.mjs test/proof/nine-dragon-stack/run.mjs all",
     "exitStatus": 0,
     "scope": "Headless gameplay and durable ledger outcomes unchanged. Props binding and native continuation hashes follow the port; exact restored and shipping-worker suffixes pass.",
     "runs": "Clean immediate parent 8aabadebe and defining 9c2ce3013 exports, admitted outputs restored only by catalogue SHA-256 pins. Current-head fixture checks retain exact equality."

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkModels } from '../scripts/check-models.mjs';
+import { checkModels } from '../src/scripts/check-models.mjs';
 
 describe('model contract after client relocation', () => {
 

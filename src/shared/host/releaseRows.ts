@@ -10,7 +10,7 @@ export interface ReleaseFile {
   readonly engineBuild: string;
   readonly saveEpoch: number;
   readonly shards: readonly { readonly slug: string; readonly revision: number }[];
-  /** The server bundle: its path under `BUNDLE_ORIGIN` and its SHA-256. `scripts/vps/pull.mjs` reads this, and a bad hash moves nothing (E7.2c). */
+  /** The server bundle: its path under `BUNDLE_ORIGIN` and its SHA-256. `src/scripts/vps/pull.mjs` reads this, and a bad hash moves nothing (E7.2c). */
   readonly bundle?: { readonly name: string; readonly sha256: string };
   /** The address clients dial. For the first sitting this is the quick tunnel's name (C22). */
   readonly socket?: string;

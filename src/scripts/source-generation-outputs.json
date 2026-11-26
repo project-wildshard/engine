@@ -1,0 +1,11 @@
+{
+  "schema": "source-generation-outputs/1",
+  "producers": {
+    "scripts/bake-packs.mjs": [
+      "src/scripts/boot-publication.generated.json"
+    ],
+    "src/scripts/ktx2-tables.mjs": [
+      "src/client/engine/boot/ktx2.generated.ts"
+    ]
+  }
+}

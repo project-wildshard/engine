@@ -68,7 +68,7 @@ status, evidence, what's open, who it waits on).
 Lead with plans, not the backlog of picks. Group them, one or two
 lines each:
 
-1. **Being worked on**: who (herdr agent / session / ask) and the
+1. **Being worked on**: who (hc terminal / session / ask) and the
    next thing.
 2. **Almost done**: the exact rows left.
 3. **Unowned / free to start**.
@@ -113,12 +113,12 @@ His standing preferences (from wildshard, 2026-09-28 → 10-03):
 ## 5. What the other agents are on
 
 ```bash
-test "${HERDR_ENV:-}" = 1 && bash .agents/hooks/herdr-peers.sh   # pane, status, goal
-herdr agent read <pane> --source visible                          # a working agent's screen
+bash .agents/hooks/peers.sh                  # terminal, status, goal, where (inside hc)
+hc read --lines 0 <t>                        # a working agent's screen
 git worktree list; git branch -a                                  # main only (D27), plus plan worktrees where J240 allows
 ```
 
-Sessions outside herdr show up in ListAgents. Report each agent in a
+Sessions outside hc show up in ListAgents. Report each agent in a
 line or two: plan, what it's building, what it waits on. **Don't
 prompt a working agent, and never one that has a question open to
 Jake**, unless he asks you to.

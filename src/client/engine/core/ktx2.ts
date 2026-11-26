@@ -5,7 +5,7 @@ import { pageScope } from '../../../shared/engine/app/resources';
  *   initKtx2(renderer)            once the renderer exists (core/assets.ts setAnisotropy): detects the GPU's compressed
  *                                 formats (ASTC · BC7 · ETC2 · S3TC …), less any family the capability probe saw sample
  *                                 wrong when mipmapped (render/ktx2Probe.ts), and starts fetching the Basis transcoder
- *                                 (/basis/r<three>/, copied from three by scripts/app-build/basis.ts), so it is warm before the first file
+ *                                 (/basis/r<three>/, copied from three by src/scripts/app-build/basis.ts), so it is warm before the first file
  *   ktx2Texture(served)           the KTX2 stand-in of a file the tier fetches, as a CompressedTexture — or null (none, or
  *                                 KTX2 off): the caller then loads the image as before. One transcode per file per wave;
  *                                 Memory saver also shares weak source identity across later waves, without retaining mips

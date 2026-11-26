@@ -7,7 +7,7 @@ import { createServer } from 'node:http';
 // oxlint-disable-next-line import/no-nodejs-modules -- npm verifies the owned registry tarball against this digest.
 import { createHash } from 'node:crypto';
 import { expect, test } from 'vitest';
-import { runCommitJobs } from '../scripts/precommit-jobs.mjs';
+import { runCommitJobs } from '../src/scripts/precommit-jobs.mjs';
 
 // npm defaults to a five-minute request timeout, longer than this proof's existing ninety-second command clock.
 // Revalidate the registry metadata so an older cached response cannot hide a newly published pinned dependency.
@@ -57,7 +57,7 @@ function installedCommands(root: string, signal: AbortSignal) {
 // --fetch-timeout, which the package cook's pack, install and two cooks overlap instead of queueing behind.
 
 // Mini QA 2026-11-16 row 41 (NB18): a shard repo cooking with the npm engine died in the 6x6 encoder's flush. Its worker
-// threads import astc6Wasm.ts, Node strips types under node_modules only through scripts/format-hook.mjs, and module
+// threads import astc6Wasm.ts, Node strips types under node_modules only through src/scripts/format-hook.mjs, and module
 // hooks are per thread, so every worker refused with ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING.
 
 test.concurrent('the cook\'s ASTC 6x6 flush runs its worker lanes from an installed engine', async ({signal, onTestFinished}) => {
@@ -67,10 +67,10 @@ test.concurrent('the cook\'s ASTC 6x6 flush runs its worker lanes from an instal
   try {
     const engine = join(root, 'node_modules/@wildshard/engine');
     mkdirSync(join(engine, 'src/cook/game'), { recursive: true });
-    mkdirSync(join(engine, 'scripts/vendor'), { recursive: true });
+    mkdirSync(join(engine, 'src/scripts/vendor'), { recursive: true });
     cpSync('src/cook/game/astc6Wasm.ts', join(engine, 'src/cook/game/astc6Wasm.ts'));
-    cpSync('scripts/format-hook.mjs', join(engine, 'scripts/format-hook.mjs'));
-    symlinkSync(resolve('scripts/vendor/basisu'), join(engine, 'scripts/vendor/basisu'), 'dir');
+    cpSync('src/scripts/format-hook.mjs', join(engine, 'src/scripts/format-hook.mjs'));
+    symlinkSync(resolve('src/scripts/vendor/basisu'), join(engine, 'src/scripts/vendor/basisu'), 'dir');
     // What a shard repo's cook does: the hook on its own thread, then the engine's encoder, one lane, one input.
     writeFileSync(join(root, 'cook.mjs'), [
       "const {wasmAstc6} = await import('./node_modules/@wildshard/engine/src/cook/game/astc6Wasm.ts');",
@@ -79,7 +79,7 @@ test.concurrent('the cook\'s ASTC 6x6 flush runs its worker lanes from an instal
       "await astc6.flush();",
       "console.log('flushed');",
     ].join('\n'));
-    const run = await commands.run('worker', process.execPath, ['--import', './node_modules/@wildshard/engine/scripts/format-hook.mjs', 'cook.mjs'], root, 60_000, 1024 * 1024);
+    const run = await commands.run('worker', process.execPath, ['--import', './node_modules/@wildshard/engine/src/scripts/format-hook.mjs', 'cook.mjs'], root, 60_000, 1024 * 1024);
     expect(run.stderr).not.toContain('ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING');
     expect(run.stdout.trim(), run.stderr).toBe('flushed');
     expect(run.status).toBe(0);
@@ -107,7 +107,7 @@ test.concurrent('a freshly installed engine tarball completes a full ASTC phone 
     const fixed = readFileSync(worker, 'utf8');
     const old = fixed.replace('import(workerData.hook).then(() => import(workerData.module))', 'import(workerData.module)');
     expect(old).not.toBe(fixed);
-    const args = ['--import', './node_modules/@wildshard/engine/scripts/bake-loader.mjs', 'proof.mjs'];
+    const args = ['--import', './node_modules/@wildshard/engine/src/scripts/bake-loader.mjs', 'proof.mjs'];
     // Only this owned installed fixture loses the hook. Reproduce the exact pre-fix failure, then heal it.
     writeFileSync(worker, old);
     const broken = await commands.run('broken', process.execPath, args, project);

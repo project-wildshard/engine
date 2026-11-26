@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { judgedValue, verdict } from '../scripts/budgets/verdict.mjs';
+import { judgedValue, verdict } from '../src/scripts/budgets/verdict.mjs';
 
 // BUDGET-CAPS BC1 (meta docs/plans/BUDGET-CAPS-PLAN.md; J444): one hard cap, one recorded baseline, a derived 10% line.
 const base = { baseline: { value: 100_000_000, contentKey: 'driftwood-isle@5' }, hard: 150_000_000, contentKey: 'driftwood-isle@5', kind: 'exact' as const };

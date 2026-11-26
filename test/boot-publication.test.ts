@@ -3,8 +3,8 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, wr
 // oxlint-disable-next-line import/no-nodejs-modules -- Keep fixtures beneath repository tmp.
 import { resolve } from 'node:path';
 import { expect, test } from 'vitest';
-import { BOOT_PUBLICATION, bootPublicationTableSources, parseBootPublication, publishBootPublication, readBootPublication } from '../scripts/boot-publication.mjs';
-import { verifiedBootPublicationTables } from '../scripts/boot-publication-proof.mjs';
+import { BOOT_PUBLICATION, bootPublicationTableSources, parseBootPublication, publishBootPublication, readBootPublication } from '../src/scripts/boot-publication.mjs';
+import { verifiedBootPublicationTables } from '../src/scripts/boot-publication-proof.mjs';
 
 const facts = (offset = 0, length = 3, total = 3) => ({
   schema: 'boot-publication/1', bytes: { '/assets/raw.bin': 3 }, versions: { '/assets/raw.bin': '1234abcd' },
@@ -16,7 +16,7 @@ const facts = (offset = 0, length = 3, total = 3) => ({
 function fixture(): { root: string; close: () => void } {
   mkdirSync('tmp', { recursive: true });
   const root = mkdtempSync(resolve('tmp', 'boot-publication-'));
-  mkdirSync(resolve(root, 'scripts'));
+  mkdirSync(resolve(root, 'src', 'scripts'), { recursive: true });
   return { root, close: () => rmSync(root, { recursive: true, force: true }) };
 }
 
@@ -31,7 +31,7 @@ test('plain transport tables require only the complete published facts', () => {
     expect(tables['src/client/game/boot/packs.generated.ts']).toContain('["/assets/raw.bin",0,3,"application/octet-stream"]');
     expect(tables['src/client/game/boot/packs.generated.ts']).toContain('/assets/packs/demo.phone-00000000.bin');
     // No outputs, assets, products, discovery modules or tools exist in this root.
-    expect(readdirSync(f.root)).toEqual(['scripts']);
+    expect(readdirSync(f.root)).toEqual(['src']); expect(readdirSync(resolve(f.root, 'src'))).toEqual(['scripts']);
     expect(readBootPublication(f.root)).toEqual(parseBootPublication(facts()));
   } finally { f.close(); }
 });
@@ -53,7 +53,7 @@ test('malformed publication cannot replace the last complete record', () => {
       expect(() => publishBootPublication(f.root, value)).toThrow();
       expect(readFileSync(file)).toEqual(before); expect(statSync(file).ino).toBe(inode);
     }
-    expect(readdirSync(resolve(f.root, 'scripts'))).toEqual(['boot-publication.generated.json']);
+    expect(readdirSync(resolve(f.root, 'src', 'scripts'))).toEqual(['boot-publication.generated.json']);
     writeFileSync(file, '{}');
     expect(() => bootPublicationTableSources(f.root)).toThrow();
   } finally { f.close(); }

@@ -4,7 +4,7 @@ import { ANIMAL_CLASS } from '../../../src/shared/engine/net/netSchemas';
 import { RoomBot, type BotThumb } from './roomBot';
 
 // E7.3e: E7.5's two phones on real sockets: each walks, jumps, dodges and sprints, goes to the nearest creature it can see, and fights it. It prints a line a
-// minute and a last one, and the server's own lines say what the room felt. `scripts/room-soak.mjs` runs it.
+// minute and a last one, and the server's own lines say what the room felt. `src/scripts/room-soak.mjs` runs it.
 const [base = 'ws://127.0.0.1:8790', build = 'dev', secondsArg = '60'] = process.argv.slice(2), seconds = Number(secondsArg), NEAR = 3, FIGHT_RANGE = 24;
 interface Heard { hits: number; deaths: number; fighting: number }
 function phone(index: number, heard: Heard): RoomBot {

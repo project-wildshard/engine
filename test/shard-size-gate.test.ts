@@ -5,8 +5,8 @@ import { tmpdir } from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- The carried-book case writes a small dist.
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
-import { BASELINE_FILE, checkShardSizes, pinnedContentKeys, readPhoneDownloads, shardMeasures } from '../scripts/shard-size-gate.mjs';
-import { readBaselines, readCaps } from '../scripts/budgets/files.mjs';
+import { BASELINE_FILE, checkShardSizes, pinnedContentKeys, readPhoneDownloads, shardMeasures } from '../src/scripts/shard-size-gate.mjs';
+import { readBaselines, readCaps } from '../src/scripts/budgets/files.mjs';
 
 // BUDGET-CAPS BC4 (J444, J437): the download is judged by the budget verdict. The hard cap is J338's 100 MB; the soft
 // line is the recorded baseline plus 10% for the same pinned revision; a new revision is new content.

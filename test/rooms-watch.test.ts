@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { DOWN_AFTER, ROOMS, emptyState, step, watchPlist } from '../scripts/rooms-watch.mjs';
+import { DOWN_AFTER, ROOMS, emptyState, step, watchPlist } from '../src/scripts/rooms-watch.mjs';
 
 // FR-A15 part 3 (meta QA 11-25 row 31): both rooms hosts answered 521 from 10:11 UTC 11-25 and no agent heard of it.
 const [prod = '', staging = ''] = ROOMS, start = Date.parse('2026-11-25T10:11:00Z'), minute = 60_000;
@@ -49,5 +49,5 @@ test('the LaunchAgent runs one read every 60 s from the canonical checkout', () 
 // 11-25 11:45 UTC: Caddy's `rewrite * /health` keeps the query and the server answers `/health?agent=` with 404, so a
 // `?agent=` marker read both healthy hosts as 503. The rooms reads carry the marker in the user agent only.
 test('the rooms reads never add the ?agent= query', () => {
-  for (const file of ['scripts/rooms-watch.mjs', 'scripts/page-release.mjs']) expect(readFileSync(file, 'utf8'), file).not.toContain('agentUrl(');
+  for (const file of ['src/scripts/rooms-watch.mjs', 'src/scripts/page-release.mjs']) expect(readFileSync(file, 'utf8'), file).not.toContain('agentUrl(');
 });

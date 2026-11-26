@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { capFor, fileErrors, readBaselines, readCaps } from '../scripts/budgets/files.mjs';
+import { capFor, fileErrors, readBaselines, readCaps } from '../src/scripts/budgets/files.mjs';
 
 // BUDGET-CAPS BC2: the committed caps and baselines agree with each other and with Jake's numbers.
 const caps = readCaps(), baselines = readBaselines();

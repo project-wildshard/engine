@@ -11,8 +11,8 @@ import { afterEach, expect, test, vi } from 'vitest';
 vi.setConfig({ testTimeout: 120_000 });
 
 // VPS-HARDENING VH1: `harden.sh --check` against the box the 2026-11-09 audit found, as stub commands and a made-up root
-// filesystem. Its container proof is scripts/vps-harden-proof.sh; it never runs on the VPS from here.
-const HARDEN = resolve('scripts/vps/harden.sh');
+// filesystem. Its container proof is src/scripts/vps-harden-proof.sh; it never runs on the VPS from here.
+const HARDEN = resolve('src/scripts/vps/harden.sh');
 const REAL = ['bash', 'awk', 'grep', 'sed', 'sort', 'find', 'cat', 'tr', 'cut', 'wc', 'head', 'tail', 'basename', 'date', 'hostname', 'uniq', 'python3'];
 const made: string[] = [];
 afterEach(() => { for (const path of made.splice(0)) rmSync(path, { recursive: true, force: true }); });
@@ -174,7 +174,7 @@ test('VH10: the retired singleplayer page host is outside the game hosts (OFF-VE
 test('VH2: harden.sh copies and a bare prefix are not a token (MS3.4)', () => {
   const run = check(HARDENED, {}, ['--check'], {
     'home/raynos/.config/systemd/user/openclaw-gateway.service': 'removed\n',
-    'home/raynos/harden.sh': readFileSync('scripts/vps/harden.sh', 'utf8'),
+    'home/raynos/harden.sh': readFileSync('src/scripts/vps/harden.sh', 'utf8'),
     'home/wildshard-agent/vps-build/scripts/vps/harden.sh': 'grep -rl sk_claw_PLANTEDCOPYVALUE\n',
     'etc/notes.txt': 'the old prefix was sk_claw, now retired\n',
   });
@@ -214,7 +214,7 @@ test('SC2: a metrics port off loopback, a remote_write or a missing drop-in fail
 });
 
 test('VH15: the apply skips a key this kernel lacks (Yama in a container), and --check still demands it (MS3.1)', () => {
-  const apply = readFileSync(resolve('scripts/vps/harden-apply.sh'), 'utf8'), harden = readFileSync(HARDEN, 'utf8');
+  const apply = readFileSync(resolve('src/scripts/vps/harden-apply.sh'), 'utf8'), harden = readFileSync(HARDEN, 'utf8');
   const loads = apply.match(/sysctl -q[^\n]*-p \/etc\/sysctl\.d\/90-wildshard\.conf/gu) ?? [];
   expect(loads.length).toBe(2);
   for (const load of loads) expect(load).toContain('sysctl -q -e -p');
@@ -223,7 +223,7 @@ test('VH15: the apply skips a key this kernel lacks (Yama in a container), and -
 });
 
 test('VH16: auditd is skipped only inside a container, where the proofs run (MS3.1)', () => {
-  const apply = readFileSync(resolve('scripts/vps/harden-apply.sh'), 'utf8');
+  const apply = readFileSync(resolve('src/scripts/vps/harden-apply.sh'), 'utf8');
   const loop = apply.slice(apply.indexOf('for service in auditd acct sysstat; do'), apply.indexOf('done', apply.indexOf('for service in auditd acct sysstat; do')));
   expect(loop).toContain('[ "$service" = auditd ] && systemd-detect-virt --container --quiet');
   expect(loop.indexOf('systemd-detect-virt')).toBeLessThan(loop.indexOf('systemctl enable --now'));
@@ -231,10 +231,10 @@ test('VH16: auditd is skipped only inside a container, where the proofs run (MS3
 
 // `set -o pipefail` with a pipeline's `grep -q` races: grep exits at its first match, the writer before it dies of SIGPIPE,
 // and the check reads a line that was there as absent (main run 45359415900: "ok VH2 nothing on 11434" on the audited box;
-// 264 of 300 misses on a long input). Every script under scripts/vps/ ends such a pipeline in `matches`, a grep that reads
+// 264 of 300 misses on a long input). Every script under src/scripts/vps/ ends such a pipeline in `matches`, a grep that reads
 // all its input, and defines it; no code line pipes into `grep -q`.
-test('no scripts/vps/ script pipes into grep -q (pipefail SIGPIPE race)', () => {
-  const dir = resolve('scripts/vps'), scripts = readdirSync(dir).filter(name => name.endsWith('.sh'));
+test('no src/scripts/vps/ script pipes into grep -q (pipefail SIGPIPE race)', () => {
+  const dir = resolve('src/scripts/vps'), scripts = readdirSync(dir).filter(name => name.endsWith('.sh'));
   expect(scripts).toContain('harden.sh');
   for (const name of scripts) {
     const text = readFileSync(join(dir, name), 'utf8'), code = text.split('\n').filter(line => !line.trimStart().startsWith('#'));
@@ -246,9 +246,9 @@ test('no scripts/vps/ script pipes into grep -q (pipefail SIGPIPE race)', () => 
 // OB9 (opus-wave, v0.1.85 staging): harden-apply.sh runs its steps as "$HERE/<step>.sh", and harden-grafana.sh was
 // committed 100644, so the box said "Permission denied" and skipped the dashboard. Every step it runs is executable in git.
 test('every step harden-apply.sh runs directly is executable in git', () => {
-  const apply = readFileSync(resolve('scripts/vps/harden-apply.sh'), 'utf8');
-  const steps = [...new Set([...apply.matchAll(/"\$HERE\/([a-z0-9-]+\.sh)"/gu)].map(match => `scripts/vps/${match[1]}`))];
-  expect(steps).toContain('scripts/vps/harden-grafana.sh');
+  const apply = readFileSync(resolve('src/scripts/vps/harden-apply.sh'), 'utf8');
+  const steps = [...new Set([...apply.matchAll(/"\$HERE\/([a-z0-9-]+\.sh)"/gu)].map(match => `src/scripts/vps/${match[1]}`))];
+  expect(steps).toContain('src/scripts/vps/harden-grafana.sh');
   const modes = spawnSync('git', ['ls-files', '-s', '--', ...steps], { encoding: 'utf8' }).stdout.trim().split('\n');
   expect(modes.filter(line => !line.startsWith('100755 ')), 'git update-index --chmod=+x').toEqual([]);
 });
@@ -297,7 +297,7 @@ function allowed(lines: string[]): Set<string> {
 }
 
 test('each harden drop-in leaves every syscall group its service calls allowed (Caddy keeps @chown)', () => {
-  const apply = readFileSync(resolve('scripts/vps/harden-apply.sh'), 'utf8');
+  const apply = readFileSync(resolve('src/scripts/vps/harden-apply.sh'), 'utf8');
   const open = apply.indexOf("sandbox='") + "sandbox='".length, sandbox = apply.slice(open, apply.indexOf("'\n", open)).split('\n');
   expect(sandbox).toContain('SystemCallFilter=~@privileged @resources');
   for (const [unit, calls] of Object.entries(CALLS)) {
@@ -313,7 +313,7 @@ test('each harden drop-in leaves every syscall group its service calls allowed (
 // FAST-RELEASE FR-A22 (11-25): the cook's 7 CPUs run a 6-lane encoder; Pine's job alone peaked at 3963 MB on the MacBook with
 // 6 lanes, and the service had already peaked at 4.24G with 2, so harden's 5G would OOM-kill it.
 test('FR-A22: harden gives the cook 8G, room for a 6-lane job beside the worker and its listing', () => {
-  const apply = readFileSync(resolve('scripts/vps/harden-apply.sh'), 'utf8');
+  const apply = readFileSync(resolve('src/scripts/vps/harden-apply.sh'), 'utf8');
   const start = apply.indexOf('wildshard-cook.service.d/90-harden.conf'), drop = apply.slice(start, apply.indexOf('\nEOF\n', start));
   expect(drop).toMatch(/^MemoryMax=8G$/mu);
 });
@@ -321,7 +321,7 @@ test('FR-A22: harden gives the cook 8G, room for a 6-lane job beside the worker 
 // QA 11-25 row 68 (11-25): v0.1.92's recook failed the record pass on both heads it had to prepare, "Cannot open netlink
 // socket: Address family not supported by protocol": the prepare's WebKit opens a netlink socket inside the cook's sandbox.
 test("the cook's sandbox allows netlink, which the record pass's WebKit opens", () => {
-  const apply = readFileSync(resolve('scripts/vps/harden-apply.sh'), 'utf8');
+  const apply = readFileSync(resolve('src/scripts/vps/harden-apply.sh'), 'utf8');
   const start = apply.indexOf('wildshard-cook.service.d/90-harden.conf'), drop = apply.slice(start, apply.indexOf('\nEOF\n', start));
   expect(drop).toMatch(/^RestrictAddressFamilies=.*\bAF_NETLINK\b/mu);
 });

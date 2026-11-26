@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { stopSpinRecording, uploadRecordedClip } from '../scripts/model-spin-recording.mjs';
+import { stopSpinRecording, uploadRecordedClip } from '../src/scripts/model-spin-recording.mjs';
 
 const parts = [new Blob([new Uint8Array([0, 128, 255])]), new Blob([new Uint8Array([1, 2])])];
 const read = vi.fn<typeof fetch>(), off = vi.fn(), frames = vi.fn(() => 37);

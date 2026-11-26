@@ -6,9 +6,9 @@ import { mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve fixture paths.
 import { join, resolve } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { PINS_LEDGER } from '../scripts/land.mjs';
-import { MANIFEST, pinsKey, writeManifest } from '../scripts/pins-reuse.mjs';
-import { shardfileValidationRevision } from '../scripts/shardfile-validation-revision.mjs';
+import { PINS_LEDGER } from '../src/scripts/.kit/land.mjs';
+import { MANIFEST, pinsKey, writeManifest } from '../src/scripts/pins-reuse.mjs';
+import { shardfileValidationRevision } from '../src/scripts/shardfile-validation-revision.mjs';
 import { cleanLandFixtures, fixture, prepushLines } from './fixtures/land-git';
 
 afterEach(cleanLandFixtures);
@@ -31,7 +31,7 @@ test.each([
   const gen = `import { existsSync, writeFileSync } from 'node:fs';
 const rows = ${JSON.stringify([tracked, mount])}.filter(path => existsSync(path));
 writeFileSync(${JSON.stringify(STAMP)}, 'export const bytes = ' + JSON.stringify(rows) + ';\\n');`;
-  const tip = f.commit(wt, 'scripts/gen.mjs', gen, 'test: stamp available assets');
+  const tip = f.commit(wt, 'src/scripts/gen.mjs', gen, 'test: stamp available assets');
   writeFileSync(join(f.repo, '.git/info/exclude'), `out/\n${mount}\n/${STAMP}\n`);
   // LS1: the stamp is an ignored build output, never committed.
   mkdirSync(join(wt, 'src/client/game/boot'), { recursive: true });
@@ -63,8 +63,8 @@ if (process.argv.slice(2).join(' ') === '--silent pins') {
 `);
   writeFileSync(join(f.root, 'refresh.mjs'), `import { createHash } from 'node:crypto';
 import { appendFileSync } from 'node:fs';
-import { pinsKey, writeManifest } from ${JSON.stringify(resolve('scripts/pins-reuse.mjs'))};
-import { shardfileValidationRevision } from ${JSON.stringify(resolve('scripts/shardfile-validation-revision.mjs'))};
+import { pinsKey, writeManifest } from ${JSON.stringify(resolve('src/scripts/pins-reuse.mjs'))};
+import { shardfileValidationRevision } from ${JSON.stringify(resolve('src/scripts/shardfile-validation-revision.mjs'))};
 appendFileSync(${JSON.stringify(calls)}, 'pins\\n');
 ${publish}
 `);

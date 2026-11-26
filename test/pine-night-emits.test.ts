@@ -162,7 +162,7 @@ test('published spawn catalogue admits v1 bytes without installing a second gene
   const { readSpawnScript } = await import('../src/server/game/population/spawnScript');
   const { scriptAdmissionRows, decisionScriptsFromSections } = await import('@wildshard/format/scriptContract');
   const { SpawnScriptsSchema } = await import('@wildshard/format/spawnScripts');
-  const { SECTION_HOSTS } = await import('../scripts/host-ruler/roots.mjs');
+  const { SECTION_HOSTS } = await import('../src/scripts/host-ruler/roots.mjs');
   expect(SECTION_HOSTS['actors/spawn-scripts']).toContain('src/server/game/population/spawnScript.ts#SpawnScript');
   const product = await loadHeadlessFolder(builtFolder('pine-hollow'));
   const catalogue = product.section('actors/spawn-scripts');

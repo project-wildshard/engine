@@ -1,7 +1,7 @@
 // STAGING-BUGBASH SB45: an upload moves staging's placement serial (J379 GRID_AUTOPLACE) and adds a Zone select card between
 // releases; the next main-watch pass sweeps the cards that upload changed, by a cold entry, one receipt line each.
 import { expect, test } from 'vitest';
-import { changedPlacements, placementOutcomes, sweepLine, sweepOptedIn } from '../scripts/placement-sweep.mjs';
+import { changedPlacements, placementOutcomes, sweepLine, sweepOptedIn } from '../src/scripts/placement-sweep.mjs';
 
 const file = (serial: number, cells: [string, string][]) => ({ serial, cells: cells.map(([slug, hash]) => ({ slug, hash })) });
 

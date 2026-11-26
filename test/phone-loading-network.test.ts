@@ -1,8 +1,8 @@
 import {afterEach, expect, test, vi} from 'vitest';
 import type {Request, Response} from 'playwright';
 import {legacyDouble} from '@wildshard/engine/test/FakeGame';
-import {observeRequests} from '../scripts/phone-loading/network';
-import {NativeSizeLedger} from '../scripts/phone-loading/native-sizes';
+import {observeRequests} from '../src/scripts/phone-loading/network';
+import {NativeSizeLedger} from '../src/scripts/phone-loading/native-sizes';
 
 afterEach(() => {vi.useRealTimers();});
 type Sizes = Awaited<ReturnType<Request['sizes']>>;

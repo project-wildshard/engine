@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
 import { createTempRepo } from '../src/test/helpers/git.ts';
-import { engineRelease } from '../scripts/changelog.mjs';
-import { versionJson } from '../scripts/app-build/versionFiles';
+import { engineRelease } from '../src/scripts/changelog.mjs';
+import { versionJson } from '../src/scripts/app-build/versionFiles';
 
 // STAGING-BUGBASH SB7: staging v0.1.31's pill read v0.1.31 (__ENGINE_RELEASE__, releaseDescribe) while its /version.json said
 // "v0.1.29-153-g5e0fb5efb": version.json took the raw `git describe`, and the release's tag did not exist when it built.

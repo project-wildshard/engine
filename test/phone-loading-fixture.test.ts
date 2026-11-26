@@ -1,6 +1,6 @@
 import {expect, test} from 'vitest';
-import {parseSaveFixture} from '../scripts/phone-loading/fixtures';
-import {writeSaveFixture} from '../scripts/debug-settings.mjs';
+import {parseSaveFixture} from '../src/scripts/phone-loading/fixtures';
+import {writeSaveFixture} from '../src/scripts/debug-settings.mjs';
 
 test('optional fixtures leave the original ruler settings alone', () => {
   expect(parseSaveFixture(undefined)).toBeUndefined();

@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- All fixture files remain under repository scratch.
 import { resolve } from 'node:path';
 import { expect, test } from 'vitest';
-import { readBuiltShardfile } from '../scripts/built-folder.mjs';
+import { readBuiltShardfile } from '../src/scripts/built-folder.mjs';
 
 test('DOM suites can select CI products without loading a build CLI', () => {
   mkdirSync('tmp', { recursive: true });

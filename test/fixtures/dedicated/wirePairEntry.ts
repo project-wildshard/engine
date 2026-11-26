@@ -1,4 +1,4 @@
-// WIRE-STABILITY WR9: one phone of the wire pair. scripts/wire-pair.mjs builds it from one release's own tree, so its NetClient
+// WIRE-STABILITY WR9: one phone of the wire pair. src/scripts/wire-pair.mjs builds it from one release's own tree, so its NetClient
 // and its wire minor are that release's, then runs it beside a room of the other release. It stays one device through every
 // deploy the driver makes: seated and walking, it hears the J174 countdown, is told `restart`, and dials again (once a second,
 // while no room listens) until a room seats it. It reports each seat: the resume the door gave, its first and last pose, the

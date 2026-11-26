@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { expect, test } from 'vitest';
-import { agentUrl } from '../scripts/agent-marker.mjs';
-import { openPhoneBrowser, runNativePhoneCommand } from '../scripts/parity/phone-route-browser.mjs';
+import { agentUrl } from '../src/scripts/agent-marker.mjs';
+import { openPhoneBrowser, runNativePhoneCommand } from '../src/scripts/parity/phone-route-browser.mjs';
 
 test('a cold content visit retains prepared Safari while clearing all game storage before bootstrap', async () => {
   const base = 'http://127.0.0.1:4400/', destination = `${base}?tier=phone`;

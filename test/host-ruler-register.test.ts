@@ -2,7 +2,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Reads the committed register as text.
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
-import { formatRegister, hostRegisterProblems, readHostRegister, RECHECK, REGISTER, type HostRegister, type RegisterRow } from '../scripts/host-ruler/register.mjs';
+import { formatRegister, hostRegisterProblems, readHostRegister, RECHECK, REGISTER, type HostRegister, type RegisterRow } from '../src/scripts/host-ruler/register.mjs';
 
 const register = readHostRegister();
 const from = (line: number) => [{ source: 'list', line, selector: `x${line}` }];

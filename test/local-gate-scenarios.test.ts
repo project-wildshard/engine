@@ -17,8 +17,8 @@ test.each([
 test('selected disk readers require exactly their published products', () => {
   const result = execFileSync('python3', ['-c', `
 import json, runpy
-select = runpy.run_path('scripts/test_products.py')['required_test_products']
-registry = json.load(open('scripts/test-folders.json'))
+select = runpy.run_path('src/scripts/test_products.py')['required_test_products']
+registry = json.load(open('src/scripts/test-folders.json'))
 cases = [
  ['test/template-strikes-hurt.test.ts'],
  ['test/unit.test.ts', 'test/scripts/far-reach-roc.test.ts'],
@@ -51,14 +51,14 @@ test('carriers require their own zero guard and never trust a checkout-only chec
 import json, runpy
 from pathlib import Path
 from tempfile import TemporaryDirectory
-command = runpy.run_path('scripts/test_products.py')['custom_sections_zero_command']
+command = runpy.run_path('src/scripts/test_products.py')['custom_sections_zero_command']
 Path('tmp').mkdir(exist_ok=True)
 with TemporaryDirectory(dir='tmp') as temporary:
  root = Path(temporary).resolve()
  repo, tree, common = root / 'repo', root / 'carrier', root / 'git'
  for folder in [repo, tree]:
-  (folder / 'scripts').mkdir(parents=True)
- checker = 'scripts/check-custom-sections-zero.mjs'
+  (folder / 'src/scripts').mkdir(parents=True)
+ checker = 'src/scripts/check-custom-sections-zero.mjs'
  (repo / checker).write_text('checkout-only checker')
  try:
   command(tree)

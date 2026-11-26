@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { createTempRepo, type TempRepo } from '../src/test/helpers/git.ts';
-import { preparedReleaseFollows } from '../scripts/server-release/history.mjs';
+import { preparedReleaseFollows } from '../src/scripts/server-release/history.mjs';
 
 const manifest = (version: string): string => JSON.stringify({ name: 'release-fixture', version, scripts: { build: 'build' } });
 

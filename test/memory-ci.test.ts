@@ -2,7 +2,7 @@
 // ledger [L] at control and at its peak on ubuntu, (b) native WebKit footprints [K] for Template and Nine on macOS.
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { ledgerPeak, ledgerPeakLines, summaryMarkdown } from '../scripts/memory/measure.mjs';
+import { ledgerPeak, ledgerPeakLines, summaryMarkdown } from '../src/scripts/memory/measure.mjs';
 
 const MB = 1e6;
 const reports = readFileSync(new URL('../.github/workflows/ci-reports.yml', import.meta.url), 'utf8');
@@ -29,10 +29,10 @@ test('the step summary carries each run, the spread and the phone chain', () => 
 test('(b) the macOS job reads Template and Nine in native WebKit, report-only', () => {
   const street = jobs.get('nine-street') ?? '';
   expect(street).toContain('runs-on: macos-15');
-  expect(street).toContain('bash scripts/ci-playwright-install.sh webkit');
-  expect(street).toContain('node scripts/nine-ring1.mjs measure');
+  expect(street).toContain('bash src/scripts/ci-playwright-install.sh webkit');
+  expect(street).toContain('node src/scripts/nine-ring1.mjs measure');
   expect(street).toContain('continue-on-error: true');
-  const ring = readFileSync(new URL('../scripts/nine-ring1.mjs', import.meta.url), 'utf8');
+  const ring = readFileSync(new URL('../src/scripts/nine-ring1.mjs', import.meta.url), 'utf8');
   expect(ring).toContain("for (const chunk of ['brasscap-mesa','nine-dragon-stack'])");
   expect(ring).toContain("'--runs=3'");
 });
@@ -42,7 +42,7 @@ test('(a) the ubuntu job reads Template\'s ledger from the exact client ci built
   expect(ledger).toContain('runs-on: ubuntu-latest');
   expect(ledger).toContain('continue-on-error: true');
   expect(ledger).toContain('name: nine-ring1-client');
-  expect(ledger).toContain('node scripts/nine-ring1.mjs ledger');
+  expect(ledger).toContain('node src/scripts/nine-ring1.mjs ledger');
   const ci = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
   expect(ci).not.toContain('nine-ring1.mjs ledger');
 });

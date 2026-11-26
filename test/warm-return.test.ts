@@ -1,7 +1,7 @@
 // Meta IPHONE13-DRIFTWOOD DW12 / DW11: warm-return.mjs names the WebContent that shows the page from RunningBoard's log, so
 // a round says which process held the cold boot and which the warm one.
 import { expect, test } from 'vitest';
-import { kernelKills, visibleAt, visibleTimeline } from '../scripts/memory/iphone/warm-return.mjs';
+import { kernelKills, visibleAt, visibleTimeline } from '../src/scripts/memory/iphone/warm-return.mjs';
 
 const line = (at: string, pid: number, visible: boolean): string => `Nov 21 ${at}123 runningboardd(RunningBoard)[33] <Notice>: [xpcservice<com.apple.WebKit.WebContent([app<com.apple.mobilesafari(89FE87CF-5BD2-4123-AB39-1C49E6E9CD38)>:45242])>{vt hash: 71395982}[uuid:F36BC23D-1665-4222-8F24-456439511ECC]:${String(pid)}] visiblity is ${visible ? 'yes' : 'no'}`;
 

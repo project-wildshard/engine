@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 import {expect, test, vi} from 'vitest';
-import {comparisons, controlQualification, profiles, readNavigationPanel, record, type Capture, type Run} from '../scripts/phone-loading/model';
+import {comparisons, controlQualification, profiles, readNavigationPanel, record, type Capture, type Run} from '../src/scripts/phone-loading/model';
 import baseline from './fixtures/phone-loading-a6701db71.json';
-import {instrument} from '../scripts/phone-loading/instrument';
-import {observeRequests} from '../scripts/phone-loading/network';
+import {instrument} from '../src/scripts/phone-loading/instrument';
+import {observeRequests} from '../src/scripts/phone-loading/network';
 import type {Request, Response} from 'playwright';
 import {legacyDouble} from '@wildshard/engine/test/FakeGame';
 

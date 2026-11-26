@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-SPEC = importlib.util.spec_from_file_location('smoke_timings', 'scripts/smoke-timings.py')
+SPEC = importlib.util.spec_from_file_location('smoke_timings', 'src/scripts/smoke-timings.py')
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 

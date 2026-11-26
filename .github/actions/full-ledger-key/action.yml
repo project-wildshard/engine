@@ -25,7 +25,7 @@ runs:
       shell: bash
       env:
         CODEC_INPUTS: ${{ hashFiles('src/cook/game/spawnParts.ts', 'src/cook/game/astc6Wasm.ts') }}
-        PART_INPUTS: ${{ hashFiles('test/pins/shardfiles.json', 'test/pins/catalogue.json', 'test/pins/assets.json', 'src/cook/game/entryDownloads.ts', 'src/cook/game/entryTotals.ts', 'src/cook/game/shardCook.ts', 'scripts/app-build/appCook.ts') }}
+        PART_INPUTS: ${{ hashFiles('test/pins/shardfiles.json', 'test/pins/catalogue.json', 'test/pins/assets.json', 'src/cook/game/entryDownloads.ts', 'src/cook/game/entryTotals.ts', 'src/cook/game/shardCook.ts', 'src/scripts/app-build/appCook.ts') }}
       # A key that cannot be read leaves the outputs empty; actions/cache skips an empty restore key, so the job falls
       # back to the older keys and is only slower.
       run: |

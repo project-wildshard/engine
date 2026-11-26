@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
 
-const entry = fileURLToPath(new URL('../scripts/commit.sh', import.meta.url));
+const entry = fileURLToPath(new URL('../src/scripts/.kit/commit.sh', import.meta.url));
 const message = 'test(fixture): commit selected files\n\nAssisted-by: Codex:gpt-6.1-sol';
 
 function fixture(run: (root: string, git: (...args: string[]) => string, commit: (...paths: string[]) => ReturnType<typeof invoke>) => void): void {

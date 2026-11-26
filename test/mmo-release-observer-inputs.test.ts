@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {afterEach,test} from 'vitest';
 import {createServer} from 'node:http';
 import {createHash,generateKeyPairSync,sign} from 'node:crypto';
-import {observationInputs,ObservationRefusedError} from '../scripts/mmo-release-observer-inputs.mjs';
+import {observationInputs,ObservationRefusedError} from '../src/scripts/mmo-release-observer-inputs.mjs';
 
 const closes:(()=>Promise<void>)[]=[];
 afterEach(async()=>{for(const close of closes.splice(0).reverse())await close();});

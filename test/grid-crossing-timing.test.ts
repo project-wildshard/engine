@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import type { LiveGridSessionState } from '../src/client/game/grid/liveSession';
 
-const source = readFileSync(new URL('../scripts/grid-crossing-timing.mjs', import.meta.url), 'utf8');
+const source = readFileSync(new URL('../src/scripts/grid-crossing-timing.mjs', import.meta.url), 'utf8');
 const metric: unknown = runInNewContext(`${source.replace('export function', 'function')}; gridCrossingTiming`);
 if (typeof metric !== 'function') throw new Error('Missing current crossing timing reader');
 const gridCrossingTiming = (state: Pick<LiveGridSessionState, 'crossingTiming' | 'runtimeTiming'>, since: number): unknown =>

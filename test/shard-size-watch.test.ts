@@ -1,5 +1,5 @@
 import {expect, test} from 'vitest';
-import {bookBytes, sizeFindings} from '../scripts/shard-size-watch.mjs';
+import {bookBytes, sizeFindings} from '../src/scripts/shard-size-watch.mjs';
 
 const quiet = {flow: 'pine-hollow:phone', title: 2_700_000, entry: 110_000_000, book: 111_000_000, stoppedOn: 'network idle'};
 

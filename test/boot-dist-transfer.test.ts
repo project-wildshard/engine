@@ -18,7 +18,7 @@ test('exact per-leg archives preserve bytes and refuse corrupt, missing, mixed o
 });
 
 test('boot smoke keeps no title quarantine', () => {
-  const runner = readFileSync('scripts/parity/boot-smoke.mjs', 'utf8');
+  const runner = readFileSync('src/scripts/parity/boot-smoke.mjs', 'utf8');
   expect(runner).not.toContain('quarantinedTitle');
   expect(runner).not.toContain('titleOnly');
   expect(runner).toMatch(/^ {4}await observeTitleCapture\(page, join\(out, `\$\{receipt\}-title`\), \(\) => captureBootFrame\(page, 'title', deadline, frames\)\);$/mu);
@@ -32,7 +32,7 @@ test('every boot-dist leg is a subset of the complete hover-webkit world closure
     for(const [slug,status,order] of [['sunscar-dunes','live',1],['nine-dragon-stack','experimental',2]] as const){
       const directory=resolve(root,'src/shards',slug);mkdirSync(directory,{recursive:true});writeFileSync(resolve(directory,'manifest.json'),JSON.stringify(manifest(slug,status,order)));
     }
-    const result=spawnSync(process.execPath,['scripts/boot-dist-plan.mjs',root],{encoding:'utf8',timeout:10000});
+    const result=spawnSync(process.execPath,['src/scripts/boot-dist-plan.mjs',root],{encoding:'utf8',timeout:10000});
     expect(result.status,result.stderr).toBe(0);
     const plan=v.parse(v.record(v.string(),v.array(v.string())),JSON.parse(result.stdout));
     const worlds=plan['hover-webkit'];if(worlds===undefined)throw new Error('Missing complete world closure');

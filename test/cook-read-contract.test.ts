@@ -5,8 +5,8 @@ import {tmpdir} from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- This test bakes a build folder of its own from a real cook.
 import {dirname, join} from 'node:path';
 import {describe, expect, it} from 'vitest';
-import {addCookedShards} from '../scripts/app-build/catalogue';
-import {stampBuildHtml} from '../scripts/app-build/buildIdentity.mjs';
+import {addCookedShards} from '../src/scripts/app-build/catalogue';
+import {stampBuildHtml} from '../src/scripts/app-build/buildIdentity.mjs';
 import {indexKey, type CookIndex} from '../src/cook/game/cookWorker';
 import {packsBookPath} from '../src/shared/game/shardfile/spawnManifest';
 import type {TitleManifest} from '../src/client/game/shard/titleList';
@@ -36,7 +36,7 @@ describe('the cook writer and the title reader agree on paths', () => {
     const loose = index.loose ?? '';
     const out = mkdtempSync(join(tmpdir(), 'cook-read-contract-'));
     try {
-      // The bake's own steps for a stored cook (scripts/app-build/catalogue.ts addStoredShards): the manifests beside the
+      // The bake's own steps for a stored cook (src/scripts/app-build/catalogue.ts addStoredShards): the manifests beside the
       // build, the discovery document from the cook's upload folder, and the home that names that folder.
       for (const row of index.manifests) {
         mkdirSync(dirname(join(out, row.url)), {recursive: true});

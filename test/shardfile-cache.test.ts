@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, 
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
 import { dirname, join, resolve } from 'node:path';
 import { afterEach, expect, it } from 'vitest';
-import { borrowShardfileEntry, pruneShardfileCache, reuseOrBuild, shardfileKey, treeHashes } from '../scripts/shardfile-cache.mjs';
+import { borrowShardfileEntry, pruneShardfileCache, reuseOrBuild, shardfileKey, treeHashes } from '../src/scripts/shardfile-cache.mjs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Pin this test's actual live reader, not a fictitious owner.
 import { pid } from 'node:process';
 

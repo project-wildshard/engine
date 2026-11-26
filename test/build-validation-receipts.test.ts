@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Verify the exact index bytes with the production receipt hash.
 import { createHash } from 'node:crypto';
 import { afterEach, expect, test } from 'vitest';
-import { buildValidationReceipts } from '../scripts/app-build/validationReceipts.mjs';
+import { buildValidationReceipts } from '../src/scripts/app-build/validationReceipts.mjs';
 import { readValidationReceipt } from '@wildshard/format/validationReceipt';
 
 const owned: string[] = [];

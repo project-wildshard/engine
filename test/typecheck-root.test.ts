@@ -11,10 +11,10 @@ import { expect, test } from 'vitest';
 test('local checks reuse the scenario build, CI forces checks and failures propagate',()=>{
  mkdirSync('tmp',{recursive:true});const fixture=mkdtempSync(resolve('tmp','root-check-'));
  try{
-  mkdirSync(resolve(fixture,'scripts'));mkdirSync(resolve(fixture,'node_modules/.bin'),{recursive:true});
-  writeFileSync(resolve(fixture,'scripts/typecheck-root.mjs'),readFileSync('scripts/typecheck-root.mjs'));
+  mkdirSync(resolve(fixture,'src/scripts'),{recursive:true});mkdirSync(resolve(fixture,'node_modules/.bin'),{recursive:true});
+  writeFileSync(resolve(fixture,'src/scripts/typecheck-root.mjs'),readFileSync('src/scripts/typecheck-root.mjs'));
   writeFileSync(resolve(fixture,'node_modules/.bin/npr'),`#!/usr/bin/env node\nrequire('node:fs').writeFileSync('args.json',JSON.stringify(process.argv.slice(2)));process.exit(Number(process.env.COMPILER_STATUS??0));\n`,{mode:0o755});
-  const run=(environment:Record<string,string>,args:string[]=[])=>spawnSync(execPath,['scripts/typecheck-root.mjs',...args],{cwd:fixture,encoding:'utf8',env:{PATH:env['PATH']??'',...environment}});
+  const run=(environment:Record<string,string>,args:string[]=[])=>spawnSync(execPath,['src/scripts/typecheck-root.mjs',...args],{cwd:fixture,encoding:'utf8',env:{PATH:env['PATH']??'',...environment}});
   expect(run({}).status).toBe(0);
   expect(JSON.parse(readFileSync(resolve(fixture,'args.json'),'utf8'))).toEqual(['tsc','-b','test/tsconfig.json','--builders','1']);
   for(const environment of [{CI:'true'},{GITHUB_ACTIONS:'true'}]){

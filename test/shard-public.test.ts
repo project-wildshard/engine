@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- The publisher writes real files.
 import { dirname, join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { GATHERED_SHARDS, entryReadsFile, publishShardFiles } from '../scripts/shard-public.mjs';
+import { GATHERED_SHARDS, entryReadsFile, publishShardFiles } from '../src/scripts/shard-public.mjs';
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });

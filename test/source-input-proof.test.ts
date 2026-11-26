@@ -5,8 +5,8 @@ import {execFileSync} from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve only the owned fixture paths.
 import {resolve} from 'node:path';
 import {afterEach,expect,it} from 'vitest';
-import {InputHashMemo,bakeInputHashes} from '../scripts/bake-input-hashes.mjs';
-import {beginProgramInputProof,sourceSnapshotIdentity,publishSourceSnapshot,verifiedSourceSnapshot,committedSourceFiles} from '../scripts/source-input-proof.mjs';
+import {InputHashMemo,bakeInputHashes} from '../src/scripts/bake-input-hashes.mjs';
+import {beginProgramInputProof,sourceSnapshotIdentity,publishSourceSnapshot,verifiedSourceSnapshot,committedSourceFiles} from '../src/scripts/source-input-proof.mjs';
 
 const owned:string[]=[];
 afterEach(()=>{for(const root of owned.splice(0))rmSync(root,{recursive:true,force:true});});
@@ -64,10 +64,10 @@ it('refuses to publish changed source bytes or an unverified local output',()=>{
 
 function checkout() {
   mkdirSync('tmp',{recursive:true});const root=realpathSync(mkdtempSync(resolve('tmp/generation-checkout-')));owned.push(root);
-  mkdirSync(resolve(root,'scripts'));mkdirSync(resolve(root,'src'));mkdirSync(resolve(root,'.cache'));
-  writeFileSync(resolve(root,'scripts/source-generation-outputs.json'),'{"producers":{}}');writeFileSync(resolve(root,'src/a.ts'),'a');
+  mkdirSync(resolve(root,'src/scripts'),{recursive:true});mkdirSync(resolve(root,'.cache'));
+  writeFileSync(resolve(root,'src/scripts/source-generation-outputs.json'),'{"producers":{}}');writeFileSync(resolve(root,'src/a.ts'),'a');
   const git=(...args:string[])=>execFileSync('git',['-c','user.name=fixture','-c','user.email=fixture@example.test','-c','commit.gpgsign=false',...args],{cwd:root,stdio:'ignore'});
-  const commit=(message:string)=>{git('add','src','scripts');git('commit','--no-verify','-m',message);};
+  const commit=(message:string)=>{git('add','src');git('commit','--no-verify','-m',message);};
   git('init');commit('first');
   return {root,commit,receipt:resolve(root,'.cache/generation-phase.json')};
 }

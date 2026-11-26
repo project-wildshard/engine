@@ -1,7 +1,7 @@
 import { expect, test, vi } from 'vitest';
 import type { Page } from 'playwright';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
-import { busiestLeaves, busiestWindow, CLOCK_MARK, finishStallProfile, idleWithin, PLAY_BUSY_SHARE, playStall, playStallFaults, profileAnchor, profileBusy, profileIdle, stageStalls, stageGaps, stallFaults, STALL_IDLE_SHARE, STALL_WINDOW_MS } from '../scripts/loading-flow/stalls.mjs';
+import { busiestLeaves, busiestWindow, CLOCK_MARK, finishStallProfile, idleWithin, PLAY_BUSY_SHARE, playStall, playStallFaults, profileAnchor, profileBusy, profileIdle, stageStalls, stageGaps, stallFaults, STALL_IDLE_SHARE, STALL_WINDOW_MS } from '../src/scripts/loading-flow/stalls.mjs';
 
 test('NB13: home gaps ignore broad parents and union actual waits at the stage edges', () => {
   const row = (operation: string, start: number, end: number | null, realm = 'page') => ({operation, start, end, realm});
@@ -17,7 +17,7 @@ test('NB13: home gaps ignore broad parents and union actual waits at the stage e
   expect(stageGaps(entries, 'missing')).toEqual([]);
 });
 
-// NINE-DRAGON-BENCHMAX NB6: the ring-1 boot smoke's props stall ratchet (scripts/loading-flow/stalls.mjs)
+// NINE-DRAGON-BENCHMAX NB6: the ring-1 boot smoke's props stall ratchet (src/scripts/loading-flow/stalls.mjs)
 const props = (start: number, ms: number) => ({ operation: 'stage:props', realm: 'page', start, end: start + ms });
 const limit = STALL_WINDOW_MS * STALL_IDLE_SHARE;
 

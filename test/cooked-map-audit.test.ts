@@ -1,7 +1,7 @@
 // MAP-NEXT MN4 and MN6 (J450): the cooked-map audit reads each channel's build, placed cells and catalogue heads, then each head's
 // cook index, and names every head a page would draw without its map. It never touches the network here.
 import {expect, test} from 'vitest';
-import {auditCookedMaps, auditLines, mapKeys, MISSING} from '../scripts/cooked-map-audit.mjs';
+import {auditCookedMaps, auditLines, mapKeys, MISSING} from '../src/scripts/cooked-map-audit.mjs';
 
 const hash = (n: number): string => n.toString(16).padStart(64, '0');
 const PACKS = 'https://packs.test/', API = 'https://api.test', origins = {production: 'https://play.test', staging: 'https://staging.test'} as const;

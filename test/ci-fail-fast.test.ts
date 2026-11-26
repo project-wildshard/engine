@@ -4,7 +4,7 @@ import { expect, test } from 'vitest';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Paths refer only to the owned temporary test directory.
 import { resolve } from 'node:path';
-import { runChecks } from '../scripts/ci-checks.mjs';
+import { runChecks } from '../src/scripts/ci-checks.mjs';
 
 
 test('a first parallel check failure cancels its owned sibling before a later side effect', async () => {

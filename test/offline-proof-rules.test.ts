@@ -1,6 +1,6 @@
-// OFFLINE OF1: the offline proof's pass and fail rules (scripts/offline-proof-rules.mjs) on a saved request log.
+// OFFLINE OF1: the offline proof's pass and fail rules (src/scripts/offline-proof-rules.mjs) on a saved request log.
 import { describe, expect, it } from 'vitest';
-import { ALL_SHARDS, gridPlaces, judge, mayFail, screenKey, servedCounts, type RequestRow, type ScreenSample } from '../scripts/offline-proof-rules.mjs';
+import { ALL_SHARDS, gridPlaces, judge, mayFail, screenKey, servedCounts, type RequestRow, type ScreenSample } from '../src/scripts/offline-proof-rules.mjs';
 import catalogue from '../test/pins/catalogue.json' with { type: 'json' };
 
 const at = 'http://127.0.0.1:4401';

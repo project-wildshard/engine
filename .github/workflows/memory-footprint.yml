@@ -58,12 +58,12 @@ jobs:
         id: policy
         if: steps.source.outputs.artifact == 'true'
         run: |
-          armed=$(node --input-type=module -e 'import {armedMemory} from "./scripts/memory/armed.mjs"; console.log(armedMemory().zones.size > 0)')
+          armed=$(node --input-type=module -e 'import {armedMemory} from "./src/scripts/memory/armed.mjs"; console.log(armedMemory().zones.size > 0)')
           printf 'armed=%s\n' "$armed" >> "$GITHUB_OUTPUT"
           # With an empty policy, ci-reports owns the advisory native readings.
           if [[ "$armed" != true ]]; then echo "::notice::no armed zone; nothing to guard"; fi
       - if: steps.policy.outputs.armed == 'true'
-        run: node scripts/scratch-dir.mjs memory-footprint 'EM36 native WebKit footprint'
+        run: node src/scripts/.kit/scratch-dir.mjs memory-footprint 'EM36 native WebKit footprint'
       - name: Record the native measurement host
         if: steps.policy.outputs.armed == 'true'
         run: sw_vers
@@ -80,7 +80,7 @@ jobs:
         run: |
           tar -xf tmp/memory-footprint/client.tar
           rm tmp/memory-footprint/client.tar
-          bash scripts/ci-playwright-install.sh webkit
+          bash src/scripts/ci-playwright-install.sh webkit
       - name: Check armed native footprints and report Template
         if: steps.policy.outputs.armed == 'true'
         env:
@@ -88,7 +88,7 @@ jobs:
         run: |
           record=()
           if [[ "$MEMORY_RECORD" == true ]]; then record+=(--record); fi
-          node scripts/memory/ci.mjs footprint tmp/memory-ledger/preview tmp/memory-footprint/readings "${record[@]}"
+          node src/scripts/memory/ci.mjs footprint tmp/memory-ledger/preview tmp/memory-footprint/readings "${record[@]}"
       - name: Check or report Nine's online native WebKit ledger
         if: ${{ !cancelled() && steps.native-client.outcome == 'success' }}
         env:
@@ -96,7 +96,7 @@ jobs:
         run: |
           record=()
           if [[ "$MEMORY_RECORD" == true ]]; then record+=(--record); fi
-          node scripts/memory/ci.mjs webkit-ledger tmp/memory-ledger/preview tmp/memory-footprint/nine-ledger "${record[@]}"
+          node src/scripts/memory/ci.mjs webkit-ledger tmp/memory-ledger/preview tmp/memory-footprint/nine-ledger "${record[@]}"
       # MEMORY-STRUCTURE STR22: Nine's 60 s walk on the online boot; its allocation rate [S] is judged through the budget
       # verdict (walk/nine-dragon-stack/rate, BUDGET-CAPS BC11) and WebKit's WebContent peak above settled [K] is reported.
       # A confirmed regression fails this advisory run (a fix row); a walk that never completes is a warning, not a verdict.
@@ -106,15 +106,15 @@ jobs:
           MEMORY_RECORD: ${{ inputs.memory_record }}
         run: |
           # an older source commit (a ci run queued before STR22 landed) has no walk meter: nothing to judge (44448117281)
-          if [[ ! -f scripts/memory/walk-ci.mjs ]]; then echo "::notice::source commit has no scripts/memory/walk-ci.mjs; walk not judged"; exit 0; fi
+          if [[ ! -f src/scripts/memory/walk-ci.mjs ]]; then echo "::notice::source commit has no src/scripts/memory/walk-ci.mjs; walk not judged"; exit 0; fi
           # the [S] walk launches Playwright's default headless Chromium, the headless shell (44452949533 had only the full
           # browser and judged nothing)
-          bash scripts/ci-playwright-install.sh chromium
+          bash src/scripts/ci-playwright-install.sh chromium
           record=()
           if [[ "$MEMORY_RECORD" == true ]]; then record+=(--record); fi
-          node scripts/memory/walk-ci.mjs tmp/memory-ledger/preview tmp/memory-footprint/walk "${record[@]}"
+          node src/scripts/memory/walk-ci.mjs tmp/memory-ledger/preview tmp/memory-footprint/walk "${record[@]}"
       # BUDGET-CAPS BC11: every judged footprint, Nine ledger and walk row in one measures file, as a `budgets` artifact
-      # (budgets/measures.json), so a pin lane records the new content with `node scripts/budgets/cli.mjs record --run <id>`.
+      # (budgets/measures.json), so a pin lane records the new content with `node src/scripts/budgets/cli.mjs record --run <id>`.
       - name: Gather the budget measures
         id: measures
         if: always() && steps.native-client.outcome == 'success'
@@ -125,7 +125,7 @@ jobs:
           done
           if [[ ${#inputs[@]} -eq 0 ]]; then echo "::notice::no budget measures to gather"; exit 0; fi
           mkdir -p tmp/budgets
-          node scripts/budgets/cli.mjs merge tmp/budgets/measures.json "${inputs[@]}"
+          node src/scripts/budgets/cli.mjs merge tmp/budgets/measures.json "${inputs[@]}"
           cp tmp/budgets/measures.json tmp/memory-footprint/budget-measures.json
       - if: always() && steps.measures.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

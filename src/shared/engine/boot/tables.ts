@@ -1,9 +1,9 @@
 /**
  * The app's asset tables (E405 E415): every shipped file's size and content hash, the music and sound-effect
  * manifests, and each level's boot pack. They list the game's own files (every shard's folders), so they are the
- * game's: scripts/app-build/gen.ts and scripts/bake-packs.mjs write them to src/client/game/boot/*.generated.ts, and the page entry
+ * game's: src/scripts/app-build/gen.ts and scripts/bake-packs.mjs write them to src/client/game/boot/*.generated.ts, and the page entry
  * fetches them after selection, before gameplay imports (a Node bake gets them through
- * scripts/bake-loader.mjs). The engine reads them through these accessors, never by importing a table.
+ * src/scripts/bake-loader.mjs). The engine reads them through these accessors, never by importing a table.
  *
  * Like the identity, they sit in one global slot, so a test that resets its modules still sees them; nothing has a
  * default (an empty table would make every declared boot file look missing).

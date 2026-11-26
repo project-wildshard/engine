@@ -8,10 +8,10 @@ import {join, resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- The CLI's usage check runs as a child, before any git or host call.
 import {spawnSync} from 'node:child_process';
 import {afterEach, expect, test} from 'vitest';
-import {CHANNELS, CHECKED_DOCUMENTS, PHASES, PUBLIC_ROOMS, QA_LEGS, RELEASE_PUBLIC_KEY, qaGap, pinnedReleaseKey, RefusedError, runPhase, type Channel, type Deps, type PageHost, type Phase} from '../scripts/page-release/flow.mjs';
-import {runRedacted} from '../scripts/page-release/redact.mjs';
-import {CONFIG, WORKERS, isVersionUrl, workersHost} from '../scripts/page-release/hosts/workers.mjs';
-import {measureAssets} from '../scripts/app-build/assetLimits.mjs';
+import {CHANNELS, CHECKED_DOCUMENTS, PHASES, PUBLIC_ROOMS, QA_LEGS, RELEASE_PUBLIC_KEY, qaGap, pinnedReleaseKey, RefusedError, runPhase, type Channel, type Deps, type PageHost, type Phase} from '../src/scripts/page-release/flow.mjs';
+import {runRedacted} from '../src/scripts/page-release/redact.mjs';
+import {CONFIG, WORKERS, isVersionUrl, workersHost} from '../src/scripts/page-release/hosts/workers.mjs';
+import {measureAssets} from '../src/scripts/app-build/assetLimits.mjs';
 
 const build = 'a'.repeat(40);
 const zoneEntry = (on = build) => ({build:on, engine:'webkit', profile:'phone', pass:true, expected:2, arrivals:[
@@ -116,13 +116,13 @@ test('the four phases run in order and move the alias last', async () => {
   const {deps, calls, lines} = rig();
   await through(deps, 'go-live');
   expect(fetched(calls)).toEqual([
-    'prepare', 'run pnpm build:game', 'run node scripts/app-build/splitOutput.mjs dist --join', 'package', 'state build',
+    'prepare', 'run pnpm build:game', 'run node src/scripts/app-build/splitOutput.mjs dist --join', 'package', 'state build',
     'packs.publish', 'upload', 'state upload',
-    'run node scripts/release-cook.mjs --staging --build=' + build,
-    'run node --import ./scripts/bake-loader.mjs scripts/release-placed-ready.mjs staging',
+    'run node src/scripts/release-cook.mjs --staging --build=' + build,
+    'run node --import ./src/scripts/bake-loader.mjs src/scripts/release-placed-ready.mjs staging',
     'deployedDigests', 'packs.verify', 'state check',
-    'run node --import ./scripts/bake-loader.mjs scripts/release-placed-ready.mjs staging',
-    'deployedDigests', 'run node scripts/release-cook.mjs --staging --build=' + build, 'goLive', 'state go-live',
+    'run node --import ./src/scripts/bake-loader.mjs src/scripts/release-placed-ready.mjs staging',
+    'deployedDigests', 'run node src/scripts/release-cook.mjs --staging --build=' + build, 'goLive', 'state go-live',
   ]);
   expect(lines.some(line => line.includes('alias last'))).toBe(true);
 });
@@ -169,7 +169,7 @@ test('--content publishes the content set before the packs and the page (PAGE-SI
   const stamped = Buffer.from(`${String(files.get('/out/index.html'))}<script type="application/json" id="boot-module-files">{"contentBase":"https://packs.wildshard.io/content/0123456789abcdef/"}</script>`);
   files.set('/out/index.html', stamped);
   await through(deps, 'upload');
-  expect(fetched(calls)).toEqual(['prepare', 'run pnpm build:game', 'run node --import ./scripts/bake-loader.mjs scripts/page-release/stamp-content.mjs dist', 'package', 'state build', 'content.publish', 'packs.publish', 'upload', 'state upload']);
+  expect(fetched(calls)).toEqual(['prepare', 'run pnpm build:game', 'run node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/stamp-content.mjs dist', 'package', 'state build', 'content.publish', 'packs.publish', 'upload', 'state upload']);
   expect(seen).toEqual([{dir: '/out-content', cors: CHANNELS.staging.origin, dryRun: false}]);
   expect(state['build']).toMatchObject({contentBase: 'https://packs.wildshard.io/content/0123456789abcdef/'});
   deps.content = {publish: () => Promise.resolve({set: 's', base: 'b', files: 5, bytes: 50, uploaded: 1, uploadedBytes: 10, held: 3, cors: CHANNELS.staging.origin})};
@@ -285,12 +285,12 @@ test('staging moves the cook once the new rooms release is signed, before waitin
     return Promise.resolve();
   };
   await runPhase('check', deps);
-  const move = 'run node scripts/release-cook.mjs --staging --build=' + build;
+  const move = 'run node src/scripts/release-cook.mjs --staging --build=' + build;
   const health = 'fetch ' + CHANNELS.staging.health;
   expect(calls.filter(call => call === move)).toHaveLength(1);
   expect(calls.indexOf(move)).toBeGreaterThan(calls.indexOf('new rooms release signed'));
   expect(calls.indexOf(move)).toBeLessThan(calls.indexOf(health));
-  expect(calls.indexOf(move)).toBeLessThan(calls.indexOf('run node --import ./scripts/bake-loader.mjs scripts/release-placed-ready.mjs staging'));
+  expect(calls.indexOf(move)).toBeLessThan(calls.indexOf('run node --import ./src/scripts/bake-loader.mjs src/scripts/release-placed-ready.mjs staging'));
 });
 
 test('check refuses when the uploaded bytes differ from the local build', async () => {
@@ -402,7 +402,7 @@ test('child output reaches the terminal with the token replaced', () => {
 
 test('every channel has one page host, workers: any other --host is a usage error (OFF-VERCEL OV9)', () => {
   for (const channel of ['preview', 'staging', 'production']) {
-    const old = spawnSync(process.execPath, ['scripts/page-release.mjs', channel, 'build', '--host=old', '--dry-run'], {encoding: 'utf8', timeout: 20_000});
+    const old = spawnSync(process.execPath, ['src/scripts/page-release.mjs', channel, 'build', '--host=old', '--dry-run'], {encoding: 'utf8', timeout: 20_000});
     expect(old.status, old.stderr).toBe(2);
     expect(old.stderr).toContain('[--host=workers]');
   }
@@ -410,7 +410,7 @@ test('every channel has one page host, workers: any other --host is a usage erro
 
 test('--print-env: the three channels build alike but for named keys (PAGE-SIZE PZ6)', () => {
   const envs = Object.fromEntries((['preview', 'staging', 'production'] as const).map(channel => {
-    const run = spawnSync(process.execPath, ['scripts/page-release.mjs', '--print-env', channel], {encoding: 'utf8', timeout: 20_000});
+    const run = spawnSync(process.execPath, ['src/scripts/page-release.mjs', '--print-env', channel], {encoding: 'utf8', timeout: 20_000});
     expect(run.status, run.stderr).toBe(0);
     return [channel, new Map(run.stdout.trim().split('\n').map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]))];
   }));
@@ -421,10 +421,10 @@ test('--print-env: the three channels build alike but for named keys (PAGE-SIZE 
   expect(differing).toEqual(['WILDSHARD_RELEASE_URL', 'WS_CHANNEL', 'WS_PREVIOUS_DEPLOY_ORIGIN']);
   expect(envs['preview']?.get('WS_PREVIOUS_DEPLOY_ORIGIN')).toBe(CHANNELS.preview.origin);
   for (const bad of [['nowhere'], ['toString'], ['staging', '--catalogue=x.json']]) {
-    const run = spawnSync(process.execPath, ['scripts/page-release.mjs', '--print-env', ...bad], {encoding: 'utf8', timeout: 20_000});
+    const run = spawnSync(process.execPath, ['src/scripts/page-release.mjs', '--print-env', ...bad], {encoding: 'utf8', timeout: 20_000});
     expect(run.status, bad.join(' ')).toBe(2);
   }
-  const borrowed = spawnSync(process.execPath, ['scripts/page-release.mjs', '--print-env', 'preview', '--catalogue=x.json'], {encoding: 'utf8', timeout: 20_000});
+  const borrowed = spawnSync(process.execPath, ['src/scripts/page-release.mjs', '--print-env', 'preview', '--catalogue=x.json'], {encoding: 'utf8', timeout: 20_000});
   expect(borrowed.stdout).toContain(`WILDSHARD_CATALOGUE=${resolve('x.json')}`);
 });
 
@@ -435,9 +435,9 @@ test('preview signs a deployment gate while its page stays solo and the alias mo
   deps.run = (file, args, env) => { seen.push(env); run(file, args, env); };
   await through(deps, 'go-live');
   expect(fetched(calls)).toEqual([
-    'prepare', 'run pnpm build:game', 'run node scripts/app-build/splitOutput.mjs dist --join', 'package', 'state build',
+    'prepare', 'run pnpm build:game', 'run node src/scripts/app-build/splitOutput.mjs dist --join', 'package', 'state build',
     'upload', 'state upload',
-    'deployedDigests', `run node --import ./scripts/bake-loader.mjs scripts/page-release/preview.mjs --build=${build}`, 'state check',
+    'deployedDigests', `run node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/preview.mjs --build=${build}`, 'state check',
     'deployedDigests', 'goLive', 'state go-live',
   ]);
   // The deploy reads the signed file; no rooms or health reads.
@@ -654,7 +654,7 @@ test('page publication configuration cannot replace the pinned trust root', () =
   for (const value of [undefined, '', '  ', RELEASE_PUBLIC_KEY, `  ${RELEASE_PUBLIC_KEY} `]) expect(pinnedReleaseKey(value)).toBe(RELEASE_PUBLIC_KEY);
   expect(() => pinnedReleaseKey(key)).toThrow('differs from the pinned release key');
   for (const channel of ['preview', 'staging', 'production']) {
-    const run = spawnSync(process.execPath, ['scripts/page-release.mjs', '--print-env', channel], {
+    const run = spawnSync(process.execPath, ['src/scripts/page-release.mjs', '--print-env', channel], {
       encoding: 'utf8', timeout: 20_000, env: {...process.env, E7_RELEASE_PUBLIC_KEY: key},
     });
     expect(run.status).not.toBe(0); expect(run.stderr).toContain('differs from the pinned release key');
@@ -668,13 +668,13 @@ test('retention-enabled publisher signs before packaging and gates alias on its 
   const run = deps.run;
   deps.run = (file, args, env) => {
     run(file, args, env);
-    if (args[0] === 'scripts/code-retention.mjs') {
+    if (args[0] === 'src/scripts/code-retention.mjs') {
       files.set('/out/code-retention.json', Buffer.from('signed retained-code graph'));
       deployedFiles.set('/out/code-retention.json', Buffer.from('signed retained-code graph'));
     }
   };
   await through(deps, 'check');
-  expect(calls.indexOf('run node scripts/code-retention.mjs /out staging')).toBeLessThan(calls.indexOf('package'));
+  expect(calls.indexOf('run node src/scripts/code-retention.mjs /out staging')).toBeLessThan(calls.indexOf('package'));
   deployedFiles.set('/out/code-retention.json', Buffer.from('different graph'));
   await expect(runPhase('go-live', deps)).rejects.toThrow('code-retention.json');
   expect(calls).not.toContain('goLive');
@@ -685,7 +685,7 @@ test('an unready placed head stops the staging check before acceptance', async (
   await through(rig_.deps, 'upload');
   const guarded: Deps = {...rig_.deps, run: (file, args, env) => {
     rig_.deps.run(file, args, env);
-    if (args.includes('scripts/release-placed-ready.mjs')) throw new Error('placed head has no exact-build index');
+    if (args.includes('src/scripts/release-placed-ready.mjs')) throw new Error('placed head has no exact-build index');
   }};
   await expect(runPhase('check', guarded)).rejects.toThrow('placed head has no exact-build index');
   expect(rig_.state['check']).toBeUndefined();
@@ -697,7 +697,7 @@ test('a placement changes after check: staging rechecks it before aliasing', asy
   await through(rig_.deps, 'check');
   const guarded: Deps = {...rig_.deps, run: (file, args, env) => {
     rig_.deps.run(file, args, env);
-    if (args.includes('scripts/release-placed-ready.mjs')) throw new Error('new placed head is unready');
+    if (args.includes('src/scripts/release-placed-ready.mjs')) throw new Error('new placed head is unready');
   }};
   await expect(runPhase('go-live', guarded)).rejects.toThrow('new placed head is unready');
   expect(rig_.calls).not.toContain('goLive');
@@ -708,7 +708,7 @@ test('staging cannot move the alias while the cook still runs the previous build
   await through(rig_.deps, 'check');
   const guarded: Deps = {...rig_.deps, run: (file, args, env) => {
     rig_.deps.run(file, args, env);
-    if (args.includes('scripts/release-cook.mjs')) throw new Error('cook is not staging');
+    if (args.includes('src/scripts/release-cook.mjs')) throw new Error('cook is not staging');
   }};
   await expect(runPhase('go-live', guarded)).rejects.toThrow('cook is not staging');
   expect(rig_.calls).not.toContain('goLive');

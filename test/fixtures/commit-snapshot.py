@@ -14,7 +14,7 @@ import time
 
 source = Path(sys.argv[1]).resolve()
 wrapper_text = sys.stdin.read() if len(sys.argv) > 2 and sys.argv[2] == '-' else None
-wrapper = Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else source / 'scripts/commit.sh'
+wrapper = Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else source / 'src/scripts/.kit/commit.sh'
 env = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
 CASES = ['none', 'disjoint', 'dependency', 'stage', 'working', 'candidate', 'red', 'message', 'late-index', 'budget', 'syntax-body', 'syntax-edge']
 
@@ -35,12 +35,12 @@ def check_cases(cases):
         (root / 'scripts').mkdir()
         (root / 'node_modules/@typescript').mkdir(parents=True)
         (root / 'node_modules/@typescript/typescript6').symlink_to((source / 'node_modules/@typescript/typescript6').resolve())
-        shutil.copy2(source / 'scripts/repo-size.mjs', root / 'scripts/repo-size.mjs')
+        shutil.copy2(source / 'src/scripts/repo-size.mjs', root / 'src/scripts/repo-size.mjs')
         if wrapper_text is None:
-            shutil.copy2(wrapper, root / 'scripts/commit.sh')
+            shutil.copy2(wrapper, root / 'src/scripts/.kit/commit.sh')
         else:
-            (root / 'scripts/commit.sh').write_text(wrapper_text)
-            (root / 'scripts/commit.sh').chmod(0o755)
+            (root / 'src/scripts/.kit/commit.sh').write_text(wrapper_text)
+            (root / 'src/scripts/.kit/commit.sh').chmod(0o755)
         (root / '.githooks').mkdir()
         hook = root / '.githooks/pre-commit'
         hook.write_text('''#!/usr/bin/env python3
@@ -82,7 +82,7 @@ sys.exit(1 if os.environ.get('MESSAGE_RED') else 0)
             if action == 'budget':
                 (root / 'own.bin').write_text('binary change\n')
                 paths.append('own.bin')
-            child = subprocess.Popen(['scripts/commit.sh', 'fixture ' + action, '--', *paths], cwd=root,
+            child = subprocess.Popen(['src/scripts/.kit/commit.sh', 'fixture ' + action, '--', *paths], cwd=root,
                 env={**env, **({'MUTATE_CANDIDATE':'1'} if action == 'candidate' else {}),
                      **({'HOOK_RED':'1'} if action == 'red' else {}), **({'MESSAGE_RED':'1'} if action == 'message' else {}),
                      **({'MESSAGE_MUTATE':'1'} if action == 'late-index' else {}), **({'BUDGET_MOVE':'1'} if action == 'budget' else {}),

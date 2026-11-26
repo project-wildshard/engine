@@ -9,7 +9,7 @@ import {pathToFileURL} from 'node:url';
 import {expect,test} from 'vitest';
 
 test('actual practice inputs lend the admitted rifle and revoke it on exit without permanent ownership',async({signal})=>{
-  const child=await promisify(execFile)(process.execPath,['--import',pathToFileURL(resolve('scripts/sim-node-loader.mjs')).href,
+  const child=await promisify(execFile)(process.execPath,['--import',pathToFileURL(resolve('src/scripts/sim-node-loader.mjs')).href,
     resolve('test/fixtures/headless/nalati-practice-run.ts')],{encoding:'utf8',timeout:60_000,signal});
   expect(child.stdout).toContain('"story":"native-practice-loan"');
 },65_000); // Cold product admission, independent replay, restore and worker retirement exceeded 30 s on CI.

@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 import { parseManifestMetadata } from '@wildshard/format/minimap';
 import { defineAuthoredShard, declaredForestQueries, declaredGround } from '../src/client/game/shard/manifest';
 import { toLevelSpec } from '../src/client/game/shard/spec';
-import { authoredManifestSource } from '../scripts/authored-manifest.mjs';
+import { authoredManifestSource } from '../src/scripts/authored-manifest.mjs';
 import { fixtureManifest } from './fixtures/manifest-metadata';
 
 const root = resolve(import.meta.dirname, '..');

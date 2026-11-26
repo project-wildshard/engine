@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { sceneSourceUrls } from '../scripts/app-build/bootExtras';
+import { sceneSourceUrls } from '../src/scripts/app-build/bootExtras';
 
 test('lists exactly the model reader preloads, deduplicating URLs and excluding unused mappings/specimen metadata', () => {
   expect(sceneSourceUrls('models', { rows: {

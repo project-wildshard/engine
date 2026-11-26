@@ -7,8 +7,8 @@ import { setTimeout as delay } from 'node:timers/promises';
 // oxlint-disable-next-line import/no-nodejs-modules -- Identify the owned fixture lock holder.
 import { pid } from 'node:process';
 import { afterEach, expect, it } from 'vitest';
-import { bakeInputHashes } from '../scripts/bake-input-hashes.mjs';
-import { pruneRecorderCache, runNativeRecorder } from '../scripts/native-recorder-cache.mjs';
+import { bakeInputHashes } from '../src/scripts/bake-input-hashes.mjs';
+import { pruneRecorderCache, runNativeRecorder } from '../src/scripts/native-recorder-cache.mjs';
 
 const owned: string[]=[];
 afterEach(()=>{for(const root of owned.splice(0))rmSync(root,{recursive:true,force:true});});

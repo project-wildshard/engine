@@ -3,18 +3,18 @@ import {availableParallelism,constants,getPriority,homedir,loadavg} from 'node:o
 import {appendFileSync,mkdirSync,readFileSync,rmSync} from 'node:fs';
 import {dirname,join,resolve,delimiter} from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {assertHeavyLease} from '../scripts/heavy-lane-lease.mjs';
-import {gateSlot} from '../scripts/push-gate-slot.mjs';
-import {PUSH_BUDGET, PUSH_PROFILE, SPLIT_PROFILE} from '../scripts/push-budget.mjs';
-import {BROWSER_TESTS,TIMING_TESTS,logHostedOnly,planBaseRefs,splitLocalTests,splitRequested} from '../scripts/push-local-split.mjs';
-import {pushSelection} from '../scripts/push-selection.mjs';
-import {capturePushTree,pushProofDisposition,readPushProof,writePushProof} from '../scripts/push-proof-cache.mjs';
-import {gateEnvironment} from '../scripts/push-environment.mjs';
-import {gateReport,printGateReport} from '../scripts/gate-report.mjs';
-import {discoverLocalDeltaPlan,localDeltaPlan} from '../scripts/local-land-delta.mjs';
-import {fs27Plan,pinChanges,simRingSlugs} from '../scripts/push-path-edges.mjs';
-import {shardPinTests} from '../scripts/gate-related-tests.mjs';
-import {freshenPush} from '../scripts/typecheck-fresh.mjs';
+import {assertHeavyLease} from '../src/scripts/heavy-lane-lease.mjs';
+import {gateSlot} from '../src/scripts/push-gate-slot.mjs';
+import {PUSH_BUDGET, PUSH_PROFILE, SPLIT_PROFILE} from '../src/scripts/push-budget.mjs';
+import {BROWSER_TESTS,TIMING_TESTS,logHostedOnly,planBaseRefs,splitLocalTests,splitRequested} from '../src/scripts/push-local-split.mjs';
+import {pushSelection} from '../src/scripts/push-selection.mjs';
+import {capturePushTree,pushProofDisposition,readPushProof,writePushProof} from '../src/scripts/push-proof-cache.mjs';
+import {gateEnvironment} from '../src/scripts/push-environment.mjs';
+import {gateReport,printGateReport} from '../src/scripts/gate-report.mjs';
+import {discoverLocalDeltaPlan,localDeltaPlan} from '../src/scripts/local-land-delta.mjs';
+import {fs27Plan,pinChanges,simRingSlugs} from '../src/scripts/push-path-edges.mjs';
+import {shardPinTests} from '../src/scripts/gate-related-tests.mjs';
+import {freshenPush} from '../src/scripts/typecheck-fresh.mjs';
 
 /** Identical proof identity before/inside a real lease; no heavy work is done on reuse.
  * @param {NodeJS.ProcessEnv} [environment] */
@@ -98,7 +98,7 @@ export async function parallelChecks(tasks,options={}) {
   if(options.env?.WS_CPU_ADMISSION==='1')tasks=tasks.map(task=>({...task,commands:task.commands.map(command=>{
     if(task.name.startsWith('vitest'))return command; // Actual files own their grants.
     const slots=command.includes('--builders')?PUSH_BUDGET.builders:task.name.startsWith('lint')?Math.min(Math.max(2,availableParallelism()-2),Math.max(2,Number(options.env?.WS_PUSH_LINT_THREADS)||0)):1;
-    return ['python3',resolve('scripts/cpu-admission.py'),'run','--slots',String(slots),'--',...command];
+    return ['python3',resolve('src/scripts/cpu-admission.py'),'run','--slots',String(slots),'--',...command];
   })}));
   const active=new Set(),results=[],started=Date.now(),grace=options.graceMs??1500;
   // CPU-BROKER: the first failure stops every other task. A task that ends after that was stopped, not refused on its
@@ -167,21 +167,21 @@ export function staticChecks(lintThreads=PUSH_BUDGET.lintThreads){
     {name:'lint (kit + game)',commands:[['pnpm','run','--silent','lint:kit','--threads',String(lintThreads)],['pnpm','run','--silent','lint:game']]},
     {name:'format:check',commands:[['pnpm','run','--silent','format:check']]},
     {name:'check:sides',commands:[['pnpm','run','--silent','check:sides']]},
-    {name:'check:asks',commands:[['pnpm','run','--silent','check:asks'],[process.execPath,'kit/scripts/asks.mjs','check','--all']]},
+    {name:'check:asks',commands:[['pnpm','run','--silent','check:asks'],[process.execPath,'src/scripts/.kit/asks.mjs','check','--all']]},
     {name:'check:page-events',commands:[['pnpm','run','--silent','check:page-events']]},
     // DL21: index.html's inlined shell CSS is today's base.css + loading.css. Its test reads the sheets by path, so the
     // related selection never maps a loading.css edit to it (red 44617020403, after 60e6a0696).
-    {name:'check:inline-shell-css',commands:[[process.execPath,'scripts/inline-shell-css.mjs','--check']]},
+    {name:'check:inline-shell-css',commands:[[process.execPath,'src/scripts/inline-shell-css.mjs','--check']]},
     // WIRE-STABILITY WR6: the bound wire's lock is current against v0, under 1 s (release rules come with a newer pin).
     {name:'check:wire',commands:[['pnpm','run','--silent','check:wire']]},
     // WIRE-STABILITY WR7: saves.lock.json, every save key's version, shape and migrations (test/saves-lock.test.ts).
     // One focused Vitest file; its script drops the push cohort's profile.
     {name:'check:saves',commands:[['pnpm','run','--silent','check:saves']]},
     // Meta QA 11-25 row 25: every TypeScript file Node runs strip-only is erasable (no parameter property; fc0832b52's red).
-    {name:'check:strip-only',commands:[[process.execPath,'--no-warnings','scripts/strip-only.mjs']]},
+    {name:'check:strip-only',commands:[[process.execPath,'--no-warnings','src/scripts/strip-only.mjs']]},
     // Meta QA 11-25 row 42: every installed org package's engines.node admits each Node engine's range lets CI pick
     // (format 0.79.2's <25 under engine's <27 broke server-release 45703635653 at pnpm install on Node 26).
-    {name:'check:node-ranges',commands:[[process.execPath,'scripts/node-ranges.mjs']]},
+    {name:'check:node-ranges',commands:[[process.execPath,'src/scripts/node-ranges.mjs']]},
   ];
 }
 
@@ -238,10 +238,10 @@ async function main(){
     const result=await parallelChecks([
       {name:'lint (docs-only)',commands:[['pnpm','run','--silent','lint:kit','--threads',String(PUSH_BUDGET.lintThreads)],['pnpm','run','--silent','lint:game']]},
       {name:'format:check (docs-only; history scan already green)',commands:[['pnpm','run','--silent','format:check']]},
-      {name:'check:asks (committed docs)',commands:[['pnpm','run','--silent','check:asks'],[process.execPath,'kit/scripts/asks.mjs','check','--all']]},
+      {name:'check:asks (committed docs)',commands:[['pnpm','run','--silent','check:asks'],[process.execPath,'src/scripts/.kit/asks.mjs','check','--all']]},
       // EV9: agent-parity reads AGENTS.md and CLAUDE.md; a test that reads a changed doc runs too.
       {name:'check:parity (docs-only)',commands:[['pnpm','run','--silent','check:parity']]},
-      ...(selection.tests?.length?[{name:`vitest (docs readers: ${selection.tests.length})`,commands:[[process.execPath,'scripts/vitest-tmp.ts','run','--passWithNoTests',...selection.tests]]}]:[]),
+      ...(selection.tests?.length?[{name:`vitest (docs readers: ${selection.tests.length})`,commands:[[process.execPath,'src/scripts/vitest-tmp.ts','run','--passWithNoTests',...selection.tests]]}]:[]),
     ],{env});
     console.error(`  - docs-only push lane ${result.ok?'green':'RED'} in ${result.seconds.toFixed(1)} s`);if(result.ok)record(result.seconds);process.exitCode=result.ok?0:1;return;
   }
@@ -250,7 +250,7 @@ async function main(){
   const generated=await parallelChecks([{name:'gen:inputs',commands:[['pnpm','run','--silent','gen:inputs']]}],{env});
   if(!generated.ok){process.exitCode=1;return;}
   if(selection.mode==='related'){
-    const {completePushSelection}=await import('../scripts/push-related.mjs');
+    const {completePushSelection}=await import('../src/scripts/push-related.mjs');
     selection=await completePushSelection(selection);
     console.error(`  - verified tests: ${selection.mode}; ${selection.reason}`);
   }
@@ -276,9 +276,9 @@ async function main(){
   const simSlugs=selection.mode==='docs'?[]:simRingSlugs(selection.files,JSON.parse(readFileSync('test/pins/ring-digests.json','utf8')),`${process.platform}-${process.arch}`);
   const fs27=fs27Plan(selection,{split,slugs:[...new Set([...pins.ring,...simSlugs])].sort()});
   if(local!==null)local=[...new Set([...local,...fs27.tests])].sort();
-  const readers=local===null&&fs27.tests.length>0?[{name:`vitest (FS27 readers: ${fs27.tests.length})`,commands:[[process.execPath,'scripts/vitest-tmp.ts','run','--passWithNoTests=false',...fs27.tests]]}]:[];
+  const readers=local===null&&fs27.tests.length>0?[{name:`vitest (FS27 readers: ${fs27.tests.length})`,commands:[[process.execPath,'src/scripts/vitest-tmp.ts','run','--passWithNoTests=false',...fs27.tests]]}]:[];
   if(fs27.tests.length>0||fs27.tasks.length>0)console.error(`  - FS27: ${fs27.tests.length} declared reader file(s); ${fs27.tasks.map(task=>task.name).join(', ')}`);
-  // Known reds (scripts/push-known-red.mjs): a split gate keeps a JSON report, so a red that origin/main has too never
+  // Known reds (src/scripts/push-known-red.mjs): a split gate keeps a JSON report, so a red that origin/main has too never
   // refuses the push. WS_KNOWN_RED=0 refuses on every red again.
   const knownRed=split&&env.WS_KNOWN_RED!=='0'&&(local?.length??0)>0;
   const localReport=gateReport(process.env,process.env.WS_LOCAL_LAND_REPORT_ROOT);
@@ -286,10 +286,10 @@ async function main(){
   if(report!==undefined&&env.WS_PUSH_TIMINGS===undefined)mkdirSync(dirname(report),{recursive:true});
   const reporters=report===undefined?[]:['--reporter=default','--reporter=json',`--outputFile=${report}`];
   const vitest=delta.eligible&&selection.mode==='docs'
-    ?(selection.tests?.length?[{name:'vitest (incoming docs readers)',commands:[[process.execPath,'scripts/vitest-tmp.ts','run','--passWithNoTests=false',...selection.tests,...reporters]]}]:[])
+    ?(selection.tests?.length?[{name:'vitest (incoming docs readers)',commands:[[process.execPath,'src/scripts/vitest-tmp.ts','run','--passWithNoTests=false',...selection.tests,...reporters]]}]:[])
     :local===null
-    ?[{name:`vitest (${selection.mode})`,commands:[[process.execPath,'scripts/vitest-tmp.ts',...(selection.mode==='related'?['related','--run','--passWithNoTests=false',...selection.files]:['run']),...reporters]]}]
-    :local.length===0?[]:[{name:`vitest (split ${selection.mode}: ${local.length} local)`,commands:[[process.execPath,'scripts/vitest-tmp.ts','run','--passWithNoTests=false',...local,...reporters]]}];
+    ?[{name:`vitest (${selection.mode})`,commands:[[process.execPath,'src/scripts/vitest-tmp.ts',...(selection.mode==='related'?['related','--run','--passWithNoTests=false',...selection.files]:['run']),...reporters]]}]
+    :local.length===0?[]:[{name:`vitest (split ${selection.mode}: ${local.length} local)`,commands:[[process.execPath,'src/scripts/vitest-tmp.ts','run','--passWithNoTests=false',...local,...reporters]]}];
   // With known reds on, Vitest runs beside the static lane, not inside it: a Vitest red must not stop the static checks,
   // since a known red still lets the push go when everything else is green.
   const [rest,tests]=await Promise.all([
@@ -298,7 +298,7 @@ async function main(){
   ]);
   let result={...rest,ok:rest.ok&&tests.ok,results:[...rest.results,...tests.results]},tolerated=false;
   if(knownRed&&rest.ok&&!tests.ok&&report!==undefined){
-    const {failingIds,mainReds,newReds}=await import('../scripts/push-known-red.mjs');
+    const {failingIds,mainReds,newReds}=await import('../src/scripts/push-known-red.mjs');
     const pushed=failingIds(report,process.cwd());
     if(pushed===null||pushed.size===0)console.error('  !! known-red: the Vitest report names no failing test; the red stands');
     else{

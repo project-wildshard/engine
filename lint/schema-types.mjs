@@ -1,5 +1,5 @@
 // G655 TD3: syntax-only public schema admission; never build a TypeScript program.
-import { SCHEMA_TYPE_RULE, schemaTypeIdentity } from '../scripts/ratchet-approval.mjs';
+import { SCHEMA_TYPE_RULE, schemaTypeIdentity } from '../src/scripts/ratchet-approval.mjs';
 
 const factories = new Set(['any','array','bigint','blob','boolean','custom','date','enum','file','function','instance','intersect','lazy','literal',
   'looseObject','looseTuple','map','nan','never','nonNullable','nonNullish','nonOptional','null','nullable','nullish','number','object','objectWithRest',

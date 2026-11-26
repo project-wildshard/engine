@@ -2,7 +2,7 @@
   "audit": {
     "sourceRevision": "b43c23a2f9064b97dad8e003b884d8019e9cd350",
     "candidate": "G394/G405 declared melee contacts and the shared native owner; composed item role on the existing mover script host.",
-    "command": "node --import ./scripts/sim-node-loader.mjs test/proof/far-reach/run.mjs all",
+    "command": "node --import ./src/scripts/sim-node-loader.mjs test/proof/far-reach/run.mjs all",
     "exitStatus": 0,
     "scope": "Approved by coordinator under G394/G405: 26470 states / 14 gameplay categories / 0 differences; all 131 damage events, positions, health, flags, Ledger totals and order exact. Saved steps 7692, 10140, 17340, 26469 have identical non-script and canonical physics state. One items role and one 627-byte module added; existing module memory/globals, schedules and host counters unchanged. Hash 146505ca06c9ca5c5f523bbff3dc7cf6ed248017a5ad184c543b819c8ba6e864 -> 04dd4bf8da2829ea1730e9ba04a817eeb765dc16c72faa92542636e3c8d1cfa5; endpoint/victory 26469/26349 unchanged.",
     "runs": "Full uninterrupted/restore/shipping-worker replay and durable Ledger, plus three exact saved-state checkpoints and 256-frame page parity."

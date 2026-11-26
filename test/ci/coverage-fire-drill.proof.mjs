@@ -85,7 +85,7 @@ timed('dropped-section',async()=>{
 
 timed('broken-tar',async()=>{
   // QA 11-24 row 70: from format 0.79 the format ships no whole Brasscap; the tracked pin stands in (pin-format.ts).
-  const {wholeBrasscapProduct}=await import('../../scripts/pin-format.ts');
+  const {wholeBrasscapProduct}=await import('../../src/scripts/pin-format.ts');
   const {readTar}=await import('@wildshard/format/tar');
   const files=readTar(wholeBrasscapProduct().bytes);
   assert.ok(files.has('shard.json'),'Actual published Brasscap archive must be admitted');
@@ -114,7 +114,7 @@ timed('save-field',async()=>{
 });
 
 timed('cook-source',async()=>{
-  const {ringCookInputs}=await import('../../scripts/ring-cook-inputs.ts');
+  const {ringCookInputs}=await import('../../src/scripts/ring-cook-inputs.ts');
   const pins=JSON.parse(readFileSync('test/pins/shardfiles.json','utf8')).shards;
   // J434: both rings cook the catalogue head from the pin cache; the format corpus never stands in for it
   const ring=ringCookInputs(['brasscap-mesa'],pins,'tmp/absent-cook-cache');
@@ -130,7 +130,7 @@ timed('shard-red',()=>{
   mkdirSync('tmp',{recursive:true});const work=mkdtempSync(resolve('tmp/coverage-ring3-'));
   try{
     writeFileSync(join(work,'verdict.json'),bytes);
-    const child=spawnSync(process.execPath,['scripts/ring3.ts','report',work],{encoding:'utf8',timeout:9000});
+    const child=spawnSync(process.execPath,['src/scripts/ring3.ts','report',work],{encoding:'utf8',timeout:9000});
     assert.equal(child.signal,null);assert.equal(child.error,undefined);
     assert.equal(child.status,1,'TC26_RED_SHARD_HELD: actual red receiver aggregate must refuse qualification');
     assert.match(child.stdout,/RELEASE HELD/u);
@@ -146,7 +146,7 @@ timed('export',()=>{
     mkdirSync(join(work,'node_modules/@wildshard'),{recursive:true});
     symlinkSync(resolve('.'),join(work,'node_modules/@wildshard/engine'));
     writeFileSync(join(work,'main.mjs'),"import assert from 'node:assert/strict';import{emptyShardfile}from'@wildshard/engine/host/author';const shard=emptyShardfile({slug:'outside-author',name:'Outside',author:'Test',revision:1,seed:1});assert.equal(shard.identity.slug,'outside-author');console.log('TC26_CONSUMER_ACCEPTED');");
-    const output=execFileSync(process.execPath,['--import',resolve('scripts/bake-loader.mjs'),join(work,'main.mjs')],{cwd:work,encoding:'utf8',timeout:9000,stdio:['ignore','pipe','pipe']});
+    const output=execFileSync(process.execPath,['--import',resolve('src/scripts/bake-loader.mjs'),join(work,'main.mjs')],{cwd:work,encoding:'utf8',timeout:9000,stdio:['ignore','pipe','pipe']});
     assert.match(output,/TC26_CONSUMER_ACCEPTED/u);
   }finally{rmSync(work,{recursive:true,force:true});}
 });

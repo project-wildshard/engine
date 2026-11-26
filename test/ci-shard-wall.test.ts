@@ -4,8 +4,8 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
-import { checkWalls, sharedSetupMs, wallVerdicts } from '../scripts/ci-pack.mjs';
-import { AMBER, amberLine, judgeWall, parseAmber } from '../scripts/test-amber.mjs';
+import { checkWalls, sharedSetupMs, wallVerdicts } from '../src/scripts/ci-pack.mjs';
+import { AMBER, amberLine, judgeWall, parseAmber } from '../src/scripts/test-amber.mjs';
 
 const LIMIT = 300_000;
 const roots: string[] = [];

@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 
 interface Sample { sampledAt: number; corrections: number }
-const source = readFileSync(new URL('../scripts/net-lag-proof.mjs', import.meta.url), 'utf8');
+const source = readFileSync(new URL('../src/scripts/net-lag-proof.mjs', import.meta.url), 'utf8');
 const start = source.indexOf('function footRate('), end = source.indexOf('/** One run:', start);
 if (start === -1 || end <= start) throw new Error('The proof must expose its pure foot-window metric');
 const metric: unknown = runInNewContext(`${source.slice(start, end)}; footRate`);

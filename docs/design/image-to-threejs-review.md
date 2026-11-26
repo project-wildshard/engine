@@ -249,7 +249,7 @@ when a model wave needs them):
 | Idea | Where it lands |
 |---|---|
 | Detail inventory before building | the skill's step 2: a numbered detail list in the round's README, each detail mapped to a part |
-| Four views + a hole check | the skill's review step. Later a `--views` mode for `scripts/model-spin.mjs` (M9), or a small Node flood fill on the Explorer's turntable captures |
+| Four views + a hole check | the skill's review step. Later a `--views` mode for `src/scripts/model-spin.mjs` (M9), or a small Node flood fill on the Explorer's turntable captures |
 | Mirror = negate x, and flip the winding back | a rule in the skill, and a helper in `LowPolyKit` / Nine Dragon `Kit` when the next paired part is built |
 | Surface class → primitive; parallel-transport sweeps; real bevels; seam overlap | the skill's "code builder" rules |
 | Bounded loop: 3 fixes per pass, 6 total, then ask | the skill's self-review step |

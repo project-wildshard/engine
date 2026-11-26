@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { builtFolder } from '../src/test/game/builtFolder';
-import { clientPlanRoots, modulePath, folderRoots, folderRootsFrom, SECTION_HOSTS, sectionHostRows, unresolvedRoots } from '../scripts/host-ruler/roots.mjs';
+import { clientPlanRoots, modulePath, folderRoots, folderRootsFrom, SECTION_HOSTS, sectionHostRows, unresolvedRoots } from '../src/scripts/host-ruler/roots.mjs';
 
 const plan = clientPlanRoots();
 const rows = (roots: readonly { from: string; module: string; bindings: readonly string[] }[]) =>

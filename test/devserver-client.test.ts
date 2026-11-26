@@ -2,7 +2,7 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { discoveryArt, dropDanglingKtx2Rows, pruneDevserverClient } from '../scripts/devserver-client.mjs';
+import { discoveryArt, dropDanglingKtx2Rows, pruneDevserverClient } from '../src/scripts/devserver-client.mjs';
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });

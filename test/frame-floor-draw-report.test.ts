@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- The maintained Vitest scratch adapter owns this root.
 import { tmpdir } from 'node:os';
-import { frameFloorDrawReport, frameFloorDrawMarkdown, frameFloorDrawConsole, writeFrameFloorDrawReport, type FloorDrawRecord } from '../scripts/frame-floor-draw-report.mjs';
+import { frameFloorDrawReport, frameFloorDrawMarkdown, frameFloorDrawConsole, writeFrameFloorDrawReport, type FloorDrawRecord } from '../src/scripts/frame-floor-draw-report.mjs';
 
 const slugs = ['nine-dragon-stack', 'pine-hollow', 'driftwood-isle'];
 function phasedRecord(): FloorDrawRecord {

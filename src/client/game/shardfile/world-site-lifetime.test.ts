@@ -25,12 +25,12 @@ const keys = ['hut', 'lookout', 'shrine'];
 // constructors) lives in the shard repo now. Read the same shipped site rows
 // from the pinned driftwood-isle shardfile's admitted scene catalogue instead:
 // its cook already merged each layout's origin, colliders, floors and anchors.
-// The product is what `node scripts/pins.ts install` writes, or Ring 1's server
+// The product is what `node src/scripts/pins.ts install` writes, or Ring 1's server
 // slice of the same pin (test/fixtures/engine-lift/folder.ts's order); both
 // carry the identical catalogue bytes.
 const full = 'out/driftwood-isle', slice = 'out/.slices/driftwood-isle';
 const product = (process.env['WILDSHARD_RING'] === '1' ? [slice, full] : [full, slice]).find(directory => existsSync(resolvePath(directory, 'shard.json')));
-if (product === undefined) throw new Error('Missing pinned driftwood-isle product; run: node scripts/pins.ts install driftwood-isle');
+if (product === undefined) throw new Error('Missing pinned driftwood-isle product; run: node src/scripts/pins.ts install driftwood-isle');
 const index = v.parse(v.looseObject({ files: v.array(v.looseObject({ name: v.optional(v.string()), path: v.string(), hash: v.string() })) }),
   JSON.parse(readFileSync(resolvePath(product, 'shard.json'), 'utf8')));
 const entry = index.files.find(file => file.name === 'models/world-scenes.json');

@@ -5,7 +5,7 @@ import {spawnSync} from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- Own disposable fixture trees below repository scratch.
 import {join,resolve} from 'node:path';
 import {afterEach,expect,test} from 'vitest';
-import {age,pruneCompileCache,sweepTestScratch,sweepVitestRuns} from '../scripts/temp-janitor.mjs';
+import {age,pruneCompileCache,sweepTestScratch,sweepVitestRuns} from '../src/scripts/temp-janitor.mjs';
 
 const owned:string[]=[],HOUR=3_600_000,now=Date.now();
 afterEach(()=>{for(const path of owned.splice(0))rmSync(path,{recursive:true,force:true});});

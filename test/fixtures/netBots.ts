@@ -118,7 +118,7 @@ function roomEvent(slug: string, phase: 'start' | 'end'): void {
   const started = performance.now();
   // The API intentionally accepts strict ancestors, not the caller itself.
   // Its actual child can inspect this worker's still-held file grant.
-  const program = `import {ancestorCpuBudget,cpuRoot} from ${JSON.stringify(new URL('../../scripts/cpu-admission.mjs', import.meta.url).href)};import {readFileSync} from 'node:fs';import {join} from 'node:path';const budget=ancestorCpuBudget();const state=JSON.parse(readFileSync(join(cpuRoot(),'queue.json'),'utf8'));console.log(JSON.stringify({budget,queuedOwnedPids:state.cpuQueue.filter(row=>row.ownedCommand?.child===null).map(row=>row.pid)}));`;
+  const program = `import {ancestorCpuBudget,cpuRoot} from ${JSON.stringify(new URL('../../src/scripts/cpu-admission.mjs', import.meta.url).href)};import {readFileSync} from 'node:fs';import {join} from 'node:path';const budget=ancestorCpuBudget();const state=JSON.parse(readFileSync(join(cpuRoot(),'queue.json'),'utf8'));console.log(JSON.stringify({budget,queuedOwnedPids:state.cpuQueue.filter(row=>row.ownedCommand?.child===null).map(row=>row.pid)}));`;
   const observation: unknown = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', program], {encoding: 'utf8', timeout: 5000}));
   writeFileSync(`${report}.events.jsonl`, `${JSON.stringify({slug, phase, at: Date.now(), pid: process.pid, observationMs: performance.now() - started, observation})}\n`, {flag: 'a'});
 }

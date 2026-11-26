@@ -1,0 +1,304 @@
+{
+ "version": 1,
+ "note": "ENGINE-MEMORY EM11: the iPhone 17 Pro's WebContent [K] from Mac readings (src/scripts/memory/phoneModel.mjs says how; src/scripts/memory/phone-fit.mjs refits). alpha and scale: the anchor's bounds (v0.1.36 Nine rev 2 died on the phone after its last compile:after, lived through every boot trace window before). ledger: settled WebKit [K] on the ledger [L] over the seven zones, missPct the worst leave-one-out miss. chromium.loadingPerRenderer: the phone's loading peak over boot-memory-peak's renderer peak under the card. zones: the fit's data and each zone's phone prediction, MB decimal. The first zone is the retired Template (J434, 2026-11-19), kept as measured fit data until the next refit. instrument: every reading had the Web Inspector's Network and Console domains off (measure.mjs --instrument=minimal, EM11b); a full-mode reading reads 60-290 MB high and does not fit this model.",
+ "measured": "2026-11-18",
+ "host": "Mac mini (Apple M5 Pro, macOS 27.0), Playwright WebKit 27.2 headless, phone view 402x874 @3, phone tier, Low, instrument minimal; engine 037d9f15 (zones, 3 runs each, and one Chromium probe each, Driftwood's probe stalled at gameplay) and 6f53e748 (anchor, 4 runs); both lines at CRASH_LINE, 2048 MiB",
+ "limitMB": 2147,
+ "limitHighMB": 2147,
+ "gpuFloorMB": 17.6,
+ "alpha": {
+  "low": 0.309,
+  "high": 0.744
+ },
+ "scale": {
+  "low": 0.648,
+  "high": 0.911
+ },
+ "instrument": "minimal",
+ "ledger": {
+  "webcontent": {
+   "floorMB": 381.3,
+   "perMB": 3.328
+  },
+  "gpu": {
+   "floorMB": 331.3,
+   "perMB": 1.255
+  },
+  "missPct": 30.8
+ },
+ "peakOverSettled": {
+  "low": 1.195,
+  "central": 1.337,
+  "high": 1.74
+ },
+ "chromium": {
+  "loadingPerRenderer": {
+   "low": 1.183,
+   "central": 2.086,
+   "high": 2.599
+  }
+ },
+ "anchor": {
+  "last": "compile:after",
+  "runs": 4,
+  "died": [
+   {
+    "step": "compile:after",
+    "webcontentMB": 1641.54832,
+    "gpuMB": 837.322312
+   },
+   {
+    "step": "compile:after",
+    "webcontentMB": 1622.968792,
+    "gpuMB": 1713.948256
+   },
+   {
+    "step": "compile:after",
+    "webcontentMB": 1625.934344,
+    "gpuMB": 1702.561376
+   },
+   {
+    "step": "compile:after",
+    "webcontentMB": 1630.783984,
+    "gpuMB": 1740.359288
+   }
+  ],
+  "lived": [
+   {
+    "step": "compile:before",
+    "webcontentMB": 1550.289368,
+    "gpuMB": 830.932528
+   },
+   {
+    "step": "compile:before",
+    "webcontentMB": 1538.476432,
+    "gpuMB": 825.787952
+   },
+   {
+    "step": "compile:before",
+    "webcontentMB": 1541.753256,
+    "gpuMB": 835.601968
+   },
+   {
+    "step": "compile:before",
+    "webcontentMB": 1537.903016,
+    "gpuMB": 831.04724
+   }
+  ],
+  "consistent": true
+ },
+ "zones": {
+  "_template": {
+   "build": "037d9f15-mwlpyl0u",
+   "runs": 3,
+   "settledMB": {
+    "webcontent": 469,
+    "gpu": 291
+   },
+   "ledgerMB": {
+    "ram": 47.5,
+    "gpu": 28
+   },
+   "phonePlayingMB": {
+    "low": 481,
+    "central": 613,
+    "high": 677
+   },
+   "phoneLoadingMB": {
+    "low": 667,
+    "central": 820,
+    "high": 938
+   },
+   "chromiumLoadingRendererMB": 415
+  },
+  "sunscar-dunes": {
+   "build": "037d9f15-mwlpyl0u",
+   "runs": 3,
+   "settledMB": {
+    "webcontent": 480,
+    "gpu": 443
+   },
+   "ledgerMB": {
+    "ram": 64.1,
+    "gpu": 89.2
+   },
+   "phonePlayingMB": {
+    "low": 587,
+    "central": 704,
+    "high": 825
+   },
+   "phoneLoadingMB": {
+    "low": 832,
+    "central": 1017,
+    "high": 1169
+   },
+   "chromiumLoadingRendererMB": 450
+  },
+  "pine-hollow": {
+   "build": "037d9f15-mwlpyl0u",
+   "runs": 3,
+   "settledMB": {
+    "webcontent": 742,
+    "gpu": 487
+   },
+   "ledgerMB": {
+    "ram": 97.9,
+    "gpu": 128.2
+   },
+   "phonePlayingMB": {
+    "low": 785,
+    "central": 989,
+    "high": 1103
+   },
+   "phoneLoadingMB": {
+    "low": 1001,
+    "central": 1247,
+    "high": 1407
+   },
+   "chromiumLoadingRendererMB": 846
+  },
+  "nine-dragon-stack": {
+   "build": "037d9f15-mwlpyl0u",
+   "runs": 3,
+   "settledMB": {
+    "webcontent": 737,
+    "gpu": 520
+   },
+   "ledgerMB": {
+    "ram": 54.4,
+    "gpu": 174.4
+   },
+   "phonePlayingMB": {
+    "low": 803,
+    "central": 1001,
+    "high": 1129
+   },
+   "phoneLoadingMB": {
+    "low": 1334,
+    "central": 1743,
+    "high": 1888
+   },
+   "chromiumLoadingRendererMB": 926
+  },
+  "nalati-grasslands": {
+   "build": "037d9f15-mwlpyl0u",
+   "runs": 3,
+   "settledMB": {
+    "webcontent": 738,
+    "gpu": 537
+   },
+   "ledgerMB": {
+    "ram": 123.2,
+    "gpu": 125
+   },
+   "phonePlayingMB": {
+    "low": 814,
+    "central": 1011,
+    "high": 1145
+   },
+   "phoneLoadingMB": {
+    "low": 1075,
+    "central": 1338,
+    "high": 1511
+   },
+   "chromiumLoadingRendererMB": 870
+  },
+  "driftwood-isle": {
+   "build": "037d9f15-mwlpyl0u",
+   "runs": 3,
+   "settledMB": {
+    "webcontent": 734,
+    "gpu": 523
+   },
+   "ledgerMB": {
+    "ram": 85.5,
+    "gpu": 78.3
+   },
+   "phonePlayingMB": {
+    "low": 803,
+    "central": 1000,
+    "high": 1129
+   },
+   "phoneLoadingMB": {
+    "low": 983,
+    "central": 1194,
+    "high": 1382
+   },
+   "chromiumLoadingRendererMB": null
+  },
+  "far-reach": {
+   "build": "037d9f15-mwlpyl0u",
+   "runs": 3,
+   "settledMB": {
+    "webcontent": 464,
+    "gpu": 519
+   },
+   "ledgerMB": {
+    "ram": 36.9,
+    "gpu": 173.7
+   },
+   "phonePlayingMB": {
+    "low": 619,
+    "central": 729,
+    "high": 880
+   },
+   "phoneLoadingMB": {
+    "low": 807,
+    "central": 993,
+    "high": 1134
+   },
+   "chromiumLoadingRendererMB": 518
+  }
+ },
+ "devices": {
+  "iPhone14,5": {
+   "name": "iPhone 13",
+   "status": "unmeasured",
+   "reportOnly": true,
+   "alpha": null,
+   "scale": null,
+   "limitMB": null,
+   "limitHighMB": null,
+   "fitInputs": {
+    "killLineFromIP7": {
+     "limitMB": 1536,
+     "limitKind": "ActiveSoft, enforced as the WebContent highwater (jetsam memory-highwater)",
+     "killedAtKB": 1573026,
+     "ios": "18.6.2",
+     "measured": "2026-11-19 EM9 staircase, inspector driver, syslog memorystatus lines (meta iphone13/device-2026-11-19.md)"
+    },
+    "pairedFootprintsFromIP9": null
+   }
+  }
+ },
+ "staircase": {
+  "source": "meta a0cc751f project/evidence/engine-memory/17pro-staircase-2026-11-19/staircase-17pro.jpg",
+  "processLineBytes": 2147483648,
+  "lastCompletedMB": {
+   "arraybuffer": 2048,
+   "jsheap": 1088,
+   "wasm": 2049,
+   "worker": 2112,
+   "texrgba": 2013,
+   "texcomp": 2013,
+   "glbuffer": 2048,
+   "msaa": 2147,
+   "canvas2d": 872,
+   "imagebitmap": 2013,
+   "audio": 2074
+  },
+  "effectiveFactors": {
+   "arraybuffer": 1.049,
+   "jsheap": 1.974,
+   "wasm": 1.048,
+   "worker": 1.017,
+   "texrgba": 1.067,
+   "texcomp": 1.067,
+   "glbuffer": 1.049,
+   "msaa": 1,
+   "canvas2d": 2.463,
+   "imagebitmap": 1.067,
+   "audio": 1.035
+  }
+ }
+}

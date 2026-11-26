@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "about": "BUDGET-CAPS: each budget's recorded baseline, written by node scripts/budgets/cli.mjs record (never by hand). contentKey is what the value was measured on: a shard's pinned revision (<slug>@<revision>) for its numbers, engine for the app's own. declared: an engine feature that raised this budget in the commit that wrote it (cli.mjs declare); record clears it. The soft line is value plus 10% (J444).",
+ "about": "BUDGET-CAPS: each budget's recorded baseline, written by node src/scripts/budgets/cli.mjs record (never by hand). contentKey is what the value was measured on: a shard's pinned revision (<slug>@<revision>) for its numbers, engine for the app's own. declared: an engine feature that raised this budget in the commit that wrote it (cli.mjs declare); record clears it. The soft line is value plus 10% (J444).",
  "baselines": {
   "download/phone/pine-hollow": {
    "value": 49349395,

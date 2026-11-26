@@ -1,5 +1,5 @@
 import {expect, test} from 'vitest';
-import {frameFloorChromiumCpuRate, validateFrameFloorArgs} from '../scripts/frame-floor-args.mjs';
+import {frameFloorChromiumCpuRate, validateFrameFloorArgs} from '../src/scripts/frame-floor-args.mjs';
 
 test('ordinary floor remains unthrottled and phone CPU attribution is explicit', () => {
   expect(frameFloorChromiumCpuRate([])).toBe(1);

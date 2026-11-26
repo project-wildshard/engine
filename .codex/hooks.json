@@ -28,6 +28,11 @@
           },
           {
             "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/.agents/hooks/guard-hc-send.sh\"",
+            "statusMessage": "Checking hc targets for an open question"
+          },
+          {
+            "type": "command",
             "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/no-pr-guard.mjs\"",
             "statusMessage": "Checking for a pull request on a project-wildshard repo"
           },
@@ -43,18 +48,13 @@
           },
           {
             "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/gh-poll-guard.mjs\"",
-            "statusMessage": "Checking for a GitHub poll faster than once a minute"
-          },
-          {
-            "type": "command",
-            "command": "bash \"$(git rev-parse --show-toplevel)/.agents/hooks/guard-herdr-prompt.sh\"",
-            "statusMessage": "Checking herdr targets for an open question"
-          },
-          {
-            "type": "command",
             "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/active-hours.mjs\" mark",
             "statusMessage": "Recording active agent time"
+          },
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/gh-poll-guard.mjs\"",
+            "statusMessage": "Checking for a GitHub poll faster than once a minute"
           }
         ]
       },

@@ -1,5 +1,5 @@
 # DF7 / J464 / J467: the nightly Driftwood floors table. The Mac mini measures main's tip at 02:17 Cancún
-# (scripts/fps/nightly-mini.mjs, launchd) on its own Metal GPU and dispatches this job with the graded night. This job
+# (src/scripts/fps/nightly-mini.mjs, launchd) on its own Metal GPU and dispatches this job with the graded night. This job
 # runs no measured code and holds no secret: it prints the night on the run's summary page and keeps night.json as the
 # artifact the next night compares p95 against. Report only until DF15; DF15 sets GATE to 'true', and then a floor
 # miss or a p95 more than 10% worse than the last green night fails the run, which main-watch reports as a fix row for
@@ -42,15 +42,15 @@ jobs:
     timeout-minutes: 10
     steps:
       - if: inputs.night == ''
-        run: echo 'DF7 nights come from the Mac mini (node scripts/fps/nightly-mini.mjs); dispatch with no night prints nothing.' >> "$GITHUB_STEP_SUMMARY"
+        run: echo 'DF7 nights come from the Mac mini (node src/scripts/fps/nightly-mini.mjs); dispatch with no night prints nothing.' >> "$GITHUB_STEP_SUMMARY"
       - if: inputs.night != ''
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           sparse-checkout: |
             budgets
-            scripts/budgets
-            scripts/fps
+            src/scripts/budgets
+            src/scripts/fps
       - if: inputs.night != ''
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -67,7 +67,7 @@ jobs:
           gate=()
           if [ "$GATE" = true ]; then gate=(--gate); fi
           status=0
-          node scripts/fps/nightly.mjs --receipt tmp/df7/night.json "${gate[@]}" || status=$?
+          node src/scripts/fps/nightly.mjs --receipt tmp/df7/night.json "${gate[@]}" || status=$?
           { echo; echo '<details><summary>The full table</summary>'; echo; cat tmp/df7/table.md; echo; echo '</details>'; } >> "$GITHUB_STEP_SUMMARY"
           exit "$status"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

@@ -7,7 +7,7 @@ import {pathToFileURL} from 'node:url';
 import {expect,test} from 'vitest';
 
 test('real tall-grass inputs drive visible/hidden, jump cancellation and a restored one-time hint',()=>{
-  const child=spawnSync(process.execPath,['--import',pathToFileURL(resolve('scripts/sim-node-loader.mjs')).href,
+  const child=spawnSync(process.execPath,['--import',pathToFileURL(resolve('src/scripts/sim-node-loader.mjs')).href,
     resolve('test/fixtures/headless/nalati-stealth-run.ts')],{encoding:'utf8',timeout:175_000});
   expect(child.status,child.stdout+child.stderr+String(child.error??'')+(child.signal??'')).toBe(0);expect(child.stdout).toContain('"story":"native-stealth"');
 },180_000);

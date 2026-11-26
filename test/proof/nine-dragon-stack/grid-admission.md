@@ -4,7 +4,7 @@ The descriptor now admits Nine Dragon as a first-party runtime-owned grid produc
 
 ## Real browser proof
 
-`grid-admission.json` is the unedited Chromium Metal result on isolated candidate `e1b6b0fb005d54c56e88dc6862b9df41f23559bb`, built with `serve-build.sh --devserver`. One muted browser, iPhone 16 Pro, Developer ON, seed 1337, through `scripts/browser-lane.sh`; both contexts closed in `finally`.
+`grid-admission.json` is the unedited Chromium Metal result on isolated candidate `e1b6b0fb005d54c56e88dc6862b9df41f23559bb`, built with `serve-build.sh --devserver`. One muted browser, iPhone 16 Pro, Developer ON, seed 1337, through `src/scripts/browser-lane.sh`; both contexts closed in `finally`.
 
 - Standalone enters gameplay with the declared Neon Jian on the unchanged `sword` identity and native Fei Zhua LOCK/JUMP actions.
 - The grid drives from Driftwood to the road and then along the road to Nine's north midpoint. The only initial pose places the player at Driftwood's exit; entry is held movement, not a teleport.

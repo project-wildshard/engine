@@ -8,8 +8,8 @@ import { createServer } from 'node:http';
 // oxlint-disable-next-line import/no-nodejs-modules -- As above.
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, expect, test } from 'vitest';
-import { chromium, webkit } from '../scripts/browser-playwright.mjs';
-import { KEYCHAIN_ARGS } from '../scripts/chromium-keychain.mjs';
+import { chromium, webkit } from '../src/scripts/browser-playwright.mjs';
+import { KEYCHAIN_ARGS } from '../src/scripts/.kit/chromium-keychain.mjs';
 
 const MB = 1e6;
 const PAGE = readFileSync(new URL('../public/memory-calibration.html', import.meta.url));

@@ -25,7 +25,7 @@ class PushInputCache(unittest.TestCase):
         self.git('config', 'core.hooksPath', '/dev/null')
         self.put('.oxlintrc.json', '{"ignorePatterns":[]}')
         self.put('.gitignore', 'tmp/\n')
-        self.put('scripts/push-inputs.mjs', 'console.log(JSON.stringify(process.argv.slice(2)));')
+        self.put('src/scripts/push-inputs.mjs', 'console.log(JSON.stringify(process.argv.slice(2)));')
         self.base = self.commit('src/base.ts')
         self.git('update-ref', 'refs/remotes/origin/main', self.base)
 

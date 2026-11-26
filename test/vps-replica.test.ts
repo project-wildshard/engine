@@ -11,9 +11,9 @@ import { join, resolve } from 'node:path'
 
 import { afterEach, expect, test } from 'vitest'
 
-import { doorArgs, limits, RELEASE_PUBLIC_KEY, replicaRelease, SCRATCH_HBA, scratchUrl, stagingRelease, unitArgs } from '../scripts/vps/replica.mjs'
+import { doorArgs, limits, RELEASE_PUBLIC_KEY, replicaRelease, SCRATCH_HBA, scratchUrl, stagingRelease, unitArgs } from '../src/scripts/vps/replica.mjs'
 
-const REPLICA = resolve('scripts/vps/replica.mjs'), CONFIG = resolve('scripts/vps/wildshard-config')
+const REPLICA = resolve('src/scripts/vps/replica.mjs'), CONFIG = resolve('src/scripts/vps/wildshard-config')
 const key = generateKeyPairSync('ed25519')
 const publicKey = key.publicKey.export({ type: 'spki', format: 'der' }).toString('hex')
 const build = 'c'.repeat(40)
@@ -38,7 +38,7 @@ const staging = (sha256 = 'd'.repeat(64), extra: Record<string, unknown> = {}) =
   })
 
 test('replica.mjs pins the release key setup.sh embeds', () => {
-  const setup = readFileSync('scripts/vps/setup.sh', 'utf8')
+  const setup = readFileSync('src/scripts/vps/setup.sh', 'utf8')
   expect(/^EXPECTED_RELEASE_PUBLIC_KEY=([0-9a-f]+)$/mu.exec(setup)?.[1]).toBe(RELEASE_PUBLIC_KEY)
 })
 

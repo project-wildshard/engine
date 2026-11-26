@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { bootSlowDiagnostic, titleCaptureReady } from '../scripts/parity/boot-smoke.mjs';
+import { bootSlowDiagnostic, titleCaptureReady } from '../src/scripts/parity/boot-smoke.mjs';
 
 test('title pixels and a frame cannot bypass either real pending warm owner', () => {
   for (const pending of [['shaders', 'first-world-frame'], ['shaders'], ['first-world-frame']]) {

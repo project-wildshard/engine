@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- A fresh realm proves page.evaluate can serialize the reader without imports.
 import { runInNewContext } from 'node:vm';
 import { expect, test } from 'vitest';
-import { readProofState } from '../scripts/proof-state.mjs';
+import { readProofState } from '../src/scripts/proof-state.mjs';
 
 function snapshot(window: object, creatureKinds: string[] = ['boar']) {
   return runInNewContext(`(${readProofState.toString()})({creatureKinds})`, { window, creatureKinds }) as ReturnType<typeof readProofState>;

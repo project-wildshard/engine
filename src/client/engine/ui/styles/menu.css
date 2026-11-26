@@ -7,7 +7,7 @@
 .ws-menu .ws-menu-hero { position: absolute; inset: 0; z-index: calc(var(--ws-layer-hud) + 0); background-size: cover; background-position: center; opacity: 0; transition: opacity 0.35s ease; pointer-events: none; }
 .ws-menu .ws-menu-hero.show { opacity: 1; }
 /* E396: portrait heroes are shot at the iPhone PWA's own shape with the subject in the 8–46 % stage band above the card
-   (scripts/hero-shots.mjs); on a shorter or taller screen the crop comes 30 % from the sky, 70 % from the foreground */
+   (src/scripts/hero-shots.mjs); on a shorter or taller screen the crop comes 30 % from the sky, 70 % from the foreground */
 @media (orientation: portrait) { .ws-menu .ws-menu-hero { background-position: 50% 30%; } }
 /* a teaser's slideshow (HUD.ts startShots): the next screen fades in over the backdrop, then becomes it */
 /* its caption: a glass chip top-right; a tap skips ahead */

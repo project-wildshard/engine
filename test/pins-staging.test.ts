@@ -5,9 +5,9 @@ import {createServer} from 'node:http';
 import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {expect, test} from 'vitest';
-import {checkStaging, RELEASE_HASH_HEADER, type StagingPins} from '../scripts/pins-staging.ts';
+import {checkStaging, RELEASE_HASH_HEADER, type StagingPins} from '../src/scripts/pins-staging.ts';
 
-const script = resolve('scripts/pins.ts'), selector = resolve('scripts/pins-staging.ts');
+const script = resolve('src/scripts/pins.ts'), selector = resolve('src/scripts/pins-staging.ts');
 const prod = 'production sentinel';
 const release = 'c'.repeat(64);
 const digest = (value: unknown): string => createHash('sha256').update(JSON.stringify(value)).digest('hex');

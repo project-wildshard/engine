@@ -12,20 +12,20 @@ import { createHash } from 'node:crypto';
 assert.equal(typeof document, 'undefined'); assert.equal(typeof window, 'undefined');
 const ROOT = new URL('../../../', import.meta.url), loaded = new Set();
 registerHooks({ load(url, context, next) { if (url.startsWith(ROOT.href) && !url.includes('/node_modules/')) loaded.add(url); return next(url, context); } });
-const { captureNumberPathProbe } = await import('../../../scripts/number-path-probe.mjs'); captureNumberPathProbe();
+const { captureNumberPathProbe } = await import('../../../src/scripts/number-path-probe.mjs'); captureNumberPathProbe();
 const { installPortableMath } = await import('../../fake/portableMath.ts'); installPortableMath();
 const { installAppIdentity } = await import('../../../src/shared/engine/app/identity.ts');
 const { WILDSHARD_IDENTITY } = await import('../../../src/client/game/identity.ts'); installAppIdentity(WILDSHARD_IDENTITY);
 await import('./worker.ts');
 const witness = await import('./witness.ts');
-function inputFiles() { return new Set([...loaded, ...witness.witnessFolderInputFiles(), ...['src/shards/driftwood-isle/data/headlessAssembly.json', 'test/proof/driftwood-isle/run.mjs', 'src/test/game/headless/worker.ts', 'scripts/sim-node-loader.mjs', 'pnpm-lock.yaml', 'public/assets/physics/rapier.wasm'].map(path => new URL(path, ROOT).href)]); }
+function inputFiles() { return new Set([...loaded, ...witness.witnessFolderInputFiles(), ...['src/shards/driftwood-isle/data/headlessAssembly.json', 'test/proof/driftwood-isle/run.mjs', 'src/test/game/headless/worker.ts', 'src/scripts/sim-node-loader.mjs', 'pnpm-lock.yaml', 'public/assets/physics/rapier.wasm'].map(path => new URL(path, ROOT).href)]); }
 function inputs() {
   const files = inputFiles();
   const hash = createHash('sha256');
   for (const url of [...files].sort((a, b) => a < b ? -1 : a > b ? 1 : 0)) hash.update(url.slice(ROOT.href.length)).update('\0').update(readFileSync(new URL(url))).update('\0');
   return hash.digest('hex');
 }
-const { generateWitness } = await import('../../../scripts/witness-generation.mjs');
+const { generateWitness } = await import('../../../src/scripts/witness-generation.mjs');
 const mode = process.argv.at(2) ?? 'all';
 let checkpointResult;
 if (mode !== 'fresh' && mode !== 'reef') {

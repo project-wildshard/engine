@@ -1,5 +1,5 @@
 {
- "about": "SR12 (meta SPLIT-REPAIR-PLAN): every page .on, ctx.on and callback tap names a production producer and the proof that drives it for real, so a listener can't outlive its producer again (scripts/check-page-events.mjs, pnpm check:page-events). proof is flow:<worker-client-proof flow>, a repo script, or local when every producer is page code. debt names an open audit finding.",
+ "about": "SR12 (meta SPLIT-REPAIR-PLAN): every page .on, ctx.on and callback tap names a production producer and the proof that drives it for real, so a listener can't outlive its producer again (src/scripts/check-page-events.mjs, pnpm check:page-events). proof is flow:<worker-client-proof flow>, a repo script, or local when every producer is page code. debt names an open audit finding.",
  "entries": {
   "page": [
    "index.html",
@@ -601,7 +601,7 @@
      "emits": "app.events.emit('practice.active'"
     }
    ],
-   "proof": "scripts/worker-client-moments.mjs --only=practice"
+   "proof": "src/scripts/worker-client-moments.mjs --only=practice"
   },
   {
    "id": "actor.died",

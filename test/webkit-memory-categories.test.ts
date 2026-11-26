@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { memoryCategories } from '../scripts/soak/memory-categories.mjs';
+import { memoryCategories } from '../src/scripts/soak/memory-categories.mjs';
 
 test('passive categories preserve all six domains and retire without requesting a heap collection',async()=>{
   const calls:string[]=[];

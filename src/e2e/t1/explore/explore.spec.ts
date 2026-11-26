@@ -1,4 +1,4 @@
-import { expect, test } from '../../../../scripts/browser-test.mjs'
+import { expect, test } from '../../../scripts/browser-test.mjs'
 
 import type { Locator, Page } from '@playwright/test'
 

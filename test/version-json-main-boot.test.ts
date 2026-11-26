@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { readFileSync } from 'node:fs';
 import { expect, test, vi } from 'vitest';
-import { clientFloor } from '../scripts/app-build/clientFloor';
+import { clientFloor } from '../src/scripts/app-build/clientFloor';
 import { ClientUpdater, olderClient } from '../src/client/engine/boot/forceUpdate';
 import { Scope } from '../src/shared/engine/app/scope';
 

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, test, vi } from 'vitest';
-import { screenNow } from '../scripts/journey-proof.mjs';
+import { screenNow } from '../src/scripts/journey-proof.mjs';
 
 afterEach(() => { vi.unstubAllGlobals(); });
 

@@ -6,19 +6,19 @@ It reads every committed head in `test/pins/shardfiles.json` and the
 existing `test/pins/ring-2-tests.json`. Updating pins is a separate reviewed
 change: a nightly does not silently substitute live catalogue heads.
 
-Refresh staging independently with `node scripts/pins.ts refresh --channel
+Refresh staging independently with `node src/scripts/pins.ts refresh --channel
 staging`. Review and commit `test/pins/staging.json`; its catalogue and pins
 come from `GET /api/catalogue.json?channel=staging`. Dispatch `ci.yml`
 (Ring 1) or `nightly.yml` (Ring 2) with `pins_channel=staging` to select
 that committed snapshot in each disposable test checkout. Ring 1 re-cuts
 its slices from those heads. Ordinary pushes and the schedule keep their
-production pins. Local selection is `node scripts/pins-staging.ts select`;
+production pins. Local selection is `node src/scripts/pins-staging.ts select`;
 it replaces `shardfiles.json` and `catalogue.json`, so use a disposable tree.
 
 The snapshot's `catalogueHash` detects mismatched inputs; `releaseHash`
 is the live catalogue's `x-wildshard-release-hash` (api-server AP-26: the
 sha256 of the placement file body the staging row names). A staging-pinned
-nightly runs `node scripts/pins-staging.ts verify`, which refuses when the
+nightly runs `node src/scripts/pins-staging.ts verify`, which refuses when the
 live release has moved past the committed snapshot; refresh it then.
 
 Ring 2's dependencies and immutable tarballs are public. Its built-in
@@ -93,7 +93,7 @@ need their own green week before an explicit admission decision.
 
 ## TC22: the release entry reads the latest nightly
 
-Engine's pre-push reads version tags through `scripts/release-nightly.ts`.
+Engine's pre-push reads version tags through `src/scripts/release-nightly.ts`.
 This covers the current branch-based release helper, which pushes its
 exact green release tag without calling the legacy release-check entry.
 The guard downloads the latest completed scheduled main nightly's
@@ -101,7 +101,7 @@ The guard downloads the latest completed scheduled main nightly's
 using a cached full check or starting a fresh one. Missing artifacts,
 malformed reports and mismatched run/source identities also hold release.
 Ordinary pushes and deleted tags keep their existing checks. The legacy
-`scripts/release-check.mjs` also calls the guard before cached or fresh
+`src/scripts/release-check.mjs` also calls the guard before cached or fresh
 checks; its `--probe` only queries the local cache and cannot release.
 
 Under J370, existing failures alone pass this automatic check. J167's
@@ -109,7 +109,7 @@ any-red check below remains manual until the first full green night;
 this change does not qualify a red night. The selected scheduled run must
 have its full verdict; manual staging or diagnostic runs cannot clear release.
 
-The explicit `node --test scripts/release-nightly.proof.ts` plants a new
+The explicit `node --test src/scripts/release-nightly.proof.ts` plants a new
 failure through the actual pre-push and local bare origin, proves no tag
 reaches origin or the full gate, and checks missing/stale reports,
 existing failures, ordinary pushes, cache-entry refusal and cleanup.
@@ -126,7 +126,7 @@ Before promotion, download the green run's `nightly-verdict` artifact and
 run this from the exact release checkout:
 
 ```sh
-node scripts/nightly.ts guard /path/to/nightly-verdict/verdict.json
+node src/scripts/nightly.ts guard /path/to/nightly-verdict/verdict.json
 ```
 
 It refuses a different commit, pin digest, test list or incomplete set of
@@ -137,7 +137,7 @@ A green old nightly never clears a new
 commit. The optional legacy patch-tag helper also requires this verdict:
 
 ```sh
-node scripts/nightly-tag.mjs --report=/path/to/verdict.json
+node src/scripts/nightly-tag.mjs --report=/path/to/verdict.json
 ```
 
 Both commands read the latest completed hosted nightly using the existing
@@ -220,8 +220,8 @@ The quick refusal checks run explicitly in the nightly plan job and stay
 outside hooks and Vitest discovery (J186):
 
 ```sh
-node --test scripts/nightly.proof.ts
-node --test scripts/ring3.proof.ts
+node --test src/scripts/nightly.proof.ts
+node --test src/scripts/ring3.proof.ts
 actionlint .github/workflows/nightly.yml
 ```
 
@@ -229,11 +229,11 @@ The same real product path can be run locally, with the shared machine
 leases, after `pnpm build:game`:
 
 ```sh
-scripts/browser-lane.sh node scripts/nightly-heads.ts chromium 0
-scripts/browser-lane.sh node scripts/nightly-heads.ts webkit 0
+src/scripts/browser-lane.sh node src/scripts/nightly-heads.ts chromium 0
+src/scripts/browser-lane.sh node src/scripts/nightly-heads.ts webkit 0
 ```
 
-Groups 0–3 cover all heads; `node scripts/nightly.ts plan` prints their
+Groups 0–3 cover all heads; `node src/scripts/nightly.ts plan` prints their
 membership. An optional final slug limits a local diagnostic to a member
 of its partition; its partial receipt can never clear a nightly verdict.
 Use separate report directories for separate local diagnostics. A
@@ -245,7 +245,7 @@ TC26's nine positive contracts run explicitly, outside hooks and
 Vitest discovery:
 
 ```sh
-node --import ./scripts/bake-loader.mjs --test test/ci/coverage-fire-drill.proof.mjs
+node --import ./src/scripts/bake-loader.mjs --test test/ci/coverage-fire-drill.proof.mjs
 ```
 
 They use pinned Nalati and Template, native physics, the installed format's
@@ -258,11 +258,11 @@ matching hosted green observations spanning seven days, with no intervening
 observed failure. Collect actual run/job/log evidence with:
 
 ```sh
-node scripts/coverage-soak.mjs tmp/coverage-soak
+node src/scripts/coverage-soak.mjs tmp/coverage-soak
 ```
 
 From a committed checkout with pins and generated inputs installed, run
-`node scripts/coverage-fire-drill.mjs tmp/coverage-fire-drill` manually.
+`node src/scripts/coverage-fire-drill.mjs tmp/coverage-fire-drill` manually.
 Its eight plants cover taming, the actual door scene, a supplemental outside
 author export, a required format field, an absent real section, a truncated
 real tar, saved door state and release-hold loss. Each needs baseline green,
@@ -274,7 +274,7 @@ The removed-export and lost-auth owner proofs use the actual Dunes boundary
 checker and API accounts/me route test in isolated exports:
 
 ```sh
-node scripts/coverage-owner-drill.mjs ../api-server ../shard-dunes tmp/coverage-owners
+node src/scripts/coverage-owner-drill.mjs ../api-server ../shard-dunes tmp/coverage-owners
 ```
 
 The owner receipt records each repository's tested SHA and responsible fix
@@ -284,7 +284,7 @@ The page-census fault uses row 32's recorded BUG28 witness, rather than a new
 graphical capture in this campaign.
 
 Only the public Linux Actions worker runs the cold cook portion:
-`node scripts/coverage-cook-drill.mjs tmp/engine-boundaries/cook-drill`.
+`node src/scripts/coverage-cook-drill.mjs tmp/engine-boundaries/cook-drill`.
 It uses three independent cold stores, a real byte-producer edit, production
 part-diff reporting, healed byte equality and rejection of a stale result.
 The runner refuses a local invocation. These scripts retain receipts/logs
@@ -313,7 +313,7 @@ unmount assertions and their existing deadlines are unchanged.
 The full nightly maps the decimal Actions run ID to its low 32 bits for
 `NET_FUZZ_SEEDS`. The network fuzzer keeps its uint32 admission boundary;
 the full run ID remains the report identity. Reproduce the selected seed
-with `node scripts/nightly-seed.ts <run-id>`.
+with `node src/scripts/nightly-seed.ts <run-id>`.
 
 For the actual input fault drill, set `diagnostic_drill=true` beside a
 diagnostic head/browser. The hosted job builds once, then cold-cooks and

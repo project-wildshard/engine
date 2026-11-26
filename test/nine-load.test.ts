@@ -5,7 +5,7 @@ import {mkdtempSync,readFileSync,rmSync} from 'node:fs';
 import {resolve,join} from 'node:path';
 import type {Browser} from 'playwright';
 import {expect,test} from 'vitest';
-import {assertNineLoad,NINE_READY_CAP_MS,NINE_STALL_MS,readNineState,waitNineReady} from '../scripts/loading-flow/nine-load.mjs';
+import {assertNineLoad,NINE_READY_CAP_MS,NINE_STALL_MS,readNineState,waitNineReady} from '../src/scripts/loading-flow/nine-load.mjs';
 
 /** A clock that only moves when the wait sleeps. */
 function fakeClock() {

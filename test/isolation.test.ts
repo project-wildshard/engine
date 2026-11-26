@@ -3,8 +3,8 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The fixture document is the repository's own page.
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { documentIsolation, isolated, withIsolationRule } from '../scripts/app-build/isolation.mjs';
-import { serviceWorkerCore } from '../scripts/app-build/serviceWorker';
+import { documentIsolation, isolated, withIsolationRule } from '../src/scripts/app-build/isolation.mjs';
+import { serviceWorkerCore } from '../src/scripts/app-build/serviceWorker';
 
 const HEADERS = '/*\n  Cache-Control: public, max-age=0, must-revalidate\n\n/b/*\n  ! Cache-Control\n  Cache-Control: public, max-age=31536000, immutable\n';
 

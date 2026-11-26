@@ -8,7 +8,7 @@ import { contentCost, type ContentCostInput } from '@wildshard/format/contentCos
 import { MemoryAdmission } from '@wildshard/format/memoryAdmission';
 import { memoryAttribution, type MemorySnapshot } from '@wildshard/engine/core/memoryAttribution';
 import { phoneFromLedger } from '@wildshard/engine/core/phoneMemoryModel';
-import phoneModel from '../../../../scripts/memory/phone-model.json';
+import phoneModel from '../../../scripts/memory/phone-model.json';
 import { CRASH_LINE, installBudgetOverlay, memoryHeadline, phoneCrashLine } from './budgetOverlay';
 import { installMemoryWarning } from './memoryWarning';
 import { perfDockSections } from '@wildshard/engine/ui/perfDock';

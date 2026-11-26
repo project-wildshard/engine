@@ -3,8 +3,8 @@ import { createHash } from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- Exercise actual prelaunch refusal before any Simulator command.
 import { spawnSync } from 'node:child_process';
 import { expect, test } from 'vitest';
-import { captureCoreHeap, coreHeapProtocol, coreHeapRequested } from '../scripts/core-heap-diagnostic.mjs';
-import { coreMemorySummary } from '../scripts/shard-phone-memory.mjs';
+import { captureCoreHeap, coreHeapProtocol, coreHeapRequested } from '../src/scripts/core-heap-diagnostic.mjs';
+import { coreMemorySummary } from '../src/scripts/shard-phone-memory.mjs';
 
 const target = 'brasscap-mesa', href = 'http://127.0.0.1:4400/?sw=0';
 const samples = [10, 60, 120].map(second => ({phase: `${second}s`, rendererBytes: 100, gpuBytes: 1}));
@@ -98,7 +98,7 @@ test('the actual reader refuses heap mode before touching a fake Simulator', () 
     ['--core-memory=templates', `--rev=${'a'.repeat(40)}`],
     ['--core-memory=brasscap-mesa', '--rev=HEAD'],
   ]) {
-    const result = spawnSync(process.execPath, ['scripts/sim-grid-entry.mjs', '--core-heap=1', ...flags],
+    const result = spawnSync(process.execPath, ['src/scripts/sim-grid-entry.mjs', '--core-heap=1', ...flags],
       {env: {...process.env, SIM_UDID: 'no-such-core-heap-device'}, encoding: 'utf8', timeout: 10000});
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('one pinned cold Template');

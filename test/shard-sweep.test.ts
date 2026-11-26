@@ -3,7 +3,7 @@
 // request was skipped (no nightly key in shard repos, by design), so opus-fr13 tagged and dispatched by hand.
 import {readFileSync} from 'node:fs';
 import {describe, expect, it} from 'vitest';
-import {missingTag, publishedRows, sweepPlan} from '../scripts/shard-sweep.mjs';
+import {missingTag, publishedRows, sweepPlan} from '../src/scripts/shard-sweep.mjs';
 
 const BUILT = 'd7b9c83f327843bfdfbeaed59d3ff263184f4c0d', OTHER = 'a'.repeat(40);
 const pine = {'pine-hollow': {version: '0.0.17', revision: 18, hash: 'h18', channel: 'staging', commit: BUILT}};
@@ -57,7 +57,7 @@ describe('the shard sweep (QA 11-25 row 61)', () => {
     const sweep = readFileSync('.github/workflows/shard-sweep.yml', 'utf8');
     expect(sweep).toMatch(/schedule:\n\s+- cron:/u);
     expect(sweep).toContain('permission-workflows: write');
-    expect(sweep).toContain('run: node scripts/shard-sweep.mjs');
+    expect(sweep).toContain('run: node src/scripts/shard-sweep.mjs');
     expect(readFileSync('.github/workflows/shard-pin.yml', 'utf8')).toContain(
       'run-name: shard-pin ${{ inputs.slug || github.event.client_payload.slug }} r${{ inputs.revision || github.event.client_payload.revision }}');
   });

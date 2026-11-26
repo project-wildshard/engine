@@ -2,7 +2,7 @@
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Committed native checkpoints are compressed proof data.
 import { gzipSync, gunzipSync } from 'node:zlib';
-import { readWitnessManifest } from '../../../scripts/witness-checkpoints.mjs';
+import { readWitnessManifest } from '../../../src/scripts/witness-checkpoints.mjs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Native proof maps are generated beside the local product.
 import { fileURLToPath } from 'node:url';
 import * as v from 'valibot';

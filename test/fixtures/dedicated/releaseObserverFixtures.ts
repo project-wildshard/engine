@@ -5,7 +5,7 @@ import {createServer} from 'node:http';
 import {createHash,generateKeyPairSync,sign} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import type {PreparedObserver} from './releaseObserver';
-import {observationInputs} from '../../../scripts/mmo-release-observer-inputs.mjs';
+import {observationInputs} from '../../../src/scripts/mmo-release-observer-inputs.mjs';
 import {folderInput,roomBench,serverInput} from './roomBench';
 import {GAMEPLAY_SLICE} from '../gameplaySlice';
 import {ReleaseWatch} from '../../../src/server/host/dedicated/releaseFile';

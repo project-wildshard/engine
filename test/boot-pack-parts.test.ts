@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { bootPackParts } from '../scripts/boot-pack-parts.mjs';
+import { bootPackParts } from '../src/scripts/boot-pack-parts.mjs';
 import { Scope } from '../src/shared/engine/app/scope';
 import type { PackFile, PackPart } from '../src/shared/engine/boot/tables';
 import { TexturePackReads } from '../src/client/engine/boot/texturePack';

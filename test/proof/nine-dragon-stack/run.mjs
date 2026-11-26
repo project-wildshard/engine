@@ -24,14 +24,14 @@ const oracleFiles = ['test/fixtures/nine-native-oracle-inputs.ts', 'test/fixture
   'test/fixtures/nine-native-oracle.ts', 'test/fixtures/nine-native-constants.ts', 'test/fixtures/native-oracle.ts',
   'test/fixtures/native-program.ts'].map(path => new URL(path, ROOT).href);
 installAppIdentity(WILDSHARD_IDENTITY);
-function inputFiles() { return [...loaded, ...oracleFiles, ...['src/shards/nine-dragon-stack/data/headlessAssembly.json', 'test/proof/nine-dragon-stack/run.mjs', 'src/test/game/headless/worker.ts', 'scripts/sim-node-loader.mjs', 'pnpm-lock.yaml', 'public/assets/physics/rapier.wasm'].map(path => new URL(path, ROOT).href)]; }
+function inputFiles() { return [...loaded, ...oracleFiles, ...['src/shards/nine-dragon-stack/data/headlessAssembly.json', 'test/proof/nine-dragon-stack/run.mjs', 'src/test/game/headless/worker.ts', 'src/scripts/sim-node-loader.mjs', 'pnpm-lock.yaml', 'public/assets/physics/rapier.wasm'].map(path => new URL(path, ROOT).href)]; }
 function inputs() {
   const files = [...new Set(inputFiles())].sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
   const hash = createHash('sha256');
   for (const url of files) hash.update(url.slice(ROOT.href.length)).update('\0').update(readFileSync(new URL(url))).update('\0');
   return hash.digest('hex');
 }
-const { generateWitness } = await import('../../../scripts/witness-generation.mjs');
+const { generateWitness } = await import('../../../src/scripts/witness-generation.mjs');
 const mode = process.argv.at(2) ?? 'all', fingerprint = inputs();
 let checkpointResult;
 if (mode !== 'fresh') {

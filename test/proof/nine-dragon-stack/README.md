@@ -113,9 +113,9 @@ CLI admits the same closure in each mode; `fresh` and every replay refuse stale 
 wire is strictly parsed and the engine validates the packed snapshot. Regenerate explicitly from a clean candidate:
 
 ```sh
-node --import ./scripts/sim-node-loader.mjs test/proof/nine-dragon-stack/run.mjs checkpoints
-node --import ./scripts/sim-node-loader.mjs test/proof/nine-dragon-stack/run.mjs fresh
-node --import ./scripts/sim-node-loader.mjs test/proof/nine-dragon-stack/run.mjs all
+node --import ./src/scripts/sim-node-loader.mjs test/proof/nine-dragon-stack/run.mjs checkpoints
+node --import ./src/scripts/sim-node-loader.mjs test/proof/nine-dragon-stack/run.mjs fresh
+node --import ./src/scripts/sim-node-loader.mjs test/proof/nine-dragon-stack/run.mjs all
 ```
 
 `compatibility.json` is re-recorded from the real `all` run, with canonical hashes. Engine or Nine closure changes need

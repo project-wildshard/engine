@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- The fixture carries the exact native section hash.
 import { createHash } from 'node:crypto';
 import { expect, test, vi } from 'vitest';
-import { lateAudioGroups } from '../scripts/app-build/audioPacks';
+import { lateAudioGroups } from '../src/scripts/app-build/audioPacks';
 import { createCatalogueAudio } from '@wildshard/engine/audio/levelAudio';
 import { parseAudioData } from '@wildshard/format/audio';
 import * as settings from '@wildshard/engine/ui/Settings';

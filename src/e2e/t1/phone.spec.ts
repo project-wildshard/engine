@@ -3,12 +3,12 @@ import {
   SOFTWARE_GL_STALL_MS,
   STALL_MS,
   untracedChanges,
-} from '../../../scripts/loading-bar-rule.mjs'
+} from '../../scripts/loading-bar-rule.mjs'
 import { readClones } from './clones.ts'
 import { expect, phoneTest as test } from './fixtures.ts'
 import { state } from './probe.ts'
 
-import type { BarRow } from '../../../scripts/loading-bar-rule.mjs'
+import type { BarRow } from '../../scripts/loading-bar-rule.mjs'
 import type { Page } from '@playwright/test'
 
 interface Capture {
@@ -126,7 +126,7 @@ test('the phone keeps only its committed workers after control', async ({
 })
 
 // ENGINE-MEMORY EM26 (design rule 7): the phone tier has one texture path, KTX2. Brasscap's phone boot uploads no shard
-// texture as decoded RGBA8 over 1 MB (scripts/memory/uploadRecorder.mjs).
+// texture as decoded RGBA8 over 1 MB (src/scripts/memory/uploadRecorder.mjs).
 test('the phone boot uploads no shard texture as RGBA8 over 1 MB', async ({
   page,
 }): Promise<void> => {

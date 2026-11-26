@@ -16,7 +16,7 @@ test('complete unprivileged check reports all probes after a conflict and change
   const keyFile = join(directory, 'public-key'); writeFileSync(keyFile, `${key}\n`); chmodSync(keyFile, 0o644);
   const env = 'PACK_ORIGIN=\nRELEASE_URL=\nRELEASE_PUBLIC_KEY=\nSEAT_SECRET=check-only-value\n';
   for (const channel of ['production', 'staging']) writeFileSync(join(etc, `${channel}.env`), env);
-  for (const name of ['setup-state.mjs', 'pull.mjs', 'dump.sh', 'restore-check.sh', 'uptime.sh', 'health-stub.mjs']) copyFileSync(join('scripts/vps', name), join(scripts, name));
+  for (const name of ['setup-state.mjs', 'pull.mjs', 'dump.sh', 'restore-check.sh', 'uptime.sh', 'health-stub.mjs']) copyFileSync(join('src/scripts/vps', name), join(scripts, name));
   const executable = (name: string, body: string): void => { const path = join(bin, name); writeFileSync(path, `#!/bin/bash\n${body}\n`); chmodSync(path, 0o755); };
   executable('id', `if [ "$#" = 1 ]; then printf 1000; else printf '${process.getuid?.()}'; fi`);
   executable('getent', `printf 'wildshard:x:${process.getgid?.()}:\\n'`);
@@ -26,7 +26,7 @@ test('complete unprivileged check reports all probes after a conflict and change
   for (const name of ['pg_lsclusters', 'runuser', 'curl', 'install', 'chown', 'chmod', 'apt-get', 'useradd']) executable(name, `printf 'MUTATION ${name}\\n' >> "$WS_CHECK_CALLS"; exit 90`);
   const ss = join(directory, 'ss.txt'); copyFileSync('test/fixtures/vps-ss-2026-11-09.txt', ss);
   const serve = join(directory, 'serve.json'); writeFileSync(serve, JSON.stringify({ TCP: { '443': { TCPForward: '127.0.0.1:1234' } } }));
-  const script = readFileSync('scripts/vps/setup.sh', 'utf8').replace('ETC=/etc/wildshard HOME_DIR=/var/lib/wildshard', `ETC=${etc} HOME_DIR=${join(directory, 'data')}`).replace('NODE=/usr/bin/node', `NODE=${process.execPath}`).replace('KEY_FILE=/home/raynos/wildshard-e7/release-public-key.hex', `KEY_FILE=${keyFile}`);
+  const script = readFileSync('src/scripts/vps/setup.sh', 'utf8').replace('ETC=/etc/wildshard HOME_DIR=/var/lib/wildshard', `ETC=${etc} HOME_DIR=${join(directory, 'data')}`).replace('NODE=/usr/bin/node', `NODE=${process.execPath}`).replace('KEY_FILE=/home/raynos/wildshard-e7/release-public-key.hex', `KEY_FILE=${keyFile}`);
   const entry = join(scripts, 'setup.sh'); writeFileSync(entry, script);
   chmodSync(etc, 0o000);
   try {

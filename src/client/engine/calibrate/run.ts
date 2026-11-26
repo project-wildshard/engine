@@ -84,7 +84,7 @@ export async function runCalibration(progress: (s: string) => void = () => undef
       linkMs: fitted('linkMs', links), rigCpuMs: fitted('rigCpuMs', js.rig), bodyCpuMs: fitted('bodyCpuMs', js.body), agentCpuMs: fitted('agentCpuMs', js.agent),
     };
     return { schema: 1, measuredAt: new Date().toISOString(), device: 'Apple M5 Max', renderer, userAgent: navigator.userAgent, pixels: 804 * 1748,
-      source: 'budgets/calibration.json (scripts/calibrate.mjs)', phone: { ratio: 10, source: 'docs/tasks/asks/E283.md; hot phone:M5 ≈10× (cool ≈6×)', assumption: 'ASSUMPTION: hot iPhone costs equal measured M5 costs × 10; no phone calibration was run (decision 99)' },
+      source: 'budgets/calibration.json (src/scripts/calibrate.mjs)', phone: { ratio: 10, source: 'docs/tasks/asks/E283.md; hot phone:M5 ≈10× (cool ≈6×)', assumption: 'ASSUMPTION: hot iPhone costs equal measured M5 costs × 10; no phone calibration was run (decision 99)' },
       combine: 'serial', costs, fits, cold, hot, js, coldJs, coldLinks, links, wasm, heat, stable, lowPowerMode: 'unknown',
       flags: [...stable ? [] : ['preheat did not converge below 2% in 30-second windows'], 'Low Power Mode cannot be detected reliably by Web APIs; unknown'],
       protocol: { timing: '5 batches ×16–128 frozen draws (100ms pilot target); pass range 8/32/128, pending 1px write/readPixels sync; p50; interleaved empty baselines; positive linear fits require r² >=0.9. Fresh 64/256/1024-program compile + first-use + readback measures link/warm-up including conservative first-use overhead, without 10ms async polling. Throughput is a GPU ruler including submission, not timer-query GPU time.',

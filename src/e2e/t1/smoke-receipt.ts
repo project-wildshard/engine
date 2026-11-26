@@ -5,9 +5,9 @@ import path from 'node:path'
 import {
   readSmokeHistory,
   smokeSplitRegression,
-} from '../../../scripts/smoke-split-history.mjs'
+} from '../../scripts/smoke-split-history.mjs'
 
-import type { SmokeReceipt } from '../../../scripts/smoke-split-history.mjs'
+import type { SmokeReceipt } from '../../scripts/smoke-split-history.mjs'
 import type { Page } from '@playwright/test'
 
 interface Span {

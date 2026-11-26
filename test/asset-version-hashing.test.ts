@@ -5,7 +5,7 @@ import { syncBuiltinESMExports } from 'node:module';
 // oxlint-disable-next-line import/no-nodejs-modules -- Keep all fixtures beneath checkout scratch.
 import { resolve } from 'node:path';
 import { expect, test, vi } from 'vitest';
-import { contentNamed, hashTree } from '../scripts/app-build/assetHashes';
+import { contentNamed, hashTree } from '../src/scripts/app-build/assetHashes';
 
 test('version filtering omits discarded bodies and retains current full-tree hashes',()=>{
   const root=mkdtempSync(resolve('tmp/asset-version-'));

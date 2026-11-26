@@ -5,7 +5,7 @@
 // manifest name the same colour.
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { afterFirstPaint, stampBuildHtml } from '../scripts/app-build/buildIdentity.mjs';
+import { afterFirstPaint, stampBuildHtml } from '../src/scripts/app-build/buildIdentity.mjs';
 
 const source = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const manifest = JSON.parse(readFileSync(new URL('../public/manifest.webmanifest', import.meta.url), 'utf8')) as { background_color: string; theme_color: string };

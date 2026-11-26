@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { fingerprintLines, fingerprintsOf, sideAt } from '../scripts/fingerprints.ts';
+import { fingerprintLines, fingerprintsOf, sideAt } from '../src/scripts/fingerprints.ts';
 
 // SHARD-COMPAT SP4: CI prints the fingerprints a push moves. A render edit moves the renderer (and the cook, which
 // names it); a doc edit moves none; the format and chain lines move with the format pin.

@@ -7,8 +7,8 @@ import { tmpdir } from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { hasShardSource, manifestFolders, outputManifest, outputFolderOf, shardOutputs, shardSourceDir, singleShardFolder } from '../scripts/shard-outputs.mjs';
-import { mapShards } from '../scripts/map-hash.mjs';
+import { hasShardSource, manifestFolders, outputManifest, outputFolderOf, shardOutputs, shardSourceDir, singleShardFolder } from '../src/scripts/shard-outputs.mjs';
+import { mapShards } from '../src/scripts/map-hash.mjs';
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });

@@ -3,8 +3,8 @@ import { expect, test } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve isolated synthetic report paths.
 import { resolve } from 'node:path';
-import { createShardPlan, readShardPlan, CI_SHARD_COUNT } from '../scripts/test-shard-plan';
-import { measuredWeights, selectTimingHistory } from '../scripts/vitest-plan';
+import { createShardPlan, readShardPlan, CI_SHARD_COUNT } from '../src/scripts/test-shard-plan';
+import { measuredWeights, selectTimingHistory } from '../src/scripts/vitest-plan';
 
 const source = { sha: 'a'.repeat(40), run: '123' };
 function fixture() {

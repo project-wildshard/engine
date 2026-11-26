@@ -7,7 +7,7 @@ import { resolve } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Give the fixture the same measured hash checks as the product reader.
 import { createHash } from 'node:crypto';
 import { encodeTerrainTile } from '@wildshard/format/terrainTileBytes';
-import { bakeWorldMapAtlas, folderMapBytes, writeWorldMapAtlas } from '../scripts/app-build/worldMapAtlas';
+import { bakeWorldMapAtlas, folderMapBytes, writeWorldMapAtlas } from '../src/scripts/app-build/worldMapAtlas';
 
 test('one atlas includes every unique map with stable crops and an explicit nonblank plain-plot tile', async () => {
   const red = await sharp({ create: { width: 8, height: 8, channels: 3, background: '#ff0000' } }).png().toBuffer();
@@ -55,8 +55,8 @@ test('the app build writes one atlas and its define, verifies source hashes, and
 });
 
 test('the atlas precedes the app build, and a cold atlas refuses an unbuilt product', async () => {
-  const script = readFileSync('scripts/build-app.mjs', 'utf8');
-  const pipeline = readFileSync('scripts/app-build-pipeline.mjs', 'utf8');
+  const script = readFileSync('src/scripts/build-app.mjs', 'utf8');
+  const pipeline = readFileSync('src/scripts/app-build-pipeline.mjs', 'utf8');
   const preparation = pipeline.slice(pipeline.indexOf('export function prepareAppBuild()'), pipeline.indexOf('export async function finishAppBuild('));
   expect(preparation).toContain('writeWorldMapAtlas(process.cwd())');
   const prepareCall = script.indexOf('  prepareAppBuild();');

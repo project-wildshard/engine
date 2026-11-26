@@ -10,8 +10,8 @@ import { afterEach, expect, test } from 'vitest';
 
 // MMO-SERVER-PLAN MS3.5 (J266): the agents' account, its allowlist and its two helpers. Neither helper honours its test
 // switch as root, so these run as the developer; the box never sees them.
-const CONFIG = resolve('scripts/vps/wildshard-config'), APPLY = resolve('scripts/vps/wildshard-apply.mjs');
-const harden = readFileSync('scripts/vps/harden-apply.sh', 'utf8');
+const CONFIG = resolve('src/scripts/vps/wildshard-config'), APPLY = resolve('src/scripts/vps/wildshard-apply.mjs');
+const harden = readFileSync('src/scripts/vps/harden-apply.sh', 'utf8');
 const made: string[] = [];
 afterEach(() => { for (const path of made.splice(0)) rmSync(path, { recursive: true, force: true }); });
 function scratch(): string {
@@ -116,7 +116,7 @@ test('wildshard-config narrows ALLOWED_ORIGINS to the game hosts, keeping the ch
 // SA33: the placement pair. Each placement key takes one exact value or blank, and the
 // two go together, as main.ts throws at boot on one without the other.
 const STAGING_FILE = 'https://packs.wildshard.io/releases/staging-placements.json';
-const PLACEMENT_KEY = /^export const PLACEMENT_PUBLIC_KEY = '([0-9a-f]+)';$/mu.exec(readFileSync('scripts/preview-grid.ts', 'utf8'))?.[1] ?? '';
+const PLACEMENT_KEY = /^export const PLACEMENT_PUBLIC_KEY = '([0-9a-f]+)';$/mu.exec(readFileSync('src/scripts/preview-grid.ts', 'utf8'))?.[1] ?? '';
 
 test('wildshard-config pins the placement key preview-grid.ts holds, an Ed25519 SPKI', () => {
   expect(PLACEMENT_KEY).toMatch(/^302a300506032b6570032100[0-9a-f]{64}$/u);
@@ -349,7 +349,7 @@ test('wildshard-apply never reads a file a channel user owns', () => {
 });
 
 test("wildshard-apply pins the same release public key setup.sh embeds", () => {
-  const embedded = /^EXPECTED_RELEASE_PUBLIC_KEY=([0-9a-f]+)$/mu.exec(readFileSync('scripts/vps/setup.sh', 'utf8'))?.[1];
+  const embedded = /^EXPECTED_RELEASE_PUBLIC_KEY=([0-9a-f]+)$/mu.exec(readFileSync('src/scripts/vps/setup.sh', 'utf8'))?.[1];
   expect(embedded).toMatch(/^302a300506032b6570032100[0-9a-f]{64}$/u);
   expect(readFileSync(APPLY, 'utf8')).toContain(`const RELEASE_PUBLIC_KEY = '${embedded ?? ''}';`);
 });
@@ -398,12 +398,12 @@ test("the agent logs in by root's copy of its key only, and sshd lets in raynos 
   expect(harden).not.toMatch(/\/home\/\$AGENT/u);
   expect(harden).not.toMatch(/usermod[^\n]*\bsudo\b[^\n]*wildshard-agent|-aG sudo "\$AGENT"/u);
   for (const file of ['wildshard-agent.pub', 'wildshard-ci.pub']) {
-    const key = readFileSync(`scripts/vps/${file}`, 'utf8').trim().split('\n');
+    const key = readFileSync(`src/scripts/vps/${file}`, 'utf8').trim().split('\n');
     expect(key).toHaveLength(1);
     expect(key[0]).toMatch(/^ssh-ed25519 AAAAC3NzaC1lZDI1NTE5[A-Za-z0-9+/]+=* \S/u);
     expect(key[0]).not.toContain('PRIVATE');
   }
-  expect(readFileSync('scripts/vps/wildshard-ci.pub', 'utf8')).not.toBe(readFileSync('scripts/vps/wildshard-agent.pub', 'utf8'));
+  expect(readFileSync('src/scripts/vps/wildshard-ci.pub', 'utf8')).not.toBe(readFileSync('src/scripts/vps/wildshard-agent.pub', 'utf8'));
   // sudo and SSH sessions reach Sentry through PAM for every account, the agent's too (VH14).
   expect(harden).toMatch(/for service in sshd sudo login; do/u);
 });

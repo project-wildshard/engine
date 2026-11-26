@@ -26,7 +26,7 @@ installAppIdentity(WILDSHARD_IDENTITY);
 /** The headless inputs: every repo module the witness loaded (the runtime, the engine, the tape), the physics module and the shard's assets. */
 function inputFiles() {
   const assets = new URL('src/shards/far-reach/assets/', ROOT);
-  return [...loaded, ...['test/proof/far-reach/run.mjs', 'scripts/sim-node-loader.mjs', 'pnpm-lock.yaml', 'public/assets/physics/rapier.wasm'].map(path => new URL(path, ROOT).href), ...readdirSync(assets).map(name => new URL(name, assets).href)];
+  return [...loaded, ...['test/proof/far-reach/run.mjs', 'src/scripts/sim-node-loader.mjs', 'pnpm-lock.yaml', 'public/assets/physics/rapier.wasm'].map(path => new URL(path, ROOT).href), ...readdirSync(assets).map(name => new URL(name, assets).href)];
 }
 function inputs() {
   const files = [...new Set(inputFiles())].sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
@@ -35,7 +35,7 @@ function inputs() {
   return hash.digest('hex');
 }
 
-const { generateWitness } = await import('../../../scripts/witness-generation.mjs');
+const { generateWitness } = await import('../../../src/scripts/witness-generation.mjs');
 const mode = process.argv.at(2) ?? 'all';
 let checkpointResult;
 if (mode !== 'fresh') {

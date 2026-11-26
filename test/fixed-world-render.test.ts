@@ -2,7 +2,7 @@
 import { runInNewContext } from 'node:vm';
 import { expect, test } from 'vitest';
 import { Object3D, PerspectiveCamera, Vector3 } from 'three';
-import { fixedWorldFrame } from '../scripts/parity/fixed-render.mjs';
+import { fixedWorldFrame } from '../src/scripts/parity/fixed-render.mjs';
 
 function fixture(fail = false, locked = false, submitHeld = true) {
   let live = 37;

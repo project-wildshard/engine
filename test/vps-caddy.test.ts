@@ -6,7 +6,7 @@ import { expect, test } from 'vitest';
 
 // VPS-HARDENING VH9 and D7: both rooms sites answer /up the same way, so Sentry can watch production and staging from
 // outside the box. `--print` renders the file and stops before any root step.
-const CADDY = resolve('scripts/vps/harden-caddy.sh');
+const CADDY = resolve('src/scripts/vps/harden-caddy.sh');
 
 function render(addresses: string): string {
   const run = spawnSync('bash', [CADDY, '--print', addresses], { encoding: 'utf8' });

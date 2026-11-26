@@ -4,7 +4,7 @@
  *
  * Tests load no compiler: the guest bytes are source-keyed snapshots in `sdk-built/script-guests` (scriptGuests.ts).
  * A new or changed guest source is pinned once with `WS_FREEZE_GUESTS=1 WS_SHARDDEV=<sharddev checkout>`, which runs
- * `scripts/freeze-script-guest.mjs` (sharddev's real compiler and fuel metering) and writes the snapshot to commit.
+ * `src/scripts/freeze-script-guest.mjs` (sharddev's real compiler and fuel metering) and writes the snapshot to commit.
  *
  * Guest helpers, all in the guest's own memory (layout from `scriptV1Layout`):
  * - `events()`: inbox events this call; `ev(i, slot)`: slot 0..5 of event i (kind, subject, a, b, c, d).
@@ -58,7 +58,7 @@ export async function decisionGuest(body: string, shape: { states?: number; para
 export async function pinnedGuest(source: string, options: Readonly<Record<string, unknown>>): Promise<Uint8Array> {
   try { return await frozenLegacyGuest(source, options); } catch (error) {
     if (process.env['WS_FREEZE_GUESTS'] !== '1') throw new Error(`Unpinned decision guest: rerun with WS_FREEZE_GUESTS=1 WS_SHARDDEV=<sharddev> to pin it (${String(error)})`);
-    execFileSync(process.execPath, ['scripts/freeze-script-guest.mjs'], { input: JSON.stringify(['compileScript', [source, options]]), stdio: ['pipe', 'pipe', 'inherit'] });
+    execFileSync(process.execPath, ['src/scripts/freeze-script-guest.mjs'], { input: JSON.stringify(['compileScript', [source, options]]), stdio: ['pipe', 'pipe', 'inherit'] });
     return frozenLegacyGuest(source, options);
   }
 }

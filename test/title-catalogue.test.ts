@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { contentHash } from '../src/shared/game/shardfile/contentHash';
 import { GridCellEvents } from '../src/shared/game/grid/cellEvents';
-import { titleRowOf } from '../scripts/app-build/catalogue';
+import { titleRowOf } from '../src/scripts/app-build/catalogue';
 import { titleMetadata, type TitleManifest } from '../src/client/game/shard/titleList';
 
 test('a title row is a discovery document\'s data, with its cards where a home serves them', () => {

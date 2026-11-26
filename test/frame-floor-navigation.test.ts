@@ -1,7 +1,7 @@
 import {expect, test} from 'vitest';
 // oxlint-disable-next-line import/no-nodejs-modules -- run the real serialized protocol command without opening a game browser
 import {runInNewContext} from 'node:vm';
-import {floorGridBenchmarkUrl, FLOOR_GRID_ENTER} from '../scripts/frame-floor-navigation.mjs';
+import {floorGridBenchmarkUrl, FLOOR_GRID_ENTER} from '../src/scripts/frame-floor-navigation.mjs';
 
 test('the benchmark disables worker registration before the title loads', () => {
   const url = new URL(floorGridBenchmarkUrl('http://127.0.0.1:4401/old?sw=1'));

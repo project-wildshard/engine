@@ -1,4 +1,4 @@
-// scripts/main-push.mjs (meta M1, ported from meta's MF7 main-push test): real git, a bare fake remote and two clones of it. Lane A works in the
+// src/scripts/.kit/main-push.mjs (meta M1, ported from meta's MF7 main-push test): real git, a bare fake remote and two clones of it. Lane A works in the
 // "shared checkout" beside another lane's tracked edit, staged file and untracked file; lane B pushes in between.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -6,9 +6,9 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync }
 import { join } from 'node:path';
 import { after, beforeEach, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { gateEnv, heldCommits, parseArgs } from '../scripts/main-push.mjs';
+import { gateEnv, heldCommits, parseArgs } from '../src/scripts/.kit/main-push.mjs';
 
-const SCRIPT = fileURLToPath(new URL('../scripts/main-push.mjs', import.meta.url));
+const SCRIPT = fileURLToPath(new URL('../src/scripts/.kit/main-push.mjs', import.meta.url));
 const repoDir = fileURLToPath(new URL('..', import.meta.url));
 const work = join(repoDir, `tmp/main-push-test-${process.pid}`);
 const remote = join(work, 'remote.git');

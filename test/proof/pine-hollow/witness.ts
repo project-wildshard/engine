@@ -12,7 +12,7 @@ import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- Committed gameplay checkpoints are compressed native save wires.
 import { gunzipSync, gzipSync } from 'node:zlib';
-import { readWitnessManifest } from '../../../scripts/witness-checkpoints.mjs';
+import { readWitnessManifest } from '../../../src/scripts/witness-checkpoints.mjs';
 import * as v from 'valibot';
 import type { ShardFolder } from '../../../src/shared/game/shardfile/shardFolder';
 import { createSimHost, type SimHost } from '../../../src/server/engine/sim';

@@ -7,7 +7,7 @@ import {pathToFileURL} from 'node:url';
 import {expect,test} from 'vitest';
 
 test('in real Nalati a bot mounts its own horse and gallops off on the wire\'s reins',()=>{
-  const child=spawnSync(process.execPath,['--import',pathToFileURL(resolve('scripts/sim-node-loader.mjs')).href,
+  const child=spawnSync(process.execPath,['--import',pathToFileURL(resolve('src/scripts/sim-node-loader.mjs')).href,
     resolve('test/fixtures/headless/nalati-bot-ride-run.ts')],{encoding:'utf8',timeout:30_000});
   expect(child.status,child.stdout+child.stderr).toBe(0);expect(child.stdout).toContain('"story":"bot-ride"');
 },35_000);

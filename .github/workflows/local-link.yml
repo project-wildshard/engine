@@ -26,7 +26,7 @@ jobs:
       - run: pnpm exec npr install --frozen
       - name: Prove local admission, publication guards and exact shard comparison
         run: >-
-          node scripts/vitest-tmp.ts run
+          node src/scripts/vitest-tmp.ts run
           test/pin-local.test.ts test/local-candidate-guards.test.ts
           test/shard-check.test.ts --reporter=default --reporter=json
           --outputFile.json=tmp/local-link/proof.json

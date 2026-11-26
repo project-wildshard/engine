@@ -1,10 +1,10 @@
 // meta IPHONE13-DRIFTWOOD DW1 (mini-driftwood13): the route bench's numbers. The device half runs on the iPhone 13
 // (meta project/evidence/iphone13-driftwood/).
 import { expect, test } from 'vitest';
-import { FRAME_LOG_READ, FRAME_LOG_START, gapWork, nameLongFrames, otherKind, OWNER_CENSUS } from '../scripts/memory/iphone/census.mjs';
-import { fenceFrames, fenceWaits } from '../scripts/memory/iphone/gpuFence.mjs';
-import { linkStages, linkTable } from '../scripts/memory/iphone/link.mjs';
-import { legSummary, routeFor, routeTable, worstSegment, type LegSample } from '../scripts/memory/iphone/route.mjs';
+import { FRAME_LOG_READ, FRAME_LOG_START, gapWork, nameLongFrames, otherKind, OWNER_CENSUS } from '../src/scripts/memory/iphone/census.mjs';
+import { fenceFrames, fenceWaits } from '../src/scripts/memory/iphone/gpuFence.mjs';
+import { linkStages, linkTable } from '../src/scripts/memory/iphone/link.mjs';
+import { legSummary, routeFor, routeTable, worstSegment, type LegSample } from '../src/scripts/memory/iphone/route.mjs';
 
 const second = (frameMs: number[], extra: Partial<LegSample> = {}): LegSample => ({ seconds: 1, frames: frameMs.length, frameMs,
   updateMs: frameMs.map(() => 4), renderMs: frameMs.map(() => 6), gpuApproxMs: frameMs.map(() => 1), draws: 80, triangles: 700_000,

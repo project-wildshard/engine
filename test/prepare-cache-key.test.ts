@@ -5,11 +5,11 @@ import {dirname,resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Use the actual product receipt and index digest algorithms.
 import {createHash} from 'node:crypto';
 import {afterEach,expect,test} from 'vitest';
-import {preparationCacheKey} from '../scripts/preparation-cache-key.mjs';
-import {InputHashMemo} from '../scripts/bake-input-hashes.mjs';
-import {captureFolderInputs,folderInputKey,folderToolchainKey,publishFolderInputs,recordBundle} from '../scripts/shardfile-inputs.mjs';
-import {publishSourceSnapshot,sourceSnapshotIdentity} from '../scripts/source-input-proof.mjs';
-import {shardfileValidationRevision} from '../scripts/shardfile-validation-revision.mjs';
+import {preparationCacheKey} from '../src/scripts/preparation-cache-key.mjs';
+import {InputHashMemo} from '../src/scripts/bake-input-hashes.mjs';
+import {captureFolderInputs,folderInputKey,folderToolchainKey,publishFolderInputs,recordBundle} from '../src/scripts/shardfile-inputs.mjs';
+import {publishSourceSnapshot,sourceSnapshotIdentity} from '../src/scripts/source-input-proof.mjs';
+import {shardfileValidationRevision} from '../src/scripts/shardfile-validation-revision.mjs';
 
 const owned:string[]=[];
 afterEach(()=>{for(const root of owned.splice(0))rmSync(root,{recursive:true,force:true});});
@@ -21,12 +21,12 @@ function write(root:string,path:string,body:string):void {
 async function fixture() {
   mkdirSync('tmp',{recursive:true});const root=realpathSync(mkdtempSync(resolve('tmp/preparation-key-')));owned.push(root);
   const cacheRoot=resolve(root,'cache'),products=['alpha','beta'];
-  const sourceFiles=['package.json','pnpm-lock.yaml','pnpm-workspace.yaml','scripts/source-generation-outputs.json','scripts/compiler.mjs',
-    'scripts/sim-safari-ready.py','scripts/test_sim_lane.py',
+  const sourceFiles=['package.json','pnpm-lock.yaml','pnpm-workspace.yaml','src/scripts/source-generation-outputs.json','scripts/compiler.mjs',
+    'src/scripts/sim-safari-ready.py','src/scripts/test_sim_lane.py',
     ...products.flatMap(slug=>[`src/shards/${slug}/manifest.json`,`src/shards/${slug}/shard.config.ts`])].sort();
   for(const path of sourceFiles)write(root,path,'{}');
   write(root,'scripts/compiler.mjs','export const version=1;');
-  write(root,'scripts/source-generation-outputs.json',JSON.stringify({producers:{fixture:['src/output.generated.ts']}}));
+  write(root,'src/scripts/source-generation-outputs.json',JSON.stringify({producers:{fixture:['src/output.generated.ts']}}));
   write(root,'src/output.generated.ts','export const output=1;');
   write(root,'docs/note.md','one');write(root,'.github/workflows/test.yml','one');
   const inventory=resolve(root,'inventory.json');
@@ -81,7 +81,7 @@ test('compiler and generator input changes require a current phase and then a ne
 
 test('Simulator-only changes retain transport identity only after full current source admission',async()=>{
   const f=await fixture(),first=f.read();expect(first.qualified,first.reason).toBe(true);
-  for(const path of ['scripts/sim-safari-ready.py','scripts/test_sim_lane.py']) {
+  for(const path of ['src/scripts/sim-safari-ready.py','src/scripts/test_sim_lane.py']) {
     write(f.root,path,'changed Simulator behavior');
     expect(f.read()).toMatchObject({qualified:false,key:fallback});
     f.publish();expect(f.read()).toEqual(first);
@@ -89,7 +89,7 @@ test('Simulator-only changes retain transport identity only after full current s
 });
 
 test('a product that reads a Simulator file still invalidates its admitted build key',async()=>{
-  const f=await fixture(),path='scripts/sim-safari-ready.py';
+  const f=await fixture(),path='src/scripts/sim-safari-ready.py';
   await f.admit('alpha',path);const first=f.read();expect(first.qualified,first.reason).toBe(true);
   write(f.root,path,'changed real author input');f.publish();
   expect(f.read()).toMatchObject({qualified:false,key:fallback});

@@ -3,7 +3,7 @@ import { installNalatiSpeciesFixture } from './nalati-species-world';
 import * as v from 'valibot';
 import perchRows from '../../src/shards/driftwood-isle/data/mixedPopulation.json' with { type: 'json' };
 import { Scope } from '../../src/shared/engine/app/scope';
-import { prepareNativeScalarBlocks } from '../../scripts/bake/nativeWorld.mjs';
+import { prepareNativeScalarBlocks } from '../../src/scripts/bake/nativeWorld.mjs';
 import { nalatiNativeGeography } from './nalati-native-program';
 import { pineDensityBlob } from '../../src/shards/pine-hollow/generators/forestRows';
 import pineManifest from '../../src/shards/pine-hollow/manifest.json' with { type: 'json' };

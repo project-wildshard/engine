@@ -8,9 +8,9 @@ import { resolve } from 'node:path';
 import { env as processEnv } from 'node:process';
 import { expect, test } from 'vitest';
 import { GENERATED_SOURCE_POLICY, checkGeneratedSourceRevision, checkGeneratedSourceTree,
-  generatedSourceIncreases, generatedSourcePolicy } from '../scripts/generated-source.mjs';
-import { commitCheckFailed } from '../scripts/precommit-jobs.mjs';
-import { ignoredBy, precommitInputs } from '../scripts/precommit-inputs.mjs';
+  generatedSourceIncreases, generatedSourcePolicy } from '../src/scripts/generated-source.mjs';
+import { commitCheckFailed } from '../src/scripts/precommit-jobs.mjs';
+import { ignoredBy, precommitInputs } from '../src/scripts/precommit-inputs.mjs';
 
 const old = 'src/shards/fixture/data/old.generated.json', source = 'a'.repeat(40);
 const policy = (files: string[] = [old]) => generatedSourcePolicy({ schema: 'generated-source/1', source, files });
@@ -56,7 +56,7 @@ test('new staged generated files and headers refuse even when the working copy i
 }));
 
 test('absent outputs remain a completed-tree refusal and cannot grant themselves debt', () => fixture((root, git, put) => {
-  const file = 'src/shards/fixture/data/rows.json', catalogue = 'scripts/source-generation-outputs.json';
+  const file = 'src/shards/fixture/data/rows.json', catalogue = 'src/scripts/source-generation-outputs.json';
   put(catalogue, JSON.stringify({ producers: { 'scripts/fixture.mjs': [old, file, 'out/fixture/body.bin'] } })); git('add', catalogue);
   expect(checkGeneratedSourceRevision(root, ':', 'HEAD', [catalogue])).toEqual([]);
   expect(checkGeneratedSourceTree(root)).toEqual([expect.stringContaining(file)]);
@@ -65,9 +65,9 @@ test('absent outputs remain a completed-tree refusal and cannot grant themselves
 }));
 
 test('committed checks ignore dirty output catalogues and a deleted policy stays a refusal', () => fixture((root, git, put) => {
-  put('scripts/source-generation-outputs.json', JSON.stringify({ producers: { 'scripts/fixture.mjs': [old] } })); git('add', '.'); git('commit', '-qm', 'catalogue');
-  put('scripts/source-generation-outputs.json', JSON.stringify({ producers: { 'scripts/fixture.mjs': ['src/poison.generated.ts'] } }));
-  expect(checkGeneratedSourceRevision(root, 'HEAD', 'HEAD^', ['scripts/source-generation-outputs.json'])).toEqual([]);
+  put('src/scripts/source-generation-outputs.json', JSON.stringify({ producers: { 'scripts/fixture.mjs': [old] } })); git('add', '.'); git('commit', '-qm', 'catalogue');
+  put('src/scripts/source-generation-outputs.json', JSON.stringify({ producers: { 'scripts/fixture.mjs': ['src/poison.generated.ts'] } }));
+  expect(checkGeneratedSourceRevision(root, 'HEAD', 'HEAD^', ['src/scripts/source-generation-outputs.json'])).toEqual([]);
   unlinkSync(resolve(root, GENERATED_SOURCE_POLICY)); git('add', GENERATED_SOURCE_POLICY);
   expect(checkGeneratedSourceRevision(root, ':', 'HEAD', [GENERATED_SOURCE_POLICY])).toEqual([expect.stringContaining('policy deleted')]);
 }));

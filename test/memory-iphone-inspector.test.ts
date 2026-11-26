@@ -1,8 +1,8 @@
 // meta IPHONE13-REAL-TEST (mini-phone-13b): the Web Inspector driver's script wrapping and page choice, and serve-local's
 // tailnet check. The device half is proved on the iPhone 13 (meta iphone13/device-2026-11-19.md).
 import { expect, test } from 'vitest';
-import { asyncExpression, pickPage, syncExpression } from '../scripts/memory/iphone/inspector.mjs';
-import { quickTunnelOrigin, tailnetName } from '../scripts/memory/iphone/serve-local.mjs';
+import { asyncExpression, pickPage, syncExpression } from '../src/scripts/memory/iphone/inspector.mjs';
+import { quickTunnelOrigin, tailnetName } from '../src/scripts/memory/iphone/serve-local.mjs';
 
 test('a WebDriver body runs with its arguments and returns elements as handles', () => {
   const window = globalThis as unknown as { __wsInspectorElements?: unknown[] };

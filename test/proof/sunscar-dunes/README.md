@@ -8,7 +8,7 @@ snapshot test; the standalone writer job is retired too. Native gameplay and con
 Run the existing gameplay/replay/Ledger witness:
 
 ```sh
-node --import ./scripts/sim-node-loader.mjs test/proof/sunscar-dunes/run.mjs all
+node --import ./src/scripts/sim-node-loader.mjs test/proof/sunscar-dunes/run.mjs all
 ```
 
 At the original authored-physics boundary, the official 12,503-tick gameplay journey retained the canonical hash `95a6050c27629ed4eb94e79af6a502495f3e5aa7b4c9fd56fb03c8cfdaef54ae`, both earned facts and 25 coins. The 1,793-tick mid-fight restore suffix and shipping-worker continuation agree exactly, with durable reload and duplicate-stable Ledger outcomes. Those historical receipts predate later scheduler changes. The current witness reads the admitted product and verifies every asset byte/hash, then independently checks gameplay, restore, shipping-worker continuation and durable Ledger outcomes. No compatibility receipt is re-pinned by the writer retirement.

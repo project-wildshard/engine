@@ -5,7 +5,7 @@
 # Hosted runners are off the tailnet (verify-staging.yml), so the job joins it with a Tailscale OAuth client (tag:ci).
 # OPEN QUESTION (Jake's Tailscale admin): that client is not made yet; until TS_OAUTH_CLIENT_ID is set the job stops
 # with a notice before any box step. The box key, host and known_hosts sit in environment `box` (main only), set
-# from the MacBook's files without printing them. MA7c: once a signed release puts the gate on the box, BOX_SSH_KEY becomes the workflows' own key (scripts/vps/wildshard-ci.pub),
+# from the MacBook's files without printing them. MA7c: once a signed release puts the gate on the box, BOX_SSH_KEY becomes the workflows' own key (src/scripts/vps/wildshard-ci.pub),
 # which the box forces to wildshard-box-gate: a loopback probe and the staging restart, nothing else.
 name: box-probe
 on:
@@ -34,7 +34,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          sparse-checkout: scripts/box-ops.mjs
+          sparse-checkout: src/scripts/box-ops.mjs
           sparse-checkout-cone-mode: false
       - name: Stop before the box without a tailnet client (OPEN QUESTION)
         if: env.TS_OAUTH_CLIENT_ID == ''
@@ -59,7 +59,7 @@ jobs:
       - name: Read tick p95, RSS and heap slope
         shell: bash
         run: |
-          node scripts/box-ops.mjs probe "$CHANNEL" | tee "$RUNNER_TEMP/probe.json"
+          node src/scripts/box-ops.mjs probe "$CHANNEL" | tee "$RUNNER_TEMP/probe.json"
           node -e '
             const s = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
             const rows = [["tick p95 (worst worker, ms)", s.tickP95MaxMs + " (worker " + s.tickP95Worker + " of " + s.workers + ")", s.tickOk ? "under 12 ms" : "OVER 12 ms"],

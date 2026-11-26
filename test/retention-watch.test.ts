@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, expect, test, vi } from 'vitest';
-// oxlint-disable-next-line import/no-nodejs-modules -- the owned fixture key signs as the page publisher does (scripts/code-retention.mjs)
+// oxlint-disable-next-line import/no-nodejs-modules -- the owned fixture key signs as the page publisher does (src/scripts/code-retention.mjs)
 import { generateKeyPairSync, sign } from 'node:crypto';
 import { Scope } from '../src/shared/engine/app/scope';
 import { fetchCodeRetention } from '../src/client/host/online/codeRetention';

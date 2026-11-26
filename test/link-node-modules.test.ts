@@ -5,7 +5,7 @@ import { join, relative, resolve } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Exercise real Node resolution from the frozen export.
 import { createRequire } from 'node:module';
 import { afterEach, describe, expect, it } from 'vitest';
-import { linkNodeModules } from '../scripts/link-node-modules.mjs';
+import { linkNodeModules } from '../src/scripts/link-node-modules.mjs';
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });

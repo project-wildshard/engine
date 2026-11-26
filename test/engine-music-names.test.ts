@@ -68,7 +68,7 @@ test('the cook refuses a shard naming an engine slot or sting the style lacks', 
   expect(engineMusicNames(level({ base: 'score', slots: ['score'], bootSlots: ['title'], sets: {}, setCatalogue: { inventory: 'title' } }).music!).slots).toEqual(['title']);
 });
 
-// The pinned products (`node scripts/pins.ts install`) and this build's boot table, when the checkout has them.
+// The pinned products (`node src/scripts/pins.ts install`) and this build's boot table, when the checkout has them.
 const bootTables = 'out/.app/boot-tables.json';
 for (const [shard, slots] of [['driftwood-isle', ['title', 'island']], ['pine-hollow', ['title', 'pine']], ['nalati-grasslands', ['title']], ['nine-dragon-stack', ['title']]] as const) {
   test.skipIf(!existsSync(`out/${shard}/shard.json`) || !existsSync(bootTables))(`${shard}: its rows name engine music the build has`, () => {

@@ -8,7 +8,7 @@ import { afterEach, expect, test } from 'vitest';
 
 // SERVER-CELLS SC2: the box's Prometheus, loopback only, 15 days, no remote write, scraping both channels' METRICS_PORT and the
 // node. `--print` renders every file and stops before any root step; `--settings` runs only the METRICS_PORT step, never as root.
-const SCRIPT = resolve('scripts/vps/harden-prometheus.sh'), CONFIG = resolve('scripts/vps/wildshard-config');
+const SCRIPT = resolve('src/scripts/vps/harden-prometheus.sh'), CONFIG = resolve('src/scripts/vps/wildshard-config');
 const made: string[] = [];
 afterEach(() => { for (const path of made.splice(0)) rmSync(path, { recursive: true, force: true }); });
 
@@ -59,9 +59,9 @@ test("the scraped ports are the ones wildshard-config pins for each channel, and
   expect(helper).toContain("'production': {'port': 8790, 'cpus': 9, 'host': 0, 'metrics': 9790}");
   expect(helper).toContain("'staging': {'port': 8791, 'cpus': 4, 'host': 1, 'metrics': 9791}");
   expect(script).toContain('PRODUCTION_METRICS=9790 STAGING_METRICS=9791');
-  expect(readFileSync('scripts/vps/harden-apply.sh', 'utf8')).toContain('\n"$HERE/harden-prometheus.sh"\n');
+  expect(readFileSync('src/scripts/vps/harden-apply.sh', 'utf8')).toContain('\n"$HERE/harden-prometheus.sh"\n');
   // harden.sh --check fails a metrics port off loopback, the tailnet included.
-  expect(readFileSync('scripts/vps/harden.sh', 'utf8')).toContain("grep -E ':(9090|9100|9256|3000|9790|9791)$'");
+  expect(readFileSync('src/scripts/vps/harden.sh', 'utf8')).toContain("grep -E ':(9090|9100|9256|3000|9790|9791)$'");
 });
 
 test('OB2: processes group by account, with a few named root jobs, so the series stay few and stable', () => {

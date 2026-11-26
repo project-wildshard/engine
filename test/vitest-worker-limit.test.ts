@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { vitestMaxWorkers, vitestNodeExecArgv } from '../scripts/vitest-lane';
+import { vitestMaxWorkers, vitestNodeExecArgv } from '../src/scripts/vitest-lane';
 // oxlint-disable-next-line import/no-nodejs-modules -- Verify the real fork/thread WASM flag boundary, not only its config text.
 import { Worker } from 'node:worker_threads';
 // oxlint-disable-next-line import/no-nodejs-modules -- The worker message or error settles the actual inheritance probe.

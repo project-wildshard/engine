@@ -5,9 +5,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Scratch paths.
 import { join, resolve } from 'node:path';
 import { afterAll, afterEach, expect, test } from 'vitest';
-import { collectTimings, readTimings, readWeights, timingsDir, writeTimings } from '../scripts/test-timings.mjs';
-import { createEnginePlan, readEnginePlan } from '../scripts/engine-ci-plan.ts';
-import { readDurations } from '../scripts/test-shard-plan.ts';
+import { collectTimings, readTimings, readWeights, timingsDir, writeTimings } from '../src/scripts/test-timings.mjs';
+import { createEnginePlan, readEnginePlan } from '../src/scripts/engine-ci-plan.ts';
+import { readDurations } from '../src/scripts/test-shard-plan.ts';
 import amberRun from './fixtures/ci/amber-43792777770.json' with { type: 'json' };
 import shardSeven from './fixtures/ci/amber-44148096662.json' with { type: 'json' };
 

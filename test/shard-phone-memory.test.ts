@@ -8,7 +8,7 @@ import { expect, test, vi } from 'vitest';
 import { coreMemorySummary, coreMemoryEstimateAudit, chromiumCoreMemorySummary, coreMemoryTargets, selectedCoreMemoryTargets, scriptResourceURLs, simulatorCoreFootprint, webKitCoreMemoryFloorBytes,
   serveHelloWorldMemory, helloWorldMemoryHTML, helloWorldMemoryFloor, coreMemoryFolderIdentity,
   webGLMemoryTarget, webGLMemoryHTML, webGLMemoryFloor,
-  threeMemoryTarget, threeMemoryHTML, threeMemoryFloor, contextMemoryDiagnostic } from '../scripts/shard-phone-memory.mjs';
+  threeMemoryTarget, threeMemoryHTML, threeMemoryFloor, contextMemoryDiagnostic } from '../src/scripts/shard-phone-memory.mjs';
 
 const MiB = 1048576;
 test('script inventory keeps distinct complete JavaScript URLs only', () => {
@@ -91,19 +91,19 @@ test('an oversized unknown-length index stream is cancelled at the diagnostic ca
 test('saved estimate audits keep a one-byte tolerance miss separate from the native budget', () => {
   const summary = {rev: '1'.repeat(40), coreMemory: 'brasscap-mesa', results: [{...nativeProtocol, version: JSON.stringify({build: '1111111-fixture'}), shard: 'brasscap-mesa', errors: [],
     samples: [{phase: '120s', rendererBytes: 250_000_000, gpuBytes: 50_000_000}]}]};
-  const result = spawnSync('node', ['scripts/shard-phone-memory.mjs', 'audit-estimate', 'brasscap-mesa', '345000001'],
+  const result = spawnSync('node', ['src/scripts/shard-phone-memory.mjs', 'audit-estimate', 'brasscap-mesa', '345000001'],
     {encoding: 'utf8', input: JSON.stringify(summary)});
   expect(result.status).toBe(1);
   expect(result.stdout).toContain('"within15Percent":false');
   expect(result.stdout).toContain('"budgetPassed":false');
-  const accurate = spawnSync('node', ['scripts/shard-phone-memory.mjs', 'audit-estimate', 'brasscap-mesa', '300000000'],
+  const accurate = spawnSync('node', ['src/scripts/shard-phone-memory.mjs', 'audit-estimate', 'brasscap-mesa', '300000000'],
     {encoding: 'utf8', input: JSON.stringify(summary)});
   expect(accurate.status).toBe(1);
   expect(accurate.stdout).toContain('"within15Percent":true');
   expect(accurate.stdout).toContain('"budgetPassed":false');
   const small = summary.results[0];
   if (small === undefined) throw new Error('Missing native fixture');
-  const passing = spawnSync('node', ['scripts/shard-phone-memory.mjs', 'audit-estimate', 'brasscap-mesa', '100000000'],
+  const passing = spawnSync('node', ['src/scripts/shard-phone-memory.mjs', 'audit-estimate', 'brasscap-mesa', '100000000'],
     {encoding: 'utf8', input: JSON.stringify({...summary, results: [{...small,
       samples: [{phase: '120s', rendererBytes: 90_000_000, gpuBytes: 10_000_000}]}]})});
   expect(passing.status).toBe(0);
@@ -129,7 +129,7 @@ test('model tolerance uses exact bytes in both directions and never grants a nat
 test('saved estimate audits refuse mixed source pins before issuing a verdict', () => {
   const summary = {rev: '1'.repeat(40), coreMemory: 'brasscap-mesa', results: [{...nativeProtocol, version: JSON.stringify({build: '2222222-other'}), shard: 'brasscap-mesa', errors: [],
     samples: [{phase: '120s', rendererBytes: 1, gpuBytes: 1}]}]};
-  const result = spawnSync('node', ['scripts/shard-phone-memory.mjs', 'audit-estimate', 'brasscap-mesa', '1'],
+  const result = spawnSync('node', ['src/scripts/shard-phone-memory.mjs', 'audit-estimate', 'brasscap-mesa', '1'],
     {encoding: 'utf8', input: JSON.stringify(summary)});
   expect(result.status).toBe(1);
   expect(result.stdout).toBe('');
@@ -141,7 +141,7 @@ test('saved Template estimates audit the floor without admitting other cohorts',
     samples: row.samples.map(sample => ({...sample, rendererBytes: 208182520 - 10 * MiB}))}));
   const summary = {rev: '1'.repeat(40), coreMemory: 'templates', results: pair};
   const audit = (target: string, input: unknown = summary) => spawnSync('node', [
-    'scripts/shard-phone-memory.mjs', 'audit-estimate', target, '208182520',
+    'src/scripts/shard-phone-memory.mjs', 'audit-estimate', target, '208182520',
   ], {encoding: 'utf8', input: JSON.stringify(input)});
   for (const target of ['brasscap-mesa']) {
     const result = audit(target);
@@ -303,19 +303,19 @@ test('duplicate or foreign floors and duplicate acceptance samples refuse', () =
 
 test('core command requires the floor protocol and source pin before any browser', () => {
   for (const flags of [[], ['--floor']]) {
-    expect(() => execFileSync('node', ['scripts/shard-phone-memory.mjs', 'http://127.0.0.1:1', 'core', 'fixture', 'tmp/unused-core.json', ...flags],
+    expect(() => execFileSync('node', ['src/scripts/shard-phone-memory.mjs', 'http://127.0.0.1:1', 'core', 'fixture', 'tmp/unused-core.json', ...flags],
       {encoding: 'utf8', stdio: 'pipe'})).toThrow(flags.length > 0 ? 'Core floors require --pin' : 'Menu/core targets require --floor');
   }
 });
 
 test('single compiled floors require their protocol and exact pin before any browser', () => {
   for (const flags of [[], ['--floor']]) expect(() => execFileSync('node', [
-    'scripts/shard-phone-memory.mjs', 'http://127.0.0.1:1', 'brasscap-mesa', 'fixture', 'tmp/unused-core.json', '--compiled', ...flags,
+    'src/scripts/shard-phone-memory.mjs', 'http://127.0.0.1:1', 'brasscap-mesa', 'fixture', 'tmp/unused-core.json', '--compiled', ...flags,
   ], {encoding: 'utf8', stdio: 'pipe'})).toThrow('Compiled floor requires');
 });
 
 test('official WebKit core floors refuse mixed entry modes or duplicate readings before Simulator access', () => {
-  const run = (flags: readonly string[]): string => execFileSync('node', ['scripts/sim-grid-entry.mjs', '--base=http://127.0.0.1:1', ...flags],
+  const run = (flags: readonly string[]): string => execFileSync('node', ['src/scripts/sim-grid-entry.mjs', '--base=http://127.0.0.1:1', ...flags],
     {encoding: 'utf8', stdio: 'pipe', env: {...process.env, SIM_UDID: 'no-device-opened'}});
   expect(() => run(['--core-memory=all', '--shard=brasscap-mesa'])).toThrow('Expected --core-memory');
   expect(() => run(['--core-memory=unknown'])).toThrow('Expected --core-memory');
@@ -326,10 +326,10 @@ test('official WebKit core floors refuse mixed entry modes or duplicate readings
 });
 
 test('upgrade observation refuses unrelated or repeated Simulator scenarios before device access', () => {
-  expect(() => execFileSync('node', ['scripts/sim-grid-entry.mjs', '--base=http://127.0.0.1:1', '--upgrade-second-tap=1'],
+  expect(() => execFileSync('node', ['src/scripts/sim-grid-entry.mjs', '--base=http://127.0.0.1:1', '--upgrade-second-tap=1'],
     { encoding: 'utf8', stdio: 'pipe', env: {...process.env, SIM_UDID: 'no-device-opened'} })).toThrow('Second tap diagnostic requires');
   for (const flags of [[], ['--runs=2', '--modes=warm'], ['--runs=1', '--modes=cold'], ['--runs=1', '--modes=warm', '--shard=brasscap-mesa']]) {
-    expect(() => execFileSync('node', ['scripts/sim-grid-entry.mjs', '--base=http://127.0.0.1:1', '--upgrade-from=https://example.test', ...flags],
+    expect(() => execFileSync('node', ['src/scripts/sim-grid-entry.mjs', '--base=http://127.0.0.1:1', '--upgrade-from=https://example.test', ...flags],
       {encoding: 'utf8', stdio: 'pipe', env: {...process.env, SIM_UDID: 'no-device-opened'}})).toThrow('one warm grid run');
   }
 });
@@ -402,7 +402,7 @@ test('hello-world budget base is exactly the unforced 120s combined native sampl
 
 test('hello-world refuses app origins or revisions before touching a Simulator', () => {
   for (const flag of ['--base=http://127.0.0.1:1', '--rev=abc']) {
-    expect(() => execFileSync('node', ['scripts/sim-grid-entry.mjs', '--core-memory=hello', flag],
+    expect(() => execFileSync('node', ['src/scripts/sim-grid-entry.mjs', '--core-memory=hello', flag],
       {encoding: 'utf8', stdio: 'pipe', env: {...process.env, SIM_UDID: 'no-device-opened'}})).toThrow('serves its own fixture');
   }
 });
@@ -438,7 +438,7 @@ test('context diagnostic refuses missing clocks, collection and extra content', 
 });
 
 test('context calibration refuses app revisions, attribution and repeat modes before Simulator access', () => {
-  const run = (selection: string, flag: string): string => execFileSync('node', ['scripts/sim-grid-entry.mjs', `--core-memory=${selection}`, flag],
+  const run = (selection: string, flag: string): string => execFileSync('node', ['src/scripts/sim-grid-entry.mjs', `--core-memory=${selection}`, flag],
     {encoding: 'utf8', stdio: 'pipe', env: {...process.env, SIM_UDID: 'no-device-opened'}});
   for (const selection of ['webgl', 'contexts', 'three']) {
     for (const flag of ['--base=http://127.0.0.1:1', '--rev=abc']) expect(() => run(selection, flag)).toThrow('serves its own fixture');

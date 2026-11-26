@@ -18,7 +18,7 @@ Only the scaffold exists:
 - `src/e2e/`: Playwright: the status page, and `smoke/`, the Template 2 smoke.
 - `src/cook/`: shardfile to runtime packs.
 - `src/scripts/check-sides.mjs`: the side rule (`pnpm check:sides`).
-- `kit/scripts/`: repo tooling (asks, md-wrap, lint), plain JS (J329).
+- `src/scripts/.kit/`: repo tooling (asks, md-wrap, lint), plain JS (J329).
 
 ## Dependencies
 

@@ -7,7 +7,7 @@ on:
   push:
     paths:
       - .github/workflows/outside-bot.yml
-      - scripts/mmo-bots.mjs
+      - src/scripts/mmo-bots.mjs
       - test/fixtures/dedicated/outsideJourney.ts
       - test/fixtures/dedicated/outsideBotEntry.ts
       - test/outside-journey.proof.mjs
@@ -33,7 +33,7 @@ jobs:
       - uses: ./.github/actions/ring-setup
         with:
           pins-cache-scope: full
-      - run: node scripts/pins.ts install
+      - run: node src/scripts/pins.ts install
       - name: Prepare the installed physics asset without a cook
         run: node --input-type=module -e 'import {copyRapierWasm} from "./vite/rapier.ts"; copyRapierWasm();'
       # J186: separate actual proof observations; a green job alone is not evidence.
@@ -42,10 +42,10 @@ jobs:
         timeout-minutes: 1
         run: |
           mkdir -p tmp/tc45-outside
-          timeout --signal=TERM --kill-after=5s 10s node --import ./scripts/sim-node-loader.mjs --test --test-timeout=10000 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=tmp/tc45-outside/proof.xml test/outside-journey.proof.mjs
+          timeout --signal=TERM --kill-after=5s 10s node --import ./src/scripts/sim-node-loader.mjs --test --test-timeout=10000 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=tmp/tc45-outside/proof.xml test/outside-journey.proof.mjs
       - name: One ordinary bot from this runner through the staging Tunnel
         if: ${{ !cancelled() }}
-        run: node scripts/mmo-bots.mjs staging --outside-proof --bots 1 --seconds 60 --keep --work-dir tmp/tc45-outside/live
+        run: node src/scripts/mmo-bots.mjs staging --outside-proof --bots 1 --seconds 60 --keep --work-dir tmp/tc45-outside/live
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

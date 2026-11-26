@@ -2,7 +2,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Run the leave page's own inline script against a stand-in location.
 import { runInNewContext } from 'node:vm';
 import { expect, test } from 'vitest';
-import { LEAVE_PAGE, LEAVE_PATH as HOST_LEAVE_PATH } from '../../../../scripts/app-build/isolation.mjs';
+import { LEAVE_PAGE, LEAVE_PATH as HOST_LEAVE_PATH } from '../../../scripts/app-build/isolation.mjs';
 import { LEAVE_PATH, throughLeave } from './freshPage';
 
 const ORIGIN = 'https://staging.wildshard.io';

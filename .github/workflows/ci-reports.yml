@@ -33,12 +33,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
           SOURCE_RUN: ${{ github.event.workflow_run.id }}
-        run: node scripts/nine-street-source.mjs
+        run: node src/scripts/nine-street-source.mjs
       - if: steps.source.outputs.artifact == 'true'
         uses: ./.github/actions/ring-setup
       - name: Own the advisory benchmark scratch folder
         if: steps.source.outputs.artifact == 'true'
-        run: node scripts/scratch-dir.mjs nine-ring1 'NB6 report-only exact client street'
+        run: node src/scripts/.kit/scratch-dir.mjs nine-ring1 'NB6 report-only exact client street'
       - if: steps.source.outputs.artifact == 'true'
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
@@ -52,13 +52,13 @@ jobs:
           mkdir -p tmp/nine-ring1/preview
           tar -xf tmp/nine-ring1/client.tar -C tmp/nine-ring1/preview
           rm tmp/nine-ring1/client.tar
-          bash scripts/ci-playwright-install.sh chromium
+          bash src/scripts/ci-playwright-install.sh chromium
       - name: Observe the unchanged Nine street ratchet
         id: street
         if: steps.source.outputs.artifact == 'true'
         continue-on-error: true
         shell: bash
-        run: node scripts/nine-ring1.mjs bench 2>&1 | tee tmp/nine-ring1/street.log
+        run: node src/scripts/nine-ring1.mjs bench 2>&1 | tee tmp/nine-ring1/street.log
       - name: Explain the hosted street limitation
         if: ${{ always() && steps.source.outputs.artifact == 'true' }}
         env:
@@ -76,19 +76,19 @@ jobs:
         continue-on-error: true
         shell: bash
         run: |
-          node scripts/nine-ring1.mjs memory 2>&1 | tee tmp/nine-ring1/memory.log
+          node src/scripts/nine-ring1.mjs memory 2>&1 | tee tmp/nine-ring1/memory.log
           grep '^BOOT MEMORY' tmp/nine-ring1/memory.log >> "$GITHUB_STEP_SUMMARY" || true
       - name: Install WebKit for the memory meter (ENGINE-MEMORY EM12)
         id: webkit
         if: steps.source.outputs.artifact == 'true'
         continue-on-error: true
-        run: bash scripts/ci-playwright-install.sh webkit
+        run: bash src/scripts/ci-playwright-install.sh webkit
       - name: Read native WebKit footprints, Template and Nine, 3 runs (ENGINE-MEMORY EM12 b)
         id: measure
         if: steps.source.outputs.artifact == 'true' && steps.webkit.outcome == 'success'
         continue-on-error: true
         shell: bash
-        run: node scripts/nine-ring1.mjs measure 2>&1 | tee tmp/nine-ring1/measure.log
+        run: node src/scripts/nine-ring1.mjs measure 2>&1 | tee tmp/nine-ring1/measure.log
       - name: Keep Nine street measurements and diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -127,12 +127,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
           SOURCE_RUN: ${{ github.event.workflow_run.id }}
-        run: node scripts/nine-street-source.mjs
+        run: node src/scripts/nine-street-source.mjs
       - if: steps.source.outputs.artifact == 'true'
         uses: ./.github/actions/ring-setup
       - name: Own the scratch folder
         if: steps.source.outputs.artifact == 'true'
-        run: node scripts/scratch-dir.mjs nine-ring1 'EM12 report-only ledger read'
+        run: node src/scripts/.kit/scratch-dir.mjs nine-ring1 'EM12 report-only ledger read'
       - if: steps.source.outputs.artifact == 'true'
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
@@ -146,11 +146,11 @@ jobs:
           mkdir -p tmp/nine-ring1/preview
           tar -xf tmp/nine-ring1/client.tar -C tmp/nine-ring1/preview
           rm tmp/nine-ring1/client.tar
-          bash scripts/ci-playwright-install.sh chromium
+          bash src/scripts/ci-playwright-install.sh chromium
       - name: Read Brasscap's ledger at control and at its peak
         if: steps.source.outputs.artifact == 'true'
         shell: bash
-        run: node scripts/nine-ring1.mjs ledger 2>&1 | tee tmp/nine-ring1/ledger.log
+        run: node src/scripts/nine-ring1.mjs ledger 2>&1 | tee tmp/nine-ring1/ledger.log
       - name: Keep the ledger read
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -200,7 +200,7 @@ jobs:
           path: tmp/timings-run
       - name: Merge this run's measured files into the table
         id: collect
-        run: node scripts/test-timings.mjs collect tmp/timings-run
+        run: node src/scripts/test-timings.mjs collect tmp/timings-run
       - if: steps.collect.outputs.measured == 'true'
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
@@ -236,7 +236,7 @@ jobs:
       - name: Soak hover presses across rejected network ticks
         if: steps.code.outputs.run == 'true'
         continue-on-error: true
-        run: node scripts/vitest-tmp.ts run test/net-hover-admission.proof.ts --reporter=default --reporter=json --outputFile.json=tmp/ci-coverage-edges/hover-admission.json
+        run: node src/scripts/vitest-tmp.ts run test/net-hover-admission.proof.ts --reporter=default --reporter=json --outputFile.json=tmp/ci-coverage-edges/hover-admission.json
       - name: Keep non-blocking coverage edge observations
         if: ${{ !cancelled() && steps.code.outputs.run == 'true' }}
         continue-on-error: true
@@ -248,4 +248,4 @@ jobs:
 
       - name: Observe active quarantine with ordinary results
         continue-on-error: true
-        run: node scripts/test-quarantine.mjs --shard=1/1
+        run: node src/scripts/test-quarantine.mjs --shard=1/1

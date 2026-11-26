@@ -3,10 +3,10 @@ import { expect, test } from 'vitest';
 import { Window } from 'happy-dom';
 // oxlint-disable-next-line import/no-nodejs-modules -- Execute the real generated bootstrap against isolated storage.
 import { runInNewContext, createContext, runInContext } from 'node:vm';
-import { phoneEngine } from '../scripts/parity/phone-route-runner.mjs';
-import { capturePhoneFailure, waitPhoneCondition, enterPhoneGrid, phoneRouteFailures, phoneRoutePlans, type PhoneReceipt, type PhoneObservation, type PhoneDocument } from '../scripts/parity/phone-route.mjs';
-import { phoneTouchButton, phoneWallTarget, phoneLoadingObservation, phoneGridEntryCondition, installPhoneTitlePaint } from '../scripts/parity/phone-route-page.mjs';
-import { phoneBootstrap, phoneDocumentMatches, phonePageTarget, followNativePhoneDocument } from '../scripts/parity/phone-route-browser.mjs';
+import { phoneEngine } from '../src/scripts/parity/phone-route-runner.mjs';
+import { capturePhoneFailure, waitPhoneCondition, enterPhoneGrid, phoneRouteFailures, phoneRoutePlans, type PhoneReceipt, type PhoneObservation, type PhoneDocument } from '../src/scripts/parity/phone-route.mjs';
+import { phoneTouchButton, phoneWallTarget, phoneLoadingObservation, phoneGridEntryCondition, installPhoneTitlePaint } from '../src/scripts/parity/phone-route-page.mjs';
+import { phoneBootstrap, phoneDocumentMatches, phonePageTarget, followNativePhoneDocument } from '../src/scripts/parity/phone-route-browser.mjs';
 
 // Exercise the serialized page observer without a browser or extra downloads.
 test.each(['load', 'error'] as const)('title phase evidence preserves the original %s witness', mode => {

@@ -21,4 +21,4 @@ jobs:
         with:
           node-version-file: package.json
       - name: Require the tag's changelog section at its commit
-        run: node scripts/changelog.mjs check "$GITHUB_REF_NAME" --at="$GITHUB_SHA"
+        run: node src/scripts/changelog.mjs check "$GITHUB_REF_NAME" --at="$GITHUB_SHA"

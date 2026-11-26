@@ -4,7 +4,7 @@ import {existsSync,lstatSync,mkdirSync,readFileSync,writeFileSync} from 'node:fs
 import {dirname,resolve,sep} from 'node:path';
 import * as v from 'valibot';
 import {encodeCanonicalJson,hashImmutableBytes} from '../../src/shared/host/immutable';
-import {recorderKey,recorderOutputHashes} from '../../scripts/native-recorder-cache.mjs';
+import {recorderKey,recorderOutputHashes} from '../../src/scripts/native-recorder-cache.mjs';
 import {nativeProgramJob,type NativeProgramSpec} from './native-program';
 
 const digest=v.pipe(v.string(),v.regex(/^[a-f0-9]{64}$/u));

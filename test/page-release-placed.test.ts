@@ -1,6 +1,6 @@
 // @vitest-environment node
 import {expect, test} from 'vitest';
-import {ensurePlacedHeads, placedIndexProblem, type Snapshot} from '../scripts/page-release/placed-ready.mjs';
+import {ensurePlacedHeads, placedIndexProblem, type Snapshot} from '../src/scripts/page-release/placed-ready.mjs';
 
 const head = {instance: 'probe', slug: 'probe', hash: 'a'.repeat(64)};
 const base = [{instance: 'home', slug: 'driftwood-isle'}];

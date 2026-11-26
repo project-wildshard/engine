@@ -7,7 +7,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, wr
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve fixture paths.
 import { join, resolve } from 'node:path';
 
-export const LAND = resolve('scripts/land.mjs');
+export const LAND = resolve('src/scripts/.kit/land.mjs');
 const roots: string[] = [];
 export function trackLandFixtureRoot(root: string): void { roots.push(root); }
 export function cleanLandFixtures(): void {

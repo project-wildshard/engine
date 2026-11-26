@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { createTempRepo } from '../src/test/helpers/git.ts';
-import { engineRelease, noteProblem, parseChangelog, pushProblems, releaseDescribe, releaseProblems } from '../scripts/changelog.mjs';
+import { engineRelease, noteProblem, parseChangelog, pushProblems, releaseDescribe, releaseProblems } from '../src/scripts/changelog.mjs';
 import { buildLabel, shortBuild } from '../src/client/engine/ui/buildCheck';
 import { changelogDate, shortBuild as menuShortBuild, versionLabel } from '../src/client/game/whatsNewBanner';
 

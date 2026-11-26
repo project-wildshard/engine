@@ -1,7 +1,7 @@
 # Trailers: shot, cut, sound and titles, all in engine
 
 > Written by: Claude (opus-trailer and opus-trailer-2, 2026-11-25), for meta ALPHA-2-TRAILER AT12. The
-> tools are in `scripts/trailer/`, ported from singleplayer `scripts/steam-trailer/` (cf104912d3^) and
+> tools are in `src/scripts/trailer/`, ported from singleplayer `scripts/steam-trailer/` (cf104912d3^) and
 > made generic.
 >
 > **State:** active recipe, 2026-11-25. The alpha 2 trailer is the worked example.
@@ -56,12 +56,12 @@ with the staging grid (the hosted staging page has no `window.__wildshard`, and 
 Driftwood entry there ended REV-BEHIND):
 
 ```sh
-node scripts/dev.mjs --staging --shard driftwood-isle --port 4420 --saves memory --no-watch \
+node src/scripts/dev.mjs --staging --shard driftwood-isle --port 4420 --saves memory --no-watch \
   --work tmp/<lane>/dev
 ```
 
 Without `--staging` a dev world holds only its `--shard`, one cell, which is a zone alone again. A
-preview (`scripts/serve-build.sh --head`) hosts the release grid in the page, which can lag staging
+preview (`src/scripts/serve-build.sh --head`) hosts the release grid in the page, which can lag staging
 (on 11-25 it had no Brasscap cell) and gives every page its own world, so no party. Its pages
 are online (a real local server), which a party shot needs anyway. Start a fresh world for the party
 shot: a world keeps a closed page's body a while, and a scout's ghosts stand where the party walks.
@@ -70,23 +70,23 @@ shot: a world keeps a closed page's body a while, and a scout's ghosts stand whe
 
 ```sh
 # 1. scout: three stills a shot, to a sheet; then the real capture of only the frames the cut uses
-node scripts/trailer/capture.mjs <frames> --shots <slug>,<slug> --base <url> --dry
-node scripts/trailer/capture.mjs <frames> --shots <slugs> --base <url> --edl <cut>/edl.json
+node src/scripts/trailer/capture.mjs <frames> --shots <slug>,<slug> --base <url> --dry
+node src/scripts/trailer/capture.mjs <frames> --shots <slugs> --base <url> --edl <cut>/edl.json
 # a party shot: the party first (loopback worlds only, a cue port), then the capture on the page's
 # real clock; the shot cues the march itself and its lens follows the bodies the page draws
-node scripts/trailer/party.mjs <url> --zone driftwood-isle --at 0,-200 --go 4498 --spread 1 --secs 600 &
-node scripts/trailer/capture.mjs <frames> --shots driftwood-isle --only d-party --base <url> --wall --sub 1 --scale 1
+node src/scripts/trailer/party.mjs <url> --zone driftwood-isle --at 0,-200 --go 4498 --spread 1 --secs 600 &
+node src/scripts/trailer/capture.mjs <frames> --shots driftwood-isle --only d-party --base <url> --wall --sub 1 --scale 1
 # 2. the build beats, from a session transcript (~/.claude/projects/…/<session>.jsonl): the ask from
 # its brief, Claude's answer and the pictures it checked, sized for a phone
-node scripts/trailer/transcript-cast.mjs <jsonl> <k>.cast --from HH:MM --to HH:MM --images <k>-img \
+node src/scripts/trailer/transcript-cast.mjs <jsonl> <k>.cast --from HH:MM --to HH:MM --images <k>-img \
   --compact --cols 60 --rows 3 --ask "<words from the brief>" --prose --match "<answer>" --pictures "<path re>"
-node scripts/trailer/panel.mjs <k>-img/images.json <k>-panel.mp4 --hold 1 --fit cover
-node scripts/trailer/build-beat.mjs <k>.cast beat-<k>.mp4 --dur <slot> --hold 1.4 --lapse <k>-panel.mp4 --layout stack
+node src/scripts/trailer/panel.mjs <k>-img/images.json <k>-panel.mp4 --hold 1 --fit cover
+node src/scripts/trailer/build-beat.mjs <k>.cast beat-<k>.mp4 --dur <slot> --hold 1.4 --lapse <k>-panel.mp4 --layout stack
 # 3. the cut, the titles, the mix and the conform
-node scripts/trailer/cut.mjs <cut> <score.wav> <sfx best> --cut alpha-2 --build-1 beat-a.mp4 …
-node scripts/trailer/titles.mjs <titles> <cut>/titles.json
-python scripts/trailer/mix.py <cut>/mix.json <mix.wav>
-node scripts/trailer/edit.mjs <frames> <cut>/edl.json <titles> <mix.wav> <master.mp4>
+node src/scripts/trailer/cut.mjs <cut> <score.wav> <sfx best> --cut alpha-2 --build-1 beat-a.mp4 …
+node src/scripts/trailer/titles.mjs <titles> <cut>/titles.json
+python src/scripts/trailer/mix.py <cut>/mix.json <mix.wav>
+node src/scripts/trailer/edit.mjs <frames> <cut>/edl.json <titles> <mix.wav> <master.mp4>
 ```
 
 A build beat is read on a phone, so what it shows is the ask and the answer, not tool calls (October's

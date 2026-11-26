@@ -22,7 +22,7 @@ wrong*, a hypothesis about *why*.
 ## 1. Pull and read
 
 ```bash
-pnpm inbox:pull          # scripts/inbox-pull.mjs: new notes → .review/inbox/<id>.json + <id>.jpg (gitignored); prints a table
+pnpm inbox:pull          # src/scripts/inbox-pull.mjs: new notes → .review/inbox/<id>.json + <id>.jpg (gitignored); prints a table
 # --url <site> or INBOX_URL points it at another API; --all fetches handled notes again
 ```
 
@@ -49,7 +49,7 @@ on it.
 
 ## 2. One ask per note, before any work
 
-`kit/scripts/ask-new.sh "<the note's words, shortened> (review note <id>)"`
+`src/scripts/.kit/ask-new.sh "<the note's words, shortened> (review note <id>)"`
 for each note. Status `open`, evidence `.review/handled/<id>`. The rules
 are in `docs/tasks/asks/README.md` (done = on origin/main with green
 CI). A note about one shard's content gets its ask in that shard repo
@@ -59,15 +59,15 @@ CI). A note about one shard's content gets its ask in that shard repo
 
 A note's context names where it was filed as fields: `zone`, and
 `pose` (x, y, z, yaw, pitch) or Explore's `explore`, `cam` and `model`.
-No URL names a zone (J522). Serve a build (`scripts/serve-build.sh
+No URL names a zone (J522). Serve a build (`src/scripts/serve-build.sh
 --head`, or `--rev <build sha>`); in agent-browser, headless, at the
 note's `viewport`, open `<preview URL>/version.json`, run the tap from
-`node scripts/zone-entry.mjs --init <zone>` there (Playwright code calls
+`node src/scripts/zone-entry.mjs --init <zone>` there (Playwright code calls
 `enterZone` from the same file), then open
 `<preview URL>/?at=<pose, comma-joined>&weapon=<id>&skipintro` (add
 `&tier=phone&touch` when `tier` is `phone`). The game starts you where
 the note was filed. Wrap
-browser work in `scripts/browser-lane.sh` (at most 3 game browsers on
+browser work in `src/scripts/browser-lane.sh` (at most 3 game browsers on
 this Mac) and close the session when done. Screenshot it and compare
 with the note's jpg. Cannot reproduce it? Say so in the ask and move on.
 
@@ -85,7 +85,7 @@ with the note's jpg. Cannot reproduce it? Say so in the ask and move on.
 | the inbox API itself | api-server repo |
 
 Fix it yourself, one note after another, in an engine plan worktree
-(`node scripts/worktree.mjs new <slug>`, land with `scripts/land.mjs`,
+(`node src/scripts/.kit/worktree.mjs new <slug>`, land with `src/scripts/.kit/land.mjs`,
 AGENTS.md). Only a big note with disjoint files goes to a subagent;
 brief it with the note's words, the jpg path, the repro URL and the
 owning files, and "prove it with a screenshot at the repro URL".

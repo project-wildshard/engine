@@ -6,9 +6,9 @@ run-name: budgets for ci ${{ inputs.source_run || github.event.workflow_run.id }
 # verdict and the release train's green-main read never wait on it. ci's own build steps refuse only past a hard cap
 # (budgets/caps.json). This job measures the exact full pinned client ci's memory-client-build archived
 # (memory-pinned-client): every zone's memory ledger (two totals a zone, median of three when a read is over), each
-# shard's phone download, the app's code sizes, and phone Low triangles, draws and programs. It judges them with `node scripts/budgets/cli.mjs check`.
+# shard's phone download, the app's code sizes, and phone Low triangles, draws and programs. It judges them with `node src/scripts/budgets/cli.mjs check`.
 # A red run here is a fix row for whoever pushed the regression (main-watch names them), never a red main or a release
-# hold. A new shard revision is new content and passes; record it with `node scripts/budgets/cli.mjs record --run <id>`.
+# hold. A new shard revision is new content and passes; record it with `node src/scripts/budgets/cli.mjs record --run <id>`.
 on:
   workflow_run:
     workflows: [ci]
@@ -63,7 +63,7 @@ jobs:
       - if: steps.source.outputs.artifact == 'true'
         uses: ./.github/actions/ring-setup
       - if: steps.source.outputs.artifact == 'true'
-        run: node scripts/scratch-dir.mjs budgets 'BUDGET-CAPS BC9 regression check'
+        run: node src/scripts/.kit/scratch-dir.mjs budgets 'BUDGET-CAPS BC9 regression check'
       - if: steps.source.outputs.artifact == 'true'
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
@@ -77,15 +77,15 @@ jobs:
         id: tools
         if: steps.source.outputs.artifact == 'true'
         run: |
-          if [[ -f scripts/budgets/cli.mjs ]]; then echo 'ok=true' >> "$GITHUB_OUTPUT"
-          else echo "::notice::source commit predates BUDGET-CAPS (no scripts/budgets/cli.mjs); nothing judged"; echo 'ok=false' >> "$GITHUB_OUTPUT"; fi
+          if [[ -f src/scripts/budgets/cli.mjs ]]; then echo 'ok=true' >> "$GITHUB_OUTPUT"
+          else echo "::notice::source commit predates BUDGET-CAPS (no src/scripts/budgets/cli.mjs); nothing judged"; echo 'ok=false' >> "$GITHUB_OUTPUT"; fi
       - name: Restore the pinned preview and install Chromium
         id: client
         if: steps.tools.outputs.ok == 'true'
         run: |
           tar -xf tmp/memory-ledger/client.tar
           rm tmp/memory-ledger/client.tar
-          bash scripts/ci-playwright-install.sh chromium
+          bash src/scripts/ci-playwright-install.sh chromium
       - name: Record the served ledger Brotli part digests
         if: steps.client.outcome == 'success'
         continue-on-error: true
@@ -100,11 +100,11 @@ jobs:
         env:
           FRAME_BUILD: ${{ steps.source.outputs.sha }}
         run: |
-          if [[ ! -f scripts/budgets/phone-frames.mjs ]]; then
+          if [[ ! -f src/scripts/budgets/phone-frames.mjs ]]; then
             echo "::notice::source commit predates the phone Low frame budgets"
             exit 0
           fi
-          node scripts/budgets/phone-frames.mjs tmp/memory-ledger/preview tmp/budgets/phone-frames.json "$FRAME_BUILD"
+          node src/scripts/budgets/phone-frames.mjs tmp/memory-ledger/preview tmp/budgets/phone-frames.json "$FRAME_BUILD"
       # The ledger step records its judged totals in tmp/budgets/ledger/budget-measures.json; the check below judges
       # them with the rest, so the step itself never decides the job.
       - name: Read every zone's memory ledger
@@ -115,7 +115,7 @@ jobs:
         run: |
           record=()
           if [[ "$MEMORY_RECORD" == true ]]; then record+=(--record); fi
-          node scripts/memory/ci.mjs ledger tmp/memory-ledger/preview tmp/budgets/ledger "${record[@]}"
+          node src/scripts/memory/ci.mjs ledger tmp/memory-ledger/preview tmp/budgets/ledger "${record[@]}"
       # BUDGET-CAPS BC11: Nine's boot budgets (retained geometry, live heap) are read by ci's nine-ring1 load, which fails
       # only on held parts or a missing reading; its budget-measures.json is judged here with the rest.
       - name: Fetch Nine's boot measures from the source run
@@ -130,21 +130,21 @@ jobs:
       - name: Collect the measured budgets
         if: steps.client.outcome == 'success'
         run: |
-          node scripts/shard-size-gate.mjs tmp/memory-ledger/preview/dist --hard-only --measures tmp/budgets/downloads.json
+          node src/scripts/shard-size-gate.mjs tmp/memory-ledger/preview/dist --hard-only --measures tmp/budgets/downloads.json
           inputs=(tmp/budgets/downloads.json)
-          if [[ -f scripts/budgets/phone-frames.mjs ]]; then inputs+=(tmp/budgets/phone-frames.json); fi
+          if [[ -f src/scripts/budgets/phone-frames.mjs ]]; then inputs+=(tmp/budgets/phone-frames.json); fi
           nine=$(find tmp/budgets/nine -name budget-measures.json 2>/dev/null | head -1 || true)
           for file in tmp/memory-ledger/preview/dist/.vite/budget-measures.json tmp/budgets/ledger/budget-measures.json "$nine"; do
             if [[ -n "$file" && -f "$file" ]]; then inputs+=("$file"); fi
           done
-          node scripts/budgets/cli.mjs merge tmp/budgets/measures.json "${inputs[@]}"
+          node src/scripts/budgets/cli.mjs merge tmp/budgets/measures.json "${inputs[@]}"
       - name: Check whether Nine boot needs confirmation
         id: nine-confirm
         if: steps.client.outcome == 'success'
         run: |
           needed=false
           if [[ $(jq -r '.caps["nine/boot/live-heap"].confirm // false' budgets/caps.json) == true ]]; then
-            needed=$(node scripts/budgets/cli.mjs needs-confirmation tmp/budgets/measures.json)
+            needed=$(node src/scripts/budgets/cli.mjs needs-confirmation tmp/budgets/measures.json)
           fi
           printf 'needed=%s\n' "$needed" >> "$GITHUB_OUTPUT"
       - name: Fetch the exact Nine client for confirmation
@@ -166,22 +166,22 @@ jobs:
           rm tmp/nine-ring1/client.tar
           reads=()
           for trial in 1 2 3; do
-            node scripts/nine-ring1.mjs boot
+            node src/scripts/nine-ring1.mjs boot
             path="tmp/budgets/nine-confirm-$trial.json"
             cp tmp/nine-ring1/boot/budget-measures.json "$path"
             reads+=("$path")
           done
-          node scripts/budgets/cli.mjs confirm tmp/budgets/measures.json "${reads[@]}"
+          node src/scripts/budgets/cli.mjs confirm tmp/budgets/measures.json "${reads[@]}"
       - name: Add the dispatched seed
         if: steps.client.outcome == 'success' && inputs.seed != ''
         env:
           SEED: ${{ inputs.seed }}
         run: |
           printf '%s\n' "$SEED" > tmp/budgets/seed.json
-          node scripts/budgets/cli.mjs merge tmp/budgets/measures.json tmp/budgets/measures.json tmp/budgets/seed.json
+          node src/scripts/budgets/cli.mjs merge tmp/budgets/measures.json tmp/budgets/measures.json tmp/budgets/seed.json
       - name: Judge every budget (regressed or over a hard cap fails this job only)
         if: steps.client.outcome == 'success'
-        run: node scripts/budgets/cli.mjs check tmp/budgets/measures.json
+        run: node src/scripts/budgets/cli.mjs check tmp/budgets/measures.json
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:

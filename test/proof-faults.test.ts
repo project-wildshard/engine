@@ -6,7 +6,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- reads the proof scripts and the modal's source
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { cardNow, ERROR_CARD, faultProblem, recordCards, watchFaults } from '../scripts/proof-faults.mjs';
+import { cardNow, ERROR_CARD, faultProblem, recordCards, watchFaults } from '../src/scripts/proof-faults.mjs';
 
 test('a faulted system, a stopped loop, a page error and a card each make a problem; other console lines do not', () => {
   expect(faultProblem('[faults] system "crash-test" threw: Error: forced system error (?crash=system)\n    at Object.run (control.js:2:86797)')).toBe('system "crash-test" faulted: Error: forced system error (?crash=system)');
@@ -24,8 +24,8 @@ test('the card selector is the modal\'s real ids (ErrorModal.ts), never the clas
   expect(modal).toContain("chip.id = 'wserr-chip';");
   expect(ERROR_CARD).toBe('#wserr, #wserr-chip');
   // the screen samplers that call an error up a modal use the real id too
-  expect(readFileSync('scripts/journey-proof.mjs', 'utf8')).not.toMatch(/\.ws-err\b/u);
-  expect(readFileSync('scripts/staging-smoke/checks.mjs', 'utf8')).not.toMatch(/\.ws-err\b/u);
+  expect(readFileSync('src/scripts/journey-proof.mjs', 'utf8')).not.toMatch(/\.ws-err\b/u);
+  expect(readFileSync('src/scripts/staging-smoke/checks.mjs', 'utf8')).not.toMatch(/\.ws-err\b/u);
 });
 
 test('the page recorder logs every card that mounts once, and cardNow reads the one on screen', async () => {
@@ -99,7 +99,7 @@ test('a card on screen that the recorder never logged still fails the proof at s
 });
 
 test('ZONE-ENTRY\'s proofs and the journey proof all use the shared check', () => {
-  for (const script of ['scripts/zone-gate-proof.mjs', 'scripts/zone-pair-proof.mjs', 'scripts/journey-proof.mjs']) {
+  for (const script of ['src/scripts/zone-gate-proof.mjs', 'src/scripts/zone-pair-proof.mjs', 'src/scripts/journey-proof.mjs']) {
     const text = readFileSync(script, 'utf8');
     expect(text, script).toMatch(/from '\.\/proof-faults\.mjs'/u);
     expect(text, script).not.toMatch(/page\.on\('pageerror'/u);

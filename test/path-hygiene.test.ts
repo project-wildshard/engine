@@ -7,7 +7,7 @@ import { dirname, resolve } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Use the test worker's Node runtime for the subprocess.
 import { execPath } from 'node:process';
 import { expect, test } from 'vitest';
-import { checkShardLayout, checkShards } from '../scripts/check-shards.mjs';
+import { checkShardLayout, checkShards } from '../src/scripts/check-shards.mjs';
 
 test('ownership declaration suffixes preserve the module existence check', () => {
   mkdirSync('tmp', { recursive: true });
@@ -16,19 +16,19 @@ test('ownership declaration suffixes preserve the module existence check', () =>
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
     writeFileSync(resolve(root, path), content);
   };
-  const run = (): ReturnType<typeof spawnSync> => spawnSync(execPath, [resolve('scripts/check-paths.mjs')], { cwd: root, encoding: 'utf8' });
+  const run = (): ReturnType<typeof spawnSync> => spawnSync(execPath, [resolve('src/scripts/check-paths.mjs')], { cwd: root, encoding: 'utf8' });
   try {
     put('src/live.ts', 'export const live = 1;');
-    put('scripts/owners.mjs', "const owner = 'src/live.ts#live';");
-    put('scripts/documented.py', '"""A retired path: src/deleted.ts"""\npattern = r"test/scripts/[^/]+\\.test\\.ts"\n');
+    put('src/scripts/owners.mjs', "const owner = 'src/live.ts#live';");
+    put('src/scripts/documented.py', '"""A retired path: src/deleted.ts"""\npattern = r"test/scripts/[^/]+\\.test\\.ts"\n');
     expect(run().status).toBe(0);
-    put('scripts/owners.mjs', "const owner = 'src/deleted.ts#live';");
+    put('src/scripts/owners.mjs', "const owner = 'src/deleted.ts#live';");
     expect(run().status).toBe(1);
-    put('scripts/owners.mjs', "const owner = 'src/live.ts#live';");
-    put('scripts/consumer.py', "source = r'test/missing.ts'\n");
+    put('src/scripts/owners.mjs', "const owner = 'src/live.ts#live';");
+    put('src/scripts/consumer.py', "source = r'test/missing.ts'\n");
     expect(run().status).toBe(1);
-    put('scripts/consumer.py', '');
-    put('scripts/consumer.mjs', "const source = 'src/missing.ts';");
+    put('src/scripts/consumer.py', '');
+    put('src/scripts/consumer.mjs', "const source = 'src/missing.ts';");
     expect(run().status).toBe(1);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
@@ -40,12 +40,12 @@ test('a logical src/format label is checked where the installed package holds it
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
     writeFileSync(resolve(root, path), content);
   };
-  const run = (): ReturnType<typeof spawnSync> => spawnSync(execPath, [resolve('scripts/check-paths.mjs')], { cwd: root, encoding: 'utf8' });
+  const run = (): ReturnType<typeof spawnSync> => spawnSync(execPath, [resolve('src/scripts/check-paths.mjs')], { cwd: root, encoding: 'utf8' });
   try {
     put('node_modules/@wildshard/format/src/format/live.ts', 'export const live = 1;');
-    put('scripts/owners.mjs', "const owner = 'src/format/live.ts#live';");
+    put('src/scripts/owners.mjs', "const owner = 'src/format/live.ts#live';");
     expect(run().status).toBe(0);
-    put('scripts/owners.mjs', "const owner = 'src/format/gone.ts#live';");
+    put('src/scripts/owners.mjs', "const owner = 'src/format/gone.ts#live';");
     expect(run().status).toBe(1);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
@@ -57,23 +57,23 @@ test('Python dynamic/regex strings are not bare tokens while real Python and she
     mkdirSync(dirname(resolve(root, path)), { recursive: true });
     writeFileSync(resolve(root, path), content);
   };
-  const run = (): ReturnType<typeof spawnSync> => spawnSync(execPath, [resolve('scripts/check-paths.mjs')], { cwd: root, encoding: 'utf8' });
+  const run = (): ReturnType<typeof spawnSync> => spawnSync(execPath, [resolve('src/scripts/check-paths.mjs')], { cwd: root, encoding: 'utf8' });
   try {
     put('src/live.ts', 'export const live = 1;');
-    put('scripts/paths.py', `layer = "game"
+    put('src/scripts/paths.py', `layer = "game"
 pattern = r"^src/shards/[a-z0-9_-]+/assets/"
 source = f"src/{layer}/package.json"
 upper = F"src/{layer}/value.ts"
 literal = "src/live.ts"
 `);
-    put('scripts/paths.sh', 'cat src/live.ts\n');
+    put('src/scripts/paths.sh', 'cat src/live.ts\n');
     expect(run().status).toBe(0);
-    put('scripts/paths.py', "literal = r'src/missing.ts'\n");
+    put('src/scripts/paths.py', "literal = r'src/missing.ts'\n");
     expect(run().status).toBe(1);
-    put('scripts/paths.py', '');
-    put('scripts/paths.sh', 'cat src/missing.ts\n');
+    put('src/scripts/paths.py', '');
+    put('src/scripts/paths.sh', 'cat src/missing.ts\n');
     expect(run().status).toBe(1);
-    put('scripts/paths.sh', "cat 'src/missing.ts'\n");
+    put('src/scripts/paths.sh', "cat 'src/missing.ts'\n");
     expect(run().status).toBe(1);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

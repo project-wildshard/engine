@@ -67,7 +67,7 @@ test('two actual online seats report corrections and settled rewind to the opera
   expect(records[1]?.frames).toBe(0); // A seated wire-only peer renders no game frames.
   expect(JSON.stringify({rows,records})).not.toMatch(/device:record|Private name/u);
   const exportFile=join(directory,'net-export.jsonl');writeFileSync(exportFile,[...records,...lines].map(row=>JSON.stringify(row)).join('\n'));
-  const table=JSON.parse(execFileSync(process.execPath,['scripts/e7-playtest-table.mjs','--json',exportFile,...readdirSync(directory).filter(name=>name.startsWith('playtest-')).map(name=>join(directory,name))],{encoding:'utf8'}));
+  const table=JSON.parse(execFileSync(process.execPath,['src/scripts/e7-playtest-table.mjs','--json',exportFile,...readdirSync(directory).filter(name=>name.startsWith('playtest-')).map(name=>join(directory,name))],{encoding:'utf8'}));
   expect(table.clients).toHaveLength(2);expect(table.rewind).toMatchObject({settledNetworkHits:1,clamped:1,clampedPercent:100,reviewJ127:true});
   expect(table.playtest).toMatchObject({complete:true,dropped:0});
   const server=createServer((request,response)=>{
@@ -77,7 +77,7 @@ test('two actual online seats report corrections and settled rewind to the opera
   await new Promise<void>(resolve=>{server.listen(0,'127.0.0.1',resolve);});
   try{
    const address=server.address() as AddressInfo;
-   const child=spawn(process.execPath,['scripts/e7-playtest-table.mjs','--api',`http://127.0.0.1:${address.port}`,'--day',new Date().toISOString().slice(0,10),'--tag','sitting-proof','--json'],{env:{...process.env,WS_TELEMETRY_REVIEW_PASSWORD:'fixture-review'},stdio:['ignore','pipe','pipe'],timeout:5000});
+   const child=spawn(process.execPath,['src/scripts/e7-playtest-table.mjs','--api',`http://127.0.0.1:${address.port}`,'--day',new Date().toISOString().slice(0,10),'--tag','sitting-proof','--json'],{env:{...process.env,WS_TELEMETRY_REVIEW_PASSWORD:'fixture-review'},stdio:['ignore','pipe','pipe'],timeout:5000});
    let output='',errors='';child.stdout.on('data',bytes=>{output+=String(bytes);});child.stderr.on('data',bytes=>{errors+=String(bytes);});
    const code=await new Promise(resolve=>{child.once('exit',resolve);});expect(code,errors).toBe(0);
    expect(JSON.parse(output).clients).toHaveLength(2);

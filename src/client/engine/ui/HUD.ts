@@ -18,7 +18,7 @@ import { listenReloadChip } from './reloadChip';
 import { FightMark } from './fightMark';
 
 /**
- * HUD — DOM overlay in `#hud`, styled by `src/client/engine/ui/styles/game.css` / `menu.css` (the in-game menu is src/client/engine/ui/Menu.ts + gmenu.css) on top of `base.css` (Wildshard glass identity; one class prefix per screen, see scripts/check-css.mjs).
+ * HUD — DOM overlay in `#hud`, styled by `src/client/engine/ui/styles/game.css` / `menu.css` (the in-game menu is src/client/engine/ui/Menu.ts + gmenu.css) on top of `base.css` (Wildshard glass identity; one class prefix per screen, see src/scripts/check-css.mjs).
  *
  *   const hud = new HUD({ pointerLock?: boolean });   // pointerLock:false in ?nolock dev mode (no pause overlay)
  *   hud.showIntro(() => player.lock())                 // title screen: shard deck + ENTER WORLD / EXPLORE WORLD; any key → onEnter

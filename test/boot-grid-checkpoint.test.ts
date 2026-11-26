@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, test, vi } from 'vitest';
-import { bootSignalRoadPlan, bootStoredSave, bootCellCheckpoint, bootCellRoadPlans, verifyBootCellRoad } from '../scripts/parity/boot-smoke.mjs';
-import type { FloorGridState, FloorGridWitness, FloorGridPlan } from '../scripts/frame-floor-grid.mjs';
+import { bootSignalRoadPlan, bootStoredSave, bootCellCheckpoint, bootCellRoadPlans, verifyBootCellRoad } from '../src/scripts/parity/boot-smoke.mjs';
+import type { FloorGridState, FloorGridWitness, FloorGridPlan } from '../src/scripts/frame-floor-grid.mjs';
 
 test('smoke road entries follow the observed lattice without changing local entry points', () => {
   const state = { pitch: 562.5, cells: [

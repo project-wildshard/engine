@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
-import { deployFrameProblem } from '../scripts/journey-proof.mjs';
-import { gateLeg, holdLine, JOURNEY_CARD, mergeVerdict } from '../scripts/staging-qa.mjs';
-import { QA_RIG_SHARDS, tourFixture } from '../scripts/staging-qa-local.mjs';
-import { TOUR_FEATURED } from '../scripts/zone-entry-featured.mjs';
-import { CHANNELS, qaGap, QA_LEGS } from '../scripts/page-release/flow.mjs';
-import { chromiumCandidateArgs } from '../scripts/staging-qa-browser.mjs';
-import { pickPhone, qaDevice } from '../scripts/staging-qa-sim.mjs';
-import { budgetFinding, LEG_CAP_S, LEG_TARGET_S, LEGS, nominalSeconds, STEPS } from '../scripts/staging-qa-budget.mjs';
+import { deployFrameProblem } from '../src/scripts/journey-proof.mjs';
+import { gateLeg, holdLine, JOURNEY_CARD, mergeVerdict } from '../src/scripts/staging-qa.mjs';
+import { QA_RIG_SHARDS, tourFixture } from '../src/scripts/staging-qa-local.mjs';
+import { TOUR_FEATURED } from '../src/scripts/zone-entry-featured.mjs';
+import { CHANNELS, qaGap, QA_LEGS } from '../src/scripts/page-release/flow.mjs';
+import { chromiumCandidateArgs } from '../src/scripts/staging-qa-browser.mjs';
+import { pickPhone, qaDevice } from '../src/scripts/staging-qa-sim.mjs';
+import { budgetFinding, LEG_CAP_S, LEG_TARGET_S, LEGS, nominalSeconds, STEPS } from '../src/scripts/staging-qa-budget.mjs';
 
 const build = 'a'.repeat(40);
 const selected = ['K3'];

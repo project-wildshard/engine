@@ -4,7 +4,7 @@ import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { devKey, devServerBuildArgs, DEV_STATE, stampDevDocument } from '../scripts/dev-world.mjs';
+import { devKey, devServerBuildArgs, DEV_STATE, stampDevDocument } from '../src/scripts/dev-world.mjs';
 import { devControlUrl, devControls } from '../src/client/host/online/devControl';
 import { devRoute } from '../src/server/host/dedicated/devControl';
 import { isDevGround } from '../src/shared/game/devColliders';

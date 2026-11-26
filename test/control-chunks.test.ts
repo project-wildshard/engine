@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { controlChunkSelector, controlChunkFileName } from '../scripts/app-build/controlChunks';
+import { controlChunkSelector, controlChunkFileName } from '../src/scripts/app-build/controlChunks';
 import { readModuleFiles } from '../src/client/engine/boot/download';
 
 test('control batches retain title, session, lazy and shard boundaries through cycles', () => {

@@ -1,6 +1,6 @@
 // EV9 (TS14): a docs-only push skips the suite, but a Markdown file that code actually reads still gets its readers run.
 import { afterAll, beforeAll, expect, test } from 'vitest';
-import { pushSelection } from '../scripts/push-selection.mjs';
+import { pushSelection } from '../src/scripts/push-selection.mjs';
 import { createTempRepo, type TempRepo } from '../src/test/helpers/git';
 
 // Inside a git hook GIT_DIR points at the outer repo; pushSelection's own git calls must read the fixture.
@@ -24,9 +24,9 @@ beforeAll(() => {
     'test/rules.test.ts': "import {readFileSync} from 'node:fs';readFileSync('docs/rules.md','utf8');\n",
     'docs/RAW.md': 'raw\n',
     'src/raw.ts': "import raw from '../docs/RAW.md?raw';export default raw;\n",
-    'scripts/changelog.mjs': "export const CHANGELOG_PATH = 'CHANGELOG.md';\n",
+    'src/scripts/changelog.mjs': "export const CHANGELOG_PATH = 'CHANGELOG.md';\n",
     'test/changelog.test.ts': "import {readFileSync} from 'node:fs';readFileSync('CHANGELOG.md','utf8');\n",
-    'scripts/agent-parity.mjs': "import {join} from 'node:path';export const read=root=>join(root, 'AGENTS.md');\n",
+    'src/scripts/.kit/agent-parity.mjs': "import {join} from 'node:path';export const read=root=>join(root, 'AGENTS.md');\n",
     // A runtime module reads a doc: no test edge is proven, so the push runs full.
     'src/read-doc.mjs': "import {readFileSync} from 'node:fs';readFileSync('docs/HOST-BAR.md','utf8');\n",
     'src/read-templated.mjs': "import {readFileSync} from 'node:fs';export const read=root=>readFileSync(`${root}/docs/TEMPLATED.md`,'utf8');\n",
@@ -50,7 +50,7 @@ test('a doc read only by tests runs those tests, not the suite', () => {
 });
 
 test('a changelog edit runs full: the build and title proof read it through changelog.mjs', () => {
-  expect(push({ 'CHANGELOG.md': '## v0.1.0 (2026-11-12)\n\n- First, better\n' })).toMatchObject({ mode: 'full', reason: expect.stringMatching(/scripts\/changelog\.mjs/u) });
+  expect(push({ 'CHANGELOG.md': '## v0.1.0 (2026-11-12)\n\n- First, better\n' })).toMatchObject({ mode: 'full', reason: expect.stringMatching(/src\/scripts\/changelog\.mjs/u) });
 });
 
 test('a doc read by code with no proven test edge still runs full', () => {

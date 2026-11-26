@@ -6,8 +6,8 @@ import {dirname, join, resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Run the CLI as build:game does.
 import {spawnSync} from 'node:child_process';
 import {afterEach, expect, test} from 'vitest';
-import {SPLITTING, contentDirOf, joinOutput, splitOutput} from '../scripts/app-build/splitOutput.mjs';
-import {gatePage, pageSize} from '../scripts/page-size.mjs';
+import {SPLITTING, contentDirOf, joinOutput, splitOutput} from '../src/scripts/app-build/splitOutput.mjs';
+import {gatePage, pageSize} from '../src/scripts/page-size.mjs';
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, {recursive: true, force: true}); });
@@ -137,15 +137,15 @@ test('a retry after an interrupted split keeps what already moved; overlapping r
 
 test('the CLI splits, gates and joins', () => {
   const dist = fixture();
-  const split = spawnSync(process.execPath, ['scripts/app-build/splitOutput.mjs', dist], {encoding: 'utf8'});
+  const split = spawnSync(process.execPath, ['src/scripts/app-build/splitOutput.mjs', dist], {encoding: 'utf8'});
   expect(split.status, split.stderr).toBe(0);
   expect(split.stdout).toContain(`${CONTENT.length} content files`);
-  const gate = spawnSync(process.execPath, ['scripts/page-size.mjs', dist, '--gate'], {encoding: 'utf8'});
+  const gate = spawnSync(process.execPath, ['src/scripts/page-size.mjs', dist, '--gate'], {encoding: 'utf8'});
   expect(gate.status, gate.stderr).toBe(0);
   expect(gate.stdout).toContain('page-size gate: pass');
-  const join_ = spawnSync(process.execPath, ['scripts/app-build/splitOutput.mjs', dist, '--join'], {encoding: 'utf8'});
+  const join_ = spawnSync(process.execPath, ['src/scripts/app-build/splitOutput.mjs', dist, '--join'], {encoding: 'utf8'});
   expect(join_.status, join_.stderr).toBe(0);
-  const whole = spawnSync(process.execPath, ['scripts/page-size.mjs', dist, '--gate'], {encoding: 'utf8'});
+  const whole = spawnSync(process.execPath, ['src/scripts/page-size.mjs', dist, '--gate'], {encoding: 'utf8'});
   expect(whole.status).toBe(1);
   expect(whole.stderr).toContain(`dist/ holds ${CONTENT.length} content files`);
 });

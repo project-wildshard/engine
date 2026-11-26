@@ -7,7 +7,7 @@ import { expect, test } from 'vitest';
 // SENTRY-TRIAGE S16: an SSH login over the tailnet is our own operator or agent (WILDSHARD-SERVER-2, -4: noise), so the box's
 // wildshard-alert sends nothing for it. Logins from anywhere else, sudo, the console and fail2ban's bans (the failed logins)
 // still report. The script is the one harden-apply.sh installs; WILDSHARD_ALERT_PRINT prints the line instead of sending it.
-const harden = readFileSync('scripts/vps/harden-apply.sh', 'utf8');
+const harden = readFileSync('src/scripts/vps/harden-apply.sh', 'utf8');
 const script = /put \/usr\/local\/sbin\/wildshard-alert 755 root:root VH14 <<'EOF'\n([\s\S]*?)\nEOF/u.exec(harden)?.[1] ?? '';
 
 /** What the alert would send for this PAM session (or argument), or '' when it sends nothing. */

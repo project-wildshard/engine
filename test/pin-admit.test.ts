@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {readTar} from '@wildshard/format/tar';
-import {admitPin} from '../scripts/pin-admit';
+import {admitPin} from '../src/scripts/pin-admit';
 import {hashOf, legacyMigrationFixture, useCookHarness} from './fixtures/cookWorkerHarness';
 
 /** SHARD-COMPAT FE9b: `pins.ts install` admits a pin as the cook does, through the chain when this validator refuses it. */

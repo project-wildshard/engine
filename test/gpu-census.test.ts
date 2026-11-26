@@ -1,10 +1,10 @@
 import {afterEach, expect, test, vi} from 'vitest';
-import {installGpuProbe, type GpuCensusPort} from '../scripts/perf/gpu-census-page.mjs';
-import {gpuPairs,gpuPhoneModel} from '../scripts/perf/gpu-census-report.mjs';
+import {installGpuProbe, type GpuCensusPort} from '../src/scripts/perf/gpu-census-page.mjs';
+import {gpuPairs,gpuPhoneModel} from '../src/scripts/perf/gpu-census-report.mjs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Validate real CLI refusals before any browser or output is opened.
 import process from 'node:process';
-import {runGpuCensus,gpuCensusPoses} from '../scripts/perf/gpu-census.mjs';
-import {sourceMatchedCoverageAliases} from '../scripts/perf/gpu-census-coverage.mjs';
+import {runGpuCensus,gpuCensusPoses} from '../src/scripts/perf/gpu-census.mjs';
+import {sourceMatchedCoverageAliases} from '../src/scripts/perf/gpu-census-coverage.mjs';
 
 const windowDescriptor=Object.getOwnPropertyDescriptor(globalThis,'window');
 function fixture() {

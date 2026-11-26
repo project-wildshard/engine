@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve the fixture's declared document entries.
 import { join, resolve } from 'node:path';
 import { expect, test, vi } from 'vitest';
-import { BUILD_ID_EXPRESSION, buildLabelOf, newBuildId, sourceBuildId, stampBuildDocuments, stampBuildHtml } from '../scripts/app-build/buildIdentity.mjs';
+import { BUILD_ID_EXPRESSION, buildLabelOf, newBuildId, sourceBuildId, stampBuildDocuments, stampBuildHtml } from '../src/scripts/app-build/buildIdentity.mjs';
 import { buildLabel } from '../src/client/engine/ui/buildCheck';
 
 test('deploy identities change the document while its module URLs and runtime expression stay stable', () => {

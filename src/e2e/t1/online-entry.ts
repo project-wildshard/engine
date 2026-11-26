@@ -4,7 +4,7 @@ import { reportBoot } from './boot-report.ts'
 import { enterBrasscap } from './fixtures.ts'
 import { device } from './online-fixtures.ts'
 
-import type { T1OnlineRig } from '../../../scripts/t1-online-rig.mjs'
+import type { T1OnlineRig } from '../../scripts/t1-online-rig.mjs'
 import type { Browser, Page } from '@playwright/test'
 
 async function seatedResult(page: Page, name: string): Promise<unknown> {

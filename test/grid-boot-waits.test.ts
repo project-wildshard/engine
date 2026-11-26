@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { gridBootWaitHistory } from '../scripts/parity/grid-boot-waits.mjs';
+import { gridBootWaitHistory } from '../src/scripts/parity/grid-boot-waits.mjs';
 
 test('the original healthy-home pending-far failure stays unassigned without phase evidence', () => {
   const history = gridBootWaitHistory();

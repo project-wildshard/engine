@@ -1,0 +1,15 @@
+{
+  "runner": "2.2.0",
+  "installer": "pnpm",
+  "projectSettings": false,
+  "tools": {
+    "typescript": "7.0.2",
+    "oxfmt": "0.74.0",
+    "oxlint-tsgolint": "7.0.2004"
+  },
+  "files": {
+    "package.json": "5256b98d6e77328731b282eb71d06358fde7c487d5b788132b3dc0b8f24d8282",
+    "pnpm-lock.yaml": "b8e1b35673722f08f52d893347dcbde0e30e18486e93ffa1095934d8c03f5eeb",
+    "pnpm-workspace.yaml": "1186000f2d09eb5fab60f1e09902da9870d51589b698f0ba7ee48c8b0366d31e"
+  }
+}

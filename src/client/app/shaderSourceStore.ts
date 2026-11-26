@@ -11,7 +11,7 @@ interface StoredBook { renderer: string; zone: string; book: SourceBook }
 /** QA-FEEDBACK-2026-11-23 row 8 (Jake: *"its only frozen and really fucking slow when doing a version upgrade or update"*): the
  *  book is keyed by the renderer it was emitted by, not the deploy. Its texts are pure functions of their keyed inputs and of the
  *  shader-emitting code (render/graph's lowering and wrapping, shaderText's finishing, three's chunks, the format pin), which is
- *  exactly what the renderer revision hashes (scripts/renderer-revision.mjs, J259; stamped on every document as
+ *  exactly what the renderer revision hashes (src/scripts/renderer-revision.mjs, J259; stamped on every document as
  *  `__WS_RENDERER_REVISION__`). GPU identity is not an input: three adds the GPU's precision and extension prefixes after the
  *  book. So an update that leaves the renderer alone replays the book; one that changes a shader starts it again. A document
  *  without the stamp (a dev page) keys by its build, as before. */

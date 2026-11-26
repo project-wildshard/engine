@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 
 interface Probe { on: boolean; drawn: number[]; slowMs: number; slowFrames: number }
-const source = readFileSync(new URL('../scripts/net-lag-proof.mjs', import.meta.url), 'utf8');
+const source = readFileSync(new URL('../src/scripts/net-lag-proof.mjs', import.meta.url), 'utf8');
 const start = source.indexOf('function pageProbe('), end = source.indexOf('/** @param {number[]} list', start);
 if (start === -1 || end <= start) throw new Error('Missing maintained page probe');
 

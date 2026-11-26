@@ -1,4 +1,0 @@
-{
- "about": "ZONE-SNAPSHOTS ZS1: today's zone snapshots; shrink only (node scripts/zone-snapshot-guard.mjs --prune)",
- "offenders": []
-}

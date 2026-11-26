@@ -10,8 +10,8 @@ with tempfile.TemporaryDirectory(dir=base/'tmp',prefix='staged-inputs-test-') as
  put('src/unit.ts','export const value = 1;\n');put('src/unrelated.ts','export const untouched = 1;\n')
  put('src/dependency.ts','export const dependency = 1;\n');put('src/asset.bin','exact asset');
  put('src/reader.ts','import "./gone";\n');put('src/gone.ts','export const gone = 1;\n')
- put('scripts/precommit-source.py','pass\n');put('scripts/push_input_cache.py','pass\n');
- put('scripts/precommit-checks.mjs','import "./helper.mjs";\n');put('scripts/helper.mjs','export const helper = 1;\n')
+ put('src/scripts/precommit-source.py','pass\n');put('src/scripts/push_input_cache.py','pass\n');
+ put('src/scripts/precommit-checks.mjs','import "./helper.mjs";\n');put('scripts/helper.mjs','export const helper = 1;\n')
  put('scripts/unrelated.mjs','export const untouched = 1;\n');put('lint/ratchet.json','{}');put('.oxlintrc.json','{}')
  put('src/engine/tsconfig.json','{"files":[],"references":[{"path":"./tsconfig.test.json"}]}')
  put('src/engine/tsconfig.test.json','{"include":["**/*.test.ts"]}')
@@ -27,8 +27,8 @@ with tempfile.TemporaryDirectory(dir=base/'tmp',prefix='staged-inputs-test-') as
  assert (tree/'scripts/helper.mjs').read_text()=='export const helper = 1;\n'
  assert not (tree/'src/unrelated.ts').exists();assert not (tree/'scripts/unrelated.mjs').exists()
  assert not (tree/'src/reader.ts').exists()
- assert (tree/'scripts/precommit-source.py').read_text()=='pass\n'
- assert (tree/'scripts/push_input_cache.py').read_text()=='pass\n'
+ assert (tree/'src/scripts/precommit-source.py').read_text()=='pass\n'
+ assert (tree/'src/scripts/push_input_cache.py').read_text()=='pass\n'
  assert (tree/'src/engine/tsconfig.json').read_text()=='{"files":[],"references":[{"path":"./tsconfig.test.json"}]}'
  assert (tree/'src/engine/tsconfig.test.json').read_text()=='{"include":["**/*.test.ts"]}'
  assert (tree/'src/tsconfig.test.json').read_text()=='{"include":["*.test.ts"]}'
@@ -41,14 +41,14 @@ with tempfile.TemporaryDirectory(dir=base/'tmp',prefix='staged-inputs-test-') as
 const result=spawnSync(process.execPath,['--import','./scripts/sim-node-loader.mjs','scripts/docs/read.mjs'],{cwd:process.cwd(),encoding:'utf8'});
 if(result.status!==0)throw Error(result.stderr);process.stdout.write(result.stdout);
 ''')
- put('scripts/sim-node-loader.mjs', 'import "./loader-helper.mjs";\n')
+ put('src/scripts/sim-node-loader.mjs', 'import "./loader-helper.mjs";\n')
  put('scripts/loader-helper.mjs', 'process.env.STAGED_CHILD_LOADER="candidate loader";\n')
  put('scripts/docs/read.mjs', 'console.log(process.env.STAGED_CHILD_LOADER);\n')
  put('scripts/docs/scripts/sim-node-loader.mjs', 'throw Error("wrong relative loader");\n')
  git('add','scripts')
- put('scripts/sim-node-loader.mjs', 'throw Error("foreign loose loader");\n')
+ put('src/scripts/sim-node-loader.mjs', 'throw Error("foreign loose loader");\n')
  tree=root/'child-loader';staged_source(root,tree,time.time()+5,specification={**spec,'files':['scripts/docs/reference.mjs']})
- assert (tree/'scripts/sim-node-loader.mjs').read_text()=='import "./loader-helper.mjs";\n'
+ assert (tree/'src/scripts/sim-node-loader.mjs').read_text()=='import "./loader-helper.mjs";\n'
  assert subprocess.check_output(['node','scripts/docs/reference.mjs'],cwd=tree,env=env,text=True)=='candidate loader\n'
  # Deletions require all active reader inputs, including unchanged readers.
  git('rm','--cached','src/gone.ts');tree=root/'deleted';staged_source(root,tree,time.time()+5,specification={**spec,'deleted':True})
@@ -81,8 +81,8 @@ if(result.status!==0)throw Error(result.stderr);process.stdout.write(result.stdo
  put('src/unit.ts','// import "./missing";\nexport const text = \'import "./missing";\';\n');git('add','src/unit.ts')
  staged_source(root,root/'comments',time.time()+5,specification=spec);checks+=1
  # Only exact generation declarations may defer generated inputs to CI.
- put('scripts/source-generation-outputs.json',json.dumps({'producers':{'scripts/fixture.mjs':['src/fixture.generated.ts']}}))
- git('add','scripts/source-generation-outputs.json')
+ put('src/scripts/source-generation-outputs.json',json.dumps({'producers':{'scripts/fixture.mjs':['src/fixture.generated.ts']}}))
+ git('add','src/scripts/source-generation-outputs.json')
  put('src/unit.ts','import "./fixture.generated";\n');git('add','src/unit.ts')
  staged_source(root,root/'declared-generated',time.time()+5,specification=spec);checks+=1
  missing('import "./undeclared.generated";','src/undeclared.generated')

@@ -1,7 +1,7 @@
 // P1-E2 (multi-repo plan, J1/J2/J5): the engine ownership map. "Tag first, move later": every non-test source under
 // src/engine and src/game names its side in lint/engine-sides.json (shared, server, client or cook) and stays where
 // it is until the engine repo cuts it into shared/, server/, client/ and cook/. This module is the one detector the
-// oxlint rule (wildshard/engine-sides, per file, in lint:fast) and the census (scripts/check-engine-sides.mjs, whole
+// oxlint rule (wildshard/engine-sides, per file, in lint:fast) and the census (src/scripts/check-engine-sides.mjs, whole
 // tree) share. Forbidden edges and DOM / renderer use in shared, server and cook are counted per file; today's counts
 // sit in lint/engine-side-edges.json and may only fall.
 import { existsSync, readFileSync, readdirSync } from 'node:fs';

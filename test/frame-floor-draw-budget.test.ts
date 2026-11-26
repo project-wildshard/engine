@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { assessDrawBudget, renderCpuUsPerDraw, type DrawSample } from '../src/client/engine/core/drawBudget';
 import { drawBudgetCounter } from '../src/client/engine/ui/drawBudgetCounter';
-import { validateFrameFloorArgs, frameFloorDrawBudgetMode } from '../scripts/frame-floor-args.mjs';
+import { validateFrameFloorArgs, frameFloorDrawBudgetMode } from '../src/scripts/frame-floor-args.mjs';
 
 const phone4 = { tier: 'phone', cpuRate: 4 };
 test('inclusive per-frame draw and 4x CPU limits pass exactly at the budget', () => {
@@ -60,7 +60,7 @@ interface Graded { pass: boolean; results: { rows: { pass: boolean; rows: { pass
 type Grade = (record: unknown) => Graded;
 const isGrade = (value: unknown): value is Grade => typeof value === 'function';
 function grade(samples: DrawSample[], surface = 'desktop', cpuRate = 4, mode: 'enforce' | 'report-only' = 'enforce', maxMs = 34): Graded {
-  const source = readFileSync('scripts/frame-floor.mjs', 'utf8');
+  const source = readFileSync('src/scripts/frame-floor.mjs', 'utf8');
   const start = source.indexOf('function assess('), end = source.indexOf('\nfunction printVerdict(', start);
   const loaded: unknown = runInNewContext(`${source.slice(start, end)};grade`, { chromiumPhone: false, chromiumCpuRate: 1, softwareCensus: null, assessDrawBudget });
   if (!isGrade(loaded)) throw new Error('Missing real frame-floor grader');

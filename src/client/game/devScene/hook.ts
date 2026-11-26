@@ -49,9 +49,9 @@ import { SwingField, createSwingUniforms, swingQuaternion, type SwingRow } from 
  *                              quest section. Resolves to what ran, or `ok: false` when the page must reload
  *
  * `version` is `DEV_HOOK_VERSION`; sharddev refuses a page with another (its page script) and a client whose build flags
- * say another (`build-flags.json` `devHook`, written by `scripts/app-build-pipeline.mjs`). Bump it on any change to these
+ * say another (`build-flags.json` `devHook`, written by `src/scripts/app-build-pipeline.mjs`). Bump it on any change to these
  * signatures or to `DevPart`. A production build has none of this: `finish.ts` imports it only behind `__DEVSERVER__`, and
- * `scripts/check-devserver.mjs` refuses a bundle that holds `DEV_HOOK_GLOBAL`.
+ * `src/scripts/check-devserver.mjs` refuses a bundle that holds `DEV_HOOK_GLOBAL`.
  */
 export const DEV_HOOK_VERSION = 4;
 

@@ -2,7 +2,7 @@
 // (src/client/engine/debug/probe.ts) and the worker client's hooks (src/client/game/shardfile/clientWorker.ts), as
 // far as the smoke uses them. The kit tsconfig has no DOM; `document` and `Event` are the two DOM names it touches.
 
-import type { BarRow } from '../../../scripts/loading-bar-rule.mjs'
+import type { BarRow } from '../../scripts/loading-bar-rule.mjs'
 
 type SmokeVec3 = Readonly<Record<'x' | 'y' | 'z', number>>
 
@@ -48,7 +48,7 @@ declare global {
     | undefined
   var __barLog: readonly BarRow[] | undefined
   var __countLog: readonly { readonly serverFiles: number }[] | undefined
-  // ENGINE-MEMORY EM26: scripts/memory/uploadRecorder.mjs, shard textures uploaded as decoded RGBA over 1 MB
+  // ENGINE-MEMORY EM26: src/scripts/memory/uploadRecorder.mjs, shard textures uploaded as decoded RGBA over 1 MB
   var __imageUploads:
     | readonly {
         readonly width: number

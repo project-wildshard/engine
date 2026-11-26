@@ -50,7 +50,7 @@
       "harness": "test/fixtures/decisionHarness.ts",
       "sourceRepository": "project-wildshard/sharddev",
       "compiler": "sharddev packages/sdk bake/compileScript.ts (AssemblyScript 0.28.20 plus structural fuel metering)",
-      "capture": "WS_FREEZE_GUESTS=1 WS_SHARDDEV=<checkouts>/sharddev runs scripts/freeze-script-guest.mjs per missing guest",
+      "capture": "WS_FREEZE_GUESTS=1 WS_SHARDDEV=<checkouts>/sharddev runs src/scripts/freeze-script-guest.mjs per missing guest",
       "files": [
         "8c634be4f8a33c433138332d5bb02d08173e8e1143773e7c9491ab95257bfc8d.json",
         "4a7a06331e9cefa41ba76100f155c5b8f215f64afb61a532f25123fb158186f0.json",

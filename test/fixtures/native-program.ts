@@ -4,13 +4,13 @@ import { execFile } from 'node:child_process';
 import { readFileSync, statSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- All compiler inputs remain repository-relative.
 import { resolve } from 'node:path';
-import { bakeInputHashes, InputHashMemo } from '../../scripts/bake-input-hashes.mjs';
-import type { RecorderTask } from '../../scripts/native-recorder-cache.mjs';
-import { runNativeRecorder } from '../../scripts/native-recorder-cache.mjs';
+import { bakeInputHashes, InputHashMemo } from '../../src/scripts/bake-input-hashes.mjs';
+import type { RecorderTask } from '../../src/scripts/native-recorder-cache.mjs';
+import { runNativeRecorder } from '../../src/scripts/native-recorder-cache.mjs';
 
 const memos = new Map<string, InputHashMemo>();
 const MAX_BYTES = 1 << 26;
-const LOADER = 'scripts/bake-loader.mjs';
+const LOADER = 'src/scripts/bake-loader.mjs';
 
 /** Share completed construction, never a test result. The existing native cache
  * binds exact input bytes, tool/host identity and every output hash, coalesces
@@ -32,7 +32,7 @@ export function nativeProgramJob(spec: NativeProgramSpec): {
   memos.set(root, memo);
   // Data-only proof constructors need no app identity or discovery-table preload.
   // The stricter simulation loader still fences its renderer admission rules.
-  const loader = spec.loader === 'simulation' ? 'scripts/sim-node-loader.mjs' : LOADER;
+  const loader = spec.loader === 'simulation' ? 'src/scripts/sim-node-loader.mjs' : LOADER;
   const loaderInputs = spec.loader === 'simulation' ? ['lint/sim-schema-leaves.json'] : [];
   const inventory = (): string[] => [...new Set([spec.script, LOADER, loader, ...loaderInputs, ...spec.inputs.flatMap(path => memo.paths(path, true))])].sort();
   const paths = inventory(), inputs = bakeInputHashes(root, paths, memo);

@@ -1,8 +1,8 @@
 import {expect, test} from 'vitest';
 // oxlint-disable-next-line import/no-nodejs-modules -- exercise the actual serialized Inspector command without opening Safari
 import {runInNewContext} from 'node:vm';
-import {STEADY_SCRIPT_WINDOW, STEADY_TIMELINE_WINDOW} from '../scripts/frame-floor-script-profile.mjs';
-import {validateFrameFloorArgs} from '../scripts/frame-floor-args.mjs';
+import {STEADY_SCRIPT_WINDOW, STEADY_TIMELINE_WINDOW} from '../src/scripts/frame-floor-script-profile.mjs';
+import {validateFrameFloorArgs} from '../src/scripts/frame-floor-args.mjs';
 
 function fixture() {
   let now = 100, stops = 0;

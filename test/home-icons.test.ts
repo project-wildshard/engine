@@ -4,7 +4,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, 
 import { join, resolve } from 'node:path';
 import sharp from 'sharp';
 import { expect, test } from 'vitest';
-import { HOME_ICON_CHANNELS, HOME_ICON_FILES, homeIconChannel, homeIconManifestRows, writeHomeIcons } from '../scripts/app-build/homeIcons.mjs';
+import { HOME_ICON_CHANNELS, HOME_ICON_FILES, homeIconChannel, homeIconManifestRows, writeHomeIcons } from '../src/scripts/app-build/homeIcons.mjs';
 
 interface Png { readonly width: number; readonly height: number; readonly colorType: number; readonly transparent: boolean }
 /** The PNG header as a browser reads it: IHDR's size and colour type, and whether a tRNS chunk adds transparency. */

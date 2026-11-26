@@ -59,8 +59,8 @@ The manual milestone proof is outside hooks:
 
 ```sh
 pnpm build:ring
-scripts/browser-lane.sh node scripts/boot-timing-proof.mjs
-scripts/browser-lane.sh node scripts/boot-timing-proof.mjs --delay=worker
+src/scripts/browser-lane.sh node scripts/boot-timing-proof.mjs
+src/scripts/browser-lane.sh node scripts/boot-timing-proof.mjs --delay=worker
 ```
 
 It opens real iPhone portrait Chromium and WebKit boots, requires live

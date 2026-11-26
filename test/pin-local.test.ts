@@ -8,10 +8,10 @@ import {dirname, join, resolve as resolvePath} from 'node:path';
 import {afterEach, expect, test} from 'vitest';
 import {readTar} from '@wildshard/format/tar';
 import {validationSourceBytes} from '@wildshard/format/validationReceipt';
-import {wholeBrasscapProduct} from '../scripts/pin-format.ts';
+import {wholeBrasscapProduct} from '../src/scripts/pin-format.ts';
 import {cookPreparationBytes} from '@wildshard/format/cookPreparation';
 import {parseOutputIndex} from '@wildshard/format/outputIndex';
-import {localCandidates, LOCAL_CANDIDATES} from '../scripts/local-candidates.ts';
+import {localCandidates, LOCAL_CANDIDATES} from '../src/scripts/local-candidates.ts';
 import {cookShard, openShardfile} from '../src/cook/game/shardCook.ts';
 import {folderTarball} from '../src/cook/game/folderTarball';
 import {loadCookedFolder} from '../src/server/host/headlessFolder';
@@ -50,7 +50,7 @@ function fixture() {
 }
 function cli(root: string, args: readonly string[], env: NodeJS.ProcessEnv = {}) {
   return new Promise<{status: number | null; output: string}>(resolve => {
-    const child = spawn(process.execPath, [resolvePath('scripts/pins.ts'), ...args], {cwd: root,
+    const child = spawn(process.execPath, [resolvePath('src/scripts/pins.ts'), ...args], {cwd: root,
       env: {...process.env, CI: '', WILDSHARD_PINS_REUSE: '0', ...env}});
     let output = '';
     child.stdout.on('data', (part: Buffer) => { output += part.toString(); });

@@ -10,7 +10,7 @@ import { installAppIdentity } from '../src/shared/engine/app/identity';
 import { WILDSHARD_IDENTITY } from '../src/client/game/identity';
 import { SaveStore } from '../src/shared/engine/saves/store';
 import { deviceIdentity } from '../src/shared/engine/net/identity';
-import { clientFloor } from '../scripts/app-build/clientFloor';
+import { clientFloor } from '../src/scripts/app-build/clientFloor';
 import { olderClient } from '../src/client/engine/boot/forceUpdate';
 import { playerSavesOver } from '../src/server/host/dedicated/playerSaves';
 import { writeSave } from '../src/server/host/dedicated/saves/saveStore';

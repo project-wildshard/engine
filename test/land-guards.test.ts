@@ -1,4 +1,4 @@
-// J240 / DEV-SPEED DS21: scripts/land.mjs against real git. A bare repo stands
+// J240 / DEV-SPEED DS21: src/scripts/.kit/land.mjs against real git. A bare repo stands
 // in for GitHub (with protect-main's no-force, no-delete rule as an update
 // hook) and a post-receive hook records every pushed tip. The guards land
 // keeps in J422 push mode: pins and boot stamps before the gate, a clean tree,
@@ -11,8 +11,8 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, symlinkSyn
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
-import { failingDetail, failureLine, PINS_LEDGER, prePushCause, REF_LOCK } from '../scripts/land.mjs';
-import { BOOT_STAMPS } from '../scripts/boot-stamps.mjs';
+import { failingDetail, failureLine, PINS_LEDGER, prePushCause, REF_LOCK } from '../src/scripts/.kit/land.mjs';
+import { BOOT_STAMPS } from '../src/scripts/boot-stamps.mjs';
 import { cleanLandFixtures, fixture, prepushLines, type Fixture } from './fixtures/land-git';
 
 afterEach(cleanLandFixtures);
@@ -36,7 +36,7 @@ describe('land (J422): the guards around the main push, and Git retries', () => 
   test('a worktree whose out/ holds a pin main no longer names runs pnpm pins before gen:inputs', () => {
     const f = fixture(), calls = plantPnpm(f, null);
     const wt = f.worktree('foo');
-    f.commit(wt, 'package.json', '{"scripts":{"pins":"node scripts/pins.ts"}}\n', 'chore: a pins script');
+    f.commit(wt, 'package.json', '{"scripts":{"pins":"node src/scripts/pins.ts"}}\n', 'chore: a pins script');
     f.commit(wt, 'test/pins/shardfiles.json', `${JSON.stringify({ shards: [{ slug: 'dunes', revision: 2, hash: 'b'.repeat(64) }] })}\n`, 'test(pins): dunes rev 2');
     writeFileSync(join(f.repo, '.git/info/exclude'), 'out/\n');
     mkdirSync(join(wt, 'out/dunes'), { recursive: true });
@@ -51,7 +51,7 @@ describe('land (J422): the guards around the main push, and Git retries', () => 
   test('a gen:inputs stop names the thrown error, not the stack\'s tail', () => {
     const f = fixture();
     const wt = f.worktree('foo');
-    f.commit(wt, 'scripts/gen.mjs', "function inner(){throw new Error('planted: out/ holds pinned products the pins no longer name');}\ninner();\n", 'build: a failing generator');
+    f.commit(wt, 'src/scripts/gen.mjs', "function inner(){throw new Error('planted: out/ holds pinned products the pins no longer name');}\ninner();\n", 'build: a failing generator');
     const result = f.land(wt);
     expect(result.status).toBe(1);
     expect(result.stdout).toContain('failed before the gate (the pre-push would fail on it too): Error: planted: out/ holds pinned products the pins no longer name');
@@ -65,7 +65,7 @@ describe('land (J422): the guards around the main push, and Git retries', () => 
     for (const ran of [false, true]) {
       const f = fixture(), calls = plantPnpm(f, null);
       const wt = f.worktree('foo');
-      f.commit(wt, 'package.json', '{"scripts":{"pins":"node scripts/pins.ts"}}\n', 'chore: a pins script');
+      f.commit(wt, 'package.json', '{"scripts":{"pins":"node src/scripts/pins.ts"}}\n', 'chore: a pins script');
       if (ran) {
         writeFileSync(join(f.repo, '.git/info/exclude'), 'out/\n');
         mkdirSync(join(wt, 'out'), { recursive: true });
@@ -96,9 +96,9 @@ describe('land (J422): the guards around the main push, and Git retries', () => 
   test('LS1: gen:inputs rewrites the ignored bytes stamp after the rebase; land commits nothing for it and lands', () => {
     const f = fixture();
     const wt = f.worktree('foo');
-    f.commit(wt, 'scripts/gen.mjs', GEN_STAMPS, 'build: a stamp generator');
+    f.commit(wt, 'src/scripts/gen.mjs', GEN_STAMPS, 'build: a stamp generator');
     writeFileSync(join(f.repo, '.git/info/exclude'), `/${STAMP}\n`);
-    const gen = () => execFileSync(process.execPath, ['scripts/gen.mjs', '--inputs-only'], { cwd: wt, env: f.env });
+    const gen = () => execFileSync(process.execPath, ['src/scripts/gen.mjs', '--inputs-only'], { cwd: wt, env: f.env });
     gen();
     f.commit(wt, 'src/feature.ts', 'export const feature = true;\n', 'feat: add feature');
     gen();
@@ -122,7 +122,7 @@ describe('land (J422): the guards around the main push, and Git retries', () => 
   test('LS1: a tracked stamp gen:inputs dirties stops land before the gate instead of being committed', () => {
     const f = fixture();
     const wt = f.worktree('foo');
-    f.commit(wt, 'scripts/gen.mjs', GEN_STAMPS, 'build: a stamp generator');
+    f.commit(wt, 'src/scripts/gen.mjs', GEN_STAMPS, 'build: a stamp generator');
     f.commit(wt, STAMP, 'export const bytes = [];\n', 'chore: a tracked stamp');
     f.commit(wt, 'src/feature.ts', 'export const feature = true;\n', 'feat: add feature');
     const result = f.land(wt);
@@ -173,8 +173,8 @@ describe('land (J422): the guards around the main push, and Git retries', () => 
     const refused = "error: failed to push some refs to 'x'\n";
     expect(prePushCause(`  - vitest (split full: 28 local) RED in 195.7 s\nX known-red: 2 NEW red(s) not on origin/main 6a6ec56939\n  NEW red: test/headless-direct-worker.test.ts::direct native deferred-run\n  NEW red: test/headless-verb-tape-worker.test.ts::native verb tape\n${refused}`))
       .toBe('vitest (split full: 28 local) RED in 195.7 s; test/headless-direct-worker.test.ts::direct native deferred-run (+1 more)');
-    expect(prePushCause(`  x eslint(no-use-before-define): 'CAP_REAP_IDLE_MS' was used before it was defined.\n     ,-[scripts/worktree.mjs:138:172]\n  - lint (kit + game) RED in 120.1 s\n${refused}`))
-      .toBe("lint (kit + game) RED in 120.1 s; eslint(no-use-before-define): 'CAP_REAP_IDLE_MS' was used before it was defined. at scripts/worktree.mjs:138:172");
+    expect(prePushCause(`  x eslint(no-use-before-define): 'CAP_REAP_IDLE_MS' was used before it was defined.\n     ,-[src/scripts/.kit/worktree.mjs:138:172]\n  - lint (kit + game) RED in 120.1 s\n${refused}`))
+      .toBe("lint (kit + game) RED in 120.1 s; eslint(no-use-before-define): 'CAP_REAP_IDLE_MS' was used before it was defined. at src/scripts/.kit/worktree.mjs:138:172");
     expect(prePushCause(`test/land-hosted.test.ts(99,30): error TS2554: Expected 1-2 arguments, but got 3.\n  - typecheck (kit + layers) RED in 47.6 s\n${refused}`))
       .toBe('typecheck (kit + layers) RED in 47.6 s; test/land-hosted.test.ts(99,30): error TS2554: Expected 1-2 arguments, but got 3.');
     expect(prePushCause(` FAIL  |node| test/x.test.ts > a case\n  - vitest (split related: 3 local) RED in 9 s\n${refused}`))
@@ -194,11 +194,11 @@ describe('land (J422): the guards around the main push, and Git retries', () => 
   test('DS22: a gen:inputs that commits on its own stops land before the gate', () => {
     const f = fixture();
     const wt = f.worktree('foo');
-    f.commit(wt, 'scripts/gen.mjs', "import {execSync} from 'node:child_process';import {writeFileSync} from 'node:fs';writeFileSync('src/sneak.ts','export {};\\n');execSync('git add src/sneak.ts && git commit -q -m sneak');", 'build: a generator');
+    f.commit(wt, 'src/scripts/gen.mjs', "import {execSync} from 'node:child_process';import {writeFileSync} from 'node:fs';writeFileSync('src/sneak.ts','export {};\\n');execSync('git add src/sneak.ts && git commit -q -m sneak');", 'build: a generator');
     f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
     const result = f.land(wt);
     expect(result.status, result.stdout).toBe(1);
-    expect(result.stdout).toMatch(/land STOP scripts\/gen\.mjs --inputs-only made a commit/u);
+    expect(result.stdout).toMatch(/land STOP src\/scripts\/gen\.mjs --inputs-only made a commit/u);
     expect(f.read(f.files.prepush)).toBe('');
     expect(f.git(f.remote, ['ls-tree', '--name-only', 'main', 'src/'])).not.toMatch(/sneak|feature/u);
   }, 60_000);

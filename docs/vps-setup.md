@@ -14,13 +14,13 @@ The server unit explicitly sets `PLAYTEST_DIR=/var/lib/wildshard/logs`.
 With `PLAYTEST=1`, E7.8a writes `playtest-<date>.jsonl` there, inside its
 existing writable sandbox; it does not use `/var/log/wildshard`.
 
-Run `bash scripts/vps/setup.sh --check` first. It inspects listeners,
+Run `bash src/scripts/vps/setup.sh --check` first. It inspects listeners,
 the tailnet-only Serve routes, the public pin and both env files even
 after a failed probe. An unprivileged check says `cannot verify` for
 protected env files and PostgreSQL, rather than inventing missing state.
 Unknown is not a green privileged verification.
 
-After review, the lane stages the pushed `scripts/vps` source under
+After review, the lane stages the pushed `src/scripts/vps` source under
 `~/wildshard-e7/phase2`, runs that unprivileged check, then gives Jake
 this single command, requiring only his sudo password:
 
@@ -58,7 +58,7 @@ The old quick-tunnel unit is left untouched and reported if still active.
 
 ## Rebuild from nothing (MMO-PLAN MP0.1)
 
-`scripts/vps/rebuild.sh` takes a fresh Ubuntu 24.04 image to a serving
+`src/scripts/vps/rebuild.sh` takes a fresh Ubuntu 24.04 image to a serving
 host: Phase 1 (Node 24 from NodeSource, apt PostgreSQL 16, rclone,
 Tailscale, Caddy installed and off; the `raynos`, `wildshard` and
 `wildshard-cook` users; PostgreSQL's local-socket settings, role and both
@@ -117,9 +117,9 @@ copy only. The unit checks the wrap once before it starts.
 Its pnpm store is `/var/lib/wildshard-pnpm-store`, root-owned and readable
 but never writable by `wildshard-cook`. The install explicitly keeps pnpm's
 global store on, outside `/root` and `/home`, then runs
-`scripts/assert-store-layout.mjs`; this remains usable with `ProtectHome=yes`.
+`src/scripts/.kit/assert-store-layout.mjs`; this remains usable with `ProtectHome=yes`.
 
-**Proof without the VPS.** `bash scripts/vps-rebuild-proof.sh` runs the
+**Proof without the VPS.** `bash src/scripts/vps-rebuild-proof.sh` runs the
 whole sequence in a throwaway container that boots systemd (Docker on
 the Mac, its own arm64; Rosetta's amd64 cannot run systemd's services): `--check`, a run that waits for Tailscale, a stub
 `tailscale up`, a run through Phase 2 that waits for `cook.env`, a run
@@ -132,7 +132,7 @@ api-server; `api.wildshard.io` resolves to nothing inside the box.
 
 ## Hardening (VPS-HARDENING VH3 to VH15, MMO-SERVER-PLAN MS3.1)
 
-`sudo bash scripts/vps/harden.sh` applies every row; `rebuild.sh` runs it
+`sudo bash src/scripts/vps/harden.sh` applies every row; `rebuild.sh` runs it
 before Phase 2, and a rerun changes nothing. What it does:
 
 - **VH3, VH4 (D1):** waits until the box is on the tailnet, then ufw
@@ -189,7 +189,7 @@ before Phase 2, and a rerun changes nothing. What it does:
 
 ## Hardening report (VPS-HARDENING VH1)
 
-`scripts/vps/harden.sh --check` reads what an unprivileged audit cannot
+`src/scripts/vps/harden.sh --check` reads what an unprivileged audit cannot
 (ufw rules, `sudoers.d`, `sshd -T`, fail2ban, auth.log, PostgreSQL roles,
 `/etc/wildshard` modes, sysctl, the Hetzner firewall when `hcloud` is set
 up) and prints one `ok`, `fail`, `unknown` or `info` line per finding,
@@ -197,9 +197,9 @@ tagged with its VPS-HARDENING row. It changes nothing. Exit 0 is clean, 1
 is any failure, 2 is something unreadable. Without root, root-only reads
 say `unknown`. Jake runs it on the box, from an engine checkout:
 
-    scp scripts/vps/harden.sh wildshard:harden.sh && ssh -t wildshard sudo bash harden.sh --check
+    scp src/scripts/vps/harden.sh wildshard:harden.sh && ssh -t wildshard sudo bash harden.sh --check
 
-`bash scripts/vps-harden-proof.sh` proves it in a throwaway container
+`bash src/scripts/vps-harden-proof.sh` proves it in a throwaway container
 dressed as the audited box; `test/vps-harden.test.ts` pins its parsing.
 
 **Proxy trust (VH10).** The server reads a forwarded address only from a
@@ -238,7 +238,7 @@ shows what would go; add `--yes` to delete. Only test and bot names
 
 ## Bots (MMO-PLAN MP0.4)
 
-`node scripts/mmo-bots.mjs replica|staging` runs real-socket bots from
+`node src/scripts/mmo-bots.mjs replica|staging` runs real-socket bots from
 this Mac (J202). Each bot is a phone's network end (`RoomBot`: `hello`,
 `resume`, `ready`, commands at 60 Hz) walking `headlessJourney`'s route
 cursor in rings around where it stands, steered by the feet the server
@@ -350,8 +350,8 @@ rclone lsf r2:wildshard-backups'
 
 The required evidence is a successful nightly dump, an uploaded object, and a
 download restored into a separate disposable database with
-`scripts/vps/restore-check.sh`; listing alone is not a restore proof.
-The operational seven-day expiry remains in `scripts/vps/dump.sh`.
+`src/scripts/vps/restore-check.sh`; listing alone is not a restore proof.
+The operational seven-day expiry remains in `src/scripts/vps/dump.sh`.
 
 Cloudflare's [bucket creation instructions](https://developers.cloudflare.com/r2/buckets/create-buckets/),
 [scoped S3 credentials](https://developers.cloudflare.com/r2/api/tokens/)
@@ -361,7 +361,7 @@ E7 retains today's network wire; wire v1 is separate work under J197.
 
 ## Resident cell capacity (SERVER-CELLS SC9)
 
-Measured on the box, 2026-11-13, by `scripts/cell-mem-bench.mjs`
+Measured on the box, 2026-11-13, by `src/scripts/cell-mem-bench.mjs`
 with four workers: 1 / 2 / 8 / 16 / 25 resident cells used
 349 / 684 / 1,028 / 1,112 / 1,205 MB RSS with one bot in each.
 At 25 cells the old worker table reached 11.9 ms tick p95 and

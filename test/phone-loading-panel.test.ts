@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import {afterEach, expect, test, vi} from 'vitest';
-import {instrument} from '../scripts/phone-loading/instrument';
+import {instrument} from '../src/scripts/phone-loading/instrument';
 
 afterEach(() => {vi.restoreAllMocks(); vi.unstubAllGlobals(); document.body.replaceChildren(); Reflect.deleteProperty(window, '__phoneLoading');});
 test('the unchanged sampler retains exact native download facts and gap durations without inventing gap boundaries', () => {

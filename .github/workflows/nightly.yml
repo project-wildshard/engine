@@ -84,17 +84,17 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: package.json
-      - run: node --test scripts/nightly.proof.ts
+      - run: node --test src/scripts/nightly.proof.ts
       - if: env.WILDSHARD_PIN_CHANNEL == 'staging'
-        run: node scripts/pins-staging.ts select
+        run: node src/scripts/pins-staging.ts select
       # MACBOOK-WAITS MW1 (api-server AP-26): the reviewed snapshot must be the release staging serves.
       - if: env.WILDSHARD_PIN_CHANNEL == 'staging'
-        run: node scripts/pins-staging.ts verify
+        run: node src/scripts/pins-staging.ts verify
       - id: plan
         if: ${{ !inputs.diagnostic_head && !inputs.diagnostic_drill }}
         run: |
-          echo "matrix=$(node scripts/nightly.ts plan)" >> "$GITHUB_OUTPUT"
-          echo "test_matrix=$(node scripts/nightly.ts test-plan)" >> "$GITHUB_OUTPUT"
+          echo "matrix=$(node src/scripts/nightly.ts plan)" >> "$GITHUB_OUTPUT"
+          echo "test_matrix=$(node src/scripts/nightly.ts test-plan)" >> "$GITHUB_OUTPUT"
       - name: Select the diagnostic head's production group and runner
         id: diagnostic
         if: ${{ inputs.diagnostic_head || inputs.diagnostic_drill }}
@@ -102,8 +102,8 @@ jobs:
           NIGHTLY_HEAD: ${{ inputs.diagnostic_head }}
           NIGHTLY_BROWSER: ${{ inputs.diagnostic_browser }}
         run: |
-          node --test scripts/nightly-head-group.proof.ts
-          route=$(node scripts/nightly-head-group.ts "$NIGHTLY_HEAD" "$NIGHTLY_BROWSER")
+          node --test src/scripts/nightly-head-group.proof.ts
+          route=$(node src/scripts/nightly-head-group.ts "$NIGHTLY_HEAD" "$NIGHTLY_BROWSER")
           jq -r '"group=\(.group)\nos=\(.os)"' <<< "$route" >> "$GITHUB_OUTPUT"
   tests:
     if: ${{ !inputs.cook_cache_only && !inputs.api_health_only && !inputs.diagnostic_head && !inputs.diagnostic_drill }}
@@ -124,7 +124,7 @@ jobs:
         with:
           path: ~/.cache/wildshard/pins
           key: nightly-pins-${{ runner.os }}-${{ hashFiles('test/pins/shardfiles.json') }}
-      - run: node scripts/pins.ts install
+      - run: node src/scripts/pins.ts install
       # Save admitted immutable inputs before a red product can end the job.
       - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         if: steps.pins.outputs.cache-hit != 'true'
@@ -133,8 +133,8 @@ jobs:
           key: ${{ steps.pins.outputs.cache-primary-key }}
       - run: pnpm gen:inputs
       - name: Choose a bounded replayable network fuzz seed
-        run: echo "NET_FUZZ_SEEDS=$(node scripts/nightly-seed.ts "$GITHUB_RUN_ID")" >> "$GITHUB_ENV"
-      - run: node scripts/nightly.ts tests
+        run: echo "NET_FUZZ_SEEDS=$(node src/scripts/nightly-seed.ts "$GITHUB_RUN_ID")" >> "$GITHUB_ENV"
+      - run: node src/scripts/nightly.ts tests
         env:
           NIGHTLY_TEST_GROUP: ${{ matrix.group }}
           WS_FULL_SUITE: '1'
@@ -163,15 +163,15 @@ jobs:
       - uses: ./.github/actions/ring-setup
         with:
           pins-cache-scope: full
-      - run: node scripts/pins.ts install && pnpm gen:inputs
+      - run: node src/scripts/pins.ts install && pnpm gen:inputs
       - name: Choose a bounded replayable network fuzz seed
-        run: echo "NET_FUZZ_SEEDS=$(node scripts/nightly-seed.ts "$GITHUB_RUN_ID")" >> "$GITHUB_ENV"
-      - run: node scripts/scratch-dir.mjs ci-native-contention 'Serial native CPU-admission rehearsals'
+        run: echo "NET_FUZZ_SEEDS=$(node src/scripts/nightly-seed.ts "$GITHUB_RUN_ID")" >> "$GITHUB_ENV"
+      - run: node src/scripts/.kit/scratch-dir.mjs ci-native-contention 'Serial native CPU-admission rehearsals'
       - name: Prove all three original files queue and pass in order
         id: serial
         run: |
           set -o pipefail
-          node scripts/native-contention-proof.mjs tmp/ci-native-contention | tee tmp/ci-native-contention/result.json
+          node src/scripts/native-contention-proof.mjs tmp/ci-native-contention | tee tmp/ci-native-contention/result.json
       - name: Flag an incomplete serial rehearsal
         if: ${{ always() && steps.serial.outcome != 'success' }}
         run: |
@@ -207,14 +207,14 @@ jobs:
         with:
           path: ~/.cache/wildshard/pins
           key: nightly-pins-${{ runner.os }}-${{ hashFiles('test/pins/shardfiles.json') }}
-      - run: node scripts/pins.ts install
+      - run: node src/scripts/pins.ts install
       # Save admitted immutable inputs before a red product can end the job.
       - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         if: steps.pins.outputs.cache-hit != 'true'
         with:
           path: ~/.cache/wildshard/pins
           key: ${{ steps.pins.outputs.cache-primary-key }}
-      - run: bash scripts/ci-playwright-install.sh ${{ matrix.browser }}
+      - run: bash src/scripts/ci-playwright-install.sh ${{ matrix.browser }}
       # Pure input-addressed encodes are reusable; each head's cook store remains cold.
       # FS30 (J505): ci's verified full-ledger parts first, so a full build never re-encodes them (the Ring 1
       # subset alone sent the nightly's Chromium heads into an 1800 s re-encode).
@@ -240,11 +240,11 @@ jobs:
           path: ~/.cache/wildshard/gen/spawn-parts-br
           key: ${{ steps.encodes.outputs.cache-primary-key }}
       # PAGE-SIZE PZ4: build:game splits dist/ from dist-content/; this job serves the whole game from dist.
-      - run: node scripts/app-build/splitOutput.mjs dist --join
+      - run: node src/scripts/app-build/splitOutput.mjs dist --join
       - name: Cold cook and real phone UI on each pinned head
         # The job's 75-minute limit includes setup. The shared Mac's 60-minute
         # default stopped the hosted Chromium lane during a bounded Pine cook.
-        run: scripts/browser-lane.sh --max 75 node scripts/nightly-heads.ts "${BROWSER}" "${GROUP}"
+        run: src/scripts/browser-lane.sh --max 75 node src/scripts/nightly-heads.ts "${BROWSER}" "${GROUP}"
         env:
           BROWSER: ${{ matrix.browser }}
           GROUP: ${{ matrix.group }}
@@ -287,10 +287,10 @@ jobs:
             gh run download "$previous" --name nightly-verdict --dir tmp/nightly/baseline || echo '::warning::Previous verdict unavailable; summary will say so'
           fi
       - if: env.WILDSHARD_PIN_CHANNEL == 'staging'
-        run: node scripts/pins-staging.ts select
+        run: node src/scripts/pins-staging.ts select
       - name: Refuse a red or incomplete night (J167)
         if: always()
-        run: node scripts/nightly.ts report tmp/nightly/reports tmp/nightly/baseline/verdict.json
+        run: node src/scripts/nightly.ts report tmp/nightly/reports tmp/nightly/baseline/verdict.json
         env:
           NIGHTLY_PLAN_RESULT: ${{ needs.plan.result }}
           NIGHTLY_TESTS_RESULT: ${{ needs.tests.result }}
@@ -327,8 +327,8 @@ jobs:
         with:
           path: ~/.cache/wildshard/pins
           key: nightly-pins-${{ runner.os }}-${{ hashFiles('test/pins/shardfiles.json') }}
-      - run: node scripts/pins.ts install
-      - run: bash scripts/ci-playwright-install.sh "$NIGHTLY_BROWSER"
+      - run: node src/scripts/pins.ts install
+      - run: bash src/scripts/ci-playwright-install.sh "$NIGHTLY_BROWSER"
       # FS30 (J505): ci's verified full-ledger parts first, so a full build never re-encodes them (the Ring 1
       # subset alone sent the nightly's Chromium heads into an 1800 s re-encode).
       - name: Key the full-ledger encodes
@@ -345,16 +345,16 @@ jobs:
             nightly-encodes-
             ring1-spawn-parts-br-
       - run: pnpm build:game
-      - run: node scripts/app-build/splitOutput.mjs dist --join
+      - run: node src/scripts/app-build/splitOutput.mjs dist --join
       - name: Exercise the production cold-pack and phone path
         env:
           NIGHTLY_GROUP: ${{ needs.plan.outputs.diagnostic_group }}
           DEBUG: pw:browser
         run: |
           if [ "$NIGHTLY_DRILL" = true ]; then
-            node scripts/nightly-head-drill.ts "$NIGHTLY_BROWSER" "$NIGHTLY_GROUP" tmp/nightly/reports "$NIGHTLY_HEAD"
+            node src/scripts/nightly-head-drill.ts "$NIGHTLY_BROWSER" "$NIGHTLY_GROUP" tmp/nightly/reports "$NIGHTLY_HEAD"
           else
-            node scripts/nightly-heads.ts "$NIGHTLY_BROWSER" "$NIGHTLY_GROUP" tmp/nightly/reports "$NIGHTLY_HEAD"
+            node src/scripts/nightly-heads.ts "$NIGHTLY_BROWSER" "$NIGHTLY_GROUP" tmp/nightly/reports "$NIGHTLY_HEAD"
           fi
       - name: Keep diagnostic receipts only
         if: always()
@@ -383,9 +383,9 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/ring-setup
       - name: Actual input closure, persistent hit, revision isolation and GC race
-        run: node --import ./scripts/bake-loader.mjs --test scripts/cook-cache.proof.ts
+        run: node --import ./src/scripts/bake-loader.mjs --test src/scripts/cook-cache.proof.ts
       - name: Real cold, encoder reuse and independent cold cook
-        run: node scripts/cook-cache-hosted.proof.mjs
+        run: node src/scripts/cook-cache-hosted.proof.mjs
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -414,10 +414,10 @@ jobs:
         id: health-proof
         run: |
           mkdir -p tmp/api-health
-          node --test --test-timeout=10000 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=tmp/api-health/proof.xml scripts/api-health.proof.ts
+          node --test --test-timeout=10000 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=tmp/api-health/proof.xml src/scripts/api-health.proof.ts
       - name: Compare deployed validator with this engine lock
         if: ${{ !cancelled() }}
-        run: node scripts/api-health.ts
+        run: node src/scripts/api-health.ts
       - name: Summarize the reader proof and live identity separately
         if: always()
         run: |

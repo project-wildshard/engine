@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { recordProgressClip, type ProgressClipCamera } from '../scripts/progress-recording.mjs';
+import { recordProgressClip, type ProgressClipCamera } from '../src/scripts/progress-recording.mjs';
 
 const tracks = [{ stop: vi.fn() }, { stop: vi.fn() }];
 const stream = { getTracks: () => tracks };

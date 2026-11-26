@@ -2,7 +2,7 @@
 import { spawnSync } from 'node:child_process';
 import { globSync, realpathSync, statSync } from 'node:fs';
 import { matchesGlob, resolve } from 'node:path';
-import { committedSourceFiles } from '../scripts/source-input-proof.mjs';
+import { committedSourceFiles } from '../src/scripts/source-input-proof.mjs';
 
 const roots = ['src', 'scripts', 'test', 'vite', 'api', 'admin', 'drafts', 'lint'];
 const code = /\.[cm]?[jt]sx?$/u;

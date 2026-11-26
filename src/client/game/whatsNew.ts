@@ -2,7 +2,7 @@
  * What the main menu's WHAT'S NEW box says (SHARD-PLATFORM SF60, Jake's pick G214: B, a slim banner under the logo). Jake,
  * 2026-11-10: "The box, the changelog box, let's show the version of the engine", and every engine version tag carries a
  * changelog. So the box names this build's engine version and lists that version's section of CHANGELOG.md: one to five
- * plain-language bullets, which the pre-push hook and CI require before a version can ship (scripts/changelog.mjs).
+ * plain-language bullets, which the pre-push hook and CI require before a version can ship (src/scripts/changelog.mjs).
  * vite.config.ts bakes the section in as `__ENGINE_RELEASE__`; there is no other copy. An empty list hides the box.
  *
  * The banner (src/client/game/whatsNewBanner.ts) shows only with Settings ▸ Developer on, and HIDE UNTIL NEXT BUILD keeps it

@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from '
 import { resolve } from 'node:path';
 import { writeSpawnManifests, type BuildHalf, type SpawnManifestBook } from '../src/cook/game/entryTotals';
 import type { AssetTables } from '../src/shared/engine/boot/tables';
-import { ASSET_TABLES, assetTableAddresses, readAssetTables, writeAssetTables } from '../scripts/app-build/assetTables.mjs';
+import { ASSET_TABLES, assetTableAddresses, readAssetTables, writeAssetTables } from '../src/scripts/app-build/assetTables.mjs';
 import { GPU_FILES } from '../src/client/engine/boot/ktx2.generated';
 
 export interface FilesOnlyCook { readonly root: string; readonly output: string; readonly book: SpawnManifestBook; readonly common: AssetTables }
@@ -18,7 +18,7 @@ export interface FilesOnlyCook { readonly root: string; readonly output: string;
 export async function cookFilesOnly(shards: readonly string[], scratch: string, options: { readonly from?: string; readonly build?: Partial<BuildHalf> } = {}): Promise<FilesOnlyCook> {
   mkdirSync(`tmp/${scratch}`, { recursive: true });
   const root = mkdtempSync(resolve(`tmp/${scratch}/cook-`));
-  const baked = spawnSync(process.execPath, ['--import', './scripts/bake-loader.mjs', 'scripts/serialize-asset-tables.mjs'],
+  const baked = spawnSync(process.execPath, ['--import', './src/scripts/bake-loader.mjs', 'src/scripts/serialize-asset-tables.mjs'],
     { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, stdio: ['ignore', 'pipe', 'inherit'] });
   if (baked.status !== 0) throw new Error(`boot tables did not bake (${String(baked.status)})`);
   mkdirSync(resolve(root, 'out/.app'), { recursive: true });

@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve only repository tooling and private scratch inputs.
 import { resolve } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { createShardPlan } from '../scripts/test-shard-plan';
+import { createShardPlan } from '../src/scripts/test-shard-plan';
 
 const owned: string[] = [], sha = 'a'.repeat(40);
 afterEach(() => { for (const directory of owned.splice(0)) rmSync(directory, { recursive: true, force: true }); });
@@ -21,7 +21,7 @@ test('dispatch',()=>{appendFileSync(${JSON.stringify(trace)},${JSON.stringify(`$
   const relative = paths.map(path => path.slice(resolve('.').length + 1));
   const weights = new Map(relative.map((path, i) => [path, [1, 20, 100, .5][i] ?? 1]));
   writeFileSync(plan, JSON.stringify(createShardPlan(relative, weights, { count: 1, workers: 1, sha, run: '1', fallbackSeconds: 1, measuredFiles: 4 })));
-  const base = resolve('vitest.config.ts'), sequencer = resolve('scripts/vitest-shard.ts');
+  const base = resolve('vitest.config.ts'), sequencer = resolve('src/scripts/vitest-shard.ts');
   writeFileSync(config, `import base from ${JSON.stringify(base)};
 import {DurationSequencer} from ${JSON.stringify(sequencer)};
 import {writeFileSync} from 'node:fs';

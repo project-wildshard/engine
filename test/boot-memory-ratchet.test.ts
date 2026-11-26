@@ -1,8 +1,8 @@
 import {expect,test} from 'vitest';
 import {BufferAttribute,BufferGeometry,InstancedMesh,InterleavedBuffer,InterleavedBufferAttribute,Mesh,MeshBasicMaterial,Scene} from 'three';
-import {bootMemoryVerdict,retainedGeometryBytes} from '../scripts/loading-flow/boot-memory-ratchet.mjs';
+import {bootMemoryVerdict,retainedGeometryBytes} from '../src/scripts/loading-flow/boot-memory-ratchet.mjs';
 
-import {readCaps} from '../scripts/budgets/files.mjs';
+import {readCaps} from '../src/scripts/budgets/files.mjs';
 
 // Mini QA 2026-11-17 row 19: the Nine load's memory ratchet (ci.yml nine-ring1). BUDGET-CAPS BC11: held parts and a
 // missing measurement fail the load; retained geometry and the live heap go through the verdict against Nine's own

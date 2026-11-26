@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { driveGridSeam, gridSeamRoute } from '../scripts/physics-grid.mjs';
+import { driveGridSeam, gridSeamRoute } from '../src/scripts/physics-grid.mjs';
 
 const originalWindow = globalThis.window;
 afterEach(() => { vi.useRealTimers(); vi.stubGlobal('window', originalWindow); });

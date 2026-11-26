@@ -1,9 +1,9 @@
 import {expect,test} from 'vitest';
 import {ShaderMaterial} from 'three';
-import {worldPixelDifference} from '../scripts/perf/world-pixel-difference.mjs';
+import {worldPixelDifference} from '../src/scripts/perf/world-pixel-difference.mjs';
 // oxlint-disable-next-line import/no-nodejs-modules -- The browser loan checks the identical complete source digest.
 import {createHash} from 'node:crypto';
-import {loanMaterialPrograms,trackMaterialProgramDraws,type ProgramSource,type MaterialProgramLoan,type ProgramDrawRenderer} from '../scripts/perf/material-program-loan.mjs';
+import {loanMaterialPrograms,trackMaterialProgramDraws,type ProgramSource,type MaterialProgramLoan,type ProgramDrawRenderer} from '../src/scripts/perf/material-program-loan.mjs';
 
 function source(body:string):ProgramSource{
  const vertex='attribute vec3 aSeed; uniform float phase; void main(){gl_Position=vec4(aSeed,1.0);}';

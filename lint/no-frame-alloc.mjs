@@ -5,8 +5,8 @@
 // `for ... of` (an iterator), and the array and string methods that return a new array or iterator. A throw's argument is
 // exempt (an error path is not the frame). A nested function is one site; its own body is not scanned unless it is tagged.
 // Syntax only, no types. Per file, a shrink-only allowance (lint/no-frame-alloc-debt.json) holds what is left: lint fails a
-// file over its count, and scripts/no-binary-json.mjs refuses a commit that raises one. Rewrite the debt after a cut:
-//   node scripts/memory/frame-alloc-debt.mjs [--check]
+// file over its count, and src/scripts/no-binary-json.mjs refuses a commit that raises one. Rewrite the debt after a cut:
+//   node src/scripts/memory/frame-alloc-debt.mjs [--check]
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 

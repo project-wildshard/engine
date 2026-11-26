@@ -1,6 +1,6 @@
 // @vitest-environment node
 import {expect, test} from 'vitest';
-import {previewUpload} from '../scripts/page-release/preview.mjs';
+import {previewUpload} from '../src/scripts/page-release/preview.mjs';
 
 const build = 'a'.repeat(40), base = 'https://packs.wildshard.io/content/0123456789abcdef/';
 const state = () => ({build: {build, contentBase: base}, upload: {build, channel: 'preview', deployment: {id: 'version'}, content: {base}}});

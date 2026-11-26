@@ -4,7 +4,7 @@ import { relative, resolve } from 'node:path';
 import ts from '@typescript/typescript6';
 import { hostPlayFile } from './host-files.mjs';
 import { shardFile, shardSourceDirs } from './shard-source.mjs';
-import { formatSource } from '../scripts/format-package.mjs';
+import { formatSource } from '../src/scripts/format-package.mjs';
 
 const projects = new Map();
 const localPath = (root, file) => relative(root, file).replaceAll('\\', '/');

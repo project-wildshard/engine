@@ -3,7 +3,7 @@ import {expect, test} from 'vitest';
 import {runInNewContext} from 'node:vm';
 // oxlint-disable-next-line import/no-nodejs-modules -- exercise the actual whole-drive sampler's diagnostic drains
 import {readFileSync} from 'node:fs';
-import {GL_TIMED, GL_TIMING_SCRIPT} from '../scripts/frame-floor-gl-time.mjs';
+import {GL_TIMED, GL_TIMING_SCRIPT} from '../src/scripts/frame-floor-gl-time.mjs';
 
 function fixture(cost = 1.25) {
   let now = 0;
@@ -98,7 +98,7 @@ test('whole-drive samples retain upload banks beside GL time while short samples
   let now = 100;
   const game = {frameCount: 0, frameI: 1, frameMs: [33], workMs: [1], renderMs: [0.25], lastFrame: {calls: 1, triangles: 1},
     app: {cpu: {enabled: false, snapshot: () => ({enabled: true, frame: 0, owners: []})}}, renderer: {getContext: () => ({isContextLost: () => false})}};
-  const source = readFileSync(new URL('../scripts/frame-floor.mjs', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../src/scripts/frame-floor.mjs', import.meta.url), 'utf8');
   const begin = source.indexOf('function sample(n, timeline = false) {'), end = source.indexOf('/** the whole-drive sampler', begin);
   if (begin === -1 || end <= begin) throw new Error('Real sampler not found');
   Object.assign(f.context.window, {__frameFloorDriveDone: true, __wildshard: {world: {game, player: {position: {x: 0,y: 0,z: 0}}},

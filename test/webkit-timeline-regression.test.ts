@@ -1,7 +1,7 @@
 import {expect, test, vi} from 'vitest';
-import {startScriptProfile} from '../scripts/frame-floor-script-profile.mjs';
-import {ensureWebKitPageClock, startWebKitTimeline, timelineLongFrames, type TimelinePort} from '../scripts/frame-floor-webkit-timeline.mjs';
-import {createWebKitTimelineSession} from '../scripts/frame-floor-timeline-session';
+import {startScriptProfile} from '../src/scripts/frame-floor-script-profile.mjs';
+import {ensureWebKitPageClock, startWebKitTimeline, timelineLongFrames, type TimelinePort} from '../src/scripts/frame-floor-webkit-timeline.mjs';
+import {createWebKitTimelineSession} from '../src/scripts/frame-floor-timeline-session';
 
 function fixture(frozen = false) {
   let enabled = false, pageMs = 1000;

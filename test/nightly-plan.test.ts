@@ -5,8 +5,8 @@ import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { CELL_HEIGHT, CHUNK_SIZE } from '@wildshard/format/contentBounds';
 import type { StandaloneCatalogue } from '@wildshard/format/standaloneCatalogue';
-import { nightlyHeadCatalogue } from '../scripts/app-build/catalogue';
-import { plan } from '../scripts/nightly-model';
+import { nightlyHeadCatalogue } from '../src/scripts/app-build/catalogue';
+import { plan } from '../src/scripts/nightly-model';
 import { bareSlug } from '../src/shared/game/grid/catalogueSlot';
 import { DEFAULT_LIMITS } from '../src/cook/game/cookWorker';
 
@@ -52,7 +52,7 @@ test('FS30 the Ring 2 CLI accepts the nightly cook allowance and refuses anythin
   const maximum = DEFAULT_LIMITS.seconds * 1000;
   // A nonempty output directory stops after argument validation, before a cook can start.
   const cook = (timeout: number) => spawnSync(process.execPath,
-    ['scripts/ring-cook.mjs', '--ring2', '--out=test', `--timeout-ms=${timeout}`],
+    ['src/scripts/ring-cook.mjs', '--ring2', '--out=test', `--timeout-ms=${timeout}`],
     { encoding: 'utf8', timeout: 10_000 });
   expect(cook(maximum).stderr).toContain('Cook output must be empty');
   expect(cook(maximum + 1).stderr).toContain(`Cook timeout must be in (0, ${maximum}] ms`);
@@ -62,13 +62,13 @@ test('FS30 the browser lease cannot end a hosted head job before its own deadlin
   const workflow = readFileSync('.github/workflows/nightly.yml', 'utf8');
   const heads = /\n  heads:\n([\s\S]+?)\n  report:/u.exec(workflow)?.[1] ?? '';
   const jobMinutes = /timeout-minutes: (\d+)/u.exec(heads)?.[1];
-  const leaseMinutes = /scripts\/browser-lane\.sh --max (\d+) node scripts\/nightly-heads\.ts/u.exec(heads)?.[1];
+  const leaseMinutes = /src\/scripts\/browser-lane\.sh --max (\d+) node src\/scripts\/nightly-heads\.ts/u.exec(heads)?.[1];
   expect(jobMinutes).toBeDefined();
   expect(leaseMinutes).toBe(jobMinutes);
 });
 
 test('FS30 begins recording live draws before running the hover journey', () => {
-  const source = readFileSync('scripts/parity/boot-smoke.mjs', 'utf8');
+  const source = readFileSync('src/scripts/parity/boot-smoke.mjs', 'utf8');
   const ready = source.indexOf('await until(page, faults, () => gameplay(true)');
   const start = source.indexOf('const enteredProof = gameplayEvidence?.onEnter?.(page)');
   const hover = source.indexOf('gameplayProbeTime(() => afterGameplay(page))');
@@ -79,7 +79,7 @@ test('FS30 begins recording live draws before running the hover journey', () => 
 });
 
 test('FS30 Pine Chromium gets its own job without duplicating any head', () => {
-  const output = spawnSync(process.execPath, ['scripts/nightly.ts', 'plan'], { encoding: 'utf8', timeout: 5_000 });
+  const output = spawnSync(process.execPath, ['src/scripts/nightly.ts', 'plan'], { encoding: 'utf8', timeout: 5_000 });
   expect(output.status).toBe(0);
   const { include } = JSON.parse(output.stdout) as { include: { browser: string; heads: string }[] };
   const pinned = plan().heads.map(head => head.slug);
@@ -91,7 +91,7 @@ test('FS30 Pine Chromium gets its own job without duplicating any head', () => {
 });
 
 test('FS30 slow Pine Chromium uses its own Metal runner beside Nine and Nalati', () => {
-  const output = spawnSync(process.execPath, ['scripts/nightly.ts', 'plan'], { encoding: 'utf8', timeout: 5_000 });
+  const output = spawnSync(process.execPath, ['src/scripts/nightly.ts', 'plan'], { encoding: 'utf8', timeout: 5_000 });
   expect(output.status).toBe(0);
   const { include } = JSON.parse(output.stdout) as { include: { browser: string; heads: string; os: string }[] };
   const chromium = include.filter(row => row.browser === 'chromium');
@@ -101,7 +101,7 @@ test('FS30 slow Pine Chromium uses its own Metal runner beside Nine and Nalati',
 });
 
 test('FS30 separates the two trusted hover taps even when the renderer stops presenting frames', () => {
-  const source = readFileSync('scripts/nightly-heads.ts', 'utf8');
+  const source = readFileSync('src/scripts/nightly-heads.ts', 'utf8');
   const firstTap = source.indexOf('await control.tap');
   const gap = source.indexOf('await delay(BOOST_TAP_MS + 1)');
   const secondTap = source.indexOf('await control.tap', firstTap + 1);

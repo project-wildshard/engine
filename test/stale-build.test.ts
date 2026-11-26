@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { builtAtOf, entryStamp } from '../scripts/app-build/builtAt.mjs';
+import { builtAtOf, entryStamp } from '../src/scripts/app-build/builtAt.mjs';
 
 // STALE-BUILD (meta docs/plans/STALE-BUILD-PLAN.md, J321): the build's one time, and the entry's stamp and check
 const at = '1794583800000';

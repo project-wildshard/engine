@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { frameFloorPending, type FloorPendingContext } from '../scripts/frame-floor-pending.mjs';
+import { frameFloorPending, type FloorPendingContext } from '../src/scripts/frame-floor-pending.mjs';
 
 function context(): FloorPendingContext {
   return { pending: ['neighbour'], pendingWork: [{ instance: 'neighbour', kind: 'optional-metadata', trigger: 'radial' }],

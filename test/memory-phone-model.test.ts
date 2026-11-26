@@ -7,9 +7,9 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
 import { CRASH_LINE, MEMORY_AMBER, MEMORY_RED } from '../src/client/game/grid/budgetOverlay';
-import { IPHONE_13_MODEL, anchorBounds, ledgerSplit, loadPhoneModel, phoneFromChromium, phoneFromLedger, phoneFromWebKit, phonePeakFromWebKit, rangeText, t90, upperOverRuns, zoneOverRuns } from '../scripts/memory/phoneModel.mjs';
-import { ANCHOR_RENDERER_MB, fitPhoneModel, lineFit } from '../scripts/memory/phone-fit.mjs';
-import { phoneLine, summaryMarkdown, traceToControl } from '../scripts/memory/measure.mjs';
+import { IPHONE_13_MODEL, anchorBounds, ledgerSplit, loadPhoneModel, phoneFromChromium, phoneFromLedger, phoneFromWebKit, phonePeakFromWebKit, rangeText, t90, upperOverRuns, zoneOverRuns } from '../src/scripts/memory/phoneModel.mjs';
+import { ANCHOR_RENDERER_MB, fitPhoneModel, lineFit } from '../src/scripts/memory/phone-fit.mjs';
+import { phoneLine, summaryMarkdown, traceToControl } from '../src/scripts/memory/measure.mjs';
 
 const MB = 1e6;
 interface Window { step: string; peak: { webcontent: number; gpu: number } }
@@ -50,7 +50,7 @@ test('IP11 names the unmeasured inputs and keeps the 17 Pro reading in the repor
   const device = loadPhoneModel().devices?.[IPHONE_13_MODEL];
   expect(device).toEqual({ name: 'iPhone 13', status: 'unmeasured', reportOnly: true,
     alpha: null, scale: null, limitMB: null, limitHighMB: null, fitInputs: { killLineFromIP7: expect.objectContaining({ limitMB: 1536 }), pairedFootprintsFromIP9: null } });
-  const out = execFileSync(process.execPath, ['scripts/memory/phone-fit.mjs', `--device=${IPHONE_13_MODEL}`], { encoding: 'utf8' });
+  const out = execFileSync(process.execPath, ['src/scripts/memory/phone-fit.mjs', `--device=${IPHONE_13_MODEL}`], { encoding: 'utf8' });
   expect(JSON.parse(out)).toEqual(device);
   const run = { instrument: 'minimal', build: 'test', settled: { webcontent: 500 * MB, gpu: 300 * MB },
     checkpoints: [{ peak: { webcontent: 600 * MB, gpu: 400 * MB } }] };
@@ -74,13 +74,13 @@ test('a 17 Pro CLI refit keeps the separate iPhone 13 entry', () => {
         settled, counters: { ram: { bytes: ram }, gpu: { bytes: gpu } }, checkpoints: [{ peak: settled }] }] }));
     }
     const out = join(scratch, 'fit.json');
-    execFileSync(process.execPath, ['scripts/memory/phone-fit.mjs', `--anchor=${anchorPath}`, `--zones=${zones.join(',')}`, `--out=${out}`]);
+    execFileSync(process.execPath, ['src/scripts/memory/phone-fit.mjs', `--anchor=${anchorPath}`, `--zones=${zones.join(',')}`, `--out=${out}`]);
     expect(JSON.parse(readFileSync(out, 'utf8'))).toMatchObject({ alpha: model.alpha, scale: model.scale, limitMB: model.limitMB,
       devices: loadPhoneModel().devices, staircase: loadPhoneModel().staircase });
     const evidence = join(scratch, 'staircase.json');
     const expected = loadPhoneModel().staircase!;
     writeFileSync(evidence, JSON.stringify({ ...expected, effectiveFactors: {} }));
-    execFileSync(process.execPath, ['scripts/memory/phone-fit.mjs', `--staircase=${evidence}`, `--out=${out}`]);
+    execFileSync(process.execPath, ['src/scripts/memory/phone-fit.mjs', `--staircase=${evidence}`, `--out=${out}`]);
     expect(JSON.parse(readFileSync(out, 'utf8'))).toMatchObject({
       alpha: model.alpha, scale: model.scale, limitMB: model.limitMB, staircase: expected,
     });

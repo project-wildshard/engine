@@ -111,7 +111,7 @@ jobs:
           # FAST-RELEASE FR6: a release-only build's ci reuses main's proof of its cut, so its code jobs skip. The same
           # selector re-proves that reuse here from git and the Actions API; anything unproven needs the full shape.
           reuse=$(GITHUB_OUTPUT='' GITHUB_REF="refs/heads/$branch" GITHUB_SHA="$RELEASE_BUILD" GITHUB_EVENT_NAME=push \
-            node scripts/ci-selection.mjs | jq -r '.docs == true and (.reason | startswith("Release "))')
+            node src/scripts/ci-selection.mjs | jq -r '.docs == true and (.reason | startswith("Release "))')
           export RELEASE_BRANCH="$branch" RELEASE_CI_RUN="$run" QUEUE_ATTEMPT="${queue_attempt:-}" RELEASE_REUSE="$reuse"
           gh run view "$run" "${attempt[@]}" --json databaseId,headSha,headBranch,event,workflowName,attempt,status,conclusion,jobs | node -e '
             const assert = require("node:assert/strict");
@@ -145,7 +145,7 @@ jobs:
           node --input-type=module <<'JS'
           import assert from 'node:assert/strict';
           import {readFileSync} from 'node:fs';
-          import {readPublication} from './scripts/server-release/sign.mjs';
+          import {readPublication} from './src/scripts/server-release/sign.mjs';
 
           const packageInfo = JSON.parse(readFileSync('package.json', 'utf8'));
           assert.equal(packageInfo.name, '@wildshard/engine');
@@ -226,7 +226,7 @@ jobs:
           import assert from 'node:assert/strict';
           import {execFileSync} from 'node:child_process';
           import {readFileSync} from 'node:fs';
-          import {readPublication} from './scripts/server-release/sign.mjs';
+          import {readPublication} from './src/scripts/server-release/sign.mjs';
 
           const manifest = JSON.parse(readFileSync('package.json', 'utf8'));
           const build = execFileSync('git', ['rev-parse', 'HEAD'], {encoding: 'utf8'}).trim();
@@ -261,18 +261,18 @@ jobs:
       # an archive without them).
       - name: Write the boot stamps from the pinned shards
         run: |
-          if ! node scripts/pins.ts install; then
+          if ! node src/scripts/pins.ts install; then
             echo 'Pinned input install failed. Retrying once.' >&2
-            node scripts/pins.ts install
+            node src/scripts/pins.ts install
           fi
-          node scripts/gen.mjs --inputs-only
+          node src/scripts/gen.mjs --inputs-only
       - name: Build the versioned local author server
-        run: node scripts/build-server.mjs --dev --out dist/dev-server
+        run: node src/scripts/build-server.mjs --dev --out dist/dev-server
       - name: Check package version, bins and exports
         run: |
           args=("$RUNNER_TEMP/engine-npm")
           if [[ "$NPM_CHANNEL" = next ]]; then args+=("$RELEASE_BUILD"); fi
-          node scripts/npm-artifact.mjs "${args[@]}" > "$RUNNER_TEMP/engine-npm.json"
+          node src/scripts/npm-artifact.mjs "${args[@]}" > "$RUNNER_TEMP/engine-npm.json"
           # shellcheck disable=SC2016 # the quoted script is JavaScript with template literals
           node -e '
           const { appendFileSync, readFileSync } = require("node:fs");
@@ -324,7 +324,7 @@ jobs:
       # Every engine version carries a changelog (Jake, 2026-11-10); changelog-tag.yml checks the same, but a
       # separate workflow cannot stop this one.
       - name: Require the release changelog section at its commit
-        run: node scripts/changelog.mjs check "$RELEASE_TAG" --at="$RELEASE_BUILD"
+        run: node src/scripts/changelog.mjs check "$RELEASE_TAG" --at="$RELEASE_BUILD"
       - name: Publish the exact archive with its channel tag
         run: |
           name=$(node -p 'require("./package.json").name')

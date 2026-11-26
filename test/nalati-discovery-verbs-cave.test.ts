@@ -8,7 +8,7 @@ import {expect,test} from 'vitest';
 
 // FAST-SLOW-TESTS FS5: the cave leg of the tour, from the snow leopard cave; nalati-discovery-verbs.test.ts runs the entry leg.
 test('Nalati places past the snow leopard cave require real native arrival and survive independent input replay',()=>{
-  const child=spawnSync(process.execPath,['--import',pathToFileURL(resolve('scripts/sim-node-loader.mjs')).href,
+  const child=spawnSync(process.execPath,['--import',pathToFileURL(resolve('src/scripts/sim-node-loader.mjs')).href,
     resolve('test/fixtures/headless/nalati-discovery-run.ts'),'cave'],{encoding:'utf8',timeout:150_000});
   expect(child.status,child.stdout+child.stderr+String(child.error??'')+(child.signal??'')).toBe(0);
   expect(child.stdout).toContain('"story":"nalati-discoveries"');

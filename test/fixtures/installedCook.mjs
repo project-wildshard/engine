@@ -13,7 +13,7 @@ import {validationSourceBytes} from '@wildshard/format/validationReceipt';
 import { outputIndexEnvelope } from '@wildshard/format/version';
 
 const require=createRequire(import.meta.url),engine=dirname(require.resolve('@wildshard/engine/package.json'));
-const basis=await require(join(engine,'scripts/vendor/basisu/basis_encoder.cjs'))({wasmBinary:new Uint8Array(readFileSync(join(engine,'scripts/vendor/basisu/basis_encoder.wasm'))),print:()=>{},printErr:()=>{}});
+const basis=await require(join(engine,'src/scripts/vendor/basisu/basis_encoder.cjs'))({wasmBinary:new Uint8Array(readFileSync(join(engine,'src/scripts/vendor/basisu/basis_encoder.wasm'))),print:()=>{},printErr:()=>{}});
 basis.initializeBasis();
 const encoder=new basis.BasisEncoder(),rgba=new Uint8Array(64*64*4);
 for(let i=0;i<rgba.length;i++)rgba[i]=i%256;

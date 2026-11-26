@@ -3,7 +3,7 @@ import {expect, test} from 'vitest';
 import {mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Keep all fixture writes inside the repository.
 import {resolve} from 'node:path';
-import {readPacksSet, writeSpawnManifests} from '../scripts/app-build/appCook';
+import {readPacksSet, writeSpawnManifests} from '../src/scripts/app-build/appCook';
 import {desktopFence} from '../src/cook/game/entryTotals';
 import {emptyShardfile} from '@wildshard/engine/host/author';
 import {outputSectionPayloads} from '@wildshard/format/outputFields';

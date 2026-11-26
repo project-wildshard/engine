@@ -6,7 +6,7 @@ import {mkdirSync,mkdtempSync,readFileSync,rmSync,writeFileSync} from 'node:fs';
 import {dirname,resolve} from 'node:path';
 import * as v from 'valibot';
 import {expect,test} from 'vitest';
-import {hardRules,readLintConfig} from '../scripts/guard-counts.mjs';
+import {hardRules,readLintConfig} from '../src/scripts/guard-counts.mjs';
 
 test.each([
   ['no-raw-random-time','src/engine/example.ts','Math.random();','Math.random();'],
@@ -66,7 +66,7 @@ test('ordinary lint enforces exact recorded file counts while raw census still r
       expect(configData.rules[rule]).toBeUndefined();expect(hard.has(rule)).toBe(false);
       expect(configData.overrides?.some(row=>row.rules?.[rule]==='off')).toBe(false);
     }
-    expect(readFileSync('scripts/typecheck-lint.sh','utf8')).not.toContain('lint:ratchet');
+    expect(readFileSync('src/scripts/typecheck-lint.sh','utf8')).not.toContain('lint:ratchet');
   } finally {rmSync(root,{recursive:true,force:true});}
 });
 

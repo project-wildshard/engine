@@ -1,6 +1,6 @@
 import {expect, test, vi} from 'vitest';
-import {frameFloorCpuPhase, assertFrameFloorRenderer} from '../scripts/frame-floor-report-phase.mjs';
-import {frameFloorChromiumAngle} from '../scripts/frame-floor-args.mjs';
+import {frameFloorCpuPhase, assertFrameFloorRenderer} from '../src/scripts/frame-floor-report-phase.mjs';
+import {frameFloorChromiumAngle} from '../src/scripts/frame-floor-args.mjs';
 
 const fence = {frame: 10, atMs: 100, firstCompletedFrame: 12, documentOrigin: 1000};
 

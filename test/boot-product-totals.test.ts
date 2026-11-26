@@ -4,8 +4,8 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve that compiler fixture without changing cwd.
 import { resolve } from 'node:path';
 import { emptyShardfile } from '@wildshard/engine/host/author';
-import { bootFolderTotals, folderDownloadTotal, homeClientModuleGroups } from '../scripts/app-build/bootFolders';
-import {bootTierFolderTotals} from '../scripts/app-build/bootFolderTiers';
+import { bootFolderTotals, folderDownloadTotal, homeClientModuleGroups } from '../src/scripts/app-build/bootFolders';
+import {bootTierFolderTotals} from '../src/scripts/app-build/bootFolderTiers';
 import {readOutputDownloadIndex} from '@wildshard/format/outputDownload';
 import { outputSectionPayloads } from '@wildshard/format/outputFields';
 // oxlint-disable-next-line import/no-nodejs-modules -- Record exact section hashes in the real output fixture.

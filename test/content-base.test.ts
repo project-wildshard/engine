@@ -11,7 +11,7 @@ import type {Rapier} from '../src/shared/engine/physics/rapier';
 import {installAssetTables} from '../src/shared/engine/boot/tables';
 import {readAssetTables} from '../src/client/app/assetTables';
 import {titleAssetURL} from '../src/client/game/titleAssets';
-import {stampContentBase} from '../scripts/app-build/contentBase.mjs';
+import {stampContentBase} from '../src/scripts/app-build/contentBase.mjs';
 
 const CDN = 'https://packs.example.test/';
 const page = (): string => new URL('/', document.baseURI).href;

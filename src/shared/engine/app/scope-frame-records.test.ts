@@ -110,7 +110,7 @@ test('completed callbacks release their real targets while the scope and empty f
     try {
       const config = resolvePath(directory, 'vitest.config.mjs');
       writeFileSync(config, `export default {root:${JSON.stringify(resolvePath('.'))},test:{include:['src/shared/engine/app/scope-frame-records.test.ts'],testNamePattern:'completed callbacks release',setupFiles:[],pool:'forks',maxWorkers:1,execArgv:['--expose-gc']}};`);
-      const result = execFileSync(process.execPath, ['--expose-gc', resolvePath('scripts/vitest-tmp.ts'), 'run', 'src/shared/engine/app/scope-frame-records.test.ts', '--config', config],
+      const result = execFileSync(process.execPath, ['--expose-gc', resolvePath('src/scripts/vitest-tmp.ts'), 'run', 'src/shared/engine/app/scope-frame-records.test.ts', '--config', config],
         { env: { ...process.env, WS_FRAME_RECORD_GC: '1', NO_COLOR: '1' }, encoding: 'utf8', timeout: 30000 });
       expect(result).toContain('1 passed');
     } finally { rmSync(directory, { recursive: true, force: true }); }

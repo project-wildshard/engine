@@ -1,7 +1,7 @@
 # J186: daily Ring 2 report remains outside TS15's validated push-half gate.
 # Cold q11 cooking plus a clean build exceeds ten seconds: Ring 2.
 # CI-JOB-PACKING (J244): a push no longer starts this workflow. Its push half, cook-to-play on Ring 1's products,
-# is ci's blocking `boundaries` unit (scripts/ci-pack.mjs); its six Vitest files already run in ci's shards.
+# is ci's blocking `boundaries` unit (src/scripts/ci-pack.mjs); its six Vitest files already run in ci's shards.
 # The daily schedule and a dispatch still run the whole report, Ring 2 steps included.
 name: engine-boundaries
 on:
@@ -24,18 +24,18 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - uses: ./.github/actions/ring-setup
-      - run: node scripts/pins.ts install --ring 1
+      - run: node src/scripts/pins.ts install --ring 1
       - id: inputs
         run: pnpm gen:inputs
       # Ring 2: re-cutting five large raw heads is outside Ring 1.
       - name: Re-cut the pinned server slices
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-        run: node scripts/pins.ts verify-slices
+        run: node src/scripts/pins.ts verify-slices
       - name: Measure native play after host installation
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-        run: node --import ./scripts/bake-loader.mjs scripts/host-activity.ts tmp/engine-boundaries/host-activity.json
+        run: node --import ./src/scripts/bake-loader.mjs src/scripts/host-activity.ts tmp/engine-boundaries/host-activity.json
       - name: Real worker, hostile peers, and restore continuation
-        run: node scripts/vitest-tmp.ts run test/cook-refusals.test.ts test/cook-hostile-pins.test.ts test/net-hostile-play.test.ts test/net-link-play.test.ts test/pinned-restore-play.test.ts
+        run: node src/scripts/vitest-tmp.ts run test/cook-refusals.test.ts test/cook-hostile-pins.test.ts test/net-hostile-play.test.ts test/net-link-play.test.ts test/pinned-restore-play.test.ts
         env:
           WS_VITEST_MAX_WORKERS: '2'
           NET_FUZZ_SEEDS: ${{ github.event_name == 'schedule' && github.run_id || '20261108' }}
@@ -44,16 +44,16 @@ jobs:
       # stored-product proof. A failed setup or cancellation still stops it.
       - id: browser
         if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
-        run: bash scripts/ci-playwright-install.sh chromium
+        run: bash src/scripts/ci-playwright-install.sh chromium
       - name: Cook, attach, and play the same bytes
         if: ${{ !cancelled() && steps.inputs.outcome == 'success' && steps.browser.outcome == 'success' }}
-        run: node scripts/cook-to-play.mjs --out=tmp/engine-boundaries
+        run: node src/scripts/cook-to-play.mjs --out=tmp/engine-boundaries
       - name: Plant and heal actual cold-cook faults
         if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
-        run: node scripts/coverage-cook-drill.mjs tmp/engine-boundaries/cook-drill
+        run: node src/scripts/coverage-cook-drill.mjs tmp/engine-boundaries/cook-drill
       - name: Check the full Nalati server herd tick budget
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-        run: node --import ./scripts/sim-node-loader.mjs --test test/nalati-herd-tick.proof.ts
+        run: node --import ./src/scripts/sim-node-loader.mjs --test test/nalati-herd-tick.proof.ts
       - name: Keep the report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -76,10 +76,10 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - uses: ./.github/actions/ring-setup
-      - run: node scripts/pins.ts install
+      - run: node src/scripts/pins.ts install
       - run: pnpm gen:inputs
       - name: Resume actual released saves against the current pinned worlds
-        run: node scripts/vitest-tmp.ts run test/released-save-play.test.ts
+        run: node src/scripts/vitest-tmp.ts run test/released-save-play.test.ts
   # EG26: JavaScriptCore is a separate engine from Chromium/V8. Report-only Ring 2; never a hook or push test.
   worker-determinism:
     continue-on-error: true
@@ -90,11 +90,11 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/ring-setup
-      - run: node scripts/pins.ts install --ring 1
-      - run: bash scripts/ci-playwright-install.sh webkit
+      - run: node src/scripts/pins.ts install --ring 1
+      - run: bash src/scripts/ci-playwright-install.sh webkit
       # Both sides use committed boot tables. Generation after the frozen Ring 1 install would dirty them.
       - name: Compare the same real tape in Node and a WebKit worker
-        run: node --import ./scripts/sim-node-loader.mjs scripts/determinism/report.ts
+        run: node --import ./src/scripts/sim-node-loader.mjs src/scripts/determinism/report.ts
         env:
           WILDSHARD_RING: '1'
       - name: Keep the worker comparison and divergent-tape control
@@ -137,7 +137,7 @@ jobs:
             ring1-spawn-parts-br-
       - name: Census all pinned title and grid heads
         run: |
-          node scripts/pins.ts install
+          node src/scripts/pins.ts install
           pnpm build:game
-          node scripts/app-build/splitOutput.mjs dist --join
-          node --import ./scripts/bake-loader.mjs scripts/catalogue-all-heads.ts dist
+          node src/scripts/app-build/splitOutput.mjs dist --join
+          node --import ./src/scripts/bake-loader.mjs src/scripts/catalogue-all-heads.ts dist

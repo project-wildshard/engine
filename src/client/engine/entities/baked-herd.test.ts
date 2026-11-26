@@ -41,7 +41,7 @@ function quadruped(): { root: Group; mesh: SkinnedMesh } {
   return { root, mesh };
 }
 
-/** The bench's stand-in gait (scripts/creature-bench/bench.ts). */
+/** The bench's stand-in gait (src/scripts/creature-bench/bench.ts). */
 const HZ = 1.6;
 const gait: GaitPose = (bones, rest, t) => {
   const e = new Euler(), r = new Quaternion();

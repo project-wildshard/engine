@@ -5,7 +5,7 @@ import { Window } from 'happy-dom';
 import { afterEach, expect, test, vi } from 'vitest';
 import { showStartTitle } from '../ui/StartTitle';
 import type { TitleDeckView } from '../ui/HUD';
-import { stampBuildHtml } from '../../../../scripts/app-build/buildIdentity.mjs';
+import { stampBuildHtml } from '../../../scripts/app-build/buildIdentity.mjs';
 
 const html = readFileSync('index.html', 'utf8');
 // The real HTML runs before runtime identity installation (test/setup is epoch

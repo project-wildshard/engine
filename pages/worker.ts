@@ -47,11 +47,11 @@ const OK = 200
 const FOUND = 302
 const PART = /^\/assets\/spawn\/(?:parts|server)\/[^/]+\.pack\.br$/u
 const NOT_MODIFIED = 304
-// Meta IPHONE13-DRIFTWOOD DW12: the game's document, and only it, says COOP `same-origin` (scripts/app-build/isolation.mjs
+// Meta IPHONE13-DRIFTWOOD DW12: the game's document, and only it, says COOP `same-origin` (src/scripts/app-build/isolation.mjs
 // DOCUMENT_OPENER; a named value export would be a workerd entrypoint). WebKit starts a navigation whose opener policy
 // changes in a new WebContent, so a boot after a COOP-less page never inherits the last boot's heap.
 const OPENER = 'same-origin'
-// DW12: the leave page between two game documents, with no opener policy (scripts/app-build/isolation.mjs LEAVE_PAGE, the
+// DW12: the leave page between two game documents, with no opener policy (src/scripts/app-build/isolation.mjs LEAVE_PAGE, the
 // same bytes; test/page-headers.test.ts pins them): the next game document starts in a new WebContent.
 const LEAVE_PATH = '/leave'
 const LEAVE_PAGE = '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="color-scheme" content="dark"><meta name="robots" content="noindex"><style>html,body{margin:0;background:#050810}i{position:fixed;left:0;top:50%;width:30%;height:2px;background:#7fd8ff;animation:s 1s linear infinite}@keyframes s{from{transform:translateX(-100%)}to{transform:translateX(340%)}}</style><script>(()=>{let to="/",gone=0;try{const u=new URL(new URLSearchParams(location.search).get("to")||"/",location.origin);if(u.origin===location.origin&&u.pathname!=="/leave")to=u.pathname+u.search+u.hash}catch{}const go=()=>{if(!gone){gone=1;location.replace(to)}};requestAnimationFrame(()=>requestAnimationFrame(go));setTimeout(go,150)})()</script></head><body><i></i></body></html>'

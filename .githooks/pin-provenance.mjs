@@ -113,9 +113,9 @@ function refuse(changed, why) {
       `This push to main changes ${changed.length} file(s) under test/pins/ (${changed.slice(0, 3).join(', ')}${changed.length > 3 ? ', …' : ''}).`,
       ...why,
       'J375: pin changes land like code, through a plan branch and its green CI. Do it this way:',
-      '  node scripts/worktree.mjs new <slug>   (from the canonical checkout), then commit or cherry-pick the pin change there,',
-      '  then from the worktree: WS_LANE_NAME=<lane> node scripts/land.mjs   (push gate, then main; J422).',
-      '  A no-plan fix: commit on main in engine-quickfix and WS_LANE_NAME=<lane> node scripts/main-push.mjs (FS18).',
+      '  node src/scripts/.kit/worktree.mjs new <slug>   (from the canonical checkout), then commit or cherry-pick the pin change there,',
+      '  then from the worktree: WS_LANE_NAME=<lane> node src/scripts/.kit/land.mjs   (push gate, then main; J422).',
+      '  A no-plan fix: commit on main in engine-quickfix and WS_LANE_NAME=<lane> node src/scripts/.kit/main-push.mjs (FS18).',
       'Escape hatch, only when truly stuck (main red and the fix cannot wait for CI): ALLOW_PIN_PUSH=1 git push origin main,',
       'and say so in your receipt.',
     ],
@@ -124,7 +124,7 @@ function refuse(changed, why) {
 
 /** GitHub's `ci` verdict for one SHA, through gh (land's own query and verdict). */
 async function ghCiState(cwd, env) {
-  const { githubSlug, shaVerdict } = await import('../scripts/land.mjs');
+  const { githubSlug, shaVerdict } = await import('../src/scripts/.kit/land.mjs');
   const repo = env.WS_LAND_REPO ?? githubSlug(git(cwd, ['remote', 'get-url', 'origin']).out);
   if (repo === null || !/^[-\w.]+\/[-\w.]+$/u.test(repo)) throw new Error('origin is not a GitHub repo');
   return (sha) => {

@@ -4,7 +4,7 @@
 // cascade: on a desktop window the dock is anchored to the top-left corner (the same place in every world: it is one element on
 // <body>), well inside the window, in readable type, and stops short of the boss bar. happy-dom matches neither a media query
 // list nor (pointer: …), so the phone's PAUSE row (perf.css's `(max-width: 700px), (pointer: coarse)` block) and the real
-// boxes are checked in Chromium by scripts/hud-worst.mjs --check: every Developer surface inside the window, 8 px clear of each edge.
+// boxes are checked in Chromium by src/scripts/hud-worst.mjs --check: every Developer surface inside the window, 8 px clear of each edge.
 // oxlint-disable-next-line import/no-nodejs-modules -- the real stylesheets, not a copy of them
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, expect, it } from 'vitest';

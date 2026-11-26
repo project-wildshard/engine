@@ -1,4 +1,4 @@
-// E7.3d: a build's server book and parts, as an origin holds them, from built products, with the cook's own writer. `scripts/server-origin.mjs` runs it.
+// E7.3d: a build's server book and parts, as an origin holds them, from built products, with the cook's own writer. `src/scripts/server-origin.mjs` runs it.
 // GC15: and the grid pack the bake left in `--grid=<root>` (default this checkout), so a rig's road has its strips as staging's does.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

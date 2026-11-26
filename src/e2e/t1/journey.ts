@@ -1,16 +1,16 @@
 // The phone journey judge T1's E and F suites share (journey.spec.ts, journey-ways.spec.ts): BUGBASH-LOOP's tapped path
 // from the title into play, where every sample is a menu, the world's full-screen loading card or play.
-import { expect } from '../../../scripts/browser-test.mjs'
-import { harnessPins, saveFixture } from '../../../scripts/debug-settings.mjs'
+import { expect } from '../../scripts/browser-test.mjs'
+import { harnessPins, saveFixture } from '../../scripts/debug-settings.mjs'
 import {
   judge,
   label,
   PHONE,
   stickMoves,
   tapJourney,
-} from '../../../scripts/journey-proof.mjs'
+} from '../../scripts/journey-proof.mjs'
 
-import type { JourneyPath, Sample } from '../../../scripts/journey-proof.mjs'
+import type { JourneyPath, Sample } from '../../scripts/journey-proof.mjs'
 import type { Browser, Frame, Locator, Page, WebSocket } from '@playwright/test'
 
 // MAIN-SCREEN MS5 (J399): the same judge on all three ways in: ZONE SELECT and a card, ENTER THE MMO, and the one-zone deep

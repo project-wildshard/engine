@@ -8,9 +8,9 @@ import { resolve } from 'node:path';
 import { env as processEnv, execPath } from 'node:process';
 import { expect, test } from 'vitest';
 import { binaryJsonCounts, binaryJsonFailures, binaryJsonPolicy, binaryPolicyIncreases,
-  checkBinaryRevision, checkBinaryTree } from '../scripts/no-binary-json.mjs';
+  checkBinaryRevision, checkBinaryTree } from '../src/scripts/no-binary-json.mjs';
 
-import { commitCheckFailed } from '../scripts/precommit-jobs.mjs';
+import { commitCheckFailed } from '../src/scripts/precommit-jobs.mjs';
 
 const payload = 'a'.repeat(1024);
 const path = 'public/assets/example/rows.json';
@@ -175,7 +175,7 @@ test('source/tool base64 debt cannot grow, move or disappear from exact Git poli
 }));
 
 test('protocol source debt needs exact unique approval in the committed final footer',()=>fixture((root,git,put)=>{
-  const file='lint/base64-debt.json', transport='scripts/parity/fast-png.mjs';
+  const file='lint/base64-debt.json', transport='src/scripts/parity/fast-png.mjs';
   const debt=(count:number)=>JSON.stringify({schema:'no-base64/1',source,files:count===0?{}:{[transport]:count}});
   put(file,debt(0));git('add',file);git('commit','-qm','seed source policy');
   const parent=git('rev-parse','HEAD'), line=`Base64-Approved: wildshard-new ${transport} 1`;
@@ -223,7 +223,7 @@ test('generated import debt grows only with its own exact approval in the final 
 
 test('the binary CLI refuses missing range operands before any Git traversal', () => {
   for (const args of [['--range'], ['--range', 'HEAD']]) {
-    const result = spawnSync(execPath, [resolve('scripts/no-binary-json.mjs'), ...args], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
+    const result = spawnSync(execPath, [resolve('src/scripts/no-binary-json.mjs'), ...args], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('usage: no-binary-json.mjs');
     expect(result.stderr).not.toContain('bad revision');
@@ -239,11 +239,11 @@ test.each(['exact','unregistered','other-producer','kept-ts','missing-json','old
   git('add','.');git('commit','-qm','native manifest');
   if(mode!=='kept-ts')git('rm',`${folder}/manifest.ts`);
   if(mode!=='missing-json')put(`${folder}/manifest.json`,'{}');
-  put('scripts/source-generation-outputs.json',JSON.stringify({schema:'source-generation-outputs/1',producers:{
+  put('src/scripts/source-generation-outputs.json',JSON.stringify({schema:'source-generation-outputs/1',producers:{
     [mode==='other-producer'?'scripts/other.mjs':'scripts/gen-shards.mjs']:mode==='unregistered'?[]:[discoveryPath],
   }}));
   put(file,debt([mode==='wrong-path'?`${folder}/other.generated.ts`:discoveryPath]));git('add','.');
-  const failures=checkBinaryRevision(root,':','HEAD',[file,'scripts/source-generation-outputs.json',`${folder}/manifest.ts`,`${folder}/manifest.json`]);
+  const failures=checkBinaryRevision(root,':','HEAD',[file,'src/scripts/source-generation-outputs.json',`${folder}/manifest.ts`,`${folder}/manifest.json`]);
   if(mode==='exact')expect(failures).toEqual([]);
   else expect(failures.join(' ')).toContain('app source exemption grew');
 }));

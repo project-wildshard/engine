@@ -1,8 +1,8 @@
 import { expect, test } from 'vitest';
-import { readCaps } from '../scripts/budgets/files.mjs';
-import { GRID_SEAMS, gridSeamAsset, readGridSeams, writeGridSeams } from '../scripts/app-build/gridSeams.mjs';
-import { checkChunks } from '../scripts/check-chunks.mjs';
-import { writeChunkReport } from '../scripts/app-build/chunkReport.mjs';
+import { readCaps } from '../src/scripts/budgets/files.mjs';
+import { GRID_SEAMS, gridSeamAsset, readGridSeams, writeGridSeams } from '../src/scripts/app-build/gridSeams.mjs';
+import { checkChunks } from '../src/scripts/check-chunks.mjs';
+import { writeChunkReport } from '../src/scripts/app-build/chunkReport.mjs';
 import { build, type InlineConfig } from 'vite';
 import { jsonDataHeapBytes } from '@wildshard/format/json';
 // oxlint-disable-next-line import/no-nodejs-modules -- The build guard fixture owns and removes only its small tmp tree.

@@ -1,8 +1,8 @@
 import {expect, test} from 'vitest';
 // oxlint-disable-next-line import/no-nodejs-modules -- execute actual serialized diagnostic without Safari
 import {runInNewContext} from 'node:vm';
-import {ABLATION_NORMAL, ABLATION_PAUSED, ABLATION_BUFFERS, refreshAblationInspector, ablationPhases} from '../scripts/frame-floor-pause-ablation.mjs';
-import {validateFrameFloorArgs} from '../scripts/frame-floor-args.mjs';
+import {ABLATION_NORMAL, ABLATION_PAUSED, ABLATION_BUFFERS, refreshAblationInspector, ablationPhases} from '../src/scripts/frame-floor-pause-ablation.mjs';
+import {validateFrameFloorArgs} from '../src/scripts/frame-floor-args.mjs';
 
 function fixture(paused = false) {
   let now = 100, next = 0, begins = 0, ends = 0;

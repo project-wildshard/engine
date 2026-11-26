@@ -1,7 +1,7 @@
 import {readFileSync} from 'node:fs';
 import {expect,test,vi} from 'vitest';
 import {parseGridCatalogue} from '../src/shared/game/grid/catalogue';
-import {stepCheckpoints,settleControl,untilControl,untilAfterBootAudio,refusal,ledgerByKind,stats,dumpsInOrder,bootURL,bootOf,isServerWorker,webkitLines,PROTOCOL,ladderParts,ledgerTotal,ladderLines,ledgerParity,predictFootprint,categoryRemainder,addCategories,builtGridCell,placeOffGrid,ringThree} from '../scripts/memory/measure.mjs';
+import {stepCheckpoints,settleControl,untilControl,untilAfterBootAudio,refusal,ledgerByKind,stats,dumpsInOrder,bootURL,bootOf,isServerWorker,webkitLines,PROTOCOL,ladderParts,ledgerTotal,ladderLines,ledgerParity,predictFootprint,categoryRemainder,addCategories,builtGridCell,placeOffGrid,ringThree} from '../src/scripts/memory/measure.mjs';
 
 const procs=[{pid:1,role:'webcontent',name:'wc'},{pid:2,role:'gpu',name:'gpu'},{pid:3,role:'networking',name:'net'}];
 const sample=(seq:number,t:number,wc:[number,number],gpu:[number,number])=>({seq,t,p:{'1':wc,'2':gpu,'3':[9e9,9e9] as [number,number]}});
@@ -161,7 +161,7 @@ test('the control read waits until the after-control audio has settled', async (
   } finally {
     Reflect.set(globalThis, 'window', before);
   }
-  const source = readFileSync('scripts/memory/measure.mjs', 'utf8'), ledger = source.slice(source.indexOf('async function chromiumLedger'));
+  const source = readFileSync('src/scripts/memory/measure.mjs', 'utf8'), ledger = source.slice(source.indexOf('async function chromiumLedger'));
   expect(ledger.indexOf('untilAfterBootAudio(page, timeoutMs)')).toBeGreaterThan(0);
   expect(ledger.indexOf('untilAfterBootAudio(page, timeoutMs)')).toBeLessThan(ledger.indexOf('memory?.counters?.()'));
 });

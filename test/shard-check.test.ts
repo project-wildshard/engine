@@ -3,8 +3,8 @@ import {spawnSync} from 'node:child_process';
 import {mkdirSync, mkdtempSync, rmSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {afterEach, expect, test} from 'vitest';
-import {checkShards} from '../scripts/shard-check.ts';
-import {prepare, type Api} from '../scripts/ring3.ts';
+import {checkShards} from '../src/scripts/shard-check.ts';
+import {prepare, type Api} from '../src/scripts/ring3.ts';
 
 const candidate = 'a'.repeat(40), baseline = 'b'.repeat(40), shard = 'c'.repeat(40);
 const roots: string[] = [];

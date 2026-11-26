@@ -1,5 +1,5 @@
 // Real mirror/lease fixture. Kept outside tmp so the G670 caller guard stays enabled.
-import {openMirror} from '../../scripts/build-mirror.mjs';
+import {openMirror} from '../../src/scripts/build-mirror.mjs';
 import {existsSync,writeFileSync,renameSync} from 'node:fs';
 import {join} from 'node:path';
 import {spawnSync} from 'node:child_process';

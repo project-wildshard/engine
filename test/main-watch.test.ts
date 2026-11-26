@@ -5,9 +5,9 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 // oxlint-disable-next-line import/no-nodejs-modules -- Scratch paths.
 import { join, resolve } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
-import { attribute, blockingRun, cancelledJobs, failedNames, follow, fpsNight, judge, landers, type liveIo, paneFor, reached, sharedRuns, sweep, verdictFor } from '../scripts/main-watch.mjs';
+import { attribute, blockingRun, cancelledJobs, failedNames, follow, fpsNight, judge, landers, type liveIo, paneFor, reached, sharedRuns, sweep, verdictFor } from '../src/scripts/main-watch.mjs';
 import { audioAmberLine, audioLevel } from '../src/cook/game/audioReport';
-import '../scripts/test/main-watch-red.test.mjs';
+import '../src/scripts/test/main-watch-red.test.mjs';
 
 mkdirSync(resolve('tmp'), { recursive: true });
 const scratch = mkdtempSync(resolve('tmp/main-watch-'));

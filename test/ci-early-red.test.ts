@@ -1,7 +1,7 @@
 // Early red (meta FLOW-SIMPLE FS24): a push behind a running main run that is already red cancels that run, so the
 // pending run for the newer push starts at once. Only push runs on main; a run with no finished failure is kept.
 import { expect, test } from 'vitest';
-import { earlyRed, failedBlocking } from '../scripts/ci-early-red.mjs';
+import { earlyRed, failedBlocking } from '../src/scripts/ci-early-red.mjs';
 
 const run = (id: number, status: string, minute: number, event = 'push', head_branch = 'main') =>
   ({ id, event, status, head_branch, head_sha: String(id).padEnd(40, '0'), created_at: `2026-11-19T03:${String(minute).padStart(2, '0')}:00Z` });

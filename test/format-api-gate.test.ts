@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { compareRelease, formatApiFailures, refsFailures } from '../scripts/format-api-gate.mjs';
+import { compareRelease, formatApiFailures, refsFailures } from '../src/scripts/format-api-gate.mjs';
 
 // SHARD-COMPAT CP3 (J486 Q46): engine's push gate refuses a shard-format pin newer than the API's.
 const lock = (version: string): string => `lockfileVersion: '9.0'
@@ -89,5 +89,5 @@ test('a main push moving the pin above the API is refused from git\'s pre-push r
 });
 
 test('the pre-push hook every main push runs (land and main-push alike) calls the gate', () => {
-  expect(readFileSync('.githooks/pre-push', 'utf8')).toContain('node scripts/format-api-gate.mjs refs');
+  expect(readFileSync('.githooks/pre-push', 'utf8')).toContain('node src/scripts/format-api-gate.mjs refs');
 });

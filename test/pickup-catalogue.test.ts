@@ -43,7 +43,7 @@ it('covers every reachable seed in real table order without importing frozen cal
   const program = `import {registerHooks} from 'node:module';
 registerHooks({resolve(specifier,context,next){if(specifier.includes('-legacy/'))throw new Error('Legacy pickup dependency: '+specifier);return next(specifier,context);}});
 await import('./test/fixtures/pickupBakeWitness.mjs');`;
-  const output = execFileSync(execPath, ['--import', './scripts/bake-loader.mjs',
+  const output = execFileSync(execPath, ['--import', './src/scripts/bake-loader.mjs',
     '--input-type=module', '--eval', program, '--', '--check'], { encoding: 'utf8' });
   // The producer traces Interactables.parts and its real cache, then compares every encoded output byte.
   const result: unknown = JSON.parse(output);

@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'vitest';
-import { failed, judgeAll, recordAll } from '../scripts/budgets/cli.mjs';
-import { readCaps } from '../scripts/budgets/files.mjs';
-import { budgetReport, budgetResultLine, parseBudgetResults } from '../scripts/budgets/watch.mjs';
-import { FRAME_MS, PHONE_LOW, expectPinnedZones, measuringCatalogue, phoneFrameMeasures, slowFrame } from '../scripts/budgets/phone-frames.mjs';
+import { failed, judgeAll, recordAll } from '../src/scripts/budgets/cli.mjs';
+import { readCaps } from '../src/scripts/budgets/files.mjs';
+import { budgetReport, budgetResultLine, parseBudgetResults } from '../src/scripts/budgets/watch.mjs';
+import { FRAME_MS, PHONE_LOW, expectPinnedZones, measuringCatalogue, phoneFrameMeasures, slowFrame } from '../src/scripts/budgets/phone-frames.mjs';
 
 const slug = 'driftwood-isle', key = `render/phone-low/triangles/${slug}`;
 const pin = (revision: number) => ({ [slug]: `${slug}@${revision}` });

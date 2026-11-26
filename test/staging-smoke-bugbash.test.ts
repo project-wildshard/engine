@@ -1,7 +1,7 @@
 // Meta STAGING-SMOKE SM6: on a scratch copy of the STAGING-BUGBASH plan, two findings, one new and one matching an open row,
 // give one new row (next SB number, its own group) and one "seen again" line.
 import { expect, test } from 'vitest';
-import { bugbashRows, smokeKey } from '../scripts/staging-smoke/bugbash.mjs';
+import { bugbashRows, smokeKey } from '../src/scripts/staging-smoke/bugbash.mjs';
 
 const PLAN = `# Staging bug bash
 

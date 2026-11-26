@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { expect, test } from 'vitest';
-import { soakInspector } from '../scripts/soak/inspector.mjs';
+import { soakInspector } from '../src/scripts/soak/inspector.mjs';
 
 class WireEvent extends Event {
   readonly data: string;

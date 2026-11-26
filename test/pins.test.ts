@@ -7,15 +7,15 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, 
 import { tmpdir } from 'node:os';
 import { join, resolve as resolvePath } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { restorePacks, type PackedIndex } from '../scripts/pin-packs.ts';
-import { fetchPinnedPublicAssets, pinnedPublicAssets } from '../scripts/pin-assets.ts';
-import {wholeBrasscapProduct} from '../scripts/pin-format.ts';
+import { restorePacks, type PackedIndex } from '../src/scripts/pin-packs.ts';
+import { fetchPinnedPublicAssets, pinnedPublicAssets } from '../src/scripts/pin-assets.ts';
+import {wholeBrasscapProduct} from '../src/scripts/pin-format.ts';
 import {writeTar} from '@wildshard/format/tar';
 import {openShardfile, serverRows} from '../src/cook/game/shardCook';
 
 /** The tool's stderr, once it exits. */
 const pinsTool = (cwd: string, env: NodeJS.ProcessEnv, ...args: readonly string[]): Promise<string> => new Promise(resolve => {
-  const child = spawn(process.execPath, [resolvePath('scripts/pins.ts'), ...args], { cwd, env });
+  const child = spawn(process.execPath, [resolvePath('src/scripts/pins.ts'), ...args], { cwd, env });
   let stderr = '';
   child.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
   child.on('close', () => { resolve(stderr); });

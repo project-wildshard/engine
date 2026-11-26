@@ -2,7 +2,7 @@ name: ci-early-red
 
 # Meta FLOW-SIMPLE FS24 (J435): on each push to main, cancel main's running ci run when one of its blocking jobs has
 # already failed, so the pending run for this push starts now instead of waiting out a run that is red already.
-# scripts/ci-early-red.mjs decides; it never touches release refs or qualification dispatches (their own groups).
+# src/scripts/ci-early-red.mjs decides; it never touches release refs or qualification dispatches (their own groups).
 on:
   push:
     branches: [main]
@@ -32,4 +32,4 @@ jobs:
       - name: Cancel a running main run that is already red behind this push
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci-early-red.mjs
+        run: node src/scripts/ci-early-red.mjs

@@ -1,5 +1,5 @@
 // IOSMEM (meta PAGE-SIZE-PLAN, WILDSHARD-GAME-8G): the iPhone killed staging's page while Playing on Driftwood. The
-// memory proof (scripts/memory-proof.mjs) found the road platform's install allocating ~580 MB of short-lived JS in the
+// memory proof (src/scripts/memory-proof.mjs) found the road platform's install allocating ~580 MB of short-lived JS in the
 // first minute of Playing, most of it the clip's and the bin sort's growing number[] index and vertex lists. Those lists
 // live on the JS heap until the install ends; typed storage keeps them off it. This pins the install's live JS-heap peak.
 // oxlint-disable-next-line import/no-nodejs-modules -- the live heap is read from V8 itself, after a forced collection.

@@ -9,14 +9,14 @@
 > Written by: Claude and Codex (agents). Jake gardens this; it may be purged or promoted above the line.
 
  - AGENTS.md: agents edit only below the J241 marker, never above it; README.md stays humans-only unless Jake says otherwise
- - Every request for work from Jake -> kit/scripts/ask-new.sh "<his words>", rules in docs/tasks/asks/README.md
+ - Every request for work from Jake -> src/scripts/.kit/ask-new.sh "<his words>", rules in docs/tasks/asks/README.md
  - Follow-up work is a row in a live plan, never a new ask.
 
 Git hygiene
 
  - Small Commit early & often.
  - **Own hunks of a shared file (HOW-WE-BUILD WL17):** make a patch against HEAD containing only your hunks, then run
-   `scripts/commit.sh --patch <patch-file> "<message with Assisted-by trailer>" -- <literal-files...>`.
+   `src/scripts/.kit/commit.sh --patch <patch-file> "<message with Assisted-by trailer>" -- <literal-files...>`.
    The existing command builds its private candidate, runs installed hooks (including commit-msg), commits only
    declared paths and preserves peer working bytes/stages. Do not hand-roll private indexes or commit-tree calls.
  - Every meaningful commit writes a journal into project/journal, the why & informal.
@@ -29,26 +29,26 @@ One way onto main (J422, Jake 2026-11-18; replaces J400, J404, J336's one land p
  - **Every row, plan row or one-line fix, reaches main the same way:** commit, rebase, the push gate (lint, types,
    related tests, about 74 s), push main, and move on to the next row. No plan-branch push, no full suite in the lane,
    no queue. Main's hosted `ci` runs the full suite once per tip.
- - **A plan:** one lane, one plan, one worktree: `node scripts/worktree.mjs new <slug>`, `cd .worktrees/<slug>`, commit
-   each row there by pathspec, then `WS_LANE_NAME=<lane> node scripts/land.mjs`. Land rebases onto origin/main,
+ - **A plan:** one lane, one plan, one worktree: `node src/scripts/.kit/worktree.mjs new <slug>`, `cd .worktrees/<slug>`, commit
+   each row there by pathspec, then `WS_LANE_NAME=<lane> node src/scripts/.kit/land.mjs`. Land rebases onto origin/main,
    commits regenerated boot stamps, pushes main through the ordinary pre-push (marker `WS_LAND_MAIN_PUSH=push:<sha>`),
    rebases and pushes again if it loses a race, and starts main-watch. The worktree stays for the next row; after the
    plan's last row run `land.mjs --done` to remove it. Don't commit while it runs.
  - **A one-line fix with no plan:** in the second clone `~/projects/games/wildshard/engine-quickfix` (J323), never in
-   `~/projects/games/wildshard/engine`, which stays clean for worktrees: `WS_LANE_NAME=<lane> node scripts/main-push.mjs
+   `~/projects/games/wildshard/engine`, which stays clean for worktrees: `WS_LANE_NAME=<lane> node src/scripts/.kit/main-push.mjs
    -m "<subject>" -m "<body + Assisted-by>" <file>...`. It commits by pathspec, syncs main without a rebase or stash,
    pushes through the same pre-push and retries a race. On a conflict it uncommits your files and prints the `--onto`
    command that finishes it.
  - **The push gate** (`.githooks/run-checks.mjs`, split gate EV1/EV2): static checks plus the related Vitest files in a
-   clean copy of the pushed commit (`scripts/push-gate-copy.mjs`), so other lanes' dirt neither refuses your push nor
+   clean copy of the pushed commit (`src/scripts/push-gate-copy.mjs`), so other lanes' dirt neither refuses your push nor
    reaches the checks. Browser, timing and slow files run on main's hosted `ci`. A tag or release push keeps the full
    gate, except a release that only stamps the version and adds notes over a cut main's `ci` proved (meta FAST-RELEASE
-   FR6): its branch `ci` reuses that run and runs the docs lane plus the release readers (`scripts/ci-selection.mjs`
-   `RELEASE_READER_TESTS`), and its tag push reuses both runs (`scripts/release-gate.mjs`). If the gate regenerates a `*.generated.ts` your change feeds, it names the file: run `pnpm gen:inputs` and
+   FR6): its branch `ci` reuses that run and runs the docs lane plus the release readers (`src/scripts/ci-selection.mjs`
+   `RELEASE_READER_TESTS`), and its tag push reuses both runs (`src/scripts/release-gate.mjs`). If the gate regenerates a `*.generated.ts` your change feeds, it names the file: run `pnpm gen:inputs` and
    commit it with your change.
  - **A red main is fixed forward, never reverted (J422 wave 2):** main-watch writes `main green` or `MAIN RED <range>`
    naming the pushes, and messages each one's herdr pane. The push it names fixes it forward at once; nobody else stops.
-   A cancelled run that a newer push replaced is `superseded`, never red. Sweep by hand: `node scripts/main-watch.mjs`.
+   A cancelled run that a newer push replaced is `superseded`, never red. Sweep by hand: `node src/scripts/main-watch.mjs`.
    A `main AMBER <sha> <file> <ms>/<budget>` receipt (J295): green, but that file is over budget; fix it the same day.
  - **At most one full local run at a time**, for a release or to name a red: `pnpm test:fast`.
  - **The Mac mini lands the same way (J443, meta FLOW-SIMPLE FS23):** `land.mjs` defaults to push mode on every
@@ -57,7 +57,7 @@ One way onto main (J422, Jake 2026-11-18; replaces J400, J404, J336's one land p
    `engine-quickfix` (FS18), both through the push gate; the pre-push (`.githooks/pin-provenance.mjs`) refuses a hand
    `git push`. Escape hatch when truly stuck: `ALLOW_PIN_PUSH=1`, said in your receipt.
  - **Budgets (J444, meta BUDGET-CAPS):** hard caps live in `budgets/caps.json`, each naming its J-number (only Jake's
-   word moves one); baselines live in `budgets/baselines.json`, written by `node scripts/budgets/cli.mjs`, never by hand.
+   word moves one); baselines live in `budgets/baselines.json`, written by `node src/scripts/budgets/cli.mjs`, never by hand.
    A pin lane runs `cli.mjs record --run <budgets.yml run id>` after its pin's first green main run and commits the file.
    An engine feature that grows a budget runs `cli.mjs declare <key> --why "<feature>"` in the same commit. `cli.mjs check
    <measures.json>` prints the table. A `main BUDGET regressed` receipt is a fix row for its pusher, never a red main.
@@ -70,12 +70,12 @@ One way onto main (J422, Jake 2026-11-18; replaces J400, J404, J336's one land p
    To try an engine or SDK worktree with zero waiting (J475), add
    `--provider engine=<worktree>` (or `sdk=`) to that link: a plain
    symlink, no pack, package.json and the lock untouched; `local unlink
-   --consumer <repo>` restores it. To test an unpublished built shard, run `node scripts/pins.ts install
+   --consumer <repo>` restores it. To test an unpublished built shard, run `node src/scripts/pins.ts install
    --from-dir <canonical-shard/built-product-directory>` here, then its
    cook/journey proof. Before main-push, restore the consumer with `local
    pinned --consumer sharddev --production-live v0.1.2` and restore engine
-   products with `node scripts/pins.ts install`. Push/land/release refuse
-   local shard provenance. After pushing, run `node scripts/shard-check.ts
+   products with `node src/scripts/pins.ts install`. Push/land/release refuse
+   local shard provenance. After pushing, run `node src/scripts/shard-check.ts
    --baseline <full-pushed-sha> [--shards shard-dunes,...]`; HEAD is the
    candidate, all seven shards are the default, and both legs are bounded
    to twenty minutes. Keep its receipt and run URLs; a regression means
@@ -91,9 +91,9 @@ One way onto main (J422, Jake 2026-11-18; replaces J400, J404, J336's one land p
    push on SIGTERM or EPIPE.
  - **Phone jobs go through the queue (meta MINI-DEVEX MD1):** only the phone runner takes `iphone13.lock`. Run
    `route-bench`, `link-bench` and `bench.mjs` (`scripts/memory/iphone/`) without `--with-locks`; they submit and stream
-   the log. Any other phone script: `node scripts/memory/iphone/phone-queue.mjs submit -- <script>`. Desktop runs take
+   the log. Any other phone script: `node src/scripts/memory/iphone/phone-queue.mjs submit -- <script>`. Desktop runs take
    `desktop-gpu.lock`.
- - Abandoned worktrees: `node scripts/worktree.mjs reap` (`--dry-run` first). It never touches an unlanded, dirty
+ - Abandoned worktrees: `node src/scripts/.kit/worktree.mjs reap` (`--dry-run` first). It never touches an unlanded, dirty
    or busy one.
 
 Never:
@@ -126,13 +126,13 @@ Code rules
 
  - In the test suite, No LLM, no claude, no herdr.
  - **No zone in a URL (J522):** a page enters a zone by its tap, its tab's handoff or a record, never a `chunk` query
-   param; a tool enters with `scripts/zone-entry.mjs` `enterZone` (`alone: true` when it measures one zone), and the
+   param; a tool enters with `src/scripts/zone-entry.mjs` `enterZone` (`alone: true` when it measures one zone), and the
    chunk-param guard refuses a new one.
  - **Wire and save freeze (WIRE-STABILITY WR14, declared 2026-11-19 under J432):** a wire change is a lock diff
    (`@wildshard/wire` in shard-format: a new minor, `wire check`, then the engine pin); a save change is a `v`, a
    migration and a pin (`saves.lock.json`, `pnpm check:saves`). `check:wire` and `check:saves` run in the push gate
    and CI static; `test/contract-cross.test.ts` plays HEAD against `@wildshard/wire-released` (the last released minor).
- - Every Chromium launch passes `--use-mock-keychain` and `--password-store=basic` (else a macOS keychain dialog opens) and `--mute-audio` (Jake, 2026-11-13); spread `KEYCHAIN_ARGS` from `scripts/chromium-keychain.mjs`, which carries all three.
+ - Every Chromium launch passes `--use-mock-keychain` and `--password-store=basic` (else a macOS keychain dialog opens) and `--mute-audio` (Jake, 2026-11-13); spread `KEYCHAIN_ARGS` from `src/scripts/.kit/chromium-keychain.mjs`, which carries all three.
 
 Agent tooling
 

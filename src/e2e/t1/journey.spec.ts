@@ -2,18 +2,18 @@
 // pressing shard select, pressing driftwood, entering driftwood"): a phone taps from the title through Shard Select and Enter
 // World into play, and every sample on the way is a menu, the world's full-screen loading card or play. PZ27b2 failed this on
 // v0.1.28 to v0.1.30 (the launch shell on the world page, the main menu back, the HUD over it, a blank wait) while every other
-// T1 journey passed, because they only waited for play at the end. scripts/journey-proof.mjs is the same judge on staging.
+// T1 journey passed, because they only waited for play at the end. src/scripts/journey-proof.mjs is the same judge on staging.
 import { readFileSync } from 'node:fs'
 
-import { expect, test } from '../../../scripts/browser-test.mjs'
+import { expect, test } from '../../scripts/browser-test.mjs'
 import {
   deckFrames,
   recordDeck,
   swipeProblems,
   touchSwipe,
-} from '../../../scripts/bugbash-probes.mjs'
-import { harnessPins, saveFixture } from '../../../scripts/debug-settings.mjs'
-import { PHONE } from '../../../scripts/journey-proof.mjs'
+} from '../../scripts/bugbash-probes.mjs'
+import { harnessPins, saveFixture } from '../../scripts/debug-settings.mjs'
+import { PHONE } from '../../scripts/journey-proof.mjs'
 import {
   journey,
   markedZoneSelectPress,
@@ -98,7 +98,7 @@ test('a touch swipe on Shard Select shows one lit, solid card and rests centred'
 
 // ZONE-SELECT-SERVED ZS10 (J461, J468, J469): on the preview build at the phone viewport, Zone Select opens on FEATURED, each tab
 // shows its own cards in the room list's order, and ENTER ZONE enters a zone from every tab (the travel to its page). The page's
-// baked list is the pinned staging snapshot, as a release bakes it (scripts/app-build/catalogue.ts), with NEW holding every zone
+// baked list is the pinned staging snapshot, as a release bakes it (src/scripts/app-build/catalogue.ts), with NEW holding every zone
 // FEATURED does not, so each tab holds some of whatever ring the build carries.
 interface Served {
   readonly featured: readonly string[]

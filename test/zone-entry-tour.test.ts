@@ -1,7 +1,7 @@
 import { expect, test, vi } from 'vitest';
-import { approachBudget, featuredZoneEntry, proofHeading, settledDeck, rejoinLegs, spawnApproach, portalExitPlan, unstick, resumeZoneEntry, retrySmokeEntries, retryZoneEntry, roadApproach, smokeBatches, smokeGap, stagedTourProof, walkZoneEntryTour, zoneEntryCorridor, zoneEntryTour, type Tour } from '../scripts/zone-entry-tour.mjs';
-import { zoneEntryGap } from '../scripts/page-release/flow.mjs';
-import { TOUR_FEATURED as curated } from '../scripts/zone-entry-featured.mjs';
+import { approachBudget, featuredZoneEntry, proofHeading, settledDeck, rejoinLegs, spawnApproach, portalExitPlan, unstick, resumeZoneEntry, retrySmokeEntries, retryZoneEntry, roadApproach, smokeBatches, smokeGap, stagedTourProof, walkZoneEntryTour, zoneEntryCorridor, zoneEntryTour, type Tour } from '../src/scripts/zone-entry-tour.mjs';
+import { zoneEntryGap } from '../src/scripts/page-release/flow.mjs';
+import { TOUR_FEATURED as curated } from '../src/scripts/zone-entry-featured.mjs';
 
 const cells = [
   {instance:'driftwood-isle', cell:[0, 0]},

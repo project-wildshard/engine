@@ -1,0 +1,133 @@
+import { genStarterBag } from '../gen-starter-bag.mjs';
+import { genStarterArmClips } from '../gen-starter-arm-clips.mjs';
+import { genStarterWeapons } from '../gen-starter-weapons.mjs';
+import { genStarterEffects } from '../gen-starter-effects.mjs';
+import { execFileSync } from 'node:child_process';
+import { readdirSync, statSync, readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { contentNamed, hashTree } from './assetHashes';
+import { copyRapierWasm } from '../../../vite/rapier';
+import { copyBasisTranscoder } from './basis';
+import { publicBytesTableSource, assetVersionsTableSource } from '../boot-publication.mjs';
+import { stalePinFolders } from '../pins-reuse.mjs';
+import { readStaging } from '../pins-staging.ts';
+
+// /asset-index.json: every file under public/assets with its byte size, so the loading
+// screen can show real "x / y MB" totals for the files it has requested so far.
+export function assetIndex(): string {
+  const out: Record<string, number> = {};
+  const walk = (dir: string, pub: string) => {
+    for (const name of readdirSync(dir)) {
+      const p = join(dir, name); const st = statSync(p);
+      if (st.isDirectory()) { if (`${pub}/${name}` !== '/assets/packs') walk(p, `${pub}/${name}`); } // packs: generated from these very files, below
+      else out[`${pub}/${name}`] = st.size;
+    }
+  };
+  try { walk('public/assets', '/assets'); } catch { /* no assets dir */ }
+  return JSON.stringify(out);
+}
+
+// src/client/game/boot/bytes.generated.ts: the same table as a committed TS module, so the boot plan's declared
+// denominators need no fetch and `pnpm tsc` fails when a file a chunk declares disappears.
+const BYTES_TABLE = 'src/client/game/boot/bytes.generated.ts';
+function bytesModule(): string {
+  // A pinned product older than the pins (a tree installed before a pin bump) published its old mounts under public/:
+  // stamping them would put that revision's files back in the table, as lands from such worktrees did (Far Reach rev 1).
+  // Only land, which commits what this writes, refuses (`WS_STALE_PINS=refuse`, src/scripts/.kit/land.mjs); elsewhere it warns, since
+  // CI's ring-1 job installs its own pin list into out/ on purpose (main red 43568190100).
+  const stagingHashes = process.env['WS_DEV_STAGING'] === '1' ? readStaging().shards.map(row => row.hash) : undefined;
+  const stale = stalePinFolders('.', stagingHashes);
+  if (stale.length > 0) {
+    const why = `out/ holds pinned products the pins no longer name (${stale.map(row => `${row.folder} revision ${String(row.revision)}`).join(', ')}): their public/ mounts would go into the boot stamps. Run \`pnpm pins\` in this tree, then gen:inputs again`;
+    if (process.env['WS_STALE_PINS'] === 'refuse') throw new Error(why);
+    console.warn(`gen:inputs: ${why}`);
+  }
+  const rows = Object.fromEntries(Object.entries(JSON.parse(assetIndex()) as Record<string, number>).filter(([name]) => !name.endsWith('.DS_Store')));
+  // The staged table is the baseline (HEAD's, unless a fix to it is staged on purpose), not the file a local run last
+  // wrote: that may hold an older public/'s sizes.
+  let committed = '';
+  try { committed = execFileSync('git', ['show', `:${BYTES_TABLE}`], { encoding: 'utf8', maxBuffer: 16_000_000, stdio: ['ignore', 'pipe', 'ignore'] }); }
+  catch { /* no git history here (an installed package): nothing to compare */ }
+  const changed = changedContentNamed(committed, rows);
+  if (changed.length > 0) throw new Error(`${changed.length} content-named file(s) changed bytes under one URL, which players keep for a year (AUDIO AU21): ${changed.slice(0, 5).join(', ')}. A changed file needs a new name (sharddev 0.2.10 renames a re-encoded recording); a stale public/ copy needs \`pnpm pins\``);
+  return publicBytesTableSource(rows);
+}
+
+/** AUDIO AU21: a content-named file (`contentNamed`: no `?v=`, kept by the worker, `/assets/*` immutable) is served for a
+ *  year under its URL, so a new byte table may not give one of the previous table's content-named paths another size.
+ *  A renamed file is a new row and passes; same size with other bytes slips past (the table holds sizes only). */
+export function changedContentNamed(previous: string, rows: Readonly<Record<string, number>>): string[] {
+  const out: string[] = [];
+  for (const [, name, size] of previous.matchAll(/^\s*"([^"]+)": (\d+),?$/gmu)) {
+    const now = name === undefined ? undefined : rows[name];
+    if (name !== undefined && now !== undefined && contentNamed(name) && now !== Number(size)) out.push(`${name} (${size} to ${now} bytes)`);
+  }
+  return out;
+}
+
+// src/client/game/boot/versions.generated.ts: a content hash per file under public/assets (E160; NALATI-MERGE F4 started it for
+// public/assets/nalati/). Those files are unhashed and get edited or re-baked in place, so the network sees them as
+// `<path>?v=<hash8>` (src/client/engine/boot/bytes.ts `versionedUrl`): an edit is a new URL to the HTTP cache and the service worker
+// (cache-first on `?v=`), an unchanged file keeps its URL — and its cached copy — across every deploy. Files whose name is
+// already content-addressed (the packs, the `<name>-<hash8>.m4a` audio, src/scripts/app-build/assetHashes.ts `contentNamed`) need no `?v=`.
+function versionsModule(): string {
+  return assetVersionsTableSource(assetVersionRows());
+}
+
+/** Actual artifact versions, shared by the boot writer and final publication. */
+export function assetVersionRows(): Record<string, string> {
+  return hashTree('assets', process.cwd(), name => !contentNamed(name));
+}
+
+// /asset-manifest.json (E160 / E161): every file under public/assets — the packs included — with its content hash: what
+// this build names. The service worker reads it on activate to keep exactly those entries (a `?v=` key whose hash still
+// matches, a content-named file still shipped) and to drop everything else: old pack blobs, old versions, files removed.
+
+// src/client/game/boot/audio.generated.ts: every music style's music.json and every sound-effect set's sfx.json (public/assets/music/<style>/,
+// public/assets/sfx/<set>/), compiled into the bundle minus their provenance notes (project/archive/2026-09-23-preload-offline.md). The boot
+// declares and downloads every file they list at the loading bar and decodes the selected style + set there, so nothing
+// fetches a manifest at runtime and the hashed bundle always carries the loop points of the files it ships with.
+export function audioTableSource(root: string = process.cwd()): string {
+  const read = (sub: string, name: string): Record<string, unknown> => {
+    const out: Record<string, unknown> = {};
+    const dir = join(root, 'public/assets', sub);
+    if (!existsSync(dir)) return out;
+    for (const d of readdirSync(dir).sort()) {
+      const p = join(dir, d, name);
+      if (!existsSync(p)) continue;
+      const input: unknown = JSON.parse(readFileSync(p, 'utf8'));
+      if (typeof input !== 'object' || input === null || Array.isArray(input)) throw new Error(`${p}: audio manifest must be an object`);
+      out[d] = Object.fromEntries(Object.entries(input).filter(([key]) => key !== 'provenance' && key !== 'synth_keeps'));
+    }
+    return out;
+  };
+  return '// Generated by gen:source (src/scripts/app-build/gen.ts) from public/assets/music/*/music.json and public/assets/sfx/*/sfx.json; do not edit.\n'
+    + `export const MUSIC_MANIFESTS: Readonly<Record<string, unknown>> = ${JSON.stringify(read('music', 'music.json'), null, 1)};\n`
+    + `export const SFX_MANIFESTS: Readonly<Record<string, unknown>> = ${JSON.stringify(read('sfx', 'sfx.json'), null, 1)};\n`;
+}
+
+/** The three boot tables read from the shard builds' public/assets outputs and the manifests (from the repo root as the
+ *  working directory), by output path: what generateBootTables writes beside the committed audio table and gen:source
+ *  (src/scripts/source-generators.mjs) registers. */
+export function bootTableSources(): Record<string, string> {
+  return { ...bootTransportTableSources() };
+}
+
+/** Build-published public files stay separate from the committed source-art table. */
+export function bootTransportTableSources(): Record<string, string> {
+  return { 'src/client/game/boot/bytes.generated.ts': bytesModule(), 'src/client/game/boot/versions.generated.ts': versionsModule() };
+}
+
+
+export function generateBootTables(): void {
+  genStarterArmClips();
+  genStarterWeapons();
+  genStarterBag();
+  genStarterEffects();
+  mkdirSync('src/client/game/boot', { recursive: true });
+  copyRapierWasm();
+  copyBasisTranscoder();
+  for (const [out, src] of Object.entries({ ...bootTableSources(), 'src/client/game/boot/audio.generated.ts': audioTableSource() })) if (!existsSync(out) || readFileSync(out, 'utf8') !== src) writeFileSync(out, src);
+  // C3: legacy boot packs come from a shard's source; with none, a page reads its cooked parts and the committed table stands.
+  if (existsSync('src/shards')) execFileSync(process.execPath, ['--import', './src/scripts/bake-loader.mjs', 'scripts/bake-packs.mjs'], { stdio: 'inherit' });
+}

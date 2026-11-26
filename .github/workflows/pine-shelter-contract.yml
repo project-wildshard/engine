@@ -23,7 +23,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/ring-setup
-      - run: node scripts/pins.ts install pine-hollow
+      - run: node src/scripts/pins.ts install pine-hollow
       - name: Fresh world and actual guest selection
         run: node --test test/pine-shelter-fuel.proof.mjs
       - name: Retain actual criteria even on failure

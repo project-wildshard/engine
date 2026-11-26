@@ -5,8 +5,8 @@
     "src/client/game/grid/roadSurfaceMaps.ts": "6b5cd03e04d8f3b65fdee5c9fe93709245e3f748da5166ac98b71888cacdad99",
     "src/client/game/grid/roadGrain.ts": "43266ed886b9ce8caa1090c05ec9397ca75a69e940a433886eb472e11e18eadc",
     "src/shared/game/grid/roadLayout.ts": "36d5aa94633245e7ea714a773959180938b095ecf267693d0bdf49b55895344e",
-    "scripts/bake-road-surfaces.entry.ts": "c1322e15ce4842afc788aae880195535c3e4350e175fdae53a83accb7a64fad9",
-    "scripts/bake-road-surfaces.mjs": "b3ab576687b8ee3882234c800134936b3081490fb27a047e21d12988a6c00eb3"
+    "src/scripts/bake-road-surfaces.entry.ts": "3aee568d8d5f528f0b9c2c84f2b1fe1481e106d89412b35d90efd345e039c586",
+    "src/scripts/bake-road-surfaces.mjs": "1357adfaaf27d8b10473cf5225c4158e2b160085d7f996bb04028a64ecbb1b43"
   },
   "encoder": {
     "version": "Basis Universal LDR/HDR GPU Texture Supercompression System v2.50.0",

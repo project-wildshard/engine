@@ -1,6 +1,6 @@
 import {expect,test} from 'vitest';
-import {readCaps} from '../scripts/budgets/files.mjs';
-import {nineFaults,type NineReading} from '../scripts/loading-flow/nine-ratchet.mjs';
+import {readCaps} from '../src/scripts/budgets/files.mjs';
+import {nineFaults,type NineReading} from '../src/scripts/loading-flow/nine-ratchet.mjs';
 
 // BUDGET-CAPS BC11: the street's triangles and draws are judged against Nine's recorded baseline plus 10% (J444).
 const judging={contentKey:'nine-dragon-stack@3',budgets:{caps:readCaps(),baselines:{schema:1,about:'',baselines:{

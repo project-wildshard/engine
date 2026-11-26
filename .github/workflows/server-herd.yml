@@ -20,15 +20,15 @@ jobs:
       - uses: ./.github/actions/ring-setup
         with:
           pins-cache-scope: full
-      - run: node scripts/pins.ts install
+      - run: node src/scripts/pins.ts install
       - run: pnpm gen:inputs
       - name: Build the same committed server and full Nalati pack
         env:
           COOK_CPU_SLOTS: '2'
         run: |
           mkdir -p tmp/server-herd/result
-          node scripts/build-server.mjs --build "$GITHUB_SHA" --out tmp/server-herd/server --entry herdSoak=test/fixtures/dedicated/herdSoakEntry.ts
-          node scripts/server-origin.mjs tmp/server-herd/origin "$GITHUB_SHA" "nalati-grasslands=$PWD/out/nalati-grasslands"
+          node src/scripts/build-server.mjs --build "$GITHUB_SHA" --out tmp/server-herd/server --entry herdSoak=test/fixtures/dedicated/herdSoakEntry.ts
+          node src/scripts/server-origin.mjs tmp/server-herd/origin "$GITHUB_SHA" "nalati-grasslands=$PWD/out/nalati-grasslands"
       - name: Thirty minutes beside living horses on two Linux CPUs
         run: |
           docker run --rm --cpus=2 --cpuset-cpus=0,1 --memory=2g --pids-limit=256 --network=none \

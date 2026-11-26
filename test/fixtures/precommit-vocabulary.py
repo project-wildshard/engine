@@ -2,16 +2,16 @@
 import hashlib,json,os,runpy,subprocess,sys,tempfile,time
 from pathlib import Path
 repo=Path.cwd(); source=runpy.run_path(sys.argv[1]); staged_source=source['staged_source']
-cache_api=runpy.run_path(str(repo/'scripts/push_input_cache.py'))
+cache_api=runpy.run_path(str(repo/'src/scripts/push_input_cache.py'))
 with tempfile.TemporaryDirectory(dir=repo/'tmp',prefix='staged-vocabulary-') as folder:
  root=Path(folder);env={k:v for k,v in os.environ.items() if not k.startswith('GIT_')}
  def git(*args):return subprocess.check_output(['git',*args],cwd=root,env=env)
  def put(name,text):p=root/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(text)
  git('init','-q');git('config','user.email','fixture@example.invalid');git('config','user.name','fixture');git('config','core.hooksPath','/dev/null')
  for name in ['git-source-view.mjs','gen-shard-words.mjs','shard-outputs.mjs']:
-  put('scripts/'+name,(repo/'scripts'/name).read_text())
+  put('src/scripts/'+name,(repo/'src/scripts'/name).read_text())
  put('package.json','{"type":"module"}')
- put('scripts/precommit-source.py','pass\n');put('scripts/push_input_cache.py','pass\n');put('scripts/precommit-checks.mjs','export {};\n')
+ put('src/scripts/precommit-source.py','pass\n');put('src/scripts/push_input_cache.py','pass\n');put('src/scripts/precommit-checks.mjs','export {};\n')
  put('lint/ratchet.json','{}');put('.oxlintrc.json','{}')
  manifest='src/shards/example/manifest.json'
  base='public/assets/example/**';committed='public/assets/baked/example/navmesh.bin';staged='public/assets/baked/example/new.bin'

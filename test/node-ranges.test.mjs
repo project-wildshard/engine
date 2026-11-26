@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
 import { join, resolve } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { admits, installedOrgPackages, probes, rangeGaps } from '../scripts/node-ranges.mjs';
+import { admits, installedOrgPackages, probes, rangeGaps } from '../src/scripts/node-ranges.mjs';
 
 // Meta QA 11-25 row 42 (J505): format 0.79.2 said `>=24.18.0 <25` under engine's `<27`, and server-release 45703635653
 // died at `pnpm install` on Node 26.13.1. The push gate's check:node-ranges reads every installed org package's range.

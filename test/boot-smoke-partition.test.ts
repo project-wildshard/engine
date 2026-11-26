@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { bootCaseBrowser, bootCases, bootJobs, gameplayProbeTime, gridStandsIn, navigationCut } from '../scripts/parity/boot-smoke.mjs';
+import { bootCaseBrowser, bootCases, bootJobs, gameplayProbeTime, gridStandsIn, navigationCut } from '../src/scripts/parity/boot-smoke.mjs';
 
 const catalogue = [
   { slug: 'driftwood-isle', status: 'live', legacy: false },

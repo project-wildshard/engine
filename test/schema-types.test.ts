@@ -9,7 +9,7 @@ import { env, execPath } from 'node:process';
 import { parseSync } from 'vite';
 import { expect,test } from 'vitest';
 import { pruneSchemaTypeAllowances,untypedSchemaExports } from '../lint/schema-types.mjs';
-import { ratchetApprovalFailures,SCHEMA_TYPE_RULE } from '../scripts/ratchet-approval.mjs';
+import { ratchetApprovalFailures,SCHEMA_TYPE_RULE } from '../src/scripts/ratchet-approval.mjs';
 
 const file='src/format/sample.ts',prefix="import * as v from 'valibot';\n";
 const program=(source:string)=>parseSync(file,source).program;
@@ -96,7 +96,7 @@ test('the approval helper executes from the copied push-tool directory without s
  mkdirSync('tmp',{recursive:true});const root=mkdtempSync(resolve('tmp/schema-approval-'));
  const target=resolve(root,'ratchet-approval.mjs');
  try{
-  writeFileSync(target,readFileSync(resolve('scripts/ratchet-approval.mjs'),'utf8'));
+  writeFileSync(target,readFileSync(resolve('src/scripts/ratchet-approval.mjs'),'utf8'));
   const run=spawnSync(execPath,['--input-type=module','--eval',`const {ratchetApprovalFailures,SCHEMA_TYPE_RULE}=await import(process.argv[1]);
    const after={allow:{[SCHEMA_TYPE_RULE]:{'src/format/sample.ts#NewSchema':'existing'}}};
    process.stdout.write(JSON.stringify(ratchetApprovalFailures({},after,'')));`,target],{encoding:'utf8'});

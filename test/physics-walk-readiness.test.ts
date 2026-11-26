@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, test, vi } from 'vitest';
 import { Ray } from 'three';
-import { walkPhysicsLeg } from '../scripts/physics-walk.mjs';
+import { walkPhysicsLeg } from '../src/scripts/physics-walk.mjs';
 
 const originalProbe = Object.getOwnPropertyDescriptor(window, '__wildshard');
 afterEach(() => {

@@ -2,7 +2,7 @@
 // clones 64 KB or more of buffers, on the page (an init script) and inside each dedicated worker (installed as
 // Playwright reports the worker, so its replies to the page are seen too; a reply sent before the install lands is
 // missed). Chromium only, as T1 is.
-import { recordClones } from '../../../scripts/memory/cloneRecorder.mjs'
+import { recordClones } from '../../scripts/memory/cloneRecorder.mjs'
 
 import type { BrowserContext, Page, Worker } from '@playwright/test'
 

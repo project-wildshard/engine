@@ -134,7 +134,7 @@ test('a page that still cannot draw the rooms\' bytes after its one reload never
 });
 
 test('the release chain: a zone whose rooms run bytes the page neither baked nor can follow is a P0', async () => {
-  const { roomsRevisionFindings } = await import('../scripts/rooms-revision-check');
+  const { roomsRevisionFindings } = await import('../src/scripts/rooms-revision-check');
   const html = `<script>__WS_BUILD_ID__="b1"</script><script type="application/json" id="ws-catalogue">${JSON.stringify({ shards: [{ slug: 'driftwood-isle', hash: R8 }] })}</script>`;
   const read = (indexed: boolean) => (url: string): Promise<Response> => Promise.resolve(url.includes('/index/') ? new Response(null, { status: indexed ? 200 : 404 }) : new Response(html));
   const word = (): Promise<{ readonly revisions: Readonly<Record<string, string>> }> => Promise.resolve({ cells: 1, shards: ['driftwood-isle'], revisions: { 'driftwood-isle': R9 } });

@@ -35,7 +35,7 @@ type Leg =
   | { kind: 'wait'; until: (host: SimHost) => boolean }
   | { kind: 'king' };
 
-/** The walk baseline's legs (scripts/physics-route.json): the porch, the lookout's five flights. */
+/** The walk baseline's legs (src/scripts/physics-route.json): the porch, the lookout's five flights. */
 const PORCH: readonly Point[] = [[0, -190], [-8, -150], [-30, -95], [-12, -52], [-1, -40], [-5.71, -31.7], [-7.99, -35.02], [-9.56, -34.66], [-10.87, -34.18]];
 const OFF_PORCH: readonly Point[] = [[-9.56, -34.66], [-7.99, -35.02], [-5.71, -31.7], [0, -10]];
 const LOOKOUT_FOOT: Point = [41.23, 211.92];

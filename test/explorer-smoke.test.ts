@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { expect, test, vi } from 'vitest';
-import { explorerCards, explorerCapture, explorerCases, explorerPartition, explorerFailures, explorerState, sweepExplorer, openExplorerSession, verifyExplorerDocument, explorerDiagnostics } from '../scripts/parity/explorer-smoke.mjs';
+import { explorerCards, explorerCapture, explorerCases, explorerPartition, explorerFailures, explorerState, sweepExplorer, openExplorerSession, verifyExplorerDocument, explorerDiagnostics } from '../src/scripts/parity/explorer-smoke.mjs';
 import type { Browser, BrowserContext, CDPSession, Page, Request, Response } from 'playwright';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 // oxlint-disable-next-line import/no-nodejs-modules -- Verify the actual required workflow leg, without dispatching it.

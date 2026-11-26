@@ -2,7 +2,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Replace the process table with a fixed browser listing.
 import { execFileSync } from 'node:child_process';
 import { expect, test, vi } from 'vitest';
-import { browserSlots, browserStatus, reservedSlots } from '../scripts/browser-usage.mjs';
+import { browserSlots, browserStatus, reservedSlots } from '../src/scripts/browser-usage.mjs';
 
 vi.mock('node:child_process', async importOriginal => ({
   ...await importOriginal<typeof import('node:child_process')>(),

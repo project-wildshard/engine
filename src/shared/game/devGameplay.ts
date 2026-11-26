@@ -6,7 +6,7 @@ import { carryOutputDescriptor, outputDescriptor } from '@wildshard/engine/game/
  * changed: the in-page server restarts its world on the new sections, from a save it takes first (so progress and the
  * player's place carry over), and the page rebuilds its quest views. These are the sections it takes; anything else (the
  * state schema, the look, the ground) is a new shell or the hook's other calls. DEVSERVER-only on both sides, as
- * `devColliders.ts` is (engine `scripts/check-devserver.mjs` refuses `wildshardDevRestart` in a production bundle).
+ * `devColliders.ts` is (engine `src/scripts/check-devserver.mjs` refuses `wildshardDevRestart` in a production bundle).
  */
 // `questNpcs` and `clientScripts` are not here: only the page reads them and the hook rebuilds only the quest views, so a change
 // to either is a new shell.

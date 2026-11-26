@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { batteryTemperature, connectedDevice, developerMode, doctor, driverUsesPort } from '../scripts/memory/iphone/doctor.mjs';
+import { batteryTemperature, connectedDevice, developerMode, doctor, driverUsesPort } from '../src/scripts/memory/iphone/doctor.mjs';
 
 const phone = '00000000-0000000000000000';
 

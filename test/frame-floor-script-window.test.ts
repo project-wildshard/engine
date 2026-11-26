@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest';
-import { startDriveWindowScriptProfile, type ScriptProfilePort } from '../scripts/frame-floor-script-profile.mjs';
-import { parseSafariWindow, validateFrameFloorArgs } from '../scripts/frame-floor-args.mjs';
+import { startDriveWindowScriptProfile, type ScriptProfilePort } from '../src/scripts/frame-floor-script-profile.mjs';
+import { parseSafariWindow, validateFrameFloorArgs } from '../src/scripts/frame-floor-args.mjs';
 
 function fixture(refuseStop = false) {
   const methods: string[] = [], listeners = new Map<string, (value: unknown) => void>();

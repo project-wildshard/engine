@@ -5,7 +5,7 @@ import {spawnSync} from 'node:child_process';
 import {mkdirSync, mkdtempSync, rmSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {afterEach, expect, it} from 'vitest';
-import {laneName} from '../scripts/lane-name.mjs';
+import {laneName} from '../src/scripts/lane-name.mjs';
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, {recursive: true, force: true}); });
@@ -24,7 +24,7 @@ it.each(['main-push', 'land'])('%s.mjs stops before any work without WS_LANE_NAM
   expect(spawnSync('git', ['init', '--quiet', '--initial-branch=main', root]).status).toBe(0);
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_') && key !== 'WS_LANE_NAME'));
   const args = script === 'main-push' ? ['-m', 'fix: a', 'a.txt'] : [];
-  const result = spawnSync(process.execPath, [resolve(`scripts/${script}.mjs`), ...args],
+  const result = spawnSync(process.execPath, [resolve(`src/scripts/.kit/${script}.mjs`), ...args],
     {cwd: root, env: {...env, CI: '', WS_MAIN_PUSH_RECEIPT: '0', WS_MAIN_PUSH_PREGATE: '0'}, encoding: 'utf8', timeout: 20_000});
   expect(result.status).toBe(1);
   expect(`${result.stdout}${result.stderr}`).toContain(`${script} runs only under a lane name: set WS_LANE_NAME=`);

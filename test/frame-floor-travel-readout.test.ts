@@ -1,5 +1,5 @@
 import {afterEach, expect, test, vi} from 'vitest';
-import {driveFloorGrid, gridFloorWitnessFailures, type FloorGridPlan, type FloorGridState} from '../scripts/frame-floor-grid.mjs';
+import {driveFloorGrid, gridFloorWitnessFailures, type FloorGridPlan, type FloorGridState} from '../src/scripts/frame-floor-grid.mjs';
 
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
 afterEach(() => {

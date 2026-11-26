@@ -14,7 +14,7 @@ with tempfile.TemporaryDirectory(dir=repo/'tmp', prefix='gen-docs-test-') as fol
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text)
     def module(name, exports):
-        put('scripts/'+name+'.mjs', "import {appendFileSync} from 'node:fs';\n" + exports)
+        put('src/scripts/'+name+'.mjs', "import {appendFileSync} from 'node:fs';\n" + exports)
     def record(name):
         return "appendFileSync('calls.txt'," + json.dumps(name+'\n') + ");"
     module('quiet-cli', 'export function quietCli() {}')
@@ -31,8 +31,8 @@ with tempfile.TemporaryDirectory(dir=repo/'tmp', prefix='gen-docs-test-') as fol
         module(file, 'export function '+function+'(){'+record(function)+'}')
     module('push-post-inputs', 'export function beginPushInputs(){return ()=>{'+record('seal')+'}}')
     module('source-input-proof', 'export function beginProgramInputProof(){return ()=>{'+record('program-proof')+'}}')
-    put('scripts/app-build/gen.ts', "import {appendFileSync} from 'node:fs';export function generateBootTables(){"+record('boot')+'}')
-    put('scripts/gen.mjs', game_source)
+    put('src/scripts/app-build/gen.ts', "import {appendFileSync} from 'node:fs';export function generateBootTables(){"+record('boot')+'}')
+    put('src/scripts/gen.mjs', game_source)
     put('scripts/docs.mjs', docs_source)
     for file, function in [('gen-api','writeApiDocs'),('gen-host-catalogue','writeHostCatalogue')]:
         module(file, 'export function '+function+'(root){if(root!==new URL("../",import.meta.url).pathname.replace(/\\/$/,""))throw Error("wrong docs root");'+record(function)+'}')
@@ -43,7 +43,7 @@ with tempfile.TemporaryDirectory(dir=repo/'tmp', prefix='gen-docs-test-') as fol
         return result, (root/'calls.txt').read_text().splitlines()
     docs_steps = ['writeApiDocs','writeHostCatalogue']
     for mode in [[],['--parallel'],['--proof'],['--build-inputs'],['--inputs-only']]:
-        result,calls = run('scripts/gen.mjs',*mode)
+        result,calls = run('src/scripts/gen.mjs',*mode)
         assert result.returncode == 0,result.stderr
         assert not set(calls)&set(docs_steps),calls
         assert calls[-1]=='seal' and calls.count('shard-inputs')==1 and calls.count('shards')==1,calls
@@ -53,7 +53,7 @@ with tempfile.TemporaryDirectory(dir=repo/'tmp', prefix='gen-docs-test-') as fol
         if expected_programs:
             assert calls.index('programs') > calls.index('boot') and calls.index('programs') > calls.index('genBudgetDerivations'),calls
     module('gen-programs', 'export function generationPlan(){return {products:[],folders:[],scoped:false}}export function buildPrograms(){throw Error("actual program refusal")}'+program_tables)
-    result,calls = run('scripts/gen.mjs')
+    result,calls = run('src/scripts/gen.mjs')
     assert result.returncode!=0 and 'actual program refusal' in result.stderr,result
     assert 'seal' not in calls,calls
     put('package.json', json.dumps({'name':'docs-command-fixture','private':True,'scripts':{'docs':'node scripts/docs.mjs'}}))

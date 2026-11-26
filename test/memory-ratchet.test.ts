@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { compareLedger, confirmLedger, confirmZone, footprintBudget, ledgerOverLine, footprintInstrument, footprintBoot, ledgerBudget } from '../scripts/memory/ratchet.mjs';
+import { compareLedger, confirmLedger, confirmZone, footprintBudget, ledgerOverLine, footprintInstrument, footprintBoot, ledgerBudget } from '../src/scripts/memory/ratchet.mjs';
 
 const MB = 1e6;
 const points = (held: number): Parameters<typeof ledgerBudget>[0] => [

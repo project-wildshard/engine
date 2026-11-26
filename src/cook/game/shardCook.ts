@@ -15,7 +15,7 @@ import {dirname, join} from 'node:path';
 import {COOK_DATA_PATH, readCookData, type CookData, type CookMount} from '@wildshard/format/cookData';
 import {requireCookPreparation} from '@wildshard/format/cookPreparation';
 import {cookPreparedLine, judgeSidecar, sidecarRefusedLine, type CookSidecar} from './cookSidecar';
-import {rendererRevision} from '../../../scripts/renderer-revision.mjs';
+import {rendererRevision} from '../../scripts/renderer-revision.mjs';
 import {assembleOutputShardfile, parseOutputIndex, type OutputIndex} from '@wildshard/format/outputIndex';
 import {checkEngineFloor} from './engineFloor';
 import {SPAWN_PART_ALIGN, readSpawnManifest, type SpawnFile, type SpawnManifest, type SpawnPart} from '../../shared/game/shardfile/spawnManifest';

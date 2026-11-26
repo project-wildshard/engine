@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { expect, test } from 'vitest';
 import { DEFAULT_ALLOWED_ORIGINS, doorTrust } from '../src/server/host/dedicated/doorTrust';
 
-const source = readFileSync(process.env['WS_SETUP_SCRIPT'] ?? 'scripts/vps/setup.sh', 'utf8');
+const source = readFileSync(process.env['WS_SETUP_SCRIPT'] ?? 'src/scripts/vps/setup.sh', 'utf8');
 function definition(name: string): string {
   const start = source.indexOf(`${name}() {`);
   if (start === -1) throw new Error(`Missing ${name}`);

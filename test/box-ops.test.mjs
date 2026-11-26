@@ -4,7 +4,7 @@ import {spawnSync} from 'node:child_process';
 import {mkdirSync, mkdtempSync, rmSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {afterAll, expect, test} from 'vitest';
-import {GATE, GATE_MISSING, gateProbeCommand, gateRestartCommand, main, playerQueries, probeQueries, promCommand, restartCommand, shq, summarize, summarizePlayers, throughGate} from '../scripts/box-ops.mjs';
+import {GATE, GATE_MISSING, gateProbeCommand, gateRestartCommand, main, playerQueries, probeQueries, promCommand, restartCommand, shq, summarize, summarizePlayers, throughGate} from '../src/scripts/box-ops.mjs';
 
 const ok = result => ({status: 'success', data: {resultType: 'vector', result}});
 const sample = (labels, value) => ({metric: labels, value: [1, String(value)]});
@@ -94,7 +94,7 @@ for (const name of ['curl', 'sudo', 'systemctl', 'sleep']) {
 /** @param {string | undefined} ask @param {string[]} [args] */
 function gate(ask, args = []) {
   const env = {PATH: `${scratch}:/usr/bin:/bin`, ...(ask === undefined ? {} : {SSH_ORIGINAL_COMMAND: ask})};
-  const done = spawnSync('bash', [resolve('scripts/vps/wildshard-box-gate'), ...args], {encoding: 'utf8', env});
+  const done = spawnSync('bash', [resolve('src/scripts/vps/wildshard-box-gate'), ...args], {encoding: 'utf8', env});
   return {status: done.status, out: done.stdout.trim(), err: done.stderr};
 }
 

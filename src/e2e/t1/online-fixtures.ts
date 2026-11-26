@@ -1,10 +1,10 @@
-import { devices } from '../../../scripts/browser-playwright.mjs'
-import { expect, test as base } from '../../../scripts/browser-test.mjs'
-import { harnessPins, saveFixture } from '../../../scripts/debug-settings.mjs'
-import { openT1OnlineRig } from '../../../scripts/t1-online-rig.mjs'
+import { devices } from '../../scripts/browser-playwright.mjs'
+import { expect, test as base } from '../../scripts/browser-test.mjs'
+import { harnessPins, saveFixture } from '../../scripts/debug-settings.mjs'
+import { openT1OnlineRig } from '../../scripts/t1-online-rig.mjs'
 import { enterBrasscap } from './fixtures.ts'
 
-import type { T1OnlineRig } from '../../../scripts/t1-online-rig.mjs'
+import type { T1OnlineRig } from '../../scripts/t1-online-rig.mjs'
 import type { Browser, BrowserContext, Page } from '@playwright/test'
 
 interface Entered {

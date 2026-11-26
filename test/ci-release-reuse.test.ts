@@ -4,8 +4,8 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { afterAll, afterEach, beforeAll, expect, test } from 'vitest';
-import { RELEASE_READER_TESTS, selectCI } from '../scripts/ci-selection.mjs';
-import { vitestFile } from '../scripts/push-selection.mjs';
+import { RELEASE_READER_TESTS, selectCI } from '../src/scripts/ci-selection.mjs';
+import { vitestFile } from '../src/scripts/push-selection.mjs';
 import { createTempRepo, type TempRepo } from '../src/test/helpers/git';
 
 const REPO = 'project-wildshard/engine';
@@ -103,8 +103,8 @@ test('the history-base lookup never takes the release shortcut', async () => {
 // The readers list stays complete: a new test that reads the real version or notes joins it, or the release lane would
 // ship a stamp no test read. Fixtures that only write their own CHANGELOG.md or package.json are named here.
 const FIXTURE_ONLY = new Set(['test/ci-release-reuse.test.ts', 'test/push-selection.test.ts', 'test/server-release-history.test.ts',
-  'test/tooling/release-gate.test.mjs', 'test/release-train.test.ts']);
-const reader = /scripts\/changelog\.mjs|\/whatsNew(?:Banner)?(?:\.ts)?['"]|\/buildCheck(?:\.ts)?['"]|versionFiles(?:\.ts)?['"]|CHANGELOG\.md|readFileSync\(\s*['"](?:\.\/)?package\.json['"][^\n]*\bversion\b|\.\.\/package\.json['"][^\n]*\bversion\b|version\b[^\n]*readFileSync\(\s*['"](?:\.\/)?package\.json/u;
+  'src/test/release-gate.test.mjs', 'test/release-train.test.ts']);
+const reader = /src\/scripts\/changelog\.mjs|\/whatsNew(?:Banner)?(?:\.ts)?['"]|\/buildCheck(?:\.ts)?['"]|versionFiles(?:\.ts)?['"]|CHANGELOG\.md|readFileSync\(\s*['"](?:\.\/)?package\.json['"][^\n]*\bversion\b|\.\.\/package\.json['"][^\n]*\bversion\b|version\b[^\n]*readFileSync\(\s*['"](?:\.\/)?package\.json/u;
 
 test('every test that reads the release version or notes runs on a reused release branch', () => {
   const tests = execFileSync('git', ['ls-files', 'test', 'src'], { encoding: 'utf8' }).split('\n').filter(file => vitestFile.test(file));
@@ -120,7 +120,7 @@ test('every ci.yml job follows the selector, so a reused release run starts no s
   const unfollowed = blocks.map(block => ({ name: block.slice(2, block.indexOf(':')), block })).filter(({ block }) =>
     // Classifies itself and gates its work on the verdict, shares the packed steps that do, waits on a job that ran
     // code, or runs only on a memory qualification dispatch.
-    !(block.includes('run: node scripts/ci-selection.mjs') && block.includes("steps.paths.outputs.docs != 'true'")) &&
+    !(block.includes('run: node src/scripts/ci-selection.mjs') && block.includes("steps.paths.outputs.docs != 'true'")) &&
     !block.includes('steps: *packed-steps') &&
     !/\n {4}if: \$\{\{[^\n]*outputs\.code-run == 'true'/u.test(block) &&
     !/\n {4}if: \$\{\{ inputs\.memory_record &&/u.test(block)).map(({ name }) => name);
@@ -129,7 +129,7 @@ test('every ci.yml job follows the selector, so a reused release run starts no s
 
 test('the docs lane installs the pins before the reader tests it runs', () => {
   // v0.1.86's release ci 45567218760: save-whole-documents seats Driftwood, and the docs lane had no pins installed.
-  const script = readFileSync('scripts/ci-static.sh', 'utf8');
+  const script = readFileSync('src/scripts/ci-static.sh', 'utf8');
   const pins = script.indexOf("check doc-pins bash -c 'pnpm pins && pnpm gen:inputs'"), tests = script.indexOf('check doc-tests ');
   expect(pins).toBeGreaterThan(0);
   expect(tests).toBeGreaterThan(pins);

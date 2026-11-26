@@ -47,7 +47,7 @@ function roadNames(host: MinimapBlendHost, feet: { readonly x: number; readonly 
   }
   return labels;
 }
-/** A cell the atlas has no tile for, until its own map loads: the build's plain-plot green (scripts/app-build/worldMapAtlas.ts). */
+/** A cell the atlas has no tile for, until its own map loads: the build's plain-plot green (src/scripts/app-build/worldMapAtlas.ts). */
 const PLOT = '#69704f';
 
 /** J450: whether a decoded map is one flat colour; false when it can't be measured (no canvas), so the author's map stays. */

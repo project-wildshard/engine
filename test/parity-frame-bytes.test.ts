@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { frameSummary } from '../scripts/parity/frame-bytes.mjs';
+import { frameSummary } from '../src/scripts/parity/frame-bytes.mjs';
 
 test('native frame metadata excludes pixels and leaves an exact nonzero-offset view untouched', () => {
   const backing = new Uint8Array(24).fill(91), data = backing.subarray(4, 20);

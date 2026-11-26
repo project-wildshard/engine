@@ -8,7 +8,7 @@ import {expect, test} from 'vitest';
 import {TickWorkerHost} from '../src/server/host/tickWorkerHost';
 
 const workerURL=new URL('fixtures/headless/initialization-worker.mjs',import.meta.url);
-const args=['--import',pathToFileURL(resolvePath('scripts/sim-node-loader.mjs')).href];
+const args=['--import',pathToFileURL(resolvePath('src/scripts/sim-node-loader.mjs')).href];
 const budget={tickMicros:16_666,commandsPerTick:1};
 
 test('deferred admission keeps the same checkpoint and does not reset the original request clock',async()=>{

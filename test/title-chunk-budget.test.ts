@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
-import { readCaps } from '../scripts/budgets/files.mjs';
-import { titleClosureBudgetErrors, type ChunkBudgets, type ChunkModuleReport } from '../scripts/check-chunks.mjs';
+import { readCaps } from '../src/scripts/budgets/files.mjs';
+import { titleClosureBudgetErrors, type ChunkBudgets, type ChunkModuleReport } from '../src/scripts/check-chunks.mjs';
 // BUDGET-CAPS BC5: code sizes are judged against the real caps (J324's 1 MB raw title) and a fixture baseline.
 const realCaps = readCaps();
 function codeBudgets(values: Record<string, number>, declared: readonly string[] = []): ChunkBudgets {

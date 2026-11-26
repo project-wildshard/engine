@@ -1,7 +1,7 @@
 // MMO-PLAN MP0.4: real-socket bots. Each is a phone's network end (`RoomBot`: `hello`, `resume`, `ready`, commands at 60 Hz) whose
 // thumb is `headlessJourney`'s `PhysicsRouteCursor`, walking a ring around where it arrived and steering from the feet the server
 // sends back. It reports what `net-bots`' DirectLoopback room reports (seated, moved, others seen, bytes down) for a real socket.
-// Built by scripts/mmo-bots.mjs from the release's own commit, so its build and wire match the server's; run only by that script.
+// Built by src/scripts/mmo-bots.mjs from the release's own commit, so its build and wire match the server's; run only by that script.
 //   node mmoBots.mjs <url> <build> <bots> <seconds> <tag> <result.json> [own|forwarded]
 // J205: agents never join production. The URL must be loopback or the staging socket; the script checks first, and so does this.
 // The door allows 4 sockets and 10 connects a minute per address, and behind loopback it reads the proxy's X-Forwarded-For. On a
@@ -9,7 +9,7 @@
 // would have. Never through Funnel: staging's bots use the Mac's one address, so at most 4 join it.
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
-import { agentHeaders, agentUserAgent } from '../../../scripts/agent-marker.mjs';
+import { agentHeaders, agentUserAgent } from '../../../src/scripts/agent-marker.mjs';
 import { NET_BUTTONS } from '../../../src/shared/engine/input/netButtons';
 import { PLAYER_CLASS } from '../../../src/shared/engine/net/netSchemas';
 import { PhysicsRouteCursor, type WalkPoint } from '../../../src/shared/host/headlessJourney';

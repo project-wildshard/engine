@@ -16,7 +16,7 @@ export interface WebSocketOptions {
   readonly socket?: new (url: string, protocols?: string[]) => WebSocket;
 }
 
-/** SB42: a proof harness's door pass (`scripts/door-pass.mjs` sets `__wildshardDoorPass` in an init script); a player's page has none. */
+/** SB42: a proof harness's door pass (`src/scripts/door-pass.mjs` sets `__wildshardDoorPass` in an init script); a player's page has none. */
 const harnessDoorPass = (): unknown => (globalThis as { __wildshardDoorPass?: unknown }).__wildshardDoorPass;
 /** SB42: the subprotocols a socket offers: this page's door pass as `wspass.<lane>.<expires>.<signature>` (the door counts a proof
  *  lane's sockets apart from the address its players share), or none. A door that knows no pass picks it and goes on as before. */

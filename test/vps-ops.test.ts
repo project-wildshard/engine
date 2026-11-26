@@ -16,7 +16,7 @@ import { afterEach, expect, test } from 'vitest';
 import { readPulledReleaseCells, readReleaseFile } from '../src/server/host/dedicated/releaseFile';
 
 // E7.2c and E7.8c, at their outer edge: `pull.mjs` and `uptime.sh` as systemd runs them, against a local origin.
-const PULL = absolute(process.env['WS_VPS_PULL'] ?? 'scripts/vps/pull.mjs'), UPTIME = absolute('scripts/vps/uptime.sh');
+const PULL = absolute(process.env['WS_VPS_PULL'] ?? 'src/scripts/vps/pull.mjs'), UPTIME = absolute('src/scripts/vps/uptime.sh');
 const { publicKey, privateKey } = generateKeyPairSync('ed25519'), KEY = publicKey.export({ type: 'spki', format: 'der' }).toString('hex');
 const cleanups: (() => void)[] = [];
 afterEach(() => { for (const clean of cleanups.splice(0).reverse()) clean(); });

@@ -3,9 +3,9 @@ import { build } from 'vite';
 import { readdirSync, statSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Paths within that fixture build.
 import { join, relative, resolve } from 'node:path';
-import { writeBootModules } from '../../scripts/app-build/bootModules';
+import { writeBootModules } from '../../src/scripts/app-build/bootModules';
 
-/** A fixture app built the way scripts/build-app.mjs builds the web app (manifest, hidden source maps, one stylesheet),
+/** A fixture app built the way src/scripts/build-app.mjs builds the web app (manifest, hidden source maps, one stylesheet),
  *  then its boot module step: the output folder. */
 export async function buildWithBootModules(root: string, options: { readonly minify?: boolean; readonly assetsInlineLimit?: number } = {}): Promise<string> {
   const outDir = resolve(root, 'dist'), inlineLimit = options.assetsInlineLimit ?? 4096;

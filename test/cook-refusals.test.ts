@@ -22,7 +22,7 @@ for (const limit of ['bytes','time'] as const) test(`real cook ${limit} refusal 
     const store=folderStore(join(scratch,'store')),worker=createCookWorker({build:'bounded-proof',store,
       source:{heads:()=>Promise.resolve([{...pin,revision:1}]),download:()=>Promise.resolve(bytes)},
       serverPacks:join(scratch,'server'),scratch:join(scratch,'jobs'),
-      launcher:{root,execPath:process.execPath,loader:resolve('scripts/bake-loader.mjs'),script:resolve('scripts/cook-job.mjs'),wrap:[],
+      launcher:{root,execPath:process.execPath,loader:resolve('src/scripts/bake-loader.mjs'),script:resolve('src/scripts/cook-job.mjs'),wrap:[],
         limits:{seconds:limit==='time'?.001:5,memoryMB:4096,heapMB:2048,...limit==='bytes'?{maxBytes:bytes.length-1}:{}}}});
     const result=await worker.cook(pin);
     expect(result.state,result.detail).toBe(limit==='bytes'?'refused':'failed');

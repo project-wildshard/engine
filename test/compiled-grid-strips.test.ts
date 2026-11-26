@@ -8,7 +8,7 @@ import { ResidencyAllocator } from '../src/shared/game/grid/allocator';
 import { decodeCompiledGridBlock, mergeGridBlocks, parseCompiledGridHeader, platformGeometrySource, readCompiledGridStrips, type CompiledGridAddress } from '../src/shared/game/grid/compiledStrips';
 import { seamLookGeometrySteps } from '../src/client/game/grid/seamLook';
 import { encodeGridStripBlock, gridStripBlockKey, gridStripOverRoom, gridStripSetBudget, writeGridStripBlocks, type CompiledGridBlockFile } from '../src/cook/game/gridStripPages';
-import { gridSeamAsset, readGridSeams, writeGridSeams } from '../scripts/app-build/gridSeams.mjs';
+import { gridSeamAsset, readGridSeams, writeGridSeams } from '../src/scripts/app-build/gridSeams.mjs';
 // oxlint-disable-next-line import/no-nodejs-modules -- This artifact fixture owns and removes only its bounded tmp directory.
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve the fixture's own ignored scratch output.

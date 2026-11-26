@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { trackedPublic } from '../scripts/tracked-public.mjs';
+import { trackedPublic } from '../src/scripts/tracked-public.mjs';
 
 // GRID-CROSSING GC36's proofs: `serve-build.sh --head` builds in a build-mirror slot, which has no .git and stops git discovery
 // at the slot. pins.ts asked `git ls-files public` there, got nothing, and refused Driftwood for a tracked engine KTX2

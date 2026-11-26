@@ -5,6 +5,6 @@ import {resolve} from 'node:path';
 import {expect, test} from 'vitest';
 
 test('staged ownership vocabulary supersedes an older verified test cache', () => {
-  expect(execFileSync('python3', ['test/fixtures/precommit-vocabulary.py', resolve('scripts/precommit-source.py')],
+  expect(execFileSync('python3', ['test/fixtures/precommit-vocabulary.py', resolve('src/scripts/precommit-source.py')],
     {encoding: 'utf8', timeout: 15_000})).toContain('stale cache / staged ownership / HEAD ownership / loose refusal passed');
 });

@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- inject failing Inspector and native cleanup at the actual runner boundary
 import {runInNewContext} from 'node:vm';
 
-const source = readFileSync(new URL('../scripts/frame-floor.mjs', import.meta.url), 'utf8');
+const source = readFileSync(new URL('../src/scripts/frame-floor.mjs', import.meta.url), 'utf8');
 function actual(start: string, end: string) {
   const first = source.indexOf(start), last = source.indexOf(end, first);
   if (first === -1 || last <= first) throw new Error('Maintained frame-floor function missing');

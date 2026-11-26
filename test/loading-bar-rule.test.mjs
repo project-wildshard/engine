@@ -1,8 +1,8 @@
 import { expect, test } from 'vitest';
-import { barStalls, untracedChanges } from '../scripts/loading-bar-rule.mjs';
-import { shownError, timeLeftScore } from '../scripts/loading-time-left-rule.mjs';
+import { barStalls, untracedChanges } from '../src/scripts/loading-bar-rule.mjs';
+import { shownError, timeLeftScore } from '../src/scripts/loading-time-left-rule.mjs';
 
-/** @param {number} t @param {string} bar @param {number} pct @param {Partial<import('../scripts/loading-bar-rule.mjs').BarRow>} [rest] */
+/** @param {number} t @param {string} bar @param {number} pct @param {Partial<import('../src/scripts/loading-bar-rule.mjs').BarRow>} [rest] */
 const row = (t, bar, pct, rest = {}) => ({ t, bar, pct, step: '', atomic: 0, bytes: 0, files: 0, ...rest });
 
 test('J204: a visible 0.1 % inside every 2 s passes; the edge itself passes and a millisecond over names the stage', () => {

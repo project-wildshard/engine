@@ -18,7 +18,7 @@ const MAX_DIST = 64;
 export interface ServerSentryOptions {
   /** `SENTRY_DSN` from the channel's env file. Unset or blank, nothing is sent. */
   readonly dsn: string | undefined;
-  /** package.json's version, baked in by scripts/build-server.mjs; unset outside a built bundle. */
+  /** package.json's version, baked in by src/scripts/build-server.mjs; unset outside a built bundle. */
   readonly version: string | undefined;
   readonly build: string;
   /** The release file's channel: `staging` or `production`. */

@@ -2,7 +2,7 @@
 
 > Written by: Claude (opus-lookloop, 2026-11-11). Adapted from
 > singleplayer `docs/design/LOOK-LOOP.md` at `c02c7fae00`; the tools
-> are in `scripts/look-loop/`.
+> are in `src/scripts/look-loop/`.
 >
 > **State:** active method, 2026-11-13. The ΔE00 and learned-LUT
 > steps were cut on 2026-11-13 (meta J337, Jake: *"All the LUT
@@ -63,15 +63,15 @@ Both frames of a before / after pair must be the same frame.
 - **Time and weather** through Debug settings, not the URL: the
   cameras file's `settings` (e.g. `{"time": "midday", "weather":
   "clear"}`) is written into the save before the load, as
-  `scripts/goldens/capture.mjs` does. A shard with a fixed
+  `src/scripts/goldens/capture.mjs` does. A shard with a fixed
   `dayOverride` (Mossgate) needs no time.
 - **Creatures** calmed: `views.mjs` sets `animals.calm` and parks any
   animal within 24 m of an FP camera 70 m out (elites ignore calm;
   an elk's head once filled a whole frame).
 - **Clouds and wind still move** between shots. Accept it and say so.
 - **The build:** shoot a served build of a known SHA, never a dev
-  server or the shared working tree: `scripts/serve-build.sh --head`
-  (or `--rev`), or `scripts/preview-server.mjs --outDir <dist>` on a
+  server or the shared working tree: `src/scripts/serve-build.sh --head`
+  (or `--rev`), or `src/scripts/preview-server.mjs --outDir <dist>` on a
   build you made. Write the SHA in the round's README.
 
 ## Step 1: the anchor and the 9 cameras
@@ -156,7 +156,7 @@ same cameras measure the gap each round.
 ## Step 2: capture
 
 ```bash
-node scripts/look-loop/views.mjs --cameras=<cameras.json> --out=<round dir> \
+node src/scripts/look-loop/views.mjs --cameras=<cameras.json> --out=<round dir> \
   [--anchor=spawn,gate] [--tag=r2] [--query=k=v&...] [--url=http://127.0.0.1:44xx] [--settle=4] [--timeout=300]
 ```
 
@@ -167,15 +167,15 @@ streaming and LOD centre on the view, and poses the camera last in
 every frame from a late hook. Per anchor it writes
 `<out>/<anchor>/[<tag>-]capture-<n>-<id>.jpg` and the sheet
 `<out>/[<tag>-]<anchor>-sheet.jpg` (≤ 490 KB), each cell labelled with
-draw calls and triangles. Run it through `scripts/browser-lane.sh` so
+draw calls and triangles. Run it through `src/scripts/browser-lane.sh` so
 the machine's browser cap holds.
 
 ## Step 3: targets
 
 ```bash
-python3 scripts/look-loop/targets.py --captures <round dir>/<anchor> --out <round dir>/<anchor> \
+python3 src/scripts/look-loop/targets.py --captures <round dir>/<anchor> --out <round dir>/<anchor> \
   --seed-mockup <approved mockup.jpg> [--game "<shard>"] [--keep "<landmarks>"] [--tag r1] [--only 2,7] [--dry-run]
-python3 scripts/look-loop/targets.py ... --style "<one paragraph: light, palette, materials, line>" [--refs a.jpg,b.jpg]
+python3 src/scripts/look-loop/targets.py ... --style "<one paragraph: light, palette, materials, line>" [--refs a.jpg,b.jpg]
 ```
 
 - **Seed mode is the core of the loop:** one approved mockup plus the
@@ -303,8 +303,8 @@ plan's State line.
 
 | Command | Use |
 |---|---|
-| `node scripts/look-loop/views.mjs --cameras=<json> --out=<dir> [--anchor=a,b] [--tag=r2] [--query=…] [--url=<served build>] [--settle=4] [--timeout=300]` | Resolve and shoot the 9 cameras per anchor, write the frames and the 3×3 sheet with calls / tris |
-| `python3 scripts/look-loop/targets.py --captures <dir> --out <dir> (--seed-mockup <img> \| --style <text> \| --style-file <txt>) [--refs a,b] [--game …] [--keep …] [--tag …] [--only n,m] [--parallel 5] [--timeout 1500] [--model …] [--dry-run]` | Codex image_gen targets, one per capture, plus `mockup-sheet.jpg` |
+| `node src/scripts/look-loop/views.mjs --cameras=<json> --out=<dir> [--anchor=a,b] [--tag=r2] [--query=…] [--url=<served build>] [--settle=4] [--timeout=300]` | Resolve and shoot the 9 cameras per anchor, write the frames and the 3×3 sheet with calls / tris |
+| `python3 src/scripts/look-loop/targets.py --captures <dir> --out <dir> (--seed-mockup <img> \| --style <text> \| --style-file <txt>) [--refs a,b] [--game …] [--keep …] [--tag …] [--only n,m] [--parallel 5] [--timeout 1500] [--model …] [--dry-run]` | Codex image_gen targets, one per capture, plus `mockup-sheet.jpg` |
 
 From a shard repo or sharddev, run them from the sibling engine
 checkout (`ENGINE=$(cd ../engine && pwd)`), with the cameras, frames

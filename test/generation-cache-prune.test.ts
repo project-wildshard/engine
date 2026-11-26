@@ -7,11 +7,11 @@ import {createHash} from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- Own complete cache fixtures below repository scratch.
 import {channel} from 'node:diagnostics_channel';
 import {afterEach,expect,test} from 'vitest';
-import {trimGenerationCache} from '../scripts/generation-cache-prune.mjs';
-import {InputHashMemo} from '../scripts/bake-input-hashes.mjs';
-import {captureFolderInputs,folderInputKey,folderToolchainKey,publishFolderInputs,recordBundle} from '../scripts/shardfile-inputs.mjs';
-import {publishSourceSnapshot,sourceSnapshotIdentity} from '../scripts/source-input-proof.mjs';
-import {shardfileValidationRevision} from '../scripts/shardfile-validation-revision.mjs';
+import {trimGenerationCache} from '../src/scripts/generation-cache-prune.mjs';
+import {InputHashMemo} from '../src/scripts/bake-input-hashes.mjs';
+import {captureFolderInputs,folderInputKey,folderToolchainKey,publishFolderInputs,recordBundle} from '../src/scripts/shardfile-inputs.mjs';
+import {publishSourceSnapshot,sourceSnapshotIdentity} from '../src/scripts/source-input-proof.mjs';
+import {shardfileValidationRevision} from '../src/scripts/shardfile-validation-revision.mjs';
 
 const owned:string[]=[];afterEach(()=>{for(const root of owned.splice(0))rmSync(root,{recursive:true,force:true});});
 const digest=(text:string)=>createHash('sha256').update(text).digest('hex');
@@ -21,9 +21,9 @@ function write(root:string,path:string,body:string):void {mkdirSync(dirname(reso
 async function fixture() {
  mkdirSync('tmp',{recursive:true});const root=realpathSync(mkdtempSync(resolve('tmp/generation-prune-')));owned.push(root);
  const cache=resolve(root,'cache'),gen=resolve(root,'gen'),products=['alpha','beta'];
- const files=['package.json','pnpm-lock.yaml','pnpm-workspace.yaml','scripts/source-generation-outputs.json',...products.flatMap(p=>[`src/shards/${p}/manifest.json`,`src/shards/${p}/shard.config.ts`])].sort();
+ const files=['package.json','pnpm-lock.yaml','pnpm-workspace.yaml','src/scripts/source-generation-outputs.json',...products.flatMap(p=>[`src/shards/${p}/manifest.json`,`src/shards/${p}/shard.config.ts`])].sort();
  for(const path of files)write(root,path,'{}');
- write(root,'scripts/source-generation-outputs.json',JSON.stringify({producers:{fixture:['src/output.generated.ts']}}));write(root,'src/output.generated.ts','output');
+ write(root,'src/scripts/source-generation-outputs.json',JSON.stringify({producers:{fixture:['src/output.generated.ts']}}));write(root,'src/output.generated.ts','output');
  const inventory=resolve(root,'inventory.json');writeFileSync(inventory,JSON.stringify({root,files:[...files,'src/output.generated.ts']}));
  const env={WS_GENERATION_TREE_ROOT:root,WS_GENERATION_TREE_FILES:inventory};
  const receipts:string[]=[];

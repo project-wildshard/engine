@@ -18,7 +18,7 @@ import {validationSourceBytes} from '@wildshard/format/validationReceipt';
 import {folderTarball} from '../src/cook/game/folderTarball.ts';
 import {cookShard,openShardfile,shardHalf} from '../src/cook/game/shardCook.ts';
 import {builtFolder} from './fixtures/engine-lift/folder.ts';
-import {rendererRevision} from '../scripts/renderer-revision.mjs';
+import {rendererRevision} from '../src/scripts/renderer-revision.mjs';
 
 const valid = folderTarball(builtFolder('brasscap-mesa'));
 const root = mkdtempSync(join(tmpdir(), 'cook-preparation-'));

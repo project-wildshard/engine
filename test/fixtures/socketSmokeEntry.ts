@@ -15,7 +15,7 @@ import { SOCKET_SERVER_OPTIONS, SocketTransport } from '../../src/server/host/de
 import { loadRapier } from '../../src/shared/engine/physics/rapier';
 import { SIM_LEVEL } from './sim-level/level';
 
-// E7.1: a real run: this bundled, on plain Node 24, with no test runner, on real time. `scripts/socket-smoke.mjs` builds it as E7.2's target will.
+// E7.1: a real run: this bundled, on plain Node 24, with no test runner, on real time. `src/scripts/socket-smoke.mjs` builds it as E7.2's target will.
 const seconds = Number(process.argv[2] ?? 4), rapier = await loadRapier(readFileSync(process.argv[3] ?? 'public/assets/physics/rapier.wasm'));
 const host = createSimHost(SIM_LEVEL, { rapier }), bot = host.addPlayer('bot:1', { x: 3, y: 0, z: 0 }), world = new SimNetWorld(host);
 const room = new NetRoom({ world, step: inputs => { const commands = new Map<string, NetCommand>(); for (const row of inputs) if (row.command !== null) commands.set(row.player, row.command); host.step(commands); } });

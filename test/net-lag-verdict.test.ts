@@ -1,7 +1,7 @@
 import { expect, test, vi } from 'vitest';
 // oxlint-disable-next-line import/no-nodejs-modules -- Execute the exact serialized browser hook in isolation.
 import { runInNewContext } from 'node:vm';
-import { BOOST_SPEED, WEBKIT_PACING, b1Verdict, b3Verdict, boostBack, bridgeVerdict, installBridgeCorrections, proofVerdict } from '../scripts/net-lag-verdict.mjs';
+import { BOOST_SPEED, WEBKIT_PACING, b1Verdict, b3Verdict, boostBack, bridgeVerdict, installBridgeCorrections, proofVerdict } from '../src/scripts/net-lag-verdict.mjs';
 
 const crossing = { reached: true, under: 0, falls: 0, corrections: 2, injectedSinks: [0.3, 1], forcedFrames: 30, forcedFrameMs: 60, spanSamples: 8, lowest: 5.4 };
 
@@ -26,7 +26,7 @@ test('timing qualification still requires every requested bar', () => {
   const timing = { b1: { ok: true }, b2: { ok: true }, b3: { ok: true } };
   expect(proofVerdict(timing, 'timing').ok).toBe(true);
   expect(proofVerdict({ ...timing, error: 'page failed' }, 'timing').ok).toBe(false);
-  // ZE23: the error card, the glitch chip or a faulted system (scripts/proof-faults.mjs) fails a timing run too
+  // ZE23: the error card, the glitch chip or a faulted system (src/scripts/proof-faults.mjs) fails a timing run too
   expect(proofVerdict({ ...timing, errors: ['system "grid.live" faulted: TypeError: boom'] }, 'timing').ok).toBe(false);
   expect(proofVerdict({ b4: bridgeVerdict(crossing), error: 'page failed' }, 'correctness').ok).toBe(false);
   expect(proofVerdict({ b4: bridgeVerdict(crossing), errors: ['uncaught page error'] }, 'correctness').ok).toBe(false);

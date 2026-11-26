@@ -4,7 +4,7 @@ import {existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node
 // oxlint-disable-next-line import/no-nodejs-modules -- Scratch paths for the fake executables.
 import {join} from 'node:path';
 import {expect, test, vi} from 'vitest';
-import {ownSimulatorHid} from '../scripts/staging-qa-idb.mjs';
+import {ownSimulatorHid} from '../src/scripts/staging-qa-idb.mjs';
 
 test('a dead touch companion is replaced on a fresh private socket', async () => {
   const dir = mkdtempSync('/tmp/ws-hid-fixture-');

@@ -1,5 +1,5 @@
 # MAP-NEXT MN6 (meta docs/plans/MULTI-REPO-SAGA/MMO-SAGA/MAP-NEXT-PLAN.md; J450: "The map and the minimap should never be broken"):
-# the map never goes missing unseen. Nightly, and by hand after a recook, run MN4's audit (scripts/cooked-map-audit.mjs) against
+# the map never goes missing unseen. Nightly, and by hand after a recook, run MN4's audit (src/scripts/cooked-map-audit.mjs) against
 # staging and production. The job goes red naming each slug whose head lacks a map; the summary lists every head that is not ok.
 # The unit test runs first: its fixture index with one cooked-map key removed must go red, so a green audit is a real one.
 # Read only: it fetches version.json, the signed placement files, the API catalogue and the cook's indexes with the agent marker.
@@ -34,7 +34,7 @@ jobs:
       - name: Audit staging and production
         run: |
           set -o pipefail
-          node scripts/cooked-map-audit.mjs --channel staging --channel production 2>&1 | tee audit.txt
+          node src/scripts/cooked-map-audit.mjs --channel staging --channel production 2>&1 | tee audit.txt
       - name: Summary
         if: always()
         run: |

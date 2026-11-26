@@ -7,7 +7,7 @@ import {existsSync, readFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Checkout paths.
 import {resolve} from 'node:path';
 import {describe, expect, it} from 'vitest';
-import {HOME_GEOMETRY_INPUTS, HOME_GEOMETRY_PACKAGES, homeGeometryHash, homeGeometryRevision} from '../scripts/home-geometry-revision.mjs';
+import {HOME_GEOMETRY_INPUTS, HOME_GEOMETRY_PACKAGES, homeGeometryHash, homeGeometryRevision} from '../src/scripts/home-geometry-revision.mjs';
 import {homeGeometryCode} from '../src/client/game/shardfile/homeBuildCache';
 
 const root = resolve(import.meta.dirname, '..');

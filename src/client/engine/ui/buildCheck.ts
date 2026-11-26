@@ -6,7 +6,7 @@
  */
 
 declare const __BUILD_ID__: string;
-/** vite.config.ts: package.json's version and its CHANGELOG.md section (scripts/changelog.mjs); absent under Node */
+/** vite.config.ts: package.json's version and its CHANGELOG.md section (src/scripts/changelog.mjs); absent under Node */
 declare const __ENGINE_RELEASE__: EngineRelease;
 
 /** `<sha>-<stamp>` → the 7-character commit, or the time token when the build had no git checkout. A world build's

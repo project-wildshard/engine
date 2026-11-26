@@ -26,7 +26,7 @@ for the author pair. Then run, once for each engine/product combination:
 
 ```sh
 node --import <engine>/scripts/sim-node-loader.mjs \
-  scripts/one-format-sim.mjs <engine> <product> tmp/<lane>/<receipt>.json
+  src/scripts/one-format-sim.mjs <engine> <product> tmp/<lane>/<receipt>.json
 ```
 
 Require equal complete history and checkpoint hashes, and exactly 3,600 ticks.

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { attributionGap, fullCommitArgs, gateInputsMoved, localAttemptDir, nextAdmission, provesNpmNext, releaseCiAdmission, provesReleaseReuse, provesTrainCi, retryRead, watchTrainRun } from '../scripts/release-train-proof.mjs';
+import { attributionGap, fullCommitArgs, gateInputsMoved, localAttemptDir, nextAdmission, provesNpmNext, releaseCiAdmission, provesReleaseReuse, provesTrainCi, retryRead, watchTrainRun } from '../src/scripts/release-train-proof.mjs';
 import { createTempRepo } from '../src/test/helpers/git';
 
 const build = 'a'.repeat(40);

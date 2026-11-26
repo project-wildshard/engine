@@ -63,7 +63,7 @@ newest exact green main, runs local QA, prepares the branch, waits for
 release CI and runs staging go-live.
 
 ```bash
-scripts/release.sh vX.Y.Z --notes <notes-file>
+src/scripts/release.sh vX.Y.Z --notes <notes-file>
 ```
 
 Use `--dry-run` to check the source and cadence before cutting.
@@ -86,9 +86,9 @@ one clean release clone per channel at the exact SHA (never a worktree
 with untracked pins, never the canonical checkout):
 
 ```
-node scripts/page-release.mjs staging build,go-live --local-qa=<local-verdict> --qa-out=<evidence-dir>
-node scripts/page-release.mjs production build|upload|check|go-live --qa=<verdict.json>
-node scripts/page-release.mjs preview build,upload,check,go-live
+node src/scripts/page-release.mjs staging build,go-live --local-qa=<local-verdict> --qa-out=<evidence-dir>
+node src/scripts/page-release.mjs production build|upload|check|go-live --qa=<verdict.json>
+node src/scripts/page-release.mjs preview build,upload,check,go-live
 ```
 
 A comma list runs the phases in order and stops at the first failure.
@@ -107,7 +107,7 @@ commit is refused: publish a green descendant to fix forward.
 in `page-release/flow.mjs`; it cannot replace the trust root.
 
 Preview borrows staging's grid (SHARD-AUTHORING SA35): before the build,
-`scripts/preview-grid.ts` reads staging's signed placement file (the one
+`src/scripts/preview-grid.ts` reads staging's signed placement file (the one
 the staging MMO reads at `PLACEMENT_URL`) under the placement key with
 engine's `readPlacementFile`, adds its cells after the pinned 25 in
 `tmp/preview-grid/catalogue.json`, and `page-release.mjs preview
@@ -123,7 +123,7 @@ staging placement deploys preview even when no client input changed.
 | `go-live` | Re-reads the signed file and `/health` and refuses unless they still match, then moves the alias (last) and waits for the domain to serve the build. | runs without a fresh match |
 
 Staging `check` and `go-live` also ready the signed cells added after
-the built-in grid. `scripts/release-placed-ready.mjs staging` verifies
+the built-in grid. `src/scripts/release-placed-ready.mjs staging` verifies
 their exact-build public cook indices, or runs the normal CookWorker
 with the existing `R2_ACCOUNT_ID`, `R2_BUCKET_PACKS` and
 `R2_PACKS_ACCESS_KEY_ID` / `R2_PACKS_SECRET_ACCESS_KEY`. Credentials stay
@@ -134,12 +134,12 @@ upload/cook activation path.
 
 Staging async uploads require the cook to use the same exact build.
 Before `go-live` moves the page alias it runs
-`node scripts/release-cook.mjs --staging --build=<sha>`. This verifies
+`node src/scripts/release-cook.mjs --staging --build=<sha>`. This verifies
 the signed staging server tag and uses the root helper's normal cook
 rebuild, health check and rollback. An older installed helper upgrades
 only through the existing signed-source/harden guard. A failed move
 refuses the alias. The later `release-cook.mjs vX.Y.Z` production step
-also refuses to rewind a newer staging cook. When `scripts/vps` changed
+also refuses to rewind a newer staging cook. When `src/scripts/vps` changed
 since the box's last harden (wildshard-apply's stamp, else the cook's
 previous build), either step then runs `wildshard-apply <tag> harden`
 behind the same `--check` gate (FAST-RELEASE FR-A11); a refusal is a
@@ -162,7 +162,7 @@ a scenario that did not run, or a P0 or P1. `journey-proof.mjs
 `--throttle 4` slows Chromium's CPU like a Low Power phone; primed runs
 are reported but are not the gate's cold or warm. J205: the script opens no socket; production's own proof is
 `e7-doctor-proof.mjs <origin> <sha> <key> --human-static`. After each
-staging tag, beside GC17's crossing walk, `node scripts/net-lag-proof.mjs`
+staging tag, beside GC17's crossing walk, `node src/scripts/net-lag-proof.mjs`
 reads NET-LAG's "buttery" bar (B1 to B4) on staging, both engines and
 layouts, every deck shard; it gates no release yet. The scratch
 scripts' `/api/*` 401 checks are gone: the page's API is
@@ -206,21 +206,21 @@ on exit, including a held run. `--out` and `--qa-out` receive the verdicts
 used by the next step. The train keeps those proof and dispatch records in
 `~/.cache/wildshard/plan-artifacts/release-qa/`. Each page build still
 keeps its phase record for the following upload and alias commands.
-`node scripts/worktree.mjs reap --dry-run` lists scratch idle for 24 hours
+`node src/scripts/.kit/worktree.mjs reap --dry-run` lists scratch idle for 24 hours
 with no Git metadata or open files. Omit `--dry-run` to remove that scratch.
 
-For a standalone smoke, run `scripts/browser-lane.sh node
-scripts/zone-entry-tour.mjs --expected-build=<sha> --out=<dir>`.
+For a standalone smoke, run `src/scripts/browser-lane.sh node
+src/scripts/zone-entry-tour.mjs --expected-build=<sha> --out=<dir>`.
 Use `--seed <number>` to repeat a draw, `--retry-failed <verdict.json>`
 to carry forward successful pairs, or `--full-route` for the original walk.
 Print the train order with
-`node scripts/staging-qa.mjs --train --dry-run --release vX.Y.Z`.
+`node src/scripts/staging-qa.mjs --train --dry-run --release vX.Y.Z`.
 
 For a standalone live rerun after go-live:
 
 ```bash
-WS_LANE_NAME=codex-ms BROWSER=none bash scripts/browser-lane.sh --max 18 \
-  node scripts/staging-qa.mjs --release vX.Y.Z --build <exact-sha> --fix-owner <lane>
+WS_LANE_NAME=codex-ms BROWSER=none bash src/scripts/browser-lane.sh --max 18 \
+  node src/scripts/staging-qa.mjs --release vX.Y.Z --build <exact-sha> --fix-owner <lane>
 ```
 
 The staging deploy smoke checks entry to play, world draw, movement, the
@@ -240,7 +240,7 @@ and upload may run once the build is green. Run `production check`,
 then `production go-live --qa=<the staging go-live verdict.json>`,
 then the static Doctor with `--human-static` (J205).
 
-The cook follows production: `node scripts/release-cook.mjs vX.Y.Z`
+The cook follows production: `node src/scripts/release-cook.mjs vX.Y.Z`
 moves it through `wildshard-agent` and `wildshard-config cook` (J355).
 Finish from primary main with `release.sh vX.Y.Z --merge-back`: merge
 without fast-forward, retry against moving main, then remove the
@@ -257,7 +257,7 @@ handing the build to a shard lane for `wildshard prepare`. If its build
 fails, the author-client job reports the failure and still uploads a
 valid devserver archive.
 
-The host is `scripts/page-release/hosts/workers.mjs` (OFF-VERCEL OV4), the
+The host is `src/scripts/page-release/hosts/workers.mjs` (OFF-VERCEL OV4), the
 Cloudflare host: three Workers from `pages/wrangler.jsonc` (production
 is `--env ''`, then `--env staging` and `--env preview`). `package`
 sends the source maps to Sentry, strips them from `dist/` and checks
@@ -377,13 +377,13 @@ CORS, run setup, or prove the VPS transition. Those remain the E7
 plan's external work.
 
 For that coordinated page build, set `WS_BUILD_ID` to the full source SHA
-when invoking `scripts/build-app.mjs`; use the identical SHA with
-`scripts/build-server.mjs --build`. `version.json`, the document stamp,
+when invoking `src/scripts/build-app.mjs`; use the identical SHA with
+`src/scripts/build-server.mjs --build`. `version.json`, the document stamp,
 the server bundle and the signed release then name one build. Without
 an explicit value, page builds retain their short-SHA plus timestamp ID.
 
 Before stripping the page's source maps for the deploy, run
-`node scripts/sentry-maps.mjs dist --environment staging` (or
+`node src/scripts/sentry-maps.mjs dist --environment staging` (or
 `production`) from the same checkout: it creates the Sentry release
 `wildshard@<version>`, uploads the hidden maps under the build id as
 dist, and records the deploy (SENTRY-TRIAGE S5). It reads
@@ -393,7 +393,7 @@ for every channel, then strips the maps.
 
 ## Local proof
 
-`node scripts/vitest-tmp.ts run test/server-release-ci.test.ts` generates
+`node src/scripts/vitest-tmp.ts run test/server-release-ci.test.ts` generates
 an ephemeral in-memory key and verifies complete staging and production
 files with the real server reader and WebCrypto reader. It rejects
 tampering and epoch zero. A local HTTP S3 boundary with real SDK requests

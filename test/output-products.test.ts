@@ -5,9 +5,9 @@ import {createHash} from 'node:crypto';
 import {cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve the owned fixture and output directories.
 import {dirname, join, resolve} from 'node:path';
-import {checkPublishedMounts, copyDeferredPublic, deferredPublicCopy, copyOutputFolders, pruneLooseCopies} from '../scripts/app-build/outputFolders.mjs';
-import {checkBakedTextures} from '../scripts/app-build/bakedTextures.mjs';
-import {pinnedPublicAssets} from '../scripts/pin-assets.ts';
+import {checkPublishedMounts, copyDeferredPublic, deferredPublicCopy, copyOutputFolders, pruneLooseCopies} from '../src/scripts/app-build/outputFolders.mjs';
+import {checkBakedTextures} from '../src/scripts/app-build/bakedTextures.mjs';
+import {pinnedPublicAssets} from '../src/scripts/pin-assets.ts';
 
 function write(root: string, name: string, body: string): void {
   mkdirSync(dirname(join(root,name)),{recursive:true});writeFileSync(join(root,name),body);

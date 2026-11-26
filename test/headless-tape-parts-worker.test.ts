@@ -7,7 +7,7 @@ import {pathToFileURL} from 'node:url';
 import {expect,test} from 'vitest';
 
 test('bounded tape parts retain the same resident and native checkpoint across requests',()=>{
-  const child=spawnSync(process.execPath,['--import',pathToFileURL(resolve('scripts/sim-node-loader.mjs')).href,
+  const child=spawnSync(process.execPath,['--import',pathToFileURL(resolve('src/scripts/sim-node-loader.mjs')).href,
     resolve('test/fixtures/headless/tape-parts-run.mjs')],{encoding:'utf8',timeout:20_000});
   expect(child.status,child.stdout+child.stderr).toBe(0);
   expect(child.stdout).toContain('bounded tape parts retain native parity, commits, ownership, aggregate budgets and request deadlines');

@@ -53,13 +53,13 @@ test('a player reads only what the download listed (one music style, AU16)', asy
   } finally { set.mockRestore(); }
 });
 
-// The pinned products (`node scripts/pins.ts install`), when the checkout has them, against this checkout's own boot tables.
+// The pinned products (`node src/scripts/pins.ts install`), when the checkout has them, against this checkout's own boot tables.
 // QA-FEEDBACK-2026-11-23-b: it read the app build's `out/.app/boot-tables.json`, which a checkout keeps from its last app
 // build; a stale one (days old in the canonical checkout) listed a manifest as a recording and turned four cases red in a
 // push gate. The tables are serialized fresh from the generators instead, as the app build does (0.2 s).
 function bootTables(): AssetTables {
-  const run = spawnSync(process.execPath, ['--import', './scripts/bake-loader.mjs', 'scripts/serialize-asset-tables.mjs'], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
-  if (run.status !== 0) throw new Error(`scripts/serialize-asset-tables.mjs failed (${String(run.status)}): ${run.stderr}`);
+  const run = spawnSync(process.execPath, ['--import', './src/scripts/bake-loader.mjs', 'src/scripts/serialize-asset-tables.mjs'], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+  if (run.status !== 0) throw new Error(`src/scripts/serialize-asset-tables.mjs failed (${String(run.status)}): ${run.stderr}`);
   return JSON.parse((JSON.parse(run.stdout) as { common: string }).common) as AssetTables;
 }
 for (const [shard, pageAudio] of [['driftwood-isle', 91], ['pine-hollow', 1], ['nalati-grasslands', 1], ['nine-dragon-stack', 1]] as const) {

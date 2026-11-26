@@ -472,8 +472,8 @@ type BasisFactory = (options: {wasmBinary: Uint8Array; print: () => void; printE
 export async function basisuTextureMean(): Promise<TextureMean | undefined> {
   try {
     const require = createRequire(import.meta.url);
-    const factory = require('../../../scripts/vendor/basisu/basis_encoder.cjs') as BasisFactory;
-    const basis = await factory({wasmBinary: new Uint8Array(readFileSync(new URL('../../../scripts/vendor/basisu/basis_encoder.wasm', import.meta.url))), print: () => undefined, printErr: () => undefined});
+    const factory = require('../../scripts/vendor/basisu/basis_encoder.cjs') as BasisFactory;
+    const basis = await factory({wasmBinary: new Uint8Array(readFileSync(new URL('../../scripts/vendor/basisu/basis_encoder.wasm', import.meta.url))), print: () => undefined, printErr: () => undefined});
     basis.initializeBasis();
     const rgba32 = basis.transcoder_texture_format.cTFRGBA32.value;
     return bytes => {

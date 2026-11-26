@@ -9,7 +9,7 @@ import { dirname, join, resolve } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixtures run Git without the caller's index or hooks.
 import { env as processEnv } from 'node:process';
 import { afterEach, expect, it } from 'vitest';
-import { createChecker, isCounted, type Checker } from '../scripts/repo-size.mjs';
+import { createChecker, isCounted, type Checker } from '../src/scripts/repo-size.mjs';
 
 interface Pin { path: string; oid: string; bytes: number; kind: string; purpose: string }
 interface Fixture {
@@ -55,7 +55,7 @@ function fixture(dir?: string): Fixture {
   let config: Record<string, unknown> = structuredClone(defaults);
   const policy = (changes: Record<string, unknown> = {}): void => {
     config = { ...config, ...changes };
-    stage('scripts/storage-policy.json', JSON.stringify(config));
+    stage('src/scripts/storage-policy.json', JSON.stringify(config));
   };
   if (dir === undefined) {
     git('init', '-q', '-b', 'main');

@@ -1,7 +1,7 @@
 import {expect,test} from 'vitest';
 import {hashImmutableBytes} from '../src/shared/host/immutable';
-import {scriptScenarioMetrics,scriptScenarioReceipt} from '../scripts/script-scenario-metrics.mjs';
-import {netLineReport,platformLineFile,sourceLineDelta} from '../scripts/shard-net-lines.mjs';
+import {scriptScenarioMetrics,scriptScenarioReceipt} from '../src/scripts/script-scenario-metrics.mjs';
+import {netLineReport,platformLineFile,sourceLineDelta} from '../src/scripts/shard-net-lines.mjs';
 import type {DecisionTrace} from '../src/server/engine/script/decision';
 
 test('scenario metrics require matching actual section bytes and script identity',()=>{

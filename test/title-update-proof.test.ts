@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { expect, test } from 'vitest';
-import { FROZEN_MS, TITLE_MS, verdict } from '../scripts/title-update-proof.mjs';
+import { FROZEN_MS, TITLE_MS, verdict } from '../src/scripts/title-update-proof.mjs';
 
 // Meta QA 11-24 row 7: after a staging release, opening the app showed a frozen title for about 10 s. The proof passes
 // when the first title shows within 2 s and no frame on a shown title stalls past 1 s, across the hand-over's reload.

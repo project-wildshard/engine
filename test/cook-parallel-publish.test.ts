@@ -59,7 +59,7 @@ function timedStore(store: PackStore): {readonly store: PackStore; readonly puts
 
 test('FR-A2: the cook publishes each order group in parallel, and the groups in order', async () => {
   const timed = timedStore(folderStore(join(scratch, 'store'))), hash = createHash('sha256').update('one').digest('hex');
-  const launcher: JobLauncher = {root, execPath: process.execPath, loader: join(root, 'scripts/bake-loader.mjs'), script, wrap: [], limits: {seconds: 30, memoryMB: 2048, heapMB: 1024}};
+  const launcher: JobLauncher = {root, execPath: process.execPath, loader: join(root, 'src/scripts/bake-loader.mjs'), script, wrap: [], limits: {seconds: 30, memoryMB: 2048, heapMB: 1024}};
   const worker = createCookWorker({build: 'b-parallel', store: timed.store, launcher, serverPacks: join(scratch, 'server'), scratch: join(scratch, 'work'),
     source: {heads: () => Promise.resolve([]), download: () => Promise.resolve(new TextEncoder().encode('one'))}});
 
@@ -114,7 +114,7 @@ test('FR-A2: the bucket listing runs while the job cooks, not after it', async (
     return inner.list(prefix);
   }};
   const hash = createHash('sha256').update('listing').digest('hex');
-  const launcher: JobLauncher = {root, execPath: process.execPath, loader: join(root, 'scripts/bake-loader.mjs'), script: slow, wrap: [], limits: {seconds: 30, memoryMB: 2048, heapMB: 1024}};
+  const launcher: JobLauncher = {root, execPath: process.execPath, loader: join(root, 'src/scripts/bake-loader.mjs'), script: slow, wrap: [], limits: {seconds: 30, memoryMB: 2048, heapMB: 1024}};
   const worker = createCookWorker({build: 'b-listing', store, launcher, serverPacks: join(scratch, 'server-listing'), scratch: work,
     source: {heads: () => Promise.resolve([]), download: () => Promise.resolve(new TextEncoder().encode('listing'))}});
 
@@ -136,7 +136,7 @@ test('FR-A2: a publish uses a kept listing still young enough while a prefetch r
   }};
   const tars = new Map(['one', 'two'].map(word => [createHash('sha256').update(`kept-${word}`).digest('hex'), new TextEncoder().encode(`kept-${word}`)]));
   const [first = '', second = ''] = tars.keys();
-  const launcher: JobLauncher = {root, execPath: process.execPath, loader: join(root, 'scripts/bake-loader.mjs'), script, wrap: [], limits: {seconds: 30, memoryMB: 2048, heapMB: 1024}};
+  const launcher: JobLauncher = {root, execPath: process.execPath, loader: join(root, 'src/scripts/bake-loader.mjs'), script, wrap: [], limits: {seconds: 30, memoryMB: 2048, heapMB: 1024}};
   const worker = createCookWorker({build: 'b-kept', store, launcher, serverPacks: join(scratch, 'server-kept'), scratch: work, now: () => now,
     source: {heads: () => Promise.resolve([]), download: hash => Promise.resolve(tars.get(hash) ?? new Uint8Array())}});
 
@@ -159,7 +159,7 @@ test('FR-A2: while a refresh runs, a kept listing past its age still serves, up 
   }};
   const tars = new Map(['one', 'two'].map(word => [createHash('sha256').update(`aged-${word}`).digest('hex'), new TextEncoder().encode(`aged-${word}`)]));
   const [first = '', second = ''] = tars.keys();
-  const launcher: JobLauncher = {root, execPath: process.execPath, loader: join(root, 'scripts/bake-loader.mjs'), script, wrap: [], limits: {seconds: 30, memoryMB: 2048, heapMB: 1024}};
+  const launcher: JobLauncher = {root, execPath: process.execPath, loader: join(root, 'src/scripts/bake-loader.mjs'), script, wrap: [], limits: {seconds: 30, memoryMB: 2048, heapMB: 1024}};
   const worker = createCookWorker({build: 'b-aged', store, launcher, serverPacks: join(scratch, 'server-aged'), scratch: work, now: () => now,
     source: {heads: () => Promise.resolve([]), download: hash => Promise.resolve(tars.get(hash) ?? new Uint8Array())}});
 

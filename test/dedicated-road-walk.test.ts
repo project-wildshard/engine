@@ -7,7 +7,7 @@ import { memoryPlayerSaves } from '../src/server/host/dedicated/playerSaves';
 import { roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
 import { RoomBot } from './fixtures/dedicated/roomBot';
 
-// GRID-CROSSING GC15c: the first page walk (scripts/grid-crossing-walk-proof.mjs) stopped on Driftwood's west entryway at x -249.1,
+// GRID-CROSSING GC15c: the first page walk (src/scripts/grid-crossing-walk-proof.mjs) stopped on Driftwood's west entryway at x -249.1,
 // on flat road-height ground: a native cell's baked collision kept the shard's own page walls (`nativeBake.ts` skips them only for a
 // cell held near its player). The road test sets the feet past the edge; this one walks them through it by input, as a player does.
 // ZONE-ENTRY ZE6 (J352): the worker's road is walled as the page is. One road world holds every seat, and seats have different

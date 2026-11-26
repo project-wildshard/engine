@@ -1,6 +1,6 @@
 // CHUNK-PARAM-REMOVAL CP23 (J522): the guard refuses a URL-shaped `chunk` coming back, and nothing else named chunk.
 import { describe, expect, it } from 'vitest';
-import { chunkParamCount, chunkParamOffenders, guardKey, judge, oneShardBranches } from '../scripts/chunk-param-guard.mjs';
+import { chunkParamCount, chunkParamOffenders, guardKey, judge, oneShardBranches } from '../src/scripts/chunk-param-guard.mjs';
 
 describe('chunk-param guard', () => {
   it('fails on the param in an address, a params call and a template', () => {

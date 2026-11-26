@@ -163,7 +163,7 @@ export interface TerrainSpec {
   splat?: (x: number, z: number, t: ChunkTerrain, noise: TerrainNoise) => [number, number, number, number];
 }
 
-/** Texture / model ids under `public/assets/` (see `scripts/fetch-assets.mjs`). */
+/** Texture / model ids under `public/assets/` (see `src/scripts/fetch-assets.mjs`). */
 export interface ChunkAssets {
   /** four PBR ground sets blended by `splatAt`, in weight order */
   groundLayers: [string, string, string, string];

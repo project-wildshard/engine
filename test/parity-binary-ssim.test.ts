@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { ssim } from '../scripts/parity/ssim.mjs';
+import { ssim } from '../src/scripts/parity/ssim.mjs';
 
 const original = new Map<string, PropertyDescriptor | undefined>();
 const upload = new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' });

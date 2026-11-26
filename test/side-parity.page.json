@@ -1,5 +1,5 @@
 {
- "note": "SS1 page half: node scripts/side-parity.mjs --record (see its header). Rows: owner, material, sensor, dynamic, box.",
+ "note": "SS1 page half: node src/scripts/side-parity.mjs --record (see its header). Rows: owner, material, sensor, dynamic, box.",
  "at": {
   "driftwood-isle": [0,1,-194],
   "far-reach": [0,30,-5],

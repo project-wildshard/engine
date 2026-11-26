@@ -131,8 +131,8 @@ void test(
         process.execPath,
         [
           "--import",
-          "./scripts/bake-loader.mjs",
-                    "scripts/bake-grid-seams.mjs",
+          "./src/scripts/bake-loader.mjs",
+                    "src/scripts/bake-grid-seams.mjs",
           scratch,
           "--collision-only",
         ],

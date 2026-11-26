@@ -3,7 +3,7 @@ import {mkdirSync, mkdtempSync, openSync, closeSync, ftruncateSync, rmSync, writ
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve the fixture's output.
 import {join, resolve} from 'node:path';
 import {expect, test} from 'vitest';
-import {MAX_ASSET_BYTES, assertAssetLimits, describeAssetLimits} from '../scripts/app-build/assetLimits.mjs';
+import {MAX_ASSET_BYTES, assertAssetLimits, describeAssetLimits} from '../src/scripts/app-build/assetLimits.mjs';
 
 const sized = (path: string, bytes: number): void => { const fd = openSync(path, 'w'); try { ftruncateSync(fd, bytes); } finally { closeSync(fd); } };
 

@@ -6,7 +6,12 @@ src/test/engine/
 src/test/game/
 src/test/*.json
 .worktrees/
-# Paths under src/ that kit/.oxfmtrc.json ignored when it lived in src/;
+# Paths under src/ that .oxfmtrc.json ignored when it lived in src/;
 # its ignorePatterns now only reach kit/, and oxfmt refuses ".." (J329).
 src/scripts/**
 src/**/*.md
+# Engine's own tooling tests, from test/tooling/ (never formatted there).
+src/test/*.test.mjs
+src/test/*.test.ts
+src/test/parity/
+src/test/soak/

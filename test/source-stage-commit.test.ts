@@ -5,7 +5,7 @@ import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, 
 // oxlint-disable-next-line import/no-nodejs-modules -- Keep every fixture beneath repository tmp.
 import { resolve } from 'node:path';
 import { expect, test } from 'vitest';
-import { linkNodeModules } from '../scripts/link-node-modules.mjs';
+import { linkNodeModules } from '../src/scripts/link-node-modules.mjs';
 
 test('source staging uses candidate inputs and preserves loose files and peer stages', () => {
   mkdirSync('tmp', { recursive: true });
@@ -15,16 +15,16 @@ test('source staging uses candidate inputs and preserves loose files and peer st
   const put = (file: string, text: string): void => {
     mkdirSync(resolve(root, file, '..'), { recursive: true }); writeFileSync(resolve(root, file), text);
   };
-  const run = (patch: string) => spawnSync('scripts/commit.sh', ['--patch', patch, 'fix(fixture): preserve candidate sources', '--', 'src/input.json'], { cwd: root, env, encoding: 'utf8', timeout: 15_000 });
+  const run = (patch: string) => spawnSync('src/scripts/.kit/commit.sh', ['--patch', patch, 'fix(fixture): preserve candidate sources', '--', 'src/input.json'], { cwd: root, env, encoding: 'utf8', timeout: 15_000 });
   try {
     git('init', '-q', '-b', 'main'); git('config', 'user.name', 'Fixture'); git('config', 'user.email', 'fixture@example.invalid');
     git('config', 'core.hooksPath', '/dev/null'); git('config', 'commit.gpgsign', 'false');
     put('.gitignore', 'node_modules/\ntmp/\n');
-    mkdirSync(resolve(root, 'scripts'));
-    for (const file of ['commit.sh', 'committed-source-tables.mjs', 'git-source-view.mjs', 'gen-source.mjs'])
-      copyFileSync(resolve(repository, 'scripts', file), resolve(root, 'scripts', file));
-    chmodSync(resolve(root, 'scripts/commit.sh'), 0o755);
-    put('scripts/source-generators.mjs', `import {readFileSync} from 'node:fs';import {resolve} from 'node:path';
+    mkdirSync(resolve(root, 'src/scripts/.kit'), { recursive: true });
+    for (const file of ['.kit/commit.sh', 'committed-source-tables.mjs', 'git-source-view.mjs', 'gen-source.mjs'])
+      copyFileSync(resolve(repository, 'src/scripts', file), resolve(root, 'src/scripts', file));
+    chmodSync(resolve(root, 'src/scripts/.kit/commit.sh'), 0o755);
+    put('src/scripts/source-generators.mjs', `import {readFileSync} from 'node:fs';import {resolve} from 'node:path';
 export const SOURCE_GENERATORS=[{id:'fixture',outputs:['src/table.ts','src/budget.json'],inputs:['src/input.json'],committed:true,generate:async root=>{
  const data=JSON.parse(readFileSync(resolve(root,'src/input.json'),'utf8'));
  if(typeof data.value!=='number')throw Error('Invalid fixture source value');
@@ -61,10 +61,10 @@ if os.getenv('WS_COMMIT_WRAPPER') == '1':
     expect(readFileSync(resolve(root, 'src/table.ts'), 'utf8')).toBe('foreign loose output\n');
     // Canonical in-memory staging must retain ordinary Git's ignore refusal
     // when a new committed-table row forgot its matching ignore correction.
-    put('scripts/source-generators.mjs', readFileSync(resolve(root, 'scripts/source-generators.mjs'), 'utf8').replaceAll('src/table.ts', 'src/ignored.ts'));
+    put('src/scripts/source-generators.mjs', readFileSync(resolve(root, 'src/scripts/source-generators.mjs'), 'utf8').replaceAll('src/table.ts', 'src/ignored.ts'));
     put('.gitignore', 'node_modules/\ntmp/\nsrc/ignored.ts\n');
-    git('add', 'scripts/source-generators.mjs', '.gitignore');
-    git('commit', '-qm', 'fixture ignored producer', '--', 'scripts/source-generators.mjs', '.gitignore');
+    git('add', 'src/scripts/source-generators.mjs', '.gitignore');
+    git('commit', '-qm', 'fixture ignored producer', '--', 'src/scripts/source-generators.mjs', '.gitignore');
     const ignoredHead = git('rev-parse', 'HEAD'), ignoredIndex = readFileSync(resolve(root, '.git/index'));
     put('tmp/ignored.patch', '--- a/src/input.json\n+++ b/src/input.json\n@@ -1 +1 @@\n-{"value":2}\n+{"value":3}\n');
     const ignored = run(resolve(root, 'tmp/ignored.patch'));

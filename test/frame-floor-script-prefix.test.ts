@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest';
-import { startPrefixScriptProfile, type ScriptProfilePort } from '../scripts/frame-floor-script-profile.mjs';
-import { validateFrameFloorArgs } from '../scripts/frame-floor-args.mjs';
+import { startPrefixScriptProfile, type ScriptProfilePort } from '../src/scripts/frame-floor-script-profile.mjs';
+import { validateFrameFloorArgs } from '../src/scripts/frame-floor-args.mjs';
 
 function fixture(refuseStop = false) {
   const methods: string[] = [];

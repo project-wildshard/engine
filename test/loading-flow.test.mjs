@@ -3,8 +3,8 @@ import { expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- exercise the recorder expression in a browser-free sandbox.
 import { runInNewContext } from 'node:vm';
-import { analyse } from '../scripts/loading-flow/analyse.mjs';
-import { profileFrames } from '../scripts/loading-flow/profile.mjs';
+import { analyse } from '../src/scripts/loading-flow/analyse.mjs';
+import { profileFrames } from '../src/scripts/loading-flow/profile.mjs';
 
 // DL23: the analyser that judges every Simulator recording against Jake's loading bar (E529, G1006, G1008).
 const TAP = 1_000_000;
@@ -96,7 +96,7 @@ test('a load that never reaches control fails unless the card offers Retry; a na
 });
 
 test('a legacy recorded run retains card data but cannot qualify frames without document identity', () => {
-  // the drive's own rows, trimmed to the fields the analyser reads (scripts/loading-flow/drive.mjs, 11-04)
+  // the drive's own rows, trimmed to the fields the analyser reads (src/scripts/loading-flow/drive.mjs, 11-04)
   const rows = JSON.parse(readFileSync('test/fixtures/loading-flow/nine-86f2590-warm.json', 'utf8'));
   const r = analyse(rows);
   expect(r.controlS).toBe(10.4);
@@ -230,7 +230,7 @@ test('a same-URL navigation cannot join drawn batches even with the same origin 
 });
 
 test('the real recorder token survives repeated sampler installs but changes with its document', () => {
-  const source = readFileSync('scripts/loading-flow/drive.mjs', 'utf8');
+  const source = readFileSync('src/scripts/loading-flow/drive.mjs', 'utf8');
   const script = /const SAMPLER = `([^`]+)`;/u.exec(source)?.[1];
   expect(script).toBeTypeOf('string');
   if (script === undefined) throw new Error('Missing sampler source');

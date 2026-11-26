@@ -70,9 +70,9 @@ jobs:
       # Meta QA 11-25 row 64: never pin a head with no packs for a build the channel serves (REV-BEHIND, unenterable).
       # Waits up to 40 min for the cook (it takes an advertised head first, FR-A20), then refuses naming each build.
       - name: Wait for the head's packs on every build the channel serves
-        run: node scripts/pin-packs.mjs "$SLUG" "$HASH" "$CHANNEL" --wait=40
+        run: node src/scripts/pin-packs.mjs "$SLUG" "$HASH" "$CHANNEL" --wait=40
       - name: Move the slug's pin and the staging snapshot
-        run: node scripts/pin-shard.ts "$SLUG" "$REVISION" "$HASH" "$CHANNEL" ${{ inputs.first && '--first' || '' }}
+        run: node src/scripts/pin-shard.ts "$SLUG" "$REVISION" "$HASH" "$CHANNEL" ${{ inputs.first && '--first' || '' }}
       # A Ring 1 slug's server slice is cut from its pinned head: a new head
       # needs a new slice in the same commit, or `pins.ts install --ring 1`
       # refuses it ("slice belongs to another head"; main red at dfb768cd0).
@@ -90,12 +90,12 @@ jobs:
         uses: ./.github/actions/ring-setup
       - name: Re-cut the Ring 1 server slices from the new pins
         if: steps.ring1.outputs.slice == 'true'
-        run: node scripts/pins.ts slice
+        run: node src/scripts/pins.ts slice
       - name: Record the moved shard's Ring 1 digest on the CI runner
         if: steps.ring1.outputs.record == 'true'
         run: |
-          node scripts/pins.ts install --ring 1
-          node --no-warnings scripts/ring-step.ts --update --only "$SLUG"
+          node src/scripts/pins.ts install --ring 1
+          node --no-warnings src/scripts/ring-step.ts --update --only "$SLUG"
       - name: Mirror the tarball on the pins release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -158,10 +158,10 @@ jobs:
             echo
             echo '~~~sh'
             echo 'cd ~/projects/games/wildshard/engine'
-            echo "node scripts/worktree.mjs new $slug_dir"
+            echo "node src/scripts/.kit/worktree.mjs new $slug_dir"
             echo "cd .worktrees/$slug_dir && git fetch origin $BRANCH && git merge --ff-only FETCH_HEAD"
             echo 'pnpm pins   # gen:inputs refuses the old revision still in out/'
-            echo 'WS_LANE_NAME=<lane> node scripts/land.mjs'
+            echo 'WS_LANE_NAME=<lane> node src/scripts/.kit/land.mjs'
             echo '~~~'
           } >> "$GITHUB_STEP_SUMMARY"
   # Ring 1 digests are kept per platform (J97) and the MacBook's push gate checks darwin-arm64's. The pin job records
@@ -183,8 +183,8 @@ jobs:
       - uses: ./.github/actions/ring-setup
       - name: Record the moved shard's Ring 1 digest on darwin-arm64
         run: |
-          node scripts/pins.ts install --ring 1
-          node --no-warnings scripts/ring-step.ts --update --only "$SLUG"
+          node src/scripts/pins.ts install --ring 1
+          node --no-warnings src/scripts/ring-step.ts --update --only "$SLUG"
       - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         id: app-token
         with:

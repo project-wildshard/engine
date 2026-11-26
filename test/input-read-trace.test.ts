@@ -30,12 +30,12 @@ it('records imports and descriptor-based raw reads without consuming unrelated s
   expect(trace.files).not.toContain('unread.ts');expect(trace.opaque).toEqual([]);expect(trace.inventory.filter(probe=>!probe.startsWith('P ')||!trace.execution.includes(probe.slice(2))),JSON.stringify(trace.inventory)).toEqual([]);
 });
 it('records hidden loader data and negative probes inside the load callback',()=>{
-  const source=`import fs from 'node:fs';import{registerHooks}from'node:module';registerHooks({load(url,context,next){if(url.endsWith('/used.mjs')){fs.readFileSync('unread.ts');fs.existsSync('missing.ts');}return next(url,context);}});const{startGenerationInputTrace}=await import(${JSON.stringify(resolve('scripts/shardfile-inputs.mjs'))});startGenerationInputTrace(process.cwd(),process.env.WS_GENERATION_READ_RECEIPT);await import('./used.mjs');`;
+  const source=`import fs from 'node:fs';import{registerHooks}from'node:module';registerHooks({load(url,context,next){if(url.endsWith('/used.mjs')){fs.readFileSync('unread.ts');fs.existsSync('missing.ts');}return next(url,context);}});const{startGenerationInputTrace}=await import(${JSON.stringify(resolve('src/scripts/shardfile-inputs.mjs'))});startGenerationInputTrace(process.cwd(),process.env.WS_GENERATION_READ_RECEIPT);await import('./used.mjs');`;
   const {child,read}=fixture(source,false);expect(child.status,child.stderr).toBe(0);
   const trace=read();expect(trace.files).toContain('unread.ts');expect(trace.inventory).toContain('P missing.ts');
 });
 it.each([true,false])('uses a proven installed store root for external probes: linked=%s',linked=>{
-  const source=`import fs from'node:fs';import{resolve}from'node:path';const stage=resolve('stage'),store=resolve('installed');fs.mkdirSync(store+'/dep@1/node_modules/dep',{recursive:true});fs.mkdirSync(stage+'/node_modules',{recursive:true});${linked?"fs.symlinkSync(store,stage+'/node_modules/.pnpm','dir');":''}const{startGenerationInputTrace}=await import(${JSON.stringify(resolve('scripts/shardfile-inputs.mjs'))});startGenerationInputTrace(stage,process.env.WS_GENERATION_READ_RECEIPT);fs.existsSync(store+'/dep@1/node_modules/dep/missing.js');fs.existsSync(resolve(stage,'../unrelated.txt'));`;
+  const source=`import fs from'node:fs';import{resolve}from'node:path';const stage=resolve('stage'),store=resolve('installed');fs.mkdirSync(store+'/dep@1/node_modules/dep',{recursive:true});fs.mkdirSync(stage+'/node_modules',{recursive:true});${linked?"fs.symlinkSync(store,stage+'/node_modules/.pnpm','dir');":''}const{startGenerationInputTrace}=await import(${JSON.stringify(resolve('src/scripts/shardfile-inputs.mjs'))});startGenerationInputTrace(stage,process.env.WS_GENERATION_READ_RECEIPT);fs.existsSync(store+'/dep@1/node_modules/dep/missing.js');fs.existsSync(resolve(stage,'../unrelated.txt'));`;
   const {child,read}=fixture(source,false);expect(child.status,child.stderr).toBe(0);
   expect(read().inventory).toContain(linked?'P node_modules/.pnpm/dep@1/node_modules/dep/missing.js':'P ../installed/dep@1/node_modules/dep/missing.js');
   expect(read().inventory).toContain('P ../unrelated.txt');
@@ -71,7 +71,7 @@ it.each([
   expect(read().inventory).not.toContain(`${kind==='L'?'D':'L'} listed`);
 });
 it('keeps builtin-looking imports redirected to a real file conservative',()=>{
-  const source=`import{createRequire,registerHooks}from'node:module';registerHooks({resolve(specifier,context,next){if(specifier==='node:path'&&context.parentURL===import.meta.url)return{url:new URL('./used.mjs',import.meta.url).href,shortCircuit:true};return next(specifier,context);}});const{startGenerationInputTrace}=await import(${JSON.stringify(resolve('scripts/shardfile-inputs.mjs'))});startGenerationInputTrace(process.cwd(),process.env.WS_GENERATION_READ_RECEIPT);createRequire(import.meta.url)('node:path');`;
+  const source=`import{createRequire,registerHooks}from'node:module';registerHooks({resolve(specifier,context,next){if(specifier==='node:path'&&context.parentURL===import.meta.url)return{url:new URL('./used.mjs',import.meta.url).href,shortCircuit:true};return next(specifier,context);}});const{startGenerationInputTrace}=await import(${JSON.stringify(resolve('src/scripts/shardfile-inputs.mjs'))});startGenerationInputTrace(process.cwd(),process.env.WS_GENERATION_READ_RECEIPT);createRequire(import.meta.url)('node:path');`;
   const {child,read}=fixture(source,false);expect(child.status,child.stderr).toBe(0);
   expect(read().inventory).toContain('R commonjs-resolution');
 });

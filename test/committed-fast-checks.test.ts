@@ -7,7 +7,7 @@ import { resolve } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- The fixture invokes the real platform policy comparator.
 import { pathToFileURL } from 'node:url';
 import { expect, test } from 'vitest';
-import { linkNodeModules } from '../scripts/link-node-modules.mjs';
+import { linkNodeModules } from '../src/scripts/link-node-modules.mjs';
 
 const repository=resolve('.');
 function fixture() {
@@ -16,8 +16,8 @@ function fixture() {
   const put=(file:string,text:string)=>{mkdirSync(resolve(root,file,'..'),{recursive:true});writeFileSync(resolve(root,file),text);};
   git('init','-q','-b','main');git('config','user.name','fixture');git('config','user.email','fixture@example.invalid');git('config','core.hooksPath','/dev/null');
   put('.gitignore','tmp/\nnode_modules/\n');
-  put('scripts/guard-counts.mjs',`import{readFileSync}from'node:fs';export function readLintConfig(path){return JSON.parse(readFileSync(path,'utf8'));}export function hardRules(){return new Set();}`);
-  put('scripts/precommit-checks.mjs','export function fastCommitLintConfig(value){return value;}');
+  put('src/scripts/guard-counts.mjs',`import{readFileSync}from'node:fs';export function readLintConfig(path){return JSON.parse(readFileSync(path,'utf8'));}export function hardRules(){return new Set();}`);
+  put('src/scripts/precommit-checks.mjs','export function fastCommitLintConfig(value){return value;}');
   put('lint/plugin.mjs',`import{readFileSync}from'node:fs';import{resolve}from'node:path';
 export default {
   meta:{name:'wildshard'},rules:{marker:{
@@ -29,26 +29,26 @@ export default {
 };`);
   put('lint/marker.json','GOOD');put('lint/ratchet.json','{}');
   put('.oxlintrc.ratchet.json',JSON.stringify({jsPlugins:['./lint/plugin.mjs'],rules:{'wildshard/marker':'error'}}));
-  put('scripts/push-checks.mjs',readFileSync(resolve('scripts/push-checks.mjs'),'utf8'));
+  put('src/scripts/push-checks.mjs',readFileSync(resolve('src/scripts/push-checks.mjs'),'utf8'));
   put('lint/layer-exports.mjs',readFileSync(resolve('lint/layer-exports.mjs'),'utf8'));
-  put('scripts/gate-related-tests.mjs','export function pushGuards(){return [];}');
+  put('src/scripts/gate-related-tests.mjs','export function pushGuards(){return [];}');
   put('.oxlintrc.json',JSON.stringify({options:{typeAware:false},plugins:['import'],jsPlugins:['./lint/plugin.mjs'],categories:{correctness:'off'},rules:{'no-eval':'error','import/no-cycle':'error','wildshard/marker':'error'}}));
   put('src/client/app/main.ts','export const value=1;\n');
   const commit=()=>{git('add','.');git('commit','-qm','fixture');return git('rev-parse','HEAD');};
   const base=commit();linkNodeModules(repository,root);
-  const run=(phase:string,tip:string,files=['src/client/app/main.ts'],from=base,trace=false,native=false,reportOnly=false)=>spawnSync('node',[resolve('scripts/committed-fast-checks.mjs'),root,from,tip,phase,JSON.stringify(files)],{cwd:repository,encoding:'utf8',timeout:15_000,env:{...process.env,...(trace?{GIT_TRACE:'1'}:{}),...(native?{WS_GIT_NATIVE_ROOT:root}:{}),...(reportOnly?{WS_GIT_NATIVE_REPORT_ONLY:'1'}:{})}});
+  const run=(phase:string,tip:string,files=['src/client/app/main.ts'],from=base,trace=false,native=false,reportOnly=false)=>spawnSync('node',[resolve('src/scripts/committed-fast-checks.mjs'),root,from,tip,phase,JSON.stringify(files)],{cwd:repository,encoding:'utf8',timeout:15_000,env:{...process.env,...(trace?{GIT_TRACE:'1'}:{}),...(native?{WS_GIT_NATIVE_ROOT:root}:{}),...(reportOnly?{WS_GIT_NATIVE_REPORT_ONLY:'1'}:{})}});
   return {root,git,put,commit,base,run,close:()=>rmSync(root,{recursive:true,force:true})};
 }
 
 test('source table guards pin producers, schema data and output to the checked commit', () => {
   const f = fixture();
   try {
-    f.put('scripts/check-platform-ratchets.mjs', 'export const PLATFORM_LISTS=[];export function comparePlatformList(){return [];}');
-    f.put('scripts/ratchet-approval.mjs', 'export function ratchetApprovalFailures(){return [];}');
+    f.put('src/scripts/check-platform-ratchets.mjs', 'export const PLATFORM_LISTS=[];export function comparePlatformList(){return [];}');
+    f.put('src/scripts/ratchet-approval.mjs', 'export function ratchetApprovalFailures(){return [];}');
     for (const file of ['gen-source.mjs', 'source-generators.mjs'])
-      f.put(`scripts/${file}`, readFileSync(resolve('scripts', file), 'utf8'));
-    const registry=readFileSync(resolve('scripts/source-generators.mjs'),'utf8');
-    f.put('scripts/source-generators.mjs',registry.replace('export const SOURCE_GENERATORS = [',`export const SOURCE_GENERATORS = [
+      f.put(`src/scripts/${file}`, readFileSync(resolve('src', 'scripts', file), 'utf8'));
+    const registry=readFileSync(resolve('src/scripts/source-generators.mjs'),'utf8');
+    f.put('src/scripts/source-generators.mjs',registry.replace('export const SOURCE_GENERATORS = [',`export const SOURCE_GENERATORS = [
       ...['driftwood-isle','pine-hollow'].map(slug=>({id:slug+'-test-schema',outputs:['src/shards/'+slug+'/generators/sourceProbe.generated.ts','src/shards/'+slug+'/runtime/sourceProbe.generated.d.ts'],inputs:['src/format/schema.txt'],committed:true,generate:async root=>(await import(pathToFileURL(root+'/scripts/source-probe.mjs').href)).sourceProbeTables(root,slug).tables})),`));
     const producer = `import {readFileSync} from 'node:fs';import {resolve} from 'node:path';
 export function sourceProbeTables(root,slug){return {tables:{
@@ -92,9 +92,9 @@ export function sourceProbeTables(root,slug){return {tables:{
 
 test('a format bump the lock left behind is refused, naming the lock, and an untouching push is not',()=>{
   const f=fixture();try{
-    f.put('scripts/check-platform-ratchets.mjs','export const PLATFORM_LISTS=[];export function comparePlatformList(){return [];}');
-    f.put('scripts/ratchet-approval.mjs','export function ratchetApprovalFailures(){return [];}');
-    f.put('scripts/format-lock.mjs',readFileSync(resolve('scripts/format-lock.mjs'),'utf8'));
+    f.put('src/scripts/check-platform-ratchets.mjs','export const PLATFORM_LISTS=[];export function comparePlatformList(){return [];}');
+    f.put('src/scripts/ratchet-approval.mjs','export function ratchetApprovalFailures(){return [];}');
+    f.put('src/scripts/format-lock.mjs',readFileSync(resolve('src/scripts/format-lock.mjs'),'utf8'));
     f.put('package.json',JSON.stringify({dependencies:{'@wildshard/format':'github:project-wildshard/shard-format#v0.3.4'}}));
     const sha='a'.repeat(40),row=`git+ssh://git@github.com/project-wildshard/shardfile.git#${sha}`;
     const lock=(version:string)=>`lockfileVersion: '9.0'
@@ -130,7 +130,7 @@ packages:
 test('native-output handoff keeps ordinary source errors blocking',()=>{
   const f=fixture();try{
     f.put('.gitignore','tmp/\nnode_modules/\n*.generated.ts\n');
-    f.put('scripts/source-generation-outputs.json',JSON.stringify({producers:{'scripts/gen-shards.mjs':['src/client/app/value.generated.ts']}}));
+    f.put('src/scripts/source-generation-outputs.json',JSON.stringify({producers:{'scripts/gen-shards.mjs':['src/client/app/value.generated.ts']}}));
     f.put('src/client/app/main.ts',"import './value.generated';export const value=1;");
     const good=f.commit();f.put('src/value.generated.ts','eval("poison");');
     const handed=f.run('fast-lint',good,undefined,undefined,false,true,true);
@@ -179,7 +179,7 @@ test('lint refuses exact bad text and openly defers dirty or staged inputs',()=>
 
 test('the push ratchet refuses committed debt despite loose peer repairs',()=>{
   const f=fixture();try {
-    f.put('scripts/committed-fast-checks.mjs','// Registered exact-input counter entry.\n');
+    f.put('src/scripts/committed-fast-checks.mjs','// Registered exact-input counter entry.\n');
     f.put('lint/plugin.mjs',`import{readFileSync}from'node:fs';import{resolve}from'node:path';
 export default {meta:{name:'wildshard'},rules:{marker:{meta:{type:'problem',schema:[]},create(context){return {Program(node){
  for(let i=0;i<Number(readFileSync(resolve('lint/marker.json'),'utf8'));i++)context.report({node,message:'Counted existing debt'});
@@ -255,12 +255,12 @@ test('committed good policy ignores a loose poison and still checks the source',
 
 test('native generated inputs match canonical committed producer bytes',()=>{
   const f=fixture();try {
-    f.put('scripts/gen-starter-weapons.mjs',readFileSync(resolve('scripts/gen-starter-weapons.mjs'),'utf8'));
+    f.put('src/scripts/gen-starter-weapons.mjs',readFileSync(resolve('src/scripts/gen-starter-weapons.mjs'),'utf8'));
     f.put('src/shared/game/weapons/starterBow.json','{"damage":1}');
     f.put('src/client/app/main.ts',"import {STARTER_BOW} from '../../shared/game/weapons/starter.generated';export const value=STARTER_BOW;");
     f.put('.gitignore','.gitignore\ntmp/\nnode_modules/\n*.generated.ts\n');
     const tip=f.commit();
-    const generate=()=>execFileSync('node',['--input-type=module','--eval',"import {genStarterWeapons} from './scripts/gen-starter-weapons.mjs';genStarterWeapons();"],{cwd:f.root});
+    const generate=()=>execFileSync('node',['--input-type=module','--eval',"import {genStarterWeapons} from './src/scripts/gen-starter-weapons.mjs';genStarterWeapons();"],{cwd:f.root});
     generate();
     const passed=f.run('fast-lint',tip);
     expect(passed.status,passed.stdout+passed.stderr).toBe(0);
@@ -315,7 +315,7 @@ test('ratchet retains old unrecorded counts but refuses new counts and cannot bo
     f.put('lint/marker.json','BAD');const bad=f.commit();
     const result=f.run('ratchet',bad);expect(result.status,result.stderr).toBe(1);expect(result.stderr).toContain('was 0, now 1');
     expect(f.run('ratchet',bad,['src/client/app/main.ts'],bad).status).toBe(0);
-    f.put('scripts/guard-counts.mjs',`import{readFileSync}from'node:fs';export function readLintConfig(path){return JSON.parse(readFileSync(path,'utf8'));}export function hardRules(){return new Set(['wildshard/marker']);}`);
+    f.put('src/scripts/guard-counts.mjs',`import{readFileSync}from'node:fs';export function readLintConfig(path){return JSON.parse(readFileSync(path,'utf8'));}export function hardRules(){return new Set(['wildshard/marker']);}`);
     const hard=f.commit();const refused=f.run('ratchet',hard,['src/client/app/main.ts'],bad);expect(refused.status).toBe(1);expect(refused.stderr).toContain('was 0, now 1');
     f.put('lint/ratchet.json',JSON.stringify({'wildshard/marker':{'src/client/app/main.ts':1}}));const allowed=f.commit();
     expect(f.run('ratchet',allowed).status).toBe(0);
@@ -324,8 +324,8 @@ test('ratchet retains old unrecorded counts but refuses new counts and cannot bo
 
 test('guards lock zero through immutable committed inputs',()=>{
   const f=fixture();try{
-    f.put('scripts/ratchet-approval.mjs','export function ratchetApprovalFailures(){return [];}');
-    f.put('scripts/check-platform-ratchets.mjs',`export {comparePlatformList} from '${pathToFileURL(resolve('scripts/check-platform-ratchets.mjs')).href}';
+    f.put('src/scripts/ratchet-approval.mjs','export function ratchetApprovalFailures(){return [];}');
+    f.put('src/scripts/check-platform-ratchets.mjs',`export {comparePlatformList} from '${pathToFileURL(resolve('src/scripts/check-platform-ratchets.mjs')).href}';
 export const PLATFORM_LISTS=['lint/ratchet.json'];`);
     f.put('lint/ratchet.json',JSON.stringify({budgets:{'custom-sections/total':0}}));const base=f.commit();
     f.put('lint/ratchet.json',JSON.stringify({budgets:{'custom-sections/total':1}}));const raised=f.commit();
@@ -338,9 +338,9 @@ export const PLATFORM_LISTS=['lint/ratchet.json'];`);
 
 test('guards refuse paths written as data and a file outside a shard\'s layout',()=>{
   const f=fixture();try{
-    f.put('scripts/ratchet-approval.mjs','export function ratchetApprovalFailures(){return [];}');
-    f.put('scripts/check-platform-ratchets.mjs','export const PLATFORM_LISTS=[];export function comparePlatformList(){return [];}');
-    for(const file of ['check-spelled-paths.mjs','check-shards.mjs','shard-outputs.mjs'])f.put(`scripts/${file}`,readFileSync(resolve('scripts',file),'utf8'));
+    f.put('src/scripts/ratchet-approval.mjs','export function ratchetApprovalFailures(){return [];}');
+    f.put('src/scripts/check-platform-ratchets.mjs','export const PLATFORM_LISTS=[];export function comparePlatformList(){return [];}');
+    for(const file of ['check-spelled-paths.mjs','check-shards.mjs','shard-outputs.mjs'])f.put(`src/scripts/${file}`,readFileSync(resolve('src','scripts',file),'utf8'));
     f.put('lint/shard-layout.json',JSON.stringify({sourceLayout:{requiredFiles:['shard.config.ts'],allowedFiles:[],folders:['data']}}));
     f.put('src/shards/one/shard.config.ts','export default {};\n');f.put('src/shards/one/data/map.json','{"inputs":["data"]}\n');
     f.put('src/client/engine/view.ts','export const view=1;\n');f.put('src/client/engine/isolated-x.test.ts','const names=["client/view"];\n');
@@ -357,9 +357,9 @@ test('guards refuse paths written as data and a file outside a shard\'s layout',
 
 test('the census phase runs the ratchets over the tip, and only for source',()=>{
   const f=fixture();try{
-    for(const file of ['sort-sides.mjs','git-source-view.mjs'])f.put(`scripts/${file}`,readFileSync(resolve('scripts',file),'utf8'));
-    f.put('scripts/check-engine-sides.mjs','console.log("sides fine");\n');
-    f.put('scripts/check-sim-players.mjs',"import {readFileSync} from 'node:fs';if(readFileSync('src/client/app/main.ts','utf8').includes('rose')){console.error('  src/client/app/main.ts: 2 → 4');process.exitCode=1;}\n");
+    for(const file of ['sort-sides.mjs','git-source-view.mjs'])f.put(`src/scripts/${file}`,readFileSync(resolve('src','scripts',file),'utf8'));
+    f.put('src/scripts/check-engine-sides.mjs','console.log("sides fine");\n');
+    f.put('src/scripts/check-sim-players.mjs',"import {readFileSync} from 'node:fs';if(readFileSync('src/client/app/main.ts','utf8').includes('rose')){console.error('  src/client/app/main.ts: 2 → 4');process.exitCode=1;}\n");
     const base=f.commit();
     expect(f.run('census',base,['src/client/app/main.ts'],base).status).toBe(0);
     f.put('src/client/app/main.ts','export const rose=1;\n');const risen=f.commit();
@@ -374,8 +374,8 @@ test('the census phase runs the ratchets over the tip, and only for source',()=>
 test('side edges compare net across a push, so only the published step cannot rise',()=>{
   const f=fixture();try{
     const edges=(count:number)=>JSON.stringify({files:{'src/client/game/a.ts':{'client → server':count}}});
-    f.put('scripts/ratchet-approval.mjs','export function ratchetApprovalFailures(){return [];}');
-    f.put('scripts/check-platform-ratchets.mjs',`export {comparePlatformList} from '${pathToFileURL(resolve('scripts/check-platform-ratchets.mjs')).href}';
+    f.put('src/scripts/ratchet-approval.mjs','export function ratchetApprovalFailures(){return [];}');
+    f.put('src/scripts/check-platform-ratchets.mjs',`export {comparePlatformList} from '${pathToFileURL(resolve('src/scripts/check-platform-ratchets.mjs')).href}';
 export const PLATFORM_LISTS=['lint/engine-side-edges.json'];`);
     f.put('lint/engine-side-edges.json',edges(2));const base=f.commit();
     f.put('lint/engine-side-edges.json',edges(3));const raised=f.commit();
@@ -389,8 +389,8 @@ export const PLATFORM_LISTS=['lint/engine-side-edges.json'];`);
 
 test('a later exact approval repairs a net candidate but cannot approve a larger final row',()=>{
   const f=fixture();try {
-    f.put('scripts/check-platform-ratchets.mjs','export const PLATFORM_LISTS=[];export function comparePlatformList(){return [];}');
-    f.put('scripts/ratchet-approval.mjs',readFileSync(resolve('scripts/ratchet-approval.mjs'),'utf8'));
+    f.put('src/scripts/check-platform-ratchets.mjs','export const PLATFORM_LISTS=[];export function comparePlatformList(){return [];}');
+    f.put('src/scripts/ratchet-approval.mjs',readFileSync(resolve('src/scripts/ratchet-approval.mjs'),'utf8'));
     const rule='wildshard/generator-imports',file='src/client/app/main.ts';
     f.put('lint/ratchet.json',JSON.stringify({[rule]:{[file]:0}}));const base=f.commit();
     f.put('lint/ratchet.json',JSON.stringify({[rule]:{[file]:11}}));const unapproved=f.commit();
@@ -405,8 +405,8 @@ test('a later exact approval repairs a net candidate but cannot approve a larger
 
 test('committed guards seed a new rule atomically and ignore dirty future config for its predecessor',()=>{
   const f=fixture();try {
-    f.put('scripts/check-platform-ratchets.mjs','export const PLATFORM_LISTS=[];export function comparePlatformList(){return [];}');
-    f.put('scripts/ratchet-approval.mjs',readFileSync(resolve('scripts/ratchet-approval.mjs'),'utf8'));
+    f.put('src/scripts/check-platform-ratchets.mjs','export const PLATFORM_LISTS=[];export function comparePlatformList(){return [];}');
+    f.put('src/scripts/ratchet-approval.mjs',readFileSync(resolve('src/scripts/ratchet-approval.mjs'),'utf8'));
     const base=f.commit(),rule='wildshard/no-generated-json-import',file='scripts/old.ts';
     f.put(file,"import rows from './rows.generated.json';export default rows;");
     const predecessor=f.commit();

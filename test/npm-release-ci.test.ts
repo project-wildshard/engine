@@ -14,7 +14,11 @@ const build = 'a'.repeat(40);
 const { version } = JSON.parse(readFileSync('package.json', 'utf8')) as { version: string };
 test('the release tag installs without package build lifecycle hooks', () => {
   const { scripts } = JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> };
-  expect(['prepare', 'prepublish', 'prepack', 'publish'].filter(name => scripts[name])).toEqual([]);
+  // repo-kit D33 makes `prepare` a contract script (it replaced pnpm:devPreinstall). It may only point a Git checkout
+  // at .githooks; anything that builds is still refused.
+  const hooksOnly = 'git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git config core.hooksPath .githooks || true';
+  expect(['prepare', 'prepublish', 'prepack', 'publish']
+    .filter(name => scripts[name] && !(name === 'prepare' && scripts[name] === hooksOnly))).toEqual([]);
 });
 
 const run = 44867215030;
@@ -29,7 +33,7 @@ function admit(qualification: unknown, report = ci, { legacy = false, attempt = 
   // FR6: the selector's verdict on the build. The real one needs git and the Actions API; without a token it says full.
   const selector = reuse === '' ? '' : `
     node() {
-      if [[ "$1" == scripts/ci-selection.mjs ]]; then
+      if [[ "$1" == src/scripts/ci-selection.mjs ]]; then
         [[ "$GITHUB_REF" == "refs/heads/release/v$VERSION" && "$GITHUB_SHA" == "$RELEASE_BUILD" && "$GITHUB_EVENT_NAME" == push && -z "$GITHUB_OUTPUT" ]] || return 1
         printf '%s\\n' "$REUSE"
       else command node "$@"; fi

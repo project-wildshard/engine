@@ -5,7 +5,7 @@ import {mkdirSync,mkdtempSync,writeFileSync,rmSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- All seeded files stay under repository tmp.
 import {resolve,join} from 'node:path';
 import {expect,test} from 'vitest';
-import {sampledHeapBytes,majorHeapGCs,checkHeapRatchet} from '../scripts/memory/jsHeap.mjs';
+import {sampledHeapBytes,majorHeapGCs,checkHeapRatchet} from '../src/scripts/memory/jsHeap.mjs';
 
 const metrics={bootAllocatedBytes:100,settledUsedBytes:50,idleBytesPerSecond:20,majorGCsPer30Seconds:2};
 const baseline=()=>({version:1,baselines:{'brasscap-mesa':{...metrics}}});
@@ -41,9 +41,9 @@ test('seeded regression exits one through the existing memory CLI',()=>{
     const report=join(root,'report.json'),limits=join(root,'limits.json');
     writeFileSync(report,JSON.stringify({readings:[row({bootAllocatedBytes:111})]}));
     writeFileSync(limits,JSON.stringify(baseline()));
-    const result=spawnSync(process.execPath,['scripts/shard-phone-memory.mjs','heap-check',report,limits],{encoding:'utf8'});
+    const result=spawnSync(process.execPath,['src/scripts/shard-phone-memory.mjs','heap-check',report,limits],{encoding:'utf8'});
     expect(result.status).toBe(1);expect(result.stdout).toContain('10% regression');
     writeFileSync(report,JSON.stringify({readings:[row()]}));
-    expect(spawnSync(process.execPath,['scripts/shard-phone-memory.mjs','heap-check',report,limits]).status).toBe(0);
+    expect(spawnSync(process.execPath,['src/scripts/shard-phone-memory.mjs','heap-check',report,limits]).status).toBe(0);
   }finally{rmSync(root,{recursive:true,force:true});}
 });

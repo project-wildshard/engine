@@ -1,4 +1,4 @@
-// J240 / DEV-SPEED DS21: scripts/land.mjs against real git. A bare repo stands
+// J240 / DEV-SPEED DS21: src/scripts/.kit/land.mjs against real git. A bare repo stands
 // in for GitHub (with protect-main's no-force, no-delete rule as an update
 // hook), a post-receive hook records every pushed tip, and a fake `gh` on PATH
 // answers Actions queries only for SHAs that were really pushed.
@@ -11,9 +11,9 @@ import { runInNewContext } from 'node:vm';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
-import { packUnits, runUnits } from '../scripts/ci-pack.mjs';
-import { shaVerdict } from '../scripts/land.mjs';
-import { T1_SHARDS } from '../scripts/t1-shards.mjs';
+import { packUnits, runUnits } from '../src/scripts/ci-pack.mjs';
+import { shaVerdict } from '../src/scripts/.kit/land.mjs';
+import { T1_SHARDS } from '../src/scripts/t1-shards.mjs';
 import { cleanLandFixtures, trackLandFixtureRoot } from './fixtures/land-git';
 
 afterEach(cleanLandFixtures);
@@ -44,7 +44,7 @@ test('boundaries stays blocking and independent; J400 moves quarantine to report
     expect(block, name).toContain("    if: ${{ !startsWith(github.ref, 'refs/heads/plan/') }}");
     expect(block).not.toMatch(/^ {4}continue-on-error:/mu);
   }
-  expect(readFileSync('.github/workflows/ci-reports.yml', 'utf8')).toContain('node scripts/test-quarantine.mjs --shard=1/1');
+  expect(readFileSync('.github/workflows/ci-reports.yml', 'utf8')).toContain('node src/scripts/test-quarantine.mjs --shard=1/1');
   // FLOW-SIMPLE FS5: main never reuses a plan-branch run; there are none (J422).
   expect(readFileSync('.github/workflows/ci.yml', 'utf8')).not.toMatch(/ci-exact-reuse|steps\.reuse/u);
   expect(ciJob('tests')).not.toMatch(/^ {4}if: /mu);
@@ -96,7 +96,7 @@ test('the memory ledger (budgets.yml since BUDGET-CAPS BC9) restores and saves i
   expect(upload).toBeGreaterThan(judge);
   expect(judge).toBeGreaterThan(read);
   expect(ledger.slice(judge, upload)).not.toContain('continue-on-error');
-  expect(ledger.slice(judge, upload)).toContain('node scripts/budgets/cli.mjs check tmp/budgets/measures.json');
+  expect(ledger.slice(judge, upload)).toContain('node src/scripts/budgets/cli.mjs check tmp/budgets/measures.json');
 });
 
 test('the ledger cache keeps current encodes and records both pack digests', () => {
@@ -202,8 +202,8 @@ describe('ci.yml on main', () => {
     const t1 = jobs.get('t1-e2e') ?? '';
     expect(t1).toMatch(/^ {4}needs: products$/mu);
     expect(t1.split('\n')).toContain(`        suite: [${Object.keys(T1_SHARDS).join(', ')}]`);
-    expect(t1).toContain('bash scripts/ci-playwright-install.sh --only-shell chromium');
-    expect(t1).toContain('node scripts/t1-ci-proof.mjs');
+    expect(t1).toContain('bash src/scripts/ci-playwright-install.sh --only-shell chromium');
+    expect(t1).toContain('node src/scripts/t1-ci-proof.mjs');
     expect(t1).toContain('name: template-e2e-${{ matrix.suite }}');
     expect(packed).not.toContain('continue-on-error: true');
     expect(packed).not.toMatch(/Soak |Observe /u);
@@ -212,7 +212,7 @@ describe('ci.yml on main', () => {
     expect(reports).toContain('types: [completed]');
     expect(reports).toContain('github.event.workflow_run.head_sha');
     expect(reports).toContain('github.event.workflow_run.id');
-    expect(reports).toContain('node scripts/test-timings.mjs collect');
+    expect(reports).toContain('node src/scripts/test-timings.mjs collect');
     expect(reports).toContain('Soak hover presses');
     // Reports are read-only source-run follow-ups, never a workflow_run token
     // exposed to fork PR code or granted write permission.
@@ -252,12 +252,12 @@ describe('ci.yml on main', () => {
     expect(street).toContain('ref: ${{ github.event.workflow_run.head_sha }}');
     expect(street).toContain('run-id: ${{ steps.source.outputs.run }}');
     expect(street).toContain('name: nine-ring1-client');
-    expect(street).toContain('node scripts/nine-street-source.mjs');
-    expect(street).toContain('node scripts/nine-ring1.mjs bench');
+    expect(street).toContain('node src/scripts/nine-street-source.mjs');
+    expect(street).toContain('node src/scripts/nine-ring1.mjs bench');
     expect(street).toContain('name: nine-ring1-street');
     expect(street).toContain('if: always()');
     expect(build).not.toMatch(/^ {4}needs:/mu);
-    expect(build).toContain('node scripts/ci-selection.mjs');
+    expect(build).toContain('node src/scripts/ci-selection.mjs');
     expect(build).toContain("steps.paths.outputs.docs != 'true'");
     expect(build).toContain('code-run: ${{ steps.code.outputs.run }}');
     expect(observe).toMatch(/^ {4}needs: nine-ring1-build$/mu);
@@ -265,8 +265,8 @@ describe('ci.yml on main', () => {
     expect(observe).not.toContain('needs.products');
     for (const job of [build, observe]) expect(job).toContain('name: nine-ring1-client');
     expect([...observe.matchAll(/uses: actions\/download-artifact@/gu)]).toHaveLength(1);
-    expect(build).toContain('node scripts/nine-ring1.mjs build');
-    expect(observe).toContain('node scripts/nine-ring1.mjs boot');
+    expect(build).toContain('node src/scripts/nine-ring1.mjs build');
+    expect(observe).toContain('node src/scripts/nine-ring1.mjs boot');
     // Observed free-runner budgets: the previous dependency chain took
     // products496 + build216 + observation317 seconds, despite packed max571.
     const costs = new Map([['products', 496], ['nine-ring1-build', 216], ['nine-ring1', 317]]);

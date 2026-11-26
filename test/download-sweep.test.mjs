@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { rows } from '../scripts/loading-flow/sweep-report.mjs';
+import { rows } from '../src/scripts/loading-flow/sweep-report.mjs';
 
 // J136: the sweep's verdict per row. A row with nothing to read is never a pass.
 const nothing = { gates: {}, flows: {}, titled: null, untitled: null, tasks: null, programs: null, digest: null };

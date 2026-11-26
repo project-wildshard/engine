@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { floorGridPortalPlan, type FloorGridPlan } from '../scripts/frame-floor-grid.mjs';
+import { floorGridPortalPlan, type FloorGridPlan } from '../src/scripts/frame-floor-grid.mjs';
 
 const cell = { instance: 'tower', slug: 'tower', cell: [1, -1] as const };
 const plan: FloorGridPlan = { name: 'tower-road', from: 'tower', to: null,

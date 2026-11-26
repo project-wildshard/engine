@@ -1,7 +1,7 @@
 import {HeldEquipmentSchema} from '@wildshard/format/heldEquipment';
 import * as v from 'valibot';
 import {expect,it} from 'vitest';
-import {sectionType} from '../scripts/section-types.mjs';
+import {sectionType} from '../src/scripts/section-types.mjs';
 
 it('preserves tuple, optional and union shapes and refuses unresolved declaration types',()=>{
   expect(sectionType({type:'object',properties:{at:{type:'array',items:[{type:'number'},{type:'number'}]},mode:{enum:['a','b']}},required:['at'],additionalProperties:false}))

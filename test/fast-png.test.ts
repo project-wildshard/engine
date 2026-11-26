@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import type { Page } from 'playwright';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
-import { captureViewportPng, type CaptureSession, type OpenCaptureSession } from '../scripts/parity/fast-png.mjs';
+import { captureViewportPng, type CaptureSession, type OpenCaptureSession } from '../src/scripts/parity/fast-png.mjs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Model the exact PNG transport returned by supported CDP.
 import { Buffer } from 'node:buffer';
 

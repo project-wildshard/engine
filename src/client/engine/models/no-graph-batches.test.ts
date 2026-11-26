@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // E271 / E272, then PF1 (G936): a graph look batches like a classic one on the guarded batched draws (the grid's cell clip
 // keeps a batch's GL_ANGLE_multi_draw directive first (game/grid/cell-clip-defines.test.ts).
-// Facade declarations remain instanced (scripts/test-facade-instancing.mjs).
+// Facade declarations remain instanced (src/scripts/test-facade-instancing.mjs).
 // oxlint-disable-next-line import/no-nodejs-modules -- Scans the live source for BatchedMesh constructions.
 import { readdirSync, readFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Joins the scanned source paths.

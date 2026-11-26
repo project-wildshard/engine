@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Paths for the owned fixture folders.
 import { dirname, join, resolve } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
-import { writtenBundle } from '../scripts/app-build/writtenBundle';
+import { writtenBundle } from '../src/scripts/app-build/writtenBundle';
 
 mkdirSync('tmp', { recursive: true });
 const root = mkdtempSync(resolve('tmp/sw-bundle-'));

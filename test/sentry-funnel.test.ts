@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
-import { funnelViolations, sourceFiles } from '../scripts/sentry-funnel.mjs';
-import { overLine, table } from '../scripts/sentry-weekly.mjs';
+import { funnelViolations, sourceFiles } from '../src/scripts/sentry-funnel.mjs';
+import { overLine, table } from '../src/scripts/sentry-weekly.mjs';
 
 // SENTRY-ZERO SZ7 (Jake, 2026-11-23: "Everything in sentry MUST be a bug, and it must be fixed and it must be low frequency").
 

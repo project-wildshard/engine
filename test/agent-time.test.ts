@@ -3,7 +3,7 @@ import { expect, test } from 'vitest';
 import { spawnSync } from 'node:child_process';
 
 test('the shared-waits reading parses current sources without inventing missing observations', () => {
-  const result = spawnSync('python3', ['scripts/test_agent_time.py'], { encoding: 'utf8', timeout: 10000 });
+  const result = spawnSync('python3', ['src/scripts/test_agent_time.py'], { encoding: 'utf8', timeout: 10000 });
   expect(result.status, result.stderr).toBe(0);
   expect(result.stderr).toMatch(/Ran [1-9]\d* tests/u);
 });

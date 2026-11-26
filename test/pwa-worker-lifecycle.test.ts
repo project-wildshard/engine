@@ -5,7 +5,7 @@ import { URLPattern, type URLPatternInit } from 'node:url';
 import { expect, test, vi } from 'vitest';
 // Execute the actual bundled worker, including its explicit clock import.
 import { rolldown } from 'rolldown';
-import { LEAVE_PAGE } from '../scripts/app-build/isolation.mjs';
+import { LEAVE_PAGE } from '../src/scripts/app-build/isolation.mjs';
 import { ASSET_CACHE_NAME } from '../src/client/engine/pwa/cacheNames';
 
 const workerBuild = await rolldown({input:'src/client/engine/pwa/sw.js',platform:'browser',transform:{target:'es2022'}});

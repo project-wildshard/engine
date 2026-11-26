@@ -5,8 +5,8 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- A real owned Git fixture for the Ring 1 slug read.
 import { join, resolve } from 'node:path';
-import { FS27_STATIC, PATH_EDGES, TABLE_TESTS, fs27Plan, movedRingSlugs, pinChanges, simRingSlugs, urlReaderTests } from '../scripts/push-path-edges.mjs';
-import { shardPinTests } from '../scripts/gate-related-tests.mjs';
+import { FS27_STATIC, PATH_EDGES, TABLE_TESTS, fs27Plan, movedRingSlugs, pinChanges, simRingSlugs, urlReaderTests } from '../src/scripts/push-path-edges.mjs';
+import { shardPinTests } from '../src/scripts/gate-related-tests.mjs';
 import { staticChecks } from '../.githooks/push-checks.mjs';
 
 // FLOW-SIMPLE FS27: each row is a push that reached main untested on 2026-11-19 and went red there. The gate must
@@ -17,8 +17,8 @@ const PUSHES: { why: string; changed: string; tests?: string[]; static?: string 
   { why: 'save key', changed: 'src/shared/engine/saves/saves.lock.json', static: 'check:saves' },
   { why: 'precompile', changed: 'src/client/engine/render/precompile.ts', tests: ['src/client/engine/render/precompile-first-view.test.ts'] },
   { why: 'loading card', changed: 'src/client/engine/ui/loading.css', tests: ['test/inline-shell-css.test.mjs'], static: 'check:inline-shell-css' },
-  { why: 'chrome-keychain', changed: 'scripts/chromium-keychain.mjs', tests: ['test/tooling/chrome-keychain.test.mjs'] },
-  { why: 'gate-related-tests', changed: 'scripts/gate-related-tests.mjs', tests: ['test/gate-related-tests.test.ts'] },
+  { why: 'chrome-keychain', changed: 'src/scripts/.kit/chromium-keychain.mjs', tests: ['src/test/.kit/chrome-keychain.test.mjs'] },
+  { why: 'gate-related-tests', changed: 'src/scripts/gate-related-tests.mjs', tests: ['test/gate-related-tests.test.ts'] },
 ];
 
 const staticNames = [...staticChecks(), ...FS27_STATIC].map(task => task.name);
@@ -83,8 +83,8 @@ it('steps only the Ring 1 slugs a pin or digest change moves', () => {
   expect(movedRingSlugs({ pins: pins(1), digests: digests('a') }, { pins: pins(1), digests: digests('a') }, 'linux-x64')).toEqual([]);
   const plan = fs27Plan({ mode: 'full', files: ['test/pins/shardfiles.json'] }, { split: true, slugs: ['far-reach'] });
   expect(plan.tasks.at(-1)?.commands.map(command => command.slice(1))).toEqual([
-    ['scripts/pins.ts', 'install', '--ring-slices', '1'],
-    ['--no-warnings', 'scripts/ring-step.ts', '--only', 'far-reach'],
+    ['src/scripts/pins.ts', 'install', '--ring-slices', '1'],
+    ['--no-warnings', 'src/scripts/ring-step.ts', '--only', 'far-reach'],
   ]);
 });
 
@@ -100,19 +100,19 @@ it('adds only tests that name the moved pin, including a shard outside Ring 1', 
       { slug: 'brasscap-mesa', revision }, { slug: 'open-plot-4-1', revision }, { slug: 'pine-hollow', revision: 7 },
     ] }));
     write('test/pins/ring-digests.json', JSON.stringify({ 'linux-x64': { 240: { 'brasscap-mesa': ['h'], 'pine-hollow': ['h'] } } }));
-    git('add', 'test', 'src', 'scripts');
+    git('add', 'test', 'src');
     git('-c', 'user.name=t', '-c', 'user.email=t@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-qm', `r${revision}`, '--no-verify');
     return git('rev-parse', 'HEAD');
   };
   git('init', '-q');
   mkdirSync(join(repo, 'test/pins'), { recursive: true });
-  mkdirSync(join(repo, 'scripts'));
+  mkdirSync(join(repo, 'src/scripts'), { recursive: true });
   mkdirSync(join(repo, 'src/client/app'), { recursive: true });
   mkdirSync(join(repo, 'src/cli'), { recursive: true });
   write('test/released-save.test.ts', "test('resume', () => restore('brasscap-mesa'));");
   write('test/related-plot.test.mjs', "test('walk', () => enter('open-plot-4-1'));");
   write('test/registered.test.ts', "test('read installed product', () => assert(true));");
-  write('scripts/test-folders.json', JSON.stringify({ 'test/registered.test.ts': ['open-plot-4-1'] }));
+  write('src/scripts/test-folders.json', JSON.stringify({ 'test/registered.test.ts': ['open-plot-4-1'] }));
   write('test/unrelated.test.ts', "test('walk', () => enter('pine-hollow'));");
   write('test/other-plot.test.ts', "test('walk', () => enter('open-plot-4-10'));");
   write('src/client/app/brasscap-mesa-entry.test.ts', "test('entry', () => assert(true));");

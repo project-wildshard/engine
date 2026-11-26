@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, test, vi } from 'vitest';
-import { titleViewVisible } from '../scripts/parity/boot-smoke.mjs';
+import { titleViewVisible } from '../src/scripts/parity/boot-smoke.mjs';
 
 afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); });
 

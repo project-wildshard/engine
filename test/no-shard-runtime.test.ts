@@ -6,7 +6,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { resolve } from 'node:path';
 import * as v from 'valibot';
 import { expect, test } from 'vitest';
-import { hardRules } from '../scripts/guard-counts.mjs';
+import { hardRules } from '../src/scripts/guard-counts.mjs';
 
 test('primary authoring law refuses runtime, executable configs and runtime imports without a suffix exemption', () => {
   mkdirSync('tmp', { recursive: true });

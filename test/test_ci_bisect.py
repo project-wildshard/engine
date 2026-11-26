@@ -7,7 +7,7 @@ import sys
 import tempfile
 import unittest
 
-SOURCE = Path(__file__).resolve().parents[1] / 'scripts/ci-bisect.py'
+SOURCE = Path(__file__).resolve().parents[1] / 'src/scripts/ci-bisect.py'
 if '--candidate-stdin' in sys.argv:
     sys.argv.remove('--candidate-stdin')
     POLICY = {'__file__': str(SOURCE), '__name__': 'bisect_fixture'}

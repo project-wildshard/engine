@@ -1,5 +1,5 @@
 // FM5b1 (meta docs/plans/MMO-FAILURE-MODES-PLAN.md, mode 24): does the page's own code still exist? The page publisher signs
-// `/code-retention.json` (FM7, scripts/code-retention.mjs) with the builds it still carries. This reads it against a fresh verified
+// `/code-retention.json` (FM7, src/scripts/code-retention.mjs) with the builds it still carries. This reads it against a fresh verified
 // release, at boot and again on each update poll (the shell calls `check` on `ws-live-build`), and says kept, retired or unknown.
 // Only a verified file that matches the release's channel and build can say retired; a missing legacy file, a failed read or a bad
 // signature is unknown, and never undoes a retirement already verified. Kept code is not a promise of server wire compatibility.

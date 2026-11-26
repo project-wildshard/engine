@@ -28,10 +28,10 @@ jobs:
         with: {node-version: 24, cache: pnpm, cache-dependency-path: "pnpm-lock.yaml\npnpm-workspace.yaml"}
       - uses: ./.github/actions/org-deps
       - run: pnpm install --frozen-lockfile --config.ci=false
-      - run: bash scripts/ci-playwright-install.sh chromium
+      - run: bash src/scripts/ci-playwright-install.sh chromium
       - name: Measure production
         id: watch
-        run: node scripts/shard-size-watch.mjs --upstream https://play.wildshard.io/ --out size-watch
+        run: node src/scripts/shard-size-watch.mjs --upstream https://play.wildshard.io/ --out size-watch
         continue-on-error: true
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()

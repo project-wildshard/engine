@@ -5,9 +5,9 @@ import {execFileSync} from 'node:child_process';
 import {existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Real owned Git fixtures and a real log file.
 import {join, resolve} from 'node:path';
-import {BROWSER_TESTS, LOCAL_FILE_SECONDS, MAIN_PUSH_SPLIT, NATIVE_TESTS, TIMING_TESTS, hostedOnlyReason, landMainMode, logHostedOnly, mainPushed, planBaseRefs, splitLocalTests, splitRequested} from '../scripts/push-local-split.mjs';
-import {provesCode} from '../scripts/ci-proof-jobs.mjs';
-import { capRelated, folderReaderTests, scriptScenarioTests, pushGuards, forceRerunTriggers } from '../scripts/gate-related-tests.mjs';
+import {BROWSER_TESTS, LOCAL_FILE_SECONDS, MAIN_PUSH_SPLIT, NATIVE_TESTS, TIMING_TESTS, hostedOnlyReason, landMainMode, logHostedOnly, mainPushed, planBaseRefs, splitLocalTests, splitRequested} from '../src/scripts/push-local-split.mjs';
+import {provesCode} from '../src/scripts/ci-proof-jobs.mjs';
+import { capRelated, folderReaderTests, scriptScenarioTests, pushGuards, forceRerunTriggers } from '../src/scripts/gate-related-tests.mjs';
 
 const durations = new Map([['test/slow.test.ts', 40], ['test/cheap.test.ts', 1], ['test/mid.test.ts', 8], ['test/cover-grid.test.ts', 30]]);
 const related = [...durations.keys()];
@@ -24,7 +24,7 @@ it('runs native contention rehearsals outside the full gate and keeps original f
   const nightly = readFileSync('.github/workflows/nightly.yml', 'utf8');
   const isolated = /^  native-contention:\n((?: {4}.*\n|\n)+)/mu.exec(nightly)?.[1];
   expect(isolated).toContain('runs-on: ubuntu-24.04');
-  expect(isolated).toContain('node scripts/native-contention-proof.mjs tmp/ci-native-contention');
+  expect(isolated).toContain('node src/scripts/native-contention-proof.mjs tmp/ci-native-contention');
   expect(isolated).not.toContain('matrix:');
 });
 
@@ -35,9 +35,9 @@ it('requires guards and limits forced reruns to root configuration', () => {
   expect(pushGuards(['src/game/world.ts'])).toEqual(fixed);
   for (const root of ['format', 'sdk']) expect(pushGuards([`src/${root}/package.json`]))
     .toEqual(['test/schema-reference.test.ts', ...fixed]);
-  for (const file of ['scripts/worktree.mjs', 'scripts/keep-copy.mjs', '.agents/hooks/active-hours.mjs'])
-    expect(pushGuards([file])).toEqual(['test/tooling/worktree-fresh.test.mjs', ...fixed]);
-  expect(pushGuards(['scripts/memory/iphone/x.mjs'])).toEqual(fixed);
+  for (const file of ['src/scripts/.kit/worktree.mjs', 'src/scripts/.kit/keep-copy.mjs', '.agents/hooks/active-hours.mjs'])
+    expect(pushGuards([file])).toEqual(['src/test/worktree-fresh.test.mjs', ...fixed]);
+  expect(pushGuards(['src/scripts/memory/iphone/x.mjs'])).toEqual(fixed);
   expect(pushGuards(['test/pins/staging.json'])).toEqual(['test/pins-staging.test.ts', ...fixed]);
   expect(forceRerunTriggers('/repo')).toEqual(['/repo/package.json', '/repo/{vitest,vite}.config.*']);
 });
@@ -89,7 +89,7 @@ it('preserves author-source edges for tests consuming complete disk products', (
   expect(folderReaderTests(['src/shards/pine-hollow/generators/sourceOutput.ts'], registry)).toEqual(Object.keys(registry));
   expect(folderReaderTests(['src/shards/driftwood-isle/assets/removed'], registry)).toEqual(['test/scripts/captain.test.ts']);
   expect(folderReaderTests(['src/sharddev/project.ts'], registry)).toEqual(Object.keys(registry));
-  expect(folderReaderTests(['scripts/test-folders.json'], registry)).toEqual(Object.keys(registry));
+  expect(folderReaderTests(['src/scripts/test-folders.json'], registry)).toEqual(Object.keys(registry));
   expect(folderReaderTests(['src/shards/far-reach/data/rows.json', 'docs/ENGINE.md'], registry)).toEqual([]);
 });
 
@@ -191,7 +191,7 @@ it('every Vitest file that launches a real browser is on the browser list', () =
   // A browser launch names its Playwright browser type; a projectile's `.launch(from, velocity)` is not one.
   const launches = execFileSync('git', ['grep', '-l', '-E', String.raw`(chromium|webkit|firefox)\.launch\(|launchPersistentContext|connectOverCDP`, '--', '*.test.ts', '*.test.mjs'], {encoding: 'utf8'}).trim().split('\n');
   // These files name launches in a refusal message, the pattern above, or synthetic marker-check input.
-  const examples = new Set(['test/boot-dist-transfer.test.ts', 'test/gate-related-tests.test.ts', 'test/tooling/agent-network.test.mjs']);
+  const examples = new Set(['test/boot-dist-transfer.test.ts', 'test/gate-related-tests.test.ts', 'src/test/agent-network.test.mjs']);
   for (const file of launches.filter(path => !examples.has(path))) expect(BROWSER_TESTS).toContain(file);
 });
 

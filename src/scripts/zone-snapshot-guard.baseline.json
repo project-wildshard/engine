@@ -1,0 +1,4 @@
+{
+ "about": "ZONE-SNAPSHOTS ZS1: today's zone snapshots; shrink only (node src/scripts/zone-snapshot-guard.mjs --prune)",
+ "offenders": []
+}

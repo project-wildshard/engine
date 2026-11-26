@@ -5,8 +5,8 @@ import { tmpdir } from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { runCli } from '../scripts/budgets/cli.mjs';
-import type { BudgetBaselines } from '../scripts/budgets/files.mjs';
+import { runCli } from '../src/scripts/budgets/cli.mjs';
+import type { BudgetBaselines } from '../src/scripts/budgets/files.mjs';
 
 // BUDGET-CAPS BC3: check, record and declare on fixture files.
 const roots: string[] = [];

@@ -1,9 +1,9 @@
 import { expect, test } from 'vitest';
 // oxlint-disable-next-line import/no-nodejs-modules -- Test the serialized blank-page protocol without touching global native constructors.
 import { createContext, runInContext } from 'node:vm';
-import { runWasmMemoryProbe } from '../scripts/frame-floor-wasm-probe.mjs';
-import { WASM_CONSTRUCTORS_SCRIPT } from '../scripts/frame-floor-wasm-constructors.mjs';
-import { validateFrameFloorArgs } from '../scripts/frame-floor-args.mjs';
+import { runWasmMemoryProbe } from '../src/scripts/frame-floor-wasm-probe.mjs';
+import { WASM_CONSTRUCTORS_SCRIPT } from '../src/scripts/frame-floor-wasm-constructors.mjs';
+import { validateFrameFloorArgs } from '../src/scripts/frame-floor-args.mjs';
 
 test('requires native/Timeline evidence and refuses quiet or a different surface', () => {
   const args = ['--wasm-memory-probe', '--surface=sim', '--wasm-constructors=tmp/native', '--webkit-timeline=tmp/timeline'];

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 
 test('the blocking grid case keeps every original clock, pixel and road assertion', () => {
-  const source = readFileSync('scripts/parity/boot-smoke.mjs', 'utf8');
+  const source = readFileSync('src/scripts/parity/boot-smoke.mjs', 'utf8');
   expect(source).not.toContain('quarantinedGrid');
   expect(source).not.toContain('gridReporting');
   expect(source).toContain('deadline = Date.now() + 150000;');
