@@ -20,7 +20,7 @@ const PAGE = ['index.html', 'sw.js', 'version.json', 'catalogue.json', '.vite/ch
 /** Moved to dist-content: shard content (S1 to S7) and engine art (E1, D1 yes). */
 const CONTENT = ['shardfiles/pine-hollow/shard.json', 'assets/spawn/parts/0123456789abcdef.pack.br', 'assets/spawn/server-build1.json',
   'assets/spawn/packs-build1.json', 'programs/pine-hollow.json', 'assets/grid-strip-mesh-12345678.bin', 'assets/boot-tables-12345678.json',
-  'assets/pine-hollow/baked/a.glb', 'assets/tex/stone.ktx2', 'assets/title/card.webp', 'trailer-15.mp4', 'crossroads-rig/rig.glb'];
+  'assets/pine-hollow/baked/a.glb', 'assets/tex/stone.ktx2', 'assets/title/card.webp', 'assets/sfx/hit.ogg', 'assets/models/rig.glb'];
 
 /** Every file under a root, `/`-separated, sorted. */
 function tree(root: string): string[] {

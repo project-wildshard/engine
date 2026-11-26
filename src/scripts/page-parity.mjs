@@ -4,7 +4,7 @@
 //   node src/scripts/page-parity.mjs <old> <new> [--identity]
 //   node src/scripts/page-parity.mjs https://play.wildshard.io https://<version>-wildshard-play.<subdomain>.workers.dev
 //
-// It asks both hosts for a fixed list of 30 URLs, one or more for each header rule in public/_headers, and compares status, cache-control, content-type, content-encoding, clear-site-data and location, and
+// It asks both hosts for a fixed list of 29 URLs, one or more for each header rule in public/_headers, and compares status, cache-control, content-type, content-encoding, clear-site-data and location, and
 // the decoded body of every 200 (sha256), so a part brotli-encoded twice or a redirect elsewhere is a difference. Hashed names
 // come from the old host's own files (index.html, sw.js, asset-index.json, deploy-chunks.json, the spawn books), so
 // both hosts must serve the same build. Any difference exits 1: J272 answer 3, parity blocks a cutover. `server` and
@@ -52,7 +52,7 @@ function need(what, found) {
   return found.startsWith('/') ? found : `/${found}`;
 }
 
-/** The 30 URLs: the fixed paths, then one hashed name per rule, found on the old host. */
+/** The 29 URLs: the fixed paths, then one hashed name per rule, found on the old host. */
 async function urls() {
   const [page, sw, index, chunks, version] = await Promise.all([text('/'), text('/sw.js'), text('/asset-index.json'),
     text('/deploy-chunks.json'), text('/version.json')]);
@@ -66,7 +66,7 @@ async function urls() {
     text('/shardfiles/driftwood-isle/shard.json')]);
   return [
     '/', '/index.html', '/?doctor', '/index.html?doctor', '/version.json', '/asset-index.json', '/asset-manifest.json',
-    '/manifest.webmanifest', '/sw.js', '/clear-cache.json', '/deploy-chunks.json', '/favicon.png', '/trailer-15.mp4',
+    '/manifest.webmanifest', '/sw.js', '/clear-cache.json', '/deploy-chunks.json', '/favicon.png',
     '/page-parity-missing.js', '/basis/r186/basis_transcoder.wasm',
     need('page chunk', /"(\/b\/[^"]+\.css)"/u.exec(page)?.[1]),
     need('carried build chunk', carried.find(path => path.startsWith(`b/${build}/`) && path.endsWith('.js'))),
@@ -81,7 +81,7 @@ async function urls() {
 }
 
 const list = await urls();
-if (list.length !== 30) throw new Error(`expected 30 URLs, built ${String(list.length)}`);
+if (list.length !== 29) throw new Error(`expected 29 URLs, built ${String(list.length)}`);
 let differences = 0;
 for (const path of list) {
   const [before, after] = await Promise.all([get(oldBase, path), get(newBase, path)]);

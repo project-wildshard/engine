@@ -6,7 +6,7 @@
 //   node src/scripts/page-size.mjs <dist> [--json] [--gate]
 //
 // Kinds: code (`b/`), shell (the documents, worker, root JSON, fonts, icons), runtime (what boot needs from the engine:
-// `assets/physics/`, `basis/`), engine art (every other `assets/` file, the trailers, the crossroads rig), shard content
+// `assets/physics/`, `basis/`), engine art (every other `assets/` file), shard content
 // (S1 to S7 below; S7 is every `assets/` folder or file named for a shard) and maps (`*.map`, `.map.br`, `.map.gz`, wherever they sit). MB is 10^6 bytes.
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -64,7 +64,6 @@ export function classify(path, shards) {
   if (top === 'shardfiles') return { kind: 'shard content', part: 'S1' };
   if (top === 'programs') return { kind: 'shard content', part: 'S5' };
   if (top === 'basis') return { kind: 'runtime' };
-  if (top === 'crossroads-rig' || /^trailer-[\w-]+\.mp4$/u.test(top)) return { kind: 'engine art' };
   if (top !== 'assets') return { kind: 'shell' };
   if (parts.length === 2) return /^(?:grid|boot|world-map)-/u.test(second) ? { kind: 'shard content', part: 'S6' } : { kind: 'engine art' };
   if (second === 'physics') return { kind: 'runtime' };

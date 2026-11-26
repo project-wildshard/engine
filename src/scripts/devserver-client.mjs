@@ -6,7 +6,7 @@
 //
 // The archive is `build-app.mjs --mode devserver`, minus what only a first-party page reads: the pinned shards' folders
 // (their `discovery.json` stays, the title deck reads it, and so does the card art it names under `art`), their asset
-// folders and KTX2 and baked textures, spawn sets, programs, drafts, trailers and source maps. The author's own shard comes
+// folders and KTX2 and baked textures, spawn sets, programs, drafts and source maps. The author's own shard comes
 // from `wildshard dev`'s build. TC13 (mini QA, 2026-11-16): v0.1.29's archive kept the discovery files but not their art,
 // so every card image 404ed in a fresh SDK project; a named art file the archive lacks now refuses the archive.
 //
@@ -28,7 +28,7 @@ export const DEV_CLIENT_ASSET = 'devserver-client.tar.gz';
 export const PREPARATION_CLIENT_ASSET = 'preparation-client.tar.gz';
 /** @typedef {'devserver' | 'preparation'} ClientKind */
 /** Top-level paths (and `assets/` folders) a devserver page never reads. */
-const DROP_TOP = ['programs', 'drafts', 'trailer-15.mp4', 'trailer-30.mp4'];
+const DROP_TOP = ['programs', 'drafts'];
 const DROP_ASSETS = ['driftwood-isle', 'far-reach', 'nalati', 'nine-dragon', 'pine-hollow', 'sunscar-dunes', 'practice'];
 /** `assets/gpu/` (KTX2 stand-ins): the shards' own folders go; the engine's `tex`, `models` and `horizon` stay. */
 const DROP_GPU = ['baked', 'far-reach', 'nalati', 'nine-dragon', 'pine-hollow'];

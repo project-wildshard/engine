@@ -14,6 +14,7 @@ import { bakeGridSeams, writeGridSeams } from "./app-build/gridSeams.mjs";
 import { checkNoTopLevelAwait } from "./app-build/noTopLevelAwait.mjs";
 import { checkImportMaps } from "./app-build/importMap.mjs";
 import { checkOneThree } from "./app-build/oneThree.mjs";
+import { checkNoJunk } from "./app-build/noJunk.mjs";
 import { nameChunksByFinalBytes } from "./app-build/finalChunkNames.mjs";
 import { writeTitleAssets } from "./title-assets.mjs";
 import {
@@ -234,15 +235,6 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
   const { checkServerOutput, standaloneServerFile, writeStandaloneOutput } = await import("./app-build/standaloneOutput.mjs");
   await writeStandaloneOutput(outDir, buildId, process.cwd(), { preview: solo, devserver: mode === "devserver" });
 
-  // the crossroads phone rig beside the bundle (was vite/crossroadsRig.ts); before the worker, which counts its files
-  step([
-    "--import",
-    "./src/scripts/bake-loader.mjs",
-    "--input-type=module",
-    "-e",
-    "(await import('./src/scripts/app-build/crossroadsRig.ts')).writeCrossroadsRig(process.argv[1], process.cwd(), (await import('./src/scripts/api-origin.mjs')).apiOriginSet());",
-    outDir,
-  ]);
   // J217 (LD6b): chunks name each other through each document's import map; with every document and bundle written,
   // refuse a document without its map, or a request that resolves nowhere
   checkImportMaps(outDir);
@@ -320,6 +312,8 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
   );
 
   checkServerOutput(outDir, solo);
+  // QA 11-26 row 14: no video and no measuring rig in a page build
+  checkNoJunk(outDir);
 
   // OFF-VERCEL OV3: dist/ is the Workers asset directory. Refuse what Workers static assets would refuse.
   if (outDir === resolve("dist")) console.log(`Asset limits: ${describeAssetLimits(assertAssetLimits(outDir))}`);

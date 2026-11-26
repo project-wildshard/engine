@@ -82,7 +82,7 @@ async function pageServer(): Promise<NonNullable<typeof page>> {
     mkdirSync(dirname(file), { recursive: true });
     writeFileSync(file, path.endsWith('.pack.br') ? STORED : path === '/' ? '<!doctype html>' : 'x'.repeat(2048));
   }
-  writeFileSync(join(root, 'dist/trailer-15.mp4'), Buffer.alloc(4096, 1));
+  writeFileSync(join(root, 'dist/range-probe.bin'), Buffer.alloc(4096, 1));
   // The build copies public/ into dist (copyDeferredPublic), _headers with it.
   copyFileSync(resolve('public/_headers'), join(root, 'dist/_headers'));
   const env = { ...process.env, WRANGLER_SEND_METRICS: 'false', WRANGLER_LOG_PATH: join(root, 'logs'), CLOUDFLARE_API_TOKEN: '', CI: '1' };
@@ -212,10 +212,10 @@ test('version URLs say noindex; the channel hosts do not', async () => {
   }
 }, 30_000);
 
-// Workers static assets answer a Range request with the whole file (no 206). The trailers move to packs.wildshard.io
-// (J272 answer 6), so nothing here serves a range; this pins the behavior so a change is seen.
+// Workers static assets answer a Range request with the whole file (no 206). The page serves no video (QA 11-26 row 14)
+// and large media lives on packs.wildshard.io (J272 answer 6), so nothing here needs a range; this pins the behavior.
 test('a Range request gets the whole file, 200', async () => {
-  const response = await wire(new URL('/trailer-15.mp4', served()), { range: 'bytes=0-9' });
+  const response = await wire(new URL('/range-probe.bin', served()), { range: 'bytes=0-9' });
   expect([response.status, response.bytes.length, response.headers['content-range']]).toEqual([200, 4096, undefined]);
 }, 30_000);
 

@@ -1,9 +1,10 @@
 # Production memory check (SF22c, E435)
 
 Pause ▸ Settings ▸ Debug ▸ Memory check ▸ Run opens `/crossroads-rig/` in the same tab. One tap runs three checks,
-disposes each renderer, posts each result and a summary, then offers Return to game. This static page is emitted by
-`src/scripts/app-build/crossroadsRig.ts` in every production web build. It has no configuration controls or URL switches. The separate
-SF22a developer tool retains its configurable entry.
+disposes each renderer, posts each result and a summary, then offers Return to game. No page build ships this static
+page any more (QA 11-26 row 14): stage it by hand into a served build with
+`node --import ./src/scripts/bake-loader.mjs src/scripts/app-build/crossroadsRig.ts <served dist dir>`. It has no
+configuration controls or URL switches. The separate SF22a developer tool retains its configurable entry (`stage.sh`).
 
 `crossroadsConfig()` in `src/format/contentBounds.ts` supplies the fixed caps-v1 configuration to both the page and the API validator:
 29 L0 tiles (21 resident plus 8 lookahead), 32 L1 tiles, 9 far proxies, 4 libraries and 4 simulations; render scale 2,
