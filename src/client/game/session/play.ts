@@ -847,7 +847,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   }, game.levelScope);
   app.addSystem({ id: 'engine.player.regen', phase: 'update', after: ['main.frame'], before: ['engine.player.hud'], run: (dt) => playerHealth.update(dt) }, game.levelScope);
 
-  // `?at=x,y,z,yaw,pitch` — a review note's repro URL (src/client/engine/ui/Feedback.ts reproUrl) starts you on the spot it was filed from
+  // `?at=x,y,z,yaw,pitch`: a harness's start pose (a review note files its pose as a field, Feedback.ts filedAt, CHUNK-PARAM CP7)
   const at = (params.get('at') ?? '').split(',').map(Number);
   if (session.recovery === undefined && at.length >= 3 && at.every((v) => Number.isFinite(v))) {
     const [x = 0, y = 0, z = 0, yaw = player.yaw, pitch = 0] = at;

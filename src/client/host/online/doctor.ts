@@ -34,7 +34,7 @@ export interface DoctorConfig {
   readonly world?: { readonly release: string; readonly key: string };
   /** The page's origin, where `version.json` lives. */
   readonly origin: string;
-  /** The cell the player was loading (`?chunk=`), when the doctor knows it. */
+  /** The cell the player was loading (the game page's handoff, CHUNK-PARAM CP7), when the doctor knows it. */
   readonly cell?: string;
   /** A check's time limit in ms. */
   readonly limitMs?: number;

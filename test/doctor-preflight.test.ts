@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, test } from 'vitest';
-import { doctorPreflight, openDoctorPage } from '../src/client/engine/ui/errorScreen';
+import { doctorPreflight, doctorUrl, openDoctorPage } from '../src/client/engine/ui/errorScreen';
+import { filedAt } from '../src/client/engine/ui/Feedback';
 
 // FM8 mode 14 (meta MMO-FAILURE-MODES-PLAN): the Connection doctor opens only after its own page answers a preflight; one that
 // doesn't leaves the player's page as it was, with a card that says so.
@@ -33,4 +34,14 @@ test('a doctor that does not answer keeps the page, shows doctor-http, and Try a
   expect(document.querySelectorAll('[data-failmode="doctor-http"]')).toHaveLength(1);
   [...document.querySelectorAll<HTMLButtonElement>('[data-failmode="doctor-http"] button')].find(button => button.textContent === 'Back to the game')?.click();
   expect(document.querySelector('[data-failmode="doctor-http"]')).toBeNull();
+});
+
+test('CHUNK-PARAM CP7: the doctor\'s address and a note name no zone in a URL; the note carries zone and pose as fields', () => {
+  const doctor = new URL(doctorUrl('load-failure', { origin: 'https://wildshard.io', search: '?chunk=pine-hollow&mute=1' } as Location));
+  expect([...doctor.searchParams.keys()]).toEqual(['sw', 'from']);
+  const filed = filedAt({ shard: 'pine-hollow', pos: [1.234, 2, 3], yaw: 0.5, pitch: -0.1, weapon: 'iron' });
+  expect(filed).toMatchObject({ zone: 'pine-hollow' });
+  expect(filed['pose']).toHaveLength(5);
+  expect(JSON.stringify(filed)).not.toMatch(/chunk=|https?:/u);
+  expect(filedAt({ shard: 'pine-hollow', explore: 'world', cam: [1, 2, 3, 0, 0], model: 'tree' })).toEqual({ zone: 'pine-hollow', explore: 'world', cam: [1, 2, 3, 0, 0], model: 'tree' });
 });

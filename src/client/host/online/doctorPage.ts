@@ -6,21 +6,22 @@ import { openDoctor } from './doctorView';
 const DOCTOR_EARLIER_KEY = 'doctor.earlier';
 
 const stamps = globalThis as { __WS_BUILD_ID__?: string; __WS_WORLD__?: { release: string; key: string } };
-const chunk = new URLSearchParams(location.search).get('chunk');
 /** What the game page left (src/client/engine/ui/errorScreen.ts openDoctorPage): its LS4 report and the way back. A direct link has neither. */
-function handoff(): { readonly earlier: string | null; readonly back: string } {
+function handoff(): { readonly earlier: string | null; readonly back: string; readonly zone: string | null } {
   try {
     // oxlint-disable-next-line wildshard/no-raw-save -- this page loads no save service; it reads the one handoff key errorScreen.ts wrote
     const raw = sessionStorage.getItem(DOCTOR_EARLIER_KEY);
     // oxlint-disable-next-line wildshard/no-raw-save -- the same handoff key, read once
     sessionStorage.removeItem(DOCTOR_EARLIER_KEY);
-    const said = JSON.parse(raw ?? '{}') as { earlier?: unknown; back?: unknown };
+    const said = JSON.parse(raw ?? '{}') as { earlier?: unknown; back?: unknown; zone?: unknown };
     // Only a path on this origin: the way back is never another site.
     const back = typeof said.back === 'string' && said.back.startsWith('/') && !said.back.startsWith('//') ? said.back : '/';
-    return { earlier: typeof said.earlier === 'string' ? said.earlier : null, back };
-  } catch { return { earlier: null, back: '/' }; }
+    // CHUNK-PARAM CP7 (J522): the zone the page was loading, from its handoff (an address names none); shaped like a zone or nothing
+    const zone = typeof said.zone === 'string' && /^[a-z0-9_-]{1,64}$/u.test(said.zone) ? said.zone : null;
+    return { earlier: typeof said.earlier === 'string' ? said.earlier : null, back, zone };
+  } catch { return { earlier: null, back: '/', zone: null }; }
 }
-const { earlier, back } = handoff();
+const { earlier, back, zone } = handoff();
 document.querySelector('[data-doctor-shell]')?.remove();
-openDoctor({ build: stamps.__WS_BUILD_ID__ ?? '', origin: location.origin, ...stamps.__WS_WORLD__ === undefined ? {} : { world: stamps.__WS_WORLD__ }, ...chunk === null ? {} : { cell: chunk } },
+openDoctor({ build: stamps.__WS_BUILD_ID__ ?? '', origin: location.origin, ...stamps.__WS_WORLD__ === undefined ? {} : { world: stamps.__WS_WORLD__ }, ...zone === null ? {} : { cell: zone } },
   { label: back === '/' ? 'Open the game' : 'Back to game', go: () => { location.assign(back); } }, earlier); // exit: player (the doctor page runs no world)

@@ -1,4 +1,4 @@
-import { leaveSaved, markReload, markUnload } from '../boot/lastEnd';
+import { leaveSaved, markReload, markUnload, runningZone } from '../boot/lastEnd';
 import { showReloading } from './reloadCover';
 import { leaveAfterPaint } from '../boot/leaveAfterPaint';
 import { engineString } from '../../../shared/engine/strings';
@@ -23,11 +23,11 @@ const scope = uiScope('loadFailure', app.engineScope);
 /** A build stamped with a world (`WILDSHARD_RELEASE_URL`): only these show the title's Check connection. */
 export function hasOnlineWorld(): boolean { return (globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__ !== undefined; }
 
-/** The doctor's address from this page: where it came from, and the cell it was loading. */
+/** The doctor's address from this page: where it came from. The zone it was loading rides in the same-origin handoff (CHUNK-PARAM
+ *  CP7, J522), never in the address. */
 export function doctorUrl(from: string, at: Location = location): string {
-  const url = new URL('/doctor/', at.origin), here = new URLSearchParams(at.search), chunk = here.get('chunk');
+  const url = new URL('/doctor/', at.origin);
   url.searchParams.set('sw', '0'); url.searchParams.set('from', from);
-  if (chunk !== null) url.searchParams.set('chunk', chunk);
   return url.href;
 }
 
@@ -80,7 +80,7 @@ export async function openDoctorPage(from: string, read: typeof fetch = fetch): 
   const report = diagnosticsSource();
   try {
     // oxlint-disable-next-line wildshard/no-raw-save -- one tab-scoped handoff key the doctor's page reads; that page loads no save service
-    sessionStorage.setItem(DOCTOR_EARLIER_KEY, JSON.stringify({ earlier: report === null ? null : report(), back: `${location.pathname}${location.search}` }));
+    sessionStorage.setItem(DOCTOR_EARLIER_KEY, JSON.stringify({ earlier: report === null ? null : report(), back: `${location.pathname}${location.search}`, zone: runningZone() }));
   } catch { /* storage refused: the doctor still runs, its report is just shorter */ }
   leaveSaved(() => { markUnload('doctor'); location.assign(url); });
   return true;

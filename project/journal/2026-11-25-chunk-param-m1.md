@@ -46,3 +46,10 @@
   a prefix it doesn't know, so against one the hello goes alone and the page is seated where the world keeps it (Q3's stated
   cost for the deploy window, either way round). The door dropped `gotoCell` and `gotoSpawn`; a bad word is counted, not fatal.
 - The client's hello waits for the door's first word only on a page with a cell to ask for (at most 3 s), so nothing else moves.
+
+# The doctor and a note name the zone without a link (opus-chunk, CP7)
+
+- The doctor's address carried `?chunk=` from the page's own; the page's address names none now, so the zone rides in the
+  same-origin handoff the page already writes (`doctor.earlier`, `zone` from the alive beat's `runningZone()`).
+- A review note sent `repro`, a reload link with `?chunk=`; it sends `zone` and `pose` (or Explore's view) as fields instead
+  (`filedAt`). The drain-inbox skill reads them in meta CP18.

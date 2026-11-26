@@ -230,6 +230,8 @@ export class PageLife {
 
   /** what the alive beat and markUnload record: the running shard and the resident list (main.ts, once the host exists) */
   setAliveSource(fn: () => AliveInfo): void { this.source = fn; this.beat(); }
+  /** CHUNK-PARAM CP7: the zone this page runs now, as its alive beat names it ('' before one runs). */
+  runningZone(): string { try { return this.source?.().slug ?? ''; } catch { return ''; } }
 
   private stamp(): Stamp {
     let info: AliveInfo = { slug: '', resident: '', mode: '' };
@@ -383,6 +385,8 @@ export class PageLife {
 /** this page's life record (the page scope) */
 const page = new PageLife(pageScope);
 export function setAliveSource(fn: () => AliveInfo): void { page.setAliveSource(fn); }
+/** CHUNK-PARAM CP7 (J522): the zone this page runs now ('' on the title): the doctor's handoff and a note name it, never an address. */
+export function runningZone(): string { return page.runningZone(); }
 export function markUnload(reason: string): void { page.markUnload(reason); }
 /** KP4: how long a markUnload / markReload keeps the leave guard (src/client/engine/ui/leaveGuard.ts) down; a save before
  *  the navigation waits at most LEAVE_WAIT_MS, so this outlasts it */

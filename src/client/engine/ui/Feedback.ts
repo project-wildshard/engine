@@ -47,23 +47,21 @@ const button = (cls: string, html: string): HTMLButtonElement => { const b = doc
 /** compass heading as the HUD shows it: +Z is north, `180 − yaw°` (src/client/engine/ui/HUD.ts) */
 export function headingDeg(yaw: number): number { const d = 180 - (yaw * 180) / Math.PI; return Math.round(((d % 360) + 360) % 360) % 360; }
 
-/** the URL that reloads the game on this spot: `?chunk=&at=x,y,z,yaw,pitch&weapon=&skipintro` (main.ts reads `at`), or in Explore `?chunk=&explore=&cam=&model=` */
-export function reproUrl(origin: string, c: Record<string, ContextValue>): string {
-  const q = new URLSearchParams();
-  if (typeof c['shard'] === 'string') q.set('chunk', c['shard']);
-  // a note filed in Explore World reopens the same view: `?explore=world|model&cam=x,y,z,yaw,pitch&model=id` (main.ts)
+/** CHUNK-PARAM CP7 (J522): where a note was filed, as fields, never a link that names a zone: the zone, and the pose in the level's
+ *  authored frame (less its runtime datum, G164) as `x,y,z,yaw,pitch`; in Explore its view (`explore`, `cam`, `model`). The
+ *  drain-inbox skill reads them (meta CP18). */
+export function filedAt(c: Record<string, ContextValue>): Record<string, ContextValue> {
+  const out: Record<string, ContextValue> = {};
+  if (typeof c['shard'] === 'string') out['zone'] = c['shard'];
   if (typeof c['explore'] === 'string') {
-    q.set('explore', c['explore']);
-    if (Array.isArray(c['cam'])) q.set('cam', c['cam'].map((v) => Number(v.toFixed(2))).join(','));
-    if (typeof c['model'] === 'string') q.set('model', c['model']);
-    return engineString('s_ba48ed755795', [origin, q.toString()]);
+    out['explore'] = c['explore'];
+    if (Array.isArray(c['cam'])) out['cam'] = c['cam'].map((v) => Number(v.toFixed(2)));
+    if (typeof c['model'] === 'string') out['model'] = c['model'];
+    return out;
   }
   const pos = c['pos'], yaw = c['yaw'], pitch = c['pitch'];
-  // `at`'s y is in the level's authored frame (less its runtime datum, G164), as every `?at=` writer keeps it
-  if (Array.isArray(pos) && typeof yaw === 'number' && typeof pitch === 'number') q.set('at', [...pos.map((v, i) => (i === 1 ? v - terrainDatum() : v)), yaw, pitch].map((v) => Number(v.toFixed(2))).join(','));
-  if (typeof c['weapon'] === 'string') q.set('weapon', c['weapon']);
-  q.set('skipintro', '');
-  return engineString('s_ba48ed755795', [origin, q.toString().replace('skipintro=', 'skipintro')]);
+  if (Array.isArray(pos) && typeof yaw === 'number' && typeof pitch === 'number') out['pose'] = [...pos.map((v, i) => (i === 1 ? v - terrainDatum() : v)), yaw, pitch].map((v) => Number(v.toFixed(2)));
+  return out;
 }
 
 /** the frame with the pen strokes drawn on it, as a JPEG data URL under SHOT_MAX_BYTES (quality steps down until it fits) */
@@ -329,7 +327,7 @@ export class Feedback {
       ua: navigator.userAgent,
       url: location.href,
       at: new Date().toISOString(),
-      repro: reproUrl(location.origin, this.ctx),
+      ...filedAt(this.ctx),
     };
     const screenshot = this.shot ? bake(this.shot, this.strokes) : null;
     const r = await sendNote({ note, category: this.category, context, screenshot });
