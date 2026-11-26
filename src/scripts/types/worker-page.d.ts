@@ -47,7 +47,7 @@ export interface WorkerSaveDocument {
 
 /** Observations made while real input goes through the worker. */
 export type RepairWindow = WorkerWindow & {
-  __returnVictim: { id: string; at: number[]; boars: string[] } | null;
+  __returnVictim: { id: string; handle: number; at: number[] } | null;
   __windupProof: { events: { id: string; duration: number; serverDuration: number; stamp: number; at: number }[]; cues: number[]; warning: number | null; hints: string[]; hit: number | null };
   __repairProof: { damage: { amount: number; head: boolean; died: boolean }[]; sounds: string[]; blood: number; kills: number; deaths: string[]; floats: string[]; loose: string[]; sailorAt: number[] | null };
   __pineLife: { carcasses: { a: Animal; comeT: number; site: number }[]; ravens: { state: number }[] };

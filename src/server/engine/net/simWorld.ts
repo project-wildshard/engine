@@ -121,7 +121,7 @@ export class SimNetWorld implements NetWorld {
     for (const [id, sim] of host.entities) {
       sim.samplePose(pose);
       const view: AnimalNetView = { sim, pose, target: targets.get(id) ?? null, rideable: actRoutes(this.host).mountable?.(id) === true };
-      visitor.entity(id, ANIMAL_CLASS, view);
+      visitor.entity(id, ANIMAL_CLASS, view, sim.lives);
     }
     for (const [id, read] of encounterRows(host)) visitor.entity(id, ENCOUNTER_CLASS, read());
     const { bodies, state, world } = shardRows(host);

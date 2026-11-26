@@ -23,7 +23,7 @@ export async function creatureReturns(browser, phone, base, step) {
       world.game.levelScope.onDispose(client.onCombat(event => {
         if (event.kind !== 'hit' || !event.killed || event.confirmFor === 0 || w.__returnVictim !== null) return;
         const info = client.entities.get(event.target);
-        if (info?.initial.kind === 'boar') w.__returnVictim = { id: info.id, at: [...event.at], boars: [...client.entities.values()].filter(candidate => candidate.initial.kind === 'boar').map(candidate => candidate.id) };
+        if (info?.initial.kind === 'boar') w.__returnVictim = { id: info.id, handle: event.target, at: [...event.at] };
       }));
     });
     await step('creature-hit: S3 real boar return is server-owned and creates no page population', async () => {
@@ -43,10 +43,12 @@ export async function creatureReturns(browser, phone, base, step) {
       for (let beat = 0; beat < 45; beat++) { await page.waitForTimeout(10_000); if (beat % 6 === 0) console.log(`creature-hit: S3 waiting on authored return (${beat * 10}s)`); }
       await page.evaluate(({ at }) => (/** @type {RepairWindow} */ (window)).__wildshard.world.player.link.place(at[0] ?? 0, (at[1] ?? 0) + 1, (at[2] ?? 0) + 5, 0), victim);
       await page.waitForTimeout(2500);
-      const out = await page.evaluate(({ id, boars }) => {
+      // QA 11-25 row 86 (b): a return stands the boar up under its own id, as a new life with a fresh handle. The dead handle
+      // leaves the client (its corpse retires) and the return arrives as a new body, alive.
+      const out = await page.evaluate(({ id, handle }) => {
         const w = /** @type {RepairWindow} */ (window), client = /** @type {import('../client/engine/net/client').NetClient} */ (Reflect.get(w.__wildshard.world.player.link, 'client'));
-        const old = [...client.entities.values()].some(info => info.id === id);
-        const rows = [...client.entities].filter(([, info]) => info.initial.kind === 'boar' && !boars.includes(info.id)).map(([handle, info]) => ({ id: info.id, row: client.latest === null ? null : client.fields(client.latest, handle) }));
+        const old = client.entities.has(handle);
+        const rows = [...client.entities].filter(([known, info]) => info.id === id && known !== handle).map(([known, info]) => ({ id: info.id, handle: known, row: client.latest === null ? null : client.fields(client.latest, known) }));
         return { id, old, rows, local: ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.animals?.() ?? w.__wildshard.world.animals).animals.filter(a => !a.rowDriven).length, kills: w.__workerClient().kills, closed: w.__workerClient().closed };
       }, victim);
       return { ok: !out.old && out.rows.some(entry => entry.row?.alive === true) && out.local === 0 && out.kills >= 1 && out.closed === null, ...out };

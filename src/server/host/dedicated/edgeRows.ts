@@ -55,7 +55,7 @@ export function edgeAnimal(host: SimHost, id: string, sim: AnimalSim, dx: number
     const pose: AnimalPoseSample = { attackT: -1, attackDur: 1, groundY: 0, tiltRollT: 0, stunT: 0, flinch: 0, flinchRoll: 0, flinchPitch: 0, brace: 0, deathSide: 0 };
     const view: AnimalNetView = { sim: shifted(sim, dx, dz), pose, target: null, rideable: false, road: true };
     return { source: sim, live: () => host.entities.get(id) === sim,
-      say: (row, visitor) => { sim.samplePose(pose); visitor.entity(row, ANIMAL_CLASS, view); } };
+      say: (row, visitor) => { sim.samplePose(pose); visitor.entity(row, ANIMAL_CLASS, view, sim.lives); } };
   } };
 }
 

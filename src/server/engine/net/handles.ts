@@ -8,6 +8,8 @@ const SLOTS = 0x1000, GENERATIONS = 0x10;
 export interface NetEntityRow {
   readonly handle: number; readonly id: string; readonly cls: NetClass<never>;
   readonly initial: readonly number[]; readonly text: readonly string[];
+  /** The body's life this handle names: one that stands again after a death is a new body to a client. */
+  readonly life: number;
   seen: number;
 }
 
@@ -18,7 +20,7 @@ export class NetHandles {
   private readonly generations = new Uint8Array(SLOTS);
   private readonly free: number[] = [];
   private nextSlot = 1; // handle 0 means "none" in a `ref` field
-  /** Rows whose id took a fresh handle when their text changed; each retires at the next sweep. */
+  /** Rows whose id took a fresh handle when their text or life changed; each retires at the next sweep. */
   private readonly replaced = new Set<number>();
   /** The last sweep's retired handles whose id took a fresh one: a client hears each go before its successor's spawn, as a
    *  client drops a body's id on its despawn. */
@@ -33,18 +35,20 @@ export class NetHandles {
    * Mark an entity present this frame, assigning its handle and reading its initial fields the first time. A row whose text
    * (a player's Name) no longer reads the same takes a fresh handle, and the old one retires at the next sweep: a room's lead
    * body (`actor.player`) is the next player's once its holder leaves, and its Name travels only in a spawn. Reads the text,
-   * never sends it: a client hears a Name again only when it changed.
+   * never sends it: a client hears a Name again only when it changed. A body that stood again after a death (`life`, a
+   * creature's return or revival) takes a fresh handle the same way: a page cannot stand a body it showed dying back up, so
+   * the dead one leaves it, after its last hits and death, and the return spawns new (QA 11-25 row 86).
    */
-  touch<S>(id: string, cls: NetClass<S>, view: S, serial: number): NetEntityRow {
+  touch<S>(id: string, cls: NetClass<S>, view: S, serial: number, life = 0): NetEntityRow {
     const existing = this.byId.get(id);
     if (existing !== undefined) {
-      if (sameText(existing, cls, view)) { existing.seen = serial; return existing; }
+      if (existing.life === life && sameText(existing, cls, view)) { existing.seen = serial; return existing; }
       this.byId.delete(id); this.replaced.add(existing.handle);
     }
     const slot = this.free.pop() ?? this.nextSlot++;
     if (slot >= SLOTS) throw new RangeError('Net handles exhausted');
     const handle = slot | ((this.generations[slot] ?? 0) << 12);
-    const row: NetEntityRow = { handle, id, cls, initial: cls.initial.map(column => column.sample(view, this.refs)), text: cls.text.map(field => field.read(view)), seen: serial };
+    const row: NetEntityRow = { handle, id, cls, initial: cls.initial.map(column => column.sample(view, this.refs)), text: cls.text.map(field => field.read(view)), life, seen: serial };
     this.byId.set(id, row); this.byHandle.set(handle, row);
     return row;
   }

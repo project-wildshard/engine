@@ -88,7 +88,7 @@ async function buildLoadout(ctx: Awaited<ReturnType<typeof worldStage>>) : Promi
   const shardSword = (await step('weapon', () => Promise.all([viewmodelTexturesReady(), chunk.sword?.() ?? null])))[1]; // the viewmodels' textures from the worker + the lever-action's model (usually long done) + the shard's own sword (ShardManifest.sword); the build below is synchronous
   let arena: Arena | null = null;
   // contact leaves the client when a server owns the player: it settles each blow and its `hit` plays it (J47)
-  const targets: Targets = authoredTargets(app.events, { raycast: (origin, dir, maxDist) => player.link === null ? animals.raycast(origin, dir, maxDist) : null }, () => arena?.entered === true ? arena : null);
+  const targets: Targets = authoredTargets(app.events, animals, () => arena?.entered === true ? arena : null, () => player.link === null);
   bindEquipmentActors(targets,animals,game.levelScope);
   const swimArms = shardSword?.swim;
   const authoredKit = await boot.runtime.buildEquipment?.(targets, nolock, shardSword);

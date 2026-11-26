@@ -252,9 +252,13 @@ export class AnimalSim {
   /** CC59: a brain hook's `ability` answer: the strike its brain tries next, before its own pick; null for none. */
   nextAbility: string | null = null;
   get lockRange(): number | undefined { return this.simSpec.flight?.lockRange; }
+  /** How many times this body stood again after a death. A room gives each life its own handle: a page cannot stand a
+   *  presented death back up, so the dead body leaves it and the return arrives as a new one (QA 11-25 row 86). */
+  lives = 0;
   /** TEMPLATE-E2E TC-E2: a dead body stands again, whole (a data spawn's `respawn`); `place` it first. */
   revive(): void {
     if (this.alive) return;
+    this.lives++;
     this.alive = true; this.hp = this.maxHp; this.state = 'idle'; this.deathT = -1; this.lastHitT = -Infinity;
     this.flinch = 0; this.flinchRoll = 0; this.flinchPitch = 0; this.stunT = 0; this.pushT = 0; this.brace = 0;
     this.speed = 0; this.desiredSpeed = 0; this.strafe = 0; this.desiredStrafe = 0; this.attackT = -1;

@@ -10,11 +10,13 @@ declare module '../../../client/engine/events/maps' {
     'combat.aimTargets': [readonly AimTarget[], readonly AimTarget[]];
   }
 }
-/** An authored target source may refine the nearer creature hit. Practice uses its own isolated targets. */
-export function authoredTargets(events: Events, creatures: Targets, practice: () => Targets | null): Targets {
+/** An authored target source may refine the nearer creature hit. Practice uses its own isolated targets. While a server
+ *  owns the player (`settles` false), a blow on a creature leaves the page: the server settles it and its `hit` presents
+ *  it (J47), so a page that also settled it locally presented every blow twice (QA 11-25 row 86, the grid). */
+export function authoredTargets(events: Events, creatures: Targets, practice: () => Targets | null, settles: () => boolean): Targets {
   return { raycast: (origin, dir, maxDist) => {
     const room = practice();
     if (room !== null) return room.raycast(origin, dir, maxDist);
-    return events.ask('combat.targets.ray', { origin, dir, maxDist, hit: creatures.raycast(origin, dir, maxDist) }).hit;
+    return events.ask('combat.targets.ray', { origin, dir, maxDist, hit: settles() ? creatures.raycast(origin, dir, maxDist) : null }).hit;
   } };
 }

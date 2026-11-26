@@ -52,7 +52,8 @@ export interface NetPlayer { readonly id: string; readonly cls: NetClass<never>;
   /** The ride under this player as flat words, and how many. 0: on foot. */
   readonly ride?: (out: Float64Array) => number }
 /** Hands the room each entity, with a view its class's accessors read. A view is valid only during the call. */
-export interface NetVisitor { entity: <S>(id: string, cls: NetClass<S>, view: S) => void }
+/** `life`: a body that stood again after a death counts a new one, which takes a fresh handle (QA 11-25 row 86). */
+export interface NetVisitor { entity: <S>(id: string, cls: NetClass<S>, view: S, life?: number) => void }
 /** The world a room replicates. */
 export interface NetWorld {
   /** Bind a welcomed seat to its persistent identity, including room handoffs. Dedicated hosts must verify the hello against their authenticated session. */
@@ -427,14 +428,14 @@ export class NetRoom {
     client.state = 'live';
     // Handles are handed out by frames, and the welcome comes first: without this a first client's own handle reads 0.
     const { handles } = this, serial = ++this.serial;
-    this.world.visit({ entity: (id, cls, view) => { handles.touch(id, cls, view, serial); } });
+    this.world.visit({ entity: (id, cls, view, life) => { handles.touch(id, cls, view, serial, life); } });
     const handle = handles.refs(client.player.id);
     client.transport.send('reliable', welcomeMessage({ handle, player: client.player.id, tick: this.world.tick(), cell: this.world.cell(), simHz: SIM_HZ, frameHz: FRAME_HZ }, this.build, this.required).buffer);
   }
   private snapshot(tick: number): void {
     const frame = this.ring.claim(tick), serial = ++this.serial, { handles } = this;
-    this.world.visit({ entity: (id, cls, view) => {
-      const row = handles.touch(id, cls, view, serial), at = frame.claim(row.handle, cls.row.length), columns = cls.row, { data } = frame;
+    this.world.visit({ entity: (id, cls, view, life) => {
+      const row = handles.touch(id, cls, view, serial, life), at = frame.claim(row.handle, cls.row.length), columns = cls.row, { data } = frame;
       for (let index = 0; index < columns.length; index++) data[at + index] = (columns[index] as (typeof columns)[number]).sample(view, handles.refs);
     } });
     const retired = handles.sweep(serial), combat = freshViews(this.combat.splice(0)), lines = this.chat.drain(), riders = new Map<number, number>();

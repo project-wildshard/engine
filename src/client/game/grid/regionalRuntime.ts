@@ -56,6 +56,7 @@ import { enterDataCellHud } from './dataCellHud';
 import { SkinLocker } from '../cosmetics/locker';
 import { coverRuntimeAssets } from './assetResidency';
 import { FrameCamera } from '@wildshard/engine/world/frameCamera';
+import { presentThrough } from './cellPresentation';
 import { pacedResolve } from '@wildshard/engine/core/workSlice';
 
 function isSceneNode(value: unknown): value is Object3D { return value instanceof Object3D; }
@@ -409,7 +410,7 @@ export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts)
               await runtime.hooks.animalsBuilt?.(regional.animals);
               if (left()) throw new Error('Regional runtime left while building creatures');
               app.effects?.registerDefinitions(app.levelRegistrations.list('effect'));
-              const targets = authoredTargets(app.events, regional.animals, () => null);
+              const targets = authoredTargets(app.events, regional.animals, () => null, () => world.player.link === null);
               bindEquipmentActors(targets,regional.animals,owner);
               const build = runtime.buildEquipment;
               if (build === undefined) throw new Error('Regional kit did not install its equipment factory');
@@ -460,6 +461,7 @@ export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts)
                   disposeRifleDrop: () => { runtime.hooks.disposeRifleDrop?.(); } };
                 runtime.play = localPlay;
                 installEnteredRuntimeService(entered, entry => {
+                  entry.onDispose(presentThrough(regional.animals, page.animals, point => { view.root.updateWorldMatrix(true, false); return view.root.localToWorld(point.clone()); }));
                   const updateAnimals = (dt: number, t: number): void => {
                     const feet = world.player.position;
                     regional.animals.update(dt, t, feet, feet, viewFromRoot.of(world.game.camera));

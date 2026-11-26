@@ -762,6 +762,7 @@
     "src/client/game/grid/mapCreatures.ts": "client",
     "src/client/game/grid/loadingRings.ts": "client",
     "src/client/game/grid/mapAtlas.ts": "client",
+    "src/client/game/grid/cellPresentation.ts": "client",
     "src/client/game/grid/mapFrame.ts": "client",
     "src/client/game/grid/memoryRows.ts": "client",
     "src/client/game/grid/memoryWarning.ts": "client",
