@@ -13,6 +13,13 @@ it into main while other lanes continue landing.
 `src/scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.97 (2026-11-26)
+
+- Nine Dragon no longer shows a false "World not drawn" reload card after it loads.
+- Nine Dragon's look and distant views load on the shared world grid.
+- The game page carries one copy of its 3D library, so it loads lighter.
+- If a zone fails to load, the error now says how far it got, so it gets fixed faster.
+
 ## v0.1.96 (2026-11-26)
 
 - The game reads the newest shard format, so zones published with the latest SDK open as built.
