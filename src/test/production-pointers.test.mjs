@@ -74,7 +74,7 @@ describe('production pointers follow the signed release file', () => {
 
   test('no token moves nothing and says why', async () => {
     const net = network();
-    await expect(alignProductionPointers({ fetch: net.fetch })).rejects.toThrow(/ADMIN_TOKEN is not set/u);
+    await expect(alignProductionPointers({ fetch: net.fetch })).rejects.toThrow(/PRODUCTION_FLIP_TOKEN is not set/u);
     expect(net.seen).toEqual([]);
   });
 

@@ -195,7 +195,7 @@ jobs:
           node-version-file: .node-version
       - name: Move the API's production pointers to the signed file
         env:
-          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          PRODUCTION_FLIP_TOKEN: ${{ secrets.PRODUCTION_FLIP_TOKEN }}
           WS_LANE_NAME: server-release
         run: node src/scripts/server-release/production-pointers.mjs
 

@@ -267,7 +267,7 @@ test('J234: every run signs with main\'s publisher and builds in the source\'s o
   expect(sign).toContain('node src/scripts/server-release/publish.mjs');
 });
 
-test('meta QA 11-25 row 127: only the production-pointers job reads ADMIN_TOKEN, from the production environment', () => {
+test('meta QA 11-25 rows 127 and 135: only the production-pointers job reads the flip token, from the production environment', () => {
   const workflow = readFileSync('.github/workflows/server-release.yml', 'utf8');
   const start = workflow.indexOf('\n  production-pointers:'), end = workflow.indexOf('\n  devserver-client:');
   expect(start).toBeGreaterThan(workflow.indexOf('\n  publish:'));
@@ -275,17 +275,21 @@ test('meta QA 11-25 row 127: only the production-pointers job reads ADMIN_TOKEN,
   expect(job).toContain('needs: [source, publish]');
   expect(job).toContain("needs.publish.result == 'success' && needs.source.outputs.channel == 'production'");
   expect(job).toMatch(/\n {4}environment: production\n/u);
-  expect(job).toContain('ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}');
+  expect(job).toContain('PRODUCTION_FLIP_TOKEN: ${{ secrets.PRODUCTION_FLIP_TOKEN }}');
   expect(job).toContain('run: node src/scripts/server-release/production-pointers.mjs');
   expect(job).not.toMatch(/continue-on-error/u);
-  // Any other reader, in this workflow or another, is a leak of a repo-wide admin token on a public repo.
-  const readers = readdirSync('.github/workflows').filter(name => /\.ya?ml$/u.test(name)).flatMap(name => {
-    const text = readFileSync(join('.github/workflows', name), 'utf8');
-    return [...text.matchAll(/secrets\.ADMIN_TOKEN/gu)].map(match => ({ name, at: match.index }));
-  });
-  expect(readers).toEqual([{ name: 'server-release.yml', at: workflow.indexOf('secrets.ADMIN_TOKEN') }]);
-  expect(readers[0]?.at).toBeGreaterThan(start);
-  expect(readers[0]?.at).toBeLessThan(end);
+  // The API's flip-only token has one reader and the full admin token none (row 135: it left GitHub). A workflow
+  // naming either anywhere else leaks a catalogue write on a public repo.
+  const readers = (secret: string): { name: string, at: number | undefined }[] => readdirSync('.github/workflows')
+    .filter(name => /\.ya?ml$/u.test(name)).flatMap(name => {
+      const text = readFileSync(join('.github/workflows', name), 'utf8');
+      return [...text.matchAll(new RegExp(`secrets\\.${secret}\\b`, 'gu'))].map(match => ({ name, at: match.index }));
+    });
+  expect(readers('ADMIN_TOKEN')).toEqual([]);
+  const flip = readers('PRODUCTION_FLIP_TOKEN');
+  expect(flip).toEqual([{ name: 'server-release.yml', at: workflow.indexOf('secrets.PRODUCTION_FLIP_TOKEN') }]);
+  expect(flip[0]?.at).toBeGreaterThan(start);
+  expect(flip[0]?.at).toBeLessThan(end);
 });
 
 test('FS28: signing and client archives queue independently for the exact release', () => {

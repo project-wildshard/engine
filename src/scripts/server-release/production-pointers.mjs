@@ -2,9 +2,11 @@
 // six of the API's production pointers one release behind, and the API's daily prune keeps three revisions behind every
 // pointer, so stale pointers held eight dead uploads. server-release.yml runs this right after it signs production's file:
 // it reads the signed file the players load, maps each entry to its upload hash, and moves each production pointer that
-// differs with the API's admin flip, then reads the catalogue again and fails unless every entry matches.
+// differs with the API's production flip, then reads the catalogue again and fails unless every entry matches.
+// Meta QA 11-25 row 135: it flips with PRODUCTION_FLIP_TOKEN, which the API takes on POST /api/channels/production/flip
+// and refuses everywhere else; the full ADMIN_TOKEN is in no GitHub secret.
 //
-//   ADMIN_TOKEN=... node src/scripts/server-release/production-pointers.mjs           move, then verify
+//   PRODUCTION_FLIP_TOKEN=... node src/scripts/server-release/production-pointers.mjs move, then verify
 //   node src/scripts/server-release/production-pointers.mjs --check                   no token: list moves, exit 1 if any
 //
 // Every read and write carries the Wildshard agent marker (src/scripts/agent-requests.mjs).
@@ -75,7 +77,7 @@ export async function readMoves(deps = {}) {
  * @returns {Promise<PointerMove[]>} the moves made */
 export async function alignProductionPointers(deps = {}) {
   const get = deps.fetch ?? agentFetch, api = deps.api ?? API, log = deps.log ?? console.log;
-  if (deps.token === undefined || deps.token.length < 16) throw new Error('ADMIN_TOKEN is not set: production pointers left as they are');
+  if (deps.token === undefined || deps.token.length < 16) throw new Error('PRODUCTION_FLIP_TOKEN is not set: production pointers left as they are');
   const moves = await readMoves(deps);
   for (const move of moves) {
     await json(get, new URL('/api/channels/production/flip', api), {
@@ -99,7 +101,7 @@ async function main() {
     else console.log('production pointers match releases/production.json');
     return;
   }
-  await alignProductionPointers({ token: process.env.ADMIN_TOKEN });
+  await alignProductionPointers({ token: process.env.PRODUCTION_FLIP_TOKEN });
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
