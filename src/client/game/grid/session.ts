@@ -66,7 +66,7 @@ import type { PageResidency } from './pageResidency';
 import { PlatformRenderResidency } from './renderResidency';
 import { TileStreamer, levelPorts, type FarPlan, type LevelPrepared, type RingPorts, type RingTile, type RingWait } from '@wildshard/engine/world/tileStreamer';
 import { GhostWorlds, type GhostRegion } from '../../../shared/game/grid/ghosts';
-import { farRingPorts, installFarProxy, type FarPreparationWait, type FarPrepared, type FarProxyView } from './farView';
+import { farRingPorts, farRingWarmVariants, installFarProxy, type FarPreparationWait, type FarPrepared, type FarProxyView } from './farView';
 import { FarBatches, farBatchOn, multiDraws } from './farBatch';
 import { jsonSlot } from '@wildshard/engine/saves/slots';
 import { decodeFarImpostor, farBandShare } from './farImpostorView';
@@ -1107,15 +1107,16 @@ export class GridSession {
    *  shardfile cell is `pbr` and positional, a baked cell one of three families and not) and every band shares one, so
    *  stand-ins of each, prepared beside the cell roots and kept for the page, cover any neighbour without reading it.
    *  `warm` links roots now, unpaced (`Game.warmRootsNow`: the host's `prepareView` waits for drawn frames, and none draw
-   *  under the card). Returns the stand-ins prepared (0: no neighbours). */
+   *  under the card). Returns the stand-ins prepared (0: no neighbours; the home alone, a one-cell world, has none:
+   *  `farRingWarmVariants`, meta QA 11-25 row 105). */
   async warmFarRingPrograms(warm: (roots: readonly Object3D[], current: () => boolean) => Promise<void>, current: () => boolean): Promise<number> {
-    if (this.neighbours.length === 0) return 0;
+    const variants = farRingWarmVariants(this.neighbours, this.home.instance);
+    if (variants.length === 0) return 0;
     const holder = new Group(); holder.name = 'far-ring:warm';
     const geometry = new BufferGeometry().setAttribute('position', new Float32BufferAttribute([0, 0, 0, 1, 0, 0, 0, 1, 0], 3))
       .setAttribute('normal', new Float32BufferAttribute([0, 1, 0, 0, 1, 0, 0, 1, 0], 3)).setAttribute('color', new Float32BufferAttribute([1, 1, 1, 1, 1, 1, 1, 1, 1], 3))
       .setAttribute('uv', new Float32BufferAttribute([0, 0, 1, 0, 0, 1], 2));
     const haze = { colour: [1, 1, 1] as const };
-    const variants: readonly (readonly [FarLookRuntime['family'], boolean])[] = [['pbr', true], ['pbr', false], ['toon', false], ['painterly', false]];
     const views = variants.map(([family, positional]) => installFarProxy(holder, geometry.clone(), { family, haze }, positional));
     const unband = this.frame === null ? null : installHazeBand(holder, { colour: [1, 1, 1], height: 1, opacity: 0.5, own: 0 }, CHUNK_HALF);
     this.host.scene.add(holder);

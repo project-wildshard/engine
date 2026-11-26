@@ -129,6 +129,19 @@ function farLightMaterial(mask: Float32Array, positionalMask: boolean, additive 
   return material;
 }
 
+/** Every far proxy program a neighbour can need (DF8): a shardfile cell is `pbr` and positional, a baked cell one of three
+ *  families and not. */
+const FAR_RING_VARIANTS: readonly (readonly [FarLookRuntime['family'], boolean])[] = [['pbr', true], ['pbr', false], ['toon', false], ['painterly', false]];
+/**
+ * The far ring's stand-ins to link under the loading card (DF8, `GridSession.warmFarRingPrograms`): every variant while any
+ * cell but the home stands in the world; none in a one-cell world. The home's own far views link from its own proxy, so the
+ * stand-ins only ever serve neighbours: a one-cell world (J522 (4), a measuring tool's) linked four programs no cell ever
+ * drew, the pbr, toon and painterly stand-ins and the haze band (meta QA 11-25 row 105: Brasscap Low 49 programs, 45 now).
+ */
+export function farRingWarmVariants(cells: readonly { readonly instance: string }[], home: string): readonly (readonly [FarLookRuntime['family'], boolean])[] {
+  return cells.some((cell) => cell.instance !== home) ? FAR_RING_VARIANTS : [];
+}
+
 /**
  * Install a proxy under a cell root (the rings' upload port). It never casts or receives shadows (§3.2: only near L0).
  * `decorate` patches its material before anything compiles it (G321 part 4: the horizon fade); `grain` adds the near
