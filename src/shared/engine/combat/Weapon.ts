@@ -56,11 +56,17 @@ export interface WeaponHooks {
 }
 export abstract class Weapon extends Equipment implements WeaponHooks {
   readonly slot = 'main';
-  override readonly id: WeaponId;
+  private slotId: WeaponId;
+  /** Its item, `declared.<item id>` (FP22e), or, after `holdSlot`, the slot it took over. */
+  override get id(): WeaponId { return this.slotId; }
   constructor(row: EquipmentRow) {
     super(row);
-    this.id = weaponIdOf(row);
+    this.slotId = weaponIdOf(row);
   }
+  /** Meta QA 11-25 row 86 (a): an upgrade held in its predecessor's slot (Nalati's Golden Bow over the bow) keeps the
+   *  slot's id, which saves, ammunition, the held wire and the swap binding key by, while its row (the item its events
+   *  name) is the new one. Before FP22e the row's `legacySlot` carried it; EquipmentService.replace hands it over now. */
+  holdSlot(id: WeaponId): void { this.slotId = id; }
   private commandedAim: AimCommand | null = null;
   private aimSource: (() => AimCommand) | null = null;
   /** Live input edge supplies command data; recorded fights set an explicit command instead. */

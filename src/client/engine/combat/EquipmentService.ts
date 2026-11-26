@@ -126,7 +126,8 @@ export class EquipmentService implements WeaponHooks {
   }
   replace(id: WeaponId, next: Weapon): void {
     const previous = this.get(id), index = this.list.indexOf(previous);
-    if (next.id !== id) throw new Error(`Replacement must preserve legacy slot ${String(id)}`);
+    if (this.list.some((w) => w !== previous && w.id === next.id)) throw new Error(`Replacement ${String(next.id)} is already held`);
+    next.holdSlot(id); // the upgrade keeps its slot's id (row 86 (a)); its row names the new item
     next.state.ammo = previous.state.ammo;
     next.state.reserve = previous.state.reserve;
     next.state.loaded = previous.state.loaded;
