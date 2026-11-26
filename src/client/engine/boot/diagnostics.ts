@@ -52,7 +52,7 @@ const NAMED_OPERATIONS=new Set(['download:cache-check','app:session-code-ready',
   // NINE-DRAGON-BENCHMAX NB3: the readyFrame spawn view's parts (game/shardfile/tileDriver.ts, controlRefinement.ts)
   'app:spawn-view-frame','app:spawn-view-tiles','app:spawn-view-fence','app:ready-minimap','app:ready-horizon',
   ...['await-booted','boot-configuration','descriptor-read-and-verification','first-authoritative-frame','first-body-links',
-    'first-body-preparation-end','first-body-preparation-start','hello-send','launch-complete','rapier-held-bytes','rapier-initialize','rapier-instantiate-shared',
+    'first-body-preparation-end','first-body-preparation-start','held-listing','hello-send','launch-complete','rapier-held-bytes','rapier-initialize','rapier-instantiate-shared',
     'ready-received','ready-send','road-collision-inputs','road-physics-and-collision','simulation-and-collision-create',
     'welcome-receive','worker-bootstrap-ready','worker-runtime-import'].map(name=>`server:${name}`)]);
 /** LD3: the loading waits a paste may name, exactly as the engine writes them; `GLTF decode <url>` and `Image decode

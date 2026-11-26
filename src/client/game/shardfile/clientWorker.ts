@@ -55,7 +55,7 @@ import { GrappleTool } from '../grapple/tool';
 import { netClaw } from '../grapple/netClaw';
 import type { Mount } from '../riding/mount';
 import { NetMovers } from '../plugin/moverViews';
-import { spawnHeldBytes } from '../boot/spawnDownload';
+import { spawnHeldBytes, spawnListed } from '../boot/spawnDownload';
 import { travel, whenEntersInPage } from '../travel/travel';
 import { RegridLater, type RegridHere } from '../grid/regridLater';
 import { lendOnlineGate } from '../grid/onlineGate';
@@ -134,7 +134,7 @@ export interface WorkerClientPorts {
   /** NET-LAG NL15: link these roots' road (exterior) variants in play, paced (the other-player warm body's, once filled). */
   readonly warmRoad?: (roots: readonly Object3D[]) => Promise<void> | void;
 }
-interface ShellModule { readonly startStandalone: (config: { slug: string; base: string; build: string; savePrefix: string; name?: string; lone?: true; backgroundSaves?: boolean; held?: (url: string) => Promise<ArrayBuffer | null> } & IndexedSaves) => Shell;
+interface ShellModule { readonly startStandalone: (config: { slug: string; base: string; build: string; savePrefix: string; name?: string; lone?: true; backgroundSaves?: boolean; held?: (url: string) => Promise<ArrayBuffer | null>; listed?: (url: string) => boolean } & IndexedSaves) => Shell;
   readonly prespawnStandalone?: (held?: (url: string) => Promise<ArrayBuffer | null>) => void }
 /** What `stampBuildDocuments` writes into a build that has a world: its signed release file and the key that signed it. */
 interface BuildWorld { readonly release: string; readonly key: string; readonly recordTag?: string }
@@ -449,7 +449,7 @@ async function bootStandalone(slug: string, lone: boolean, held: () => void): Pr
   const goto = lone ? null : chosenCell(), enter = goto === null ? null : chosenArrival();
   // NB19: the inline runtime candidate this page owns reads its own server files (inlineOwner.ts)
   const backgroundSaves = jsonSlot('debug.backgroundStandaloneSaves', 'device').read() === true;
-  return startStandalone({ slug, base: contentURL(`/shardfiles/${slug}/`), build, savePrefix, backgroundSaves, ...name === null ? {} : { name }, ...lone ? { lone: true as const } : {}, ...ownsInlineCandidate(slug) ? { ownServer: true as const } : {}, ...goto === null ? {} : { goto }, ...enter === null ? {} : { enter }, held: url => { held(); return spawnHeldBytes(url); }, ...saves });
+  return startStandalone({ slug, base: contentURL(`/shardfiles/${slug}/`), build, savePrefix, backgroundSaves, ...name === null ? {} : { name }, ...lone ? { lone: true as const } : {}, ...ownsInlineCandidate(slug) ? { ownServer: true as const } : {}, ...goto === null ? {} : { goto }, ...enter === null ? {} : { enter }, held: url => { held(); return spawnHeldBytes(url); }, listed: spawnListed, ...saves });
 }
 /** LD5 (J208): a standalone server started while the first frame builds. On Jake's iPhone its boot was the last 5.1 s of
  *  Load, after every frame step; it runs on its own thread, so it can boot beside them. Its reads before the server

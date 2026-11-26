@@ -158,9 +158,12 @@ export async function readServerFolder(root: string, build: () => string, source
   // and every byte is still verified against its descriptor below.
   // Exact cooked hashes always use their index, including when a caller also requests inline author inputs.
   const serverFile = ownServer && !exactHash ? (path: string): Promise<Uint8Array> => source(new URL(path, root), path) : serverPackReader(root, slug, build, source, hash, exactHash);
+  // QA 11-25 row 68r (heldReads.ts): once the descriptor names the server's files, one ask learns which of them the page lists;
+  // a file it doesn't list goes to the network without waiting for the page's main thread to say so.
+  let listing: Promise<ReadonlyMap<string, boolean>> | undefined;
   const read = async (path: string): Promise<Uint8Array> => {
     if (path.startsWith('server/')) return serverFile(path);
-    const url = new URL(path, root), lent = await held?.(url.href);
+    const url = new URL(path, root), lent = held === undefined || (await listing)?.get(url.href) === false ? undefined : await held(url.href);
     if (lent !== undefined && lent !== null) return new Uint8Array(lent);
     // Activation must never fall back to an unrelated loose header after exact-pack refusal.
     return exactHash ? serverFile(path) : serverFile(path).catch(() => source(url, path));
@@ -179,13 +182,36 @@ export async function readServerFolder(root: string, build: () => string, source
   const files = new Map<string, { readonly path: string; readonly hash: string; readonly bytes: number }>();
   for (const file of descriptor.index.files) files.set(file.commons === true ? `commons:${file.hash}` : file.hash, { path: file.path, hash: file.hash, bytes: file.compressed });
   for (const file of descriptor.index.admission.server ?? []) files.set(file.hash, { path: file.path, hash: file.hash, bytes: file.bytes });
+  if (held?.listed !== undefined) {
+    // every file of the server's class, and the creatures' skin rigs (AP36c, read below by hash)
+    const paths = [...descriptor.index.files.filter(file => serverReadsFile(file, shard.terrain?.collider)).map(file => file.path), ...[...serverSkinRigs(shard)].flatMap(ref => files.get(ref)?.path ?? [])];
+    const urls = [...new Set(paths.filter(path => !path.startsWith('server/')).map(path => new URL(path, root).href))];
+    // a refused or broken answer lists nothing as missing: every read asks the page as before
+    listing = bootTask('server:held-listing', () => held.listed?.(urls) ?? Promise.resolve([])).then(flags => new Map(urls.map((url, at) => [url, flags[at] !== false])), () => new Map());
+  }
+  // QA 11-25 row 68r: the world's installers ask for the same file again (Nalati's create read 39 files 63 times, its sheep
+  // book 10 times): one read and one hash serve every ask made while it runs, and the verified bytes serve later asks for as long
+  // as anything still holds them. Each caller gets its own copy, as each read made one before.
+  const kept = new Map<string, WeakRef<Uint8Array>>(), reading = new Map<string, Promise<Uint8Array>>();
+  const verifiedOnce = (ref: string, file: { readonly path: string; readonly hash: string; readonly bytes: number }): Promise<Uint8Array> => {
+    const have = kept.get(ref)?.deref();
+    if (have !== undefined) return Promise.resolve(have);
+    const waiting = reading.get(ref);
+    if (waiting !== undefined) return waiting;
+    const run = (async () => {
+      const bytes = await read(file.path);
+      if (bytes.length !== file.bytes || await contentHash(bytes) !== file.hash) throw new Error('Server input hash or size mismatch');
+      bootProgress('server:verified-input-bytes', bytes.byteLength, null, 'verified-input-bytes');
+      kept.set(ref, new WeakRef(bytes));
+      return bytes;
+    })().finally(() => { reading.delete(ref); });
+    reading.set(ref, run);
+    return run;
+  };
   const verified = (ref: string): Promise<Uint8Array> => bootTask(`server:verified-input:${ref}`, async () => {
     const file = files.get(ref);
     if (file === undefined) throw new Error('Undeclared server input');
-    const bytes = await read(file.path);
-    if (bytes.length !== file.bytes || await contentHash(bytes) !== file.hash) throw new Error('Server input hash or size mismatch');
-    bootProgress('server:verified-input-bytes', bytes.byteLength, null, 'verified-input-bytes');
-    return adoptBuffer(bytes, { owner: 'server/inputs', asset: file.path, kind: 'wire' });
+    return adoptBuffer((await verifiedOnce(ref, file)).slice(), { owner: 'server/inputs', asset: file.path, kind: 'wire' });
   });
   const product = shardFolderData(shard, root, verified, !built, built, nodeNamedJsonCheck, { files: true });
   const assets = new Map<string, Uint8Array>();

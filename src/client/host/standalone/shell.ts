@@ -10,7 +10,7 @@ import { deviceIdentity, type NetIdentity } from '@wildshard/engine/net/identity
 import { saveDocuments } from '@wildshard/engine/saves/indexed';
 import type { SaveStorage } from '@wildshard/engine/saves/store';
 import { ServerMessageSchema, ShellMessageSchema, type ProbedRow, type ServerMessage, type ShellMessage } from '@wildshard/format/standaloneControl';
-import { answerHeldReads, type HeldRead } from '../../../shared/host/standalone/heldReads';
+import { answerHeldReads, type HeldListed, type HeldRead } from '../../../shared/host/standalone/heldReads';
 import { compiledRapier } from '@wildshard/engine/physics/rapierModule';
 import type { HarnessFlag, HarnessGod, HarnessHits, HarnessJoin, HarnessMove, HarnessPlace, HarnessStill } from '../../../shared/host/standalone/harnessPlace';
 import type { DevBox, DevCollidersMessage, DevGround, DevGroundMessage } from '@wildshard/engine/game/devColliders';
@@ -55,6 +55,8 @@ export interface StandaloneConfig {
   readonly enter?: { readonly x: number; readonly z: number; readonly yaw: number };
   /** A page with a download: what it holds, which the server asks for before it reads the network (DL25). */
   readonly held?: HeldRead;
+  /** QA 11-25 row 68r: whether that download lists a URL at all, so the server asks for bytes only where some may be held. */
+  readonly listed?: HeldListed;
 }
 /** A running standalone session. */
 export interface StandaloneShell {
@@ -242,7 +244,7 @@ export function startStandalone(config: StandaloneConfig): StandaloneShell {
   bootMark('worker:configuration-send');
   worker.postMessage({ rapier: compiledRapier(), catalogue: installedCatalogue() ?? null, validator: Reflect.get(globalThis, '__WS_SHARDFILE_VALIDATOR__') ?? null, verdicts: Reflect.get(globalThis, '__WS_SHARDFILE_VERDICTS__') ?? null, goto: config.goto ?? null, enter: config.enter ?? null, ownServer: config.ownServer === true ? config.slug : null, backgroundSaves: config.backgroundSaves === true } satisfies ServerWorkerStart,
     [control.port2, game.port2, harness.port2, ...reads === undefined ? [] : [reads.port2]]);
-  if (reads !== undefined && config.held !== undefined) answerHeldReads(reads.port1, config.held);
+  if (reads !== undefined && config.held !== undefined) answerHeldReads(reads.port1, config.held, config.listed);
   // The worker sits beside this module, so an emitted module's `/b/<build>/` folder is the server's real build (J57).
   const served = /^\/b\/([\w.-]+)\//u.exec(new URL(import.meta.url).pathname)?.[1];
   const refused = (): void => { void import('@wildshard/engine/boot/browserChunkRecovery').then(recovery => recovery.reloadRefusedBuild()); };
