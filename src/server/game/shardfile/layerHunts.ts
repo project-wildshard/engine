@@ -39,6 +39,8 @@ export function layerHuntFight(fight: LayerHuntFight): FightRules {
  * warning, no dodge hint) and their contact carried no `feel.blow` (no grunt, shove or fight music). */
 export function installLayerHunts(host: SimHost, rows: ShardRows, creatures: ShardCreatures, fight?: LayerHuntFight): void {
   const rules = layerHuntFight(fight);
+  // a telegraphed shard's charge is a felt blow (grunt, shove, fight music); an untelegraphed one stays the plain hit it was
+  const felt = rules.telegraphed === true;
   const layers = resolveCreatureLayers(rows, creatures.brains);
   const ground: HuntGround = {
     heightAt: (x, z) => host.groundHeightAt(x, z),
@@ -97,6 +99,7 @@ export function installLayerHunts(host: SimHost, rows: ShardRows, creatures: Sha
       }
       if (observed !== undefined) player.copy(observed.position);
     };
+    const blow: readonly `${string}.${string}`[] = felt ? [`creature.${spawn.species}`, 'feel.blow'] : [`creature.${spawn.species}`];
     const hunt = new StalkerBrain<AnimalSim>({ pattern: 'hunt', config: { rng: host.rng.stream('ai'),
       fight: rules, faunaTuning: () => undefined, species: () => species }, player, sampleTerrain: () => undefined,
       ports: { ground, nav: () => null, reach: (body, target) => canReach(body, target, host.physics),
@@ -109,7 +112,7 @@ export function installLayerHunts(host: SimHost, rows: ShardRows, creatures: Sha
         now: () => host.clock.now * 1000, sound: () => undefined,
         charge: (body, damage) => { const target = perception === undefined ? host.nearestPlayer(body.position) : observed;
           if (target === undefined || (perception !== undefined && (!target.health.alive || host.parked.has(target.id)))) return;
-          host.combat.hit({ source: body.combatActor(), sourceTags: [`creature.${spawn.species}`, 'feel.blow'], target: target.health,
+          host.combat.hit({ source: body.combatActor(), sourceTags: blow, target: target.health,
             amount: damage, point: body.position.clone(), dir: new Vector3().subVectors(target.position, body.position).normalize(), cause: { kind: body.kind, label: body.label } }); },
       } });
     hunt.adopt(actor, spawn.at[0], spawn.at[2]);
