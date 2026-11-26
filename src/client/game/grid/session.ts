@@ -147,7 +147,8 @@ const OUTER_RING_STRETCH_MS = TIER === 'phone' ? 2 : 4;
 
 /** The page lights kept for the grid's region lights (LightPool.reserve): the most one region shows at once, Pine Hollow's
  *  five cabin lights. A point light costs every lit fragment a loop step, so this is the grid's real maximum, not more;
- *  a region that shows more warns once and leaves the rest dark. */
+ *  a region that shows more warns once and leaves the rest dark. The entered data cell's declared look lamps light through
+ *  the same lights (QA 11-25 row 138, `CellSceneLife`): its nearest this many to the camera (a phone's `PHONE_LAMPS`). */
 export const GRID_REGION_POINT_LIGHTS = 5;
 /** free page lights for home content that lights itself after the first render (the population projection's) */
 export const GRID_HOME_SPARE_POINT_LIGHTS = 1;
@@ -924,7 +925,9 @@ export class GridSession {
     this.life = new NeighbourLife({ scope: host.scope, simulation: (id) => this.live?.lifeRegion(id), active: (id) => (this.live === null ? this.home.instance : this.live.live.current()) === id,
       field: (id, name) => this.live?.lifeField(id, name) });
     // its feet in the scene's home frame: the player stands in the active frame's metres (live.ts worldFeet), the cell roots in the home's
-    this.sceneLife = new CellSceneLife({ scope: host.scope, phone: TIER === 'phone', feet: () => { const at = this.world(); return { x: at.x - home.origin.x, y: host.feet().y, z: at.z - home.origin.z }; }, active: (id) => (this.live === null ? this.home.instance : this.live.live.current()) === id });
+    this.sceneLife = new CellSceneLife({ scope: host.scope, phone: TIER === 'phone', feet: () => { const at = this.world(); return { x: at.x - home.origin.x, y: host.feet().y, z: at.z - home.origin.z }; }, active: (id) => (this.live === null ? this.home.instance : this.live.live.current()) === id,
+      // QA 11-25 row 138: the entered cell's look lamps light through the page's reserved lights, the nearest the camera first
+      lights: isScene(host.scene) ? LightPool.for(host.scene) : undefined, eye: (out) => host.frame?.camera.getWorldPosition(out) });
     // one late system for the grid (the page's onLate takes one label): the alive neighbours, then the one frame's weights
     const prepareView = host.prepareView;
     this.panels = new NeighbourPanels({ scope: host.scope, region: (id) => this.live?.panelRegion(id), ...(prepareView === undefined ? {} : { prepare: prepareView }) });

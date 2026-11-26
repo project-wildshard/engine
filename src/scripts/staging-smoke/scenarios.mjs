@@ -300,6 +300,20 @@ export async function judgeWorldFrames(frames) {
   return world;
 }
 
+/**
+ * QA 11-25 row 138: the grid page drew none of a data zone's declared look lamps (Brasscap Mesa's 8, Mossgate's 16, Glowfen's
+ * 14) and no check saw it. A K6 cell whose look declares lamps must light some: the page's grid readout (`sceneLife`, engine
+ * `cellSceneLife.ts`) names how many its look declares and how many light now. Null when it lights them or declares none.
+ * @param {{ inside?: unknown, sceneLife?: unknown } | null | undefined} grid the page's `grid.state()`
+ * @returns {string | null}
+ */
+export function darkLampsProblem(grid) {
+  if (grid === null || grid === undefined || typeof grid.inside !== 'string' || !Array.isArray(grid.sceneLife)) return null;
+  const row = grid.sceneLife.find((r) => typeof r === 'object' && r !== null && r.instance === grid.inside);
+  if (row === undefined || typeof row.lampsDeclared !== 'number' || row.lampsDeclared === 0) return null;
+  return typeof row.lampsLit === 'number' && row.lampsLit > 0 ? null : `look lamps dark: ${grid.inside} declares ${String(row.lampsDeclared)} lamps and lights none (QA 11-25 row 138)`;
+}
+
 /** The Shard Select cards a player can enter on this title, as slugs (the title's rows matched to the cards by name).
  * Leaves the page on Shard Select: the caller reopens the title. @param {Page} page @returns {Promise<string[]>} */
 export async function liveCells(page) {
@@ -513,6 +527,12 @@ export async function runScenario(scenario, { url, out, card, deepLink, oldProfi
           if (!deploy) await page.waitForTimeout(CELL_SETTLE_MS);
           const path = join(dir, 'frames', `cell-${slug}.jpg`);
           try { await page.screenshot({ path, type: 'jpeg', quality: 75, scale: 'css', timeout: 5000 }); result.frames[`cell-${slug}`] = path; } catch { /* a navigation ate it */ }
+        }
+        if (leg.playAt !== null) {
+          // QA 11-25 row 138: a zone that declares look lamps lights them on the grid
+          const grid = await page.evaluate(() => { try { return /** @type {any} */ (window).__wildshard?.shard?.grid?.state?.() ?? null; } catch { return null; } }).catch(() => null);
+          const dark = darkLampsProblem(grid);
+          if (dark !== null) { leg.problems.push({ at: Date.now() - leg.tapAt, text: dark }); say(`${slug}: ${dark}`); }
         }
         const cellFrame = result.frames[`cell-${slug}`];
         if (result.frames.play1 === undefined && cellFrame !== undefined) result.frames.play1 = cellFrame;

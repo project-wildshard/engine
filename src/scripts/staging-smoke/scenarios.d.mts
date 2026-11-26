@@ -68,6 +68,7 @@ export function judgeWorldFrames(frames: Record<string, string>): Promise<Record
 }>>;
 /** The Shard Select cards a player can enter on this title, as slugs (the title's rows matched to the cards by name).
  * Leaves the page on Shard Select: the caller reopens the title. @param {Page} page @returns {Promise<string[]>} */
+export function darkLampsProblem(grid: { inside?: unknown; sceneLife?: unknown } | null | undefined): string | null;
 export function liveCells(page: Page): Promise<string[]>;
 /** The recorded clip as an .mp4 (H.264, 15 fps), or the .webm when ffmpeg is missing.
  * @param {string} webm @param {string} mp4 @returns {string} */

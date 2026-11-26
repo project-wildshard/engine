@@ -30,6 +30,9 @@ import type { Scope } from '../../../shared/engine/app/scope';
  * dark lights of its own before its first render, and `mirrorInto` takes the nested pool's lights out of three's count
  * (no layer: no camera sees them) and copies each shown one onto a reserved page light on every page render (colour,
  * intensity, reach, decay, world position), so the page's light count never moves.
+ *
+ * A grid data cell's declared look lamps (`look.light.lamps`, QA 11-25 row 138) show the same way (`show`): built under the
+ * cell's root, out of three's count, copied onto the reserved lights while they show, ahead of the nested pools' lights.
  */
 export class LightPool {
   private static pools = new WeakMap<THREE.Scene, LightPool>();
@@ -57,6 +60,8 @@ export class LightPool {
   private readonly yielding = new Set<THREE.PointLight>();
   /** A borrowed light and the yielding light whose place in the scene it holds. */
   private readonly lent = new Map<THREE.PointLight, THREE.PointLight>();
+  /** QA 11-25 row 138: plain lights shown through the reserved lights (`show`): a grid data cell's look lamps */
+  private readonly shown = new Set<readonly THREE.PointLight[]>();
   /** RP4: this nested pool's scene lights taken out of three's count (`adopt`), with the layer mask each gets back */
   private readonly adopted = new Map<THREE.PointLight, number>();
 
@@ -81,6 +86,19 @@ export class LightPool {
       const light = new THREE.PointLight(0xffffff, 0); light.castShadow = false;
       this.reserved.push(light); this.group.add(light);
     }
+  }
+
+  /** how many dark page lights `reserve` keeps for mirrored and shown lights */
+  get reservedSize(): number { return this.reserved.length; }
+
+  /** QA 11-25 row 138: show `lights` (plain point lights in this pool's scene: a grid data cell's look lamps, `lookLight.ts`
+   *  `lampLights`) through the reserved lights while `scope` lives: they leave three's light count now, and each that shows
+   *  (it and its ancestors visible) and lights is copied onto a reserved light on every render, ahead of the nested pools'.
+   *  Hiding or showing them never moves the count, so no lit program is built again. */
+  show(lights: readonly THREE.PointLight[], scope: Scope): void {
+    for (const light of lights) { light.castShadow = false; light.layers.disableAll(); }
+    this.shown.add(lights);
+    scope.onDispose(() => { this.shown.delete(lights); });
   }
 
   /** Show this (nested) pool's lights through `page`'s reserved lights while `scope` lives (see the module comment):
@@ -176,6 +194,19 @@ export class LightPool {
   /** each shown nested light onto a reserved light, in pool order; the rest dark */
   private showMirrors(): void {
     let next = 0;
+    for (const lights of this.shown) {
+      for (const light of lights) {
+        if (light.intensity <= 0 || !shownUnder(light, this.group.parent)) continue;
+        const slot = this.reserved[next];
+        if (slot === undefined) {
+          if (!this.warnedMirror) { this.warnedMirror = true; console.warn(`[LightPool] more shown lights than the ${String(this.reserved.length)} reserved: the rest stay dark`); }
+          break;
+        }
+        next++;
+        slot.color.copy(light.color); slot.intensity = light.intensity; slot.distance = light.distance; slot.decay = light.decay;
+        slot.position.setFromMatrixPosition(light.matrixWorld); slot.updateMatrixWorld();
+      }
+    }
     for (const source of this.sources) {
       if (!shownUnder(source.group, this.group.parent)) continue;
       for (const light of source.lights) {

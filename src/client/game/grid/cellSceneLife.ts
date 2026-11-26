@@ -12,14 +12,23 @@
  * layers are built on its first entry, then draw and follow the viewer while entered; its swings and splash step only
  * then. A product's copies share one compiled material set and so one set of swing uniforms (world-space pivots), so a
  * slug placed more than once keeps its swings still rather than turn one copy's lanterns round another's pivots.
- * Hung look lamps (`setLampSwings`) are not driven here: a grid cell draws no look lamp lights of its own.
+ *
+ * Its declared look lamps (`look.light.lamps`, QA 11-25 row 138): a standalone page lights them in its data look's compose
+ * (`dataLook.ts`), which a grid cell never runs, so Mossgate's hut stood unlit on the grid path (the dev page since engine
+ * e02a796fb, and every player). They are built under the cell's root (`lampLights`, a lamp on a swing swinging with its
+ * lantern) and shown through the page pool's reserved lights (`LightPool.show`): out of three's light count, so entering and
+ * leaving never rebuilds a lit program. Only the entered cell's light, its nearest lamps to the camera, as many as the
+ * reserve holds (at most the tier's own `PHONE_LAMPS` / `DESKTOP_LAMPS`), flickering as declared.
  *
  * The water surfaces are drawn on admission, as the cell's tiles are, so a neighbour's pond shows from the road; a planar
  * mirror (one extra scene draw per frame in view) shows only while its cell is entered, and its ripples step only then. On
  * staging rev 6 Mossgate's pond drew splash and rings over a bare pit: the grid drew `source.water`'s splash, never its
  * surface (QA 11-19 row 27).
  */
-import { Group, Vector3, type Material, type Mesh } from 'three';
+import { Group, Vector3, type Material, type Mesh, type PointLight } from 'three';
+import type { LightPool } from '@wildshard/engine/fx/LightPool';
+import { DESKTOP_LAMPS, PHONE_LAMPS, lampLights } from '@wildshard/engine/render/lookLight';
+import { lookLightOn } from '@wildshard/engine/ui/lookLightOption';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { windClockFallback } from '@wildshard/engine/world/wind';
 import { SwingField, type SwingMover, type SwingUniforms } from '@wildshard/engine/world/swings';
@@ -39,6 +48,12 @@ export interface CellSceneLifePorts {
   readonly feet: () => { readonly x: number; readonly y: number; readonly z: number };
   /** whether the traveller is in this cell (the active frame) */
   readonly active: (instance: string) => boolean;
+  /** the page's light pool, whose reserved lights show the entered cell's look lamps (absent: no lamps light) */
+  readonly lights?: LightPool | undefined;
+  /** the camera's world position, written into `out` (the nearest lamps light); absent: the feet */
+  readonly eye?: ((out: Vector3) => Vector3 | undefined) | undefined;
+  /** Settings ▸ Debug ▸ Look ▸ "Look light" (default: the saved row) */
+  readonly lookLight?: (() => boolean) | undefined;
 }
 
 /** The cell's compiled look, as the session's tile admission holds it per slug. */
@@ -49,7 +64,9 @@ export interface CellScenePresentation {
 }
 
 /** One cell's readout. */
-export interface CellSceneLifeCell { readonly instance: string; readonly layers: number; readonly swings: number; readonly water: number; readonly splash: boolean; readonly live: boolean }
+export interface CellSceneLifeCell { readonly instance: string; readonly layers: number; readonly swings: number; readonly water: number; readonly splash: boolean; readonly live: boolean;
+  /** its look lamps (QA 11-25 row 138): how many its look declares, how many it may light at once, and how many light now */
+  readonly lampsDeclared: number; readonly lamps: number; readonly lampsLit: number }
 
 interface CellScene {
   readonly cell: GridCell;
@@ -67,6 +84,10 @@ interface CellScene {
   /** the planar mirrors among them, shown only while entered */
   readonly mirrors: readonly Mesh[];
   readonly splash: boolean;
+  /** its look lamps (null: none declared, or no reserve to show them through), shown only while entered */
+  readonly lamps: ReturnType<typeof lampLights> | null;
+  /** how many lamps its look declares */
+  readonly lampsDeclared: number;
   live: boolean;
 }
 
@@ -74,7 +95,7 @@ interface CellScene {
  *  any declared water body draws a surface, as a standalone page's `ShardfileClient.world()` draws it. */
 export function hasCellSceneLife(source: Shardfile): boolean {
   if (source.runtime !== null || hasDeclaredClientPage(source)) return false;
-  return (source.look.details?.length ?? 0) > 0 || (source.look.light?.swings?.length ?? 0) > 0 || source.water.length > 0;
+  return (source.look.details?.length ?? 0) > 0 || (source.look.light?.swings?.length ?? 0) > 0 || (source.look.light?.lamps?.length ?? 0) > 0 || source.water.length > 0;
 }
 
 /** The data cells' scene life on this page: admitted with each cell's tiles, stepped in the page's late phase. */
@@ -87,6 +108,9 @@ export class CellSceneLife {
   private readonly feet = new Vector3();
   private readonly player: { id: string; x: number; y: number; z: number; radius: number } = { id: 'player', x: 0, y: 0, z: 0, radius: 0.45 };
   private readonly movers: SwingMover[] = [this.player];
+  /** the lamps' flicker clock (seconds the entered cell's lamps have lit) and the camera's position for their nearest */
+  private lampTime = 0;
+  private readonly eye = new Vector3();
 
   constructor(ports: CellSceneLifePorts) { this.ports = ports; }
 
@@ -124,10 +148,28 @@ export class CellSceneLife {
       const splash = installClientSplash(source.water, { root, scope, phone: this.ports.phone,
         movers: () => { this.local(root, splashFeet); return [splashFeet]; },
         frame: (run) => { frames.push(run); } }) !== null;
-      const scene: CellScene = { cell, details, install, installed: install === null, layers: 0, swings, frames, water, mirrors, splash, live: false };
+      // the lamps ride the cell's swings as they stand each frame (a second copy nulls them)
+      const self: { scene: CellScene | null } = { scene: null };
+      const lamps = this.lamps(source, root, scope, () => self.scene?.swings ?? null);
+      const scene: CellScene = { cell, details, install, installed: install === null, layers: 0, swings, frames, water, mirrors, splash, lamps, lampsDeclared: source.look.light?.lamps?.length ?? 0, live: false };
+      self.scene = scene;
       this.products.set(cell.slug, [...siblings, scene]);
       this.cells.set(cell.instance, scene);
     } catch (error) { scope.dispose(); throw error; }
+  }
+
+  /** QA 11-25 row 138: the cell's declared look lamps under `root`, hidden until entered, shown through the page pool's
+   *  reserved lights; null when it declares none, the Look light row is off, or the page has no reserve to show them. */
+  private lamps(source: Shardfile, root: Group, scope: Scope, swingsOf: () => SwingField | null): ReturnType<typeof lampLights> | null {
+    const rows = source.look.light?.lamps ?? [], pool = this.ports.lights;
+    if (rows.length === 0 || pool === undefined || pool.reservedSize === 0 || !(this.ports.lookLight ?? lookLightOn)()) return null;
+    const lit = Math.min(this.ports.phone ? PHONE_LAMPS : DESKTOP_LAMPS, pool.reservedSize);
+    const group = lampLights(rows, lit, swingsOf);
+    group.visible = false; // named 'look-light-lamps' as on a standalone page (lampLights), so tools find it the same way
+    root.add(group);
+    pool.show(group.children as PointLight[], scope);
+    scope.onDispose(() => { group.removeFromParent(); for (const light of group.children as PointLight[]) light.dispose(); });
+    return group;
   }
 
   /** The feet in `root`'s own metres, written into `out` (x, z; y when it has one). */
@@ -144,7 +186,10 @@ export class CellSceneLife {
     for (const scene of this.cells.values()) {
       const live = this.ports.active(scene.cell.instance);
       // leaving the cell stills its swings: the shared uniforms never keep a lean, and re-entry starts from rest
-      if (!live) { scene.details.visible = false; for (const mirror of scene.mirrors) mirror.visible = false; if (scene.live) scene.swings?.dispose(); scene.live = false; continue; }
+      if (!live) {
+        scene.details.visible = false; for (const mirror of scene.mirrors) mirror.visible = false; if (scene.lamps !== null) scene.lamps.visible = false;
+        if (scene.live) scene.swings?.dispose(); scene.live = false; continue;
+      }
       if (!scene.installed) {
         scene.installed = true;
         try { scene.layers = scene.install?.() ?? 0; } catch (error) { console.warn(`[grid] ${scene.cell.instance} draws no detail layers:`, error); }
@@ -158,10 +203,19 @@ export class CellSceneLife {
         this.player.x = feet.x; this.player.y = feet.y; this.player.z = feet.z;
         scene.swings.update(dt, this.movers);
       }
+      if (scene.lamps !== null) {
+        // after the swings: a lamp on a swing goes where its lantern swung this frame
+        scene.lamps.visible = true; this.lampTime += dt;
+        if (scene.lamps.update !== null) {
+          const eye = this.ports.eye?.(this.eye) ?? (() => { const feet = this.ports.feet(); return this.eye.set(feet.x, feet.y, feet.z); })();
+          scene.lamps.update(this.lampTime, eye);
+        }
+      }
     }
   }
 
   state(): CellSceneLifeCell[] {
-    return [...this.cells.values()].map((scene) => ({ instance: scene.cell.instance, layers: scene.layers, swings: scene.swings?.count ?? 0, water: scene.water.length, splash: scene.splash, live: scene.live }));
+    return [...this.cells.values()].map((scene) => ({ instance: scene.cell.instance, layers: scene.layers, swings: scene.swings?.count ?? 0, water: scene.water.length, splash: scene.splash, live: scene.live,
+      lampsDeclared: scene.lampsDeclared, lamps: scene.lamps?.children.length ?? 0, lampsLit: scene.live ? scene.lamps?.children.filter((light) => (light as PointLight).intensity > 0).length ?? 0 : 0 }));
   }
 }

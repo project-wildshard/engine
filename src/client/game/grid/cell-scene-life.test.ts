@@ -40,7 +40,7 @@ test('the entered data cell writes its swings: its pivot in world metres, a lean
   for (let i = 0; i < 60 * 5; i++) life.late(1 / 60);
   expect(swings.wsSwingPivot.value[0]?.toArray()).toEqual([312, 2.6, 3.3, 1]);
   expect(leaned(swings)).toBeGreaterThan(0.005);
-  expect(life.state()).toEqual([{ instance: 'mossgate', layers: 0, swings: 1, water: 0, splash: false, live: true }]);
+  expect(life.state()).toEqual([{ instance: 'mossgate', layers: 0, swings: 1, water: 0, splash: false, live: true, lampsDeclared: 0, lamps: 0, lampsLit: 0 }]);
 });
 
 test('walking into a lantern kicks it, and it settles', async () => {
