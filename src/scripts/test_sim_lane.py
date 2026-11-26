@@ -1450,7 +1450,46 @@ sys.exit(75 if len(path.read_text().splitlines())==2 else 0)
         self.assert_not_handed_over()
 
 
+def run_transport_client(command, exit_seconds=2):
+    """Run a host transport client; bound only its protocol work, never its startup.
+
+    The client's one-second TCP deadline starts after its `started` record
+    (sim-transport.c), so the wait for that record is the process's exec. A
+    freshly built binary's first exec waits on macOS's code-signing check,
+    which a loaded Mac queues for seconds (meta QA 11-25 row 134: 0.16 s idle,
+    1.5 s at load 40), and it once ran out a `timeout=2` that also covered
+    startup. Startup ends at the record; `exit_seconds` then guards a client
+    that ignores its own deadline. A client that never starts is bounded by the
+    whole run's cap (test/sim-transport.test.ts)."""
+    with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) as client:
+        started = client.stdout.readline()  # Blocks until the client runs (or exits without a record).
+        try:
+            rest, errors = client.communicate(timeout=exit_seconds)
+        except subprocess.TimeoutExpired:
+            client.kill()
+            client.communicate()
+            raise
+    return subprocess.CompletedProcess(command, client.returncode, started + rest, errors)
+
+
 class SimulatorTransportTests(unittest.TestCase):
+    def test_client_startup_is_never_on_the_protocol_clock(self):
+        # A deterministic slow exec: the record comes after a startup longer
+        # than the whole protocol bound, and the run still completes.
+        slow_start = [PYTHON, '-c', 'import time;time.sleep(.6);'
+            'print(\'{"phase":"started"}\',flush=True);print(\'{"phase":"complete"}\')']
+        began = time.monotonic()
+        result = run_transport_client(slow_start, exit_seconds=.3)
+        self.assertGreaterEqual(time.monotonic() - began, .6)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual([json.loads(line)['phase'] for line in result.stdout.splitlines()], ['started', 'complete'])
+        # The bound still holds once the client has started.
+        stalled = [PYTHON, '-c', 'import time;print(\'{"phase":"started"}\',flush=True);time.sleep(30)']
+        began = time.monotonic()
+        with self.assertRaises(subprocess.TimeoutExpired):
+            run_transport_client(stalled, exit_seconds=.3)
+        self.assertLess(time.monotonic() - began, 10)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(dir=ROOT / 'tmp', prefix='sim-transport-test-')
         self.addCleanup(self.temp.cleanup)
@@ -1470,8 +1509,7 @@ class SimulatorTransportTests(unittest.TestCase):
         with READY['readiness_page'](time.monotonic() + 5, lifecycle=lifecycle) as (url, ready):
             location = urlsplit(url)
             token = location.path.rsplit('/', 1)[1]
-            result = subprocess.run([str(executable), str(location.port), token],
-                capture_output=True, text=True, timeout=2, check=False)
+            result = run_transport_client([str(executable), str(location.port), token])
             self.assertEqual(result.returncode, 0, result.stderr)
             # This is a real host protocol test, not native Simulator evidence.
             records = [json.loads(line) for line in result.stdout.splitlines()]
@@ -1480,8 +1518,7 @@ class SimulatorTransportTests(unittest.TestCase):
                 {'simulator': False, 'phase': 'complete', 'connected': True, 'errno': 0})
             self.assertFalse(ready.is_set())
             foreign = ('a' if token[0] != 'a' else 'b') + token[1:]
-            refused = subprocess.run([str(executable), str(location.port), foreign],
-                capture_output=True, text=True, timeout=2, check=False)
+            refused = run_transport_client([str(executable), str(location.port), foreign])
             self.assertEqual(refused.returncode, 1, refused.stderr)
             self.assertEqual(json.loads(refused.stdout.splitlines()[-1])['phase'], 'response')
             self.assertFalse(ready.is_set())
@@ -1492,8 +1529,7 @@ class SimulatorTransportTests(unittest.TestCase):
         self.assertEqual(lifecycle['http']['accept']['count'], 2)
         with socket.socket() as unavailable:
             unavailable.bind(('127.0.0.1', 0))  # Owned port, no listening peer.
-            refused = subprocess.run([str(executable), str(unavailable.getsockname()[1]), token],
-                capture_output=True, text=True, timeout=2, check=False)
+            refused = run_transport_client([str(executable), str(unavailable.getsockname()[1]), token])
             self.assertEqual(refused.returncode, 1, refused.stderr)
             self.assertEqual(json.loads(refused.stdout.splitlines()[-1])['phase'], 'connect')
             self.assertFalse(json.loads(refused.stdout.splitlines()[-1])['connected'])
