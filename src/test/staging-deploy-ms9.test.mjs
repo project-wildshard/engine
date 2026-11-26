@@ -25,12 +25,14 @@ test('staging moves a qualified alias when rooms have switched and MS9 has no wi
     await deployStaging({
       root, out, build, source, release, phase, log: vi.fn(),
       localQa: { ...base, kind: 'local', build: source, url: 'http://localhost:4400', scenarios: ran(LEGS.local) },
-      readState: () => ({ upload: {}, check: { deployment: { url: 'https://candidate.example' }, serial: 131 } }),
+      readState: () => ({ build: { contentBase: 'https://packs.wildshard.io/content/d21a64ad329cfe38/' }, upload: {},
+        check: { deployment: { url: 'https://candidate.example' }, serial: 131 } }),
       get: async url => url === CHANNELS.staging.release ? { engineBuild: build } : { build: source },
     });
     expect(phase).toHaveBeenCalledExactlyOnceWith('go-live', expect.objectContaining({ kind: 'candidate', build }));
     const verdict = JSON.parse(readFileSync(join(out, 'verdict.json'), 'utf8'));
-    expect(verdict).toMatchObject({ status: 'pass', hold: false, aliasMoved: true });
+    // QA 11-25 row 131: the verdict names the content set its QA played, for production's byte comparison
+    expect(verdict).toMatchObject({ status: 'pass', hold: false, aliasMoved: true, contentBase: 'https://packs.wildshard.io/content/d21a64ad329cfe38/' });
     expect(verdict.findings).toEqual([expect.objectContaining({ key: 'rooms-already-switched', severity: 'P2' })]);
     expect(JSON.parse(readFileSync(join(out, 'qualification', 'leg.json'), 'utf8'))).toMatchObject({ build, kind: 'candidate' });
     expect(JSON.parse(readFileSync(join(out, 'live', 'leg.json'), 'utf8'))).toMatchObject({ build, kind: 'staging' });

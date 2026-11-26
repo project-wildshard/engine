@@ -786,3 +786,37 @@ test('production refuses to check or go live while an advertised head has no pac
   await runPhase('go-live', deps);
   expect(lines).toContain('NOTE production packs go-live: glowfen 0 (ALLOW_MISSING_PACKS=1)');
 });
+
+// QA 11-25 row 131 (v0.1.92, rows 121 and 123): production's go-live reads the page against its content set before the
+// alias moves and again after it, comparing bytes with the set staging QA played; a miss stops the release.
+test('production go-live stops on a content set that lacks what the page names, before and after the alias move', async () => {
+  const {deps, calls, lines} = rig('production');
+  const asked: string[] = [];
+  let problems: Record<'before' | 'after', string[]> = {before: ['4 named content path(s) are not in content.json: assets/boot-tables-e42a1de3.json'], after: []};
+  deps.contentReach = (when, stagingBase) => { asked.push(`${when} ${stagingBase ?? 'none'}`); return Promise.resolve({summary: `${when} ok`, problems: problems[when]}); };
+  await through(deps, 'check');
+  deps.qa = {...qaOn(), contentBase: 'https://packs.wildshard.io/content/d21a64ad329cfe38/'};
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/production go-live refused: production content before the alias move: 4 named content path\(s\) are not in content\.json/u);
+  expect(calls).not.toContain('goLive');
+  expect(asked).toEqual(['before https://packs.wildshard.io/content/d21a64ad329cfe38/']);
+
+  problems = {before: [], after: ['1 named content path(s) do not answer 200 with CORS: 404 assets/title/title-day.jpg']};
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/production content after the alias move: 1 named .* \(the alias has moved: fix the set forward\)/u);
+  expect(calls).toContain('goLive');
+  expect(calls).not.toContain('state go-live');
+  expect(lines).toContain('PASS production content before the alias move: before ok');
+
+  problems = {before: [], after: []};
+  delete deps.qa.contentBase;
+  await runPhase('go-live', deps);
+  expect(lines).toContain('PASS production content after the alias move: after ok');
+  expect(lines.some(line => line.startsWith('NOTE production content before the alias move: the staging verdict names no content set'))).toBe(true);
+  expect(asked.slice(-2)).toEqual(['before none', 'after none']);
+
+  // an unreadable page or set refuses too; ALLOW_CONTENT_GAPS=1 (J381) lets a fix-forward release through, and says so
+  deps.contentReach = () => Promise.reject(new Error('content.json answered 500'));
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/the page or its set could not be read: content\.json answered 500/u);
+  deps.allowContentGaps = true;
+  await runPhase('go-live', deps);
+  expect(lines).toContain('NOTE production content after the alias move: the page or its set could not be read: content.json answered 500 (ALLOW_CONTENT_GAPS=1)');
+});

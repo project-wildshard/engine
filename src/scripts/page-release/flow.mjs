@@ -129,6 +129,11 @@ export function pinnedReleaseKey(configured) {
  * @property {boolean} [allowRoomsDown]  ALLOW_ROOMS_DOWN=1 (J381): a release that fixes a rooms outage goes on, and says so.
  * @property {(build: string) => Promise<string[]>} [productionPacks]  FR-A17: production's advertised heads with no exact-build pack index.
  * @property {boolean} [allowMissingPacks]  ALLOW_MISSING_PACKS=1 (J381).
+ * @property {(when: 'before' | 'after', stagingBase: string | undefined) => Promise<{summary: string, problems: string[]}>} [contentReach]
+ *   QA 11-25 row 131: production's page and its content set (content-reach.mjs). Every content path the page, its boot
+ *   tables and spawn books name is in the set's index and answers with the page's CORS, and holds the bytes staging QA
+ *   played (`stagingBase`, the verdict's `contentBase`): before the alias moves (the local build) and after (the live page).
+ * @property {boolean} [allowContentGaps]  ALLOW_CONTENT_GAPS=1 (J381).
  * @property {(path: string) => Uint8Array} readFile
  * @property {{read: (phase: Phase) => any, write: (phase: Phase, value: object) => void}} state
  * @property {{clean: () => boolean, head: () => string, remoteTag: (tag: string) => string|undefined}} git
@@ -331,12 +336,15 @@ export async function runPhase(phase, deps) {
     if (!dry) deps.run('node', ['src/scripts/release-cook.mjs', '--staging', `--build=${deps.build}`]);
     await rooms('after the cook and harden');
   }
+  // QA 11-25 row 131: staging QA entered the MMO (K5) on this build; the page about to go live reads only what its set holds.
+  if (channel.channel === 'production' && !dry) await contentGate('before', deps, refuse);
   for (const line of deps.host.describe('goLive', deployed)) plan(line);
   if (dry) return {refusals};
   await deps.host.goLive(deployed);
   deps.log(`ALIAS MOVED ${channel.origin} -> ${deployment.id}; checking the domain`);
   await waitForDomain(channel, deps, refuse);
   await rooms('after the alias move');
+  if (channel.channel === 'production') await contentGate('after', deps, refuse);
   deps.state.write('go-live', {build: deps.build, channel: channel.channel, deployment, ...(gate.serial === undefined ? {} : {serial: gate.serial})});
   deps.log(`PASS ${channel.origin} -> ${deps.build} ${deployment.id} after matching serial ${gate.serial}${channel.solo ? ' (solo)' : ''} (alias last)`);
   deps.log(channel.solo ? `next: node src/scripts/e7-doctor-proof.mjs ${channel.origin} ${deps.build} --human-static`
@@ -441,11 +449,32 @@ async function productionGates(phase, deps, refuse) {
 }
 
 /**
+ * QA 11-25 row 131 (v0.1.92, rows 121 and 123): production's page named 357 content paths its set never held. Before the
+ * alias moves the local build is read; after it, the live page; a miss stops the release (after the move: fix the set
+ * forward, the alias stays).
+ * @param {'before' | 'after'} when @param {Deps} deps @param {(message: string) => void} refuse
+ */
+async function contentGate(when, deps, refuse) {
+  if (deps.contentReach === undefined) return;
+  const label = when === 'before' ? 'before the alias move' : 'after the alias move';
+  const staging = deps.qa?.contentBase;
+  if (staging === undefined) deps.log(`NOTE production content ${label}: the staging verdict names no content set (verdicts before QA 11-25 row 131), so staging's bytes are not compared`);
+  /** @type {{summary: string, problems: string[]}} */
+  let reach;
+  try { reach = await deps.contentReach(when, staging); }
+  catch (error) { reach = {summary: '', problems: [`the page or its set could not be read: ${error instanceof Error ? error.message : String(error)}`]}; }
+  if (reach.problems.length === 0) { deps.log(`PASS production content ${label}: ${reach.summary}`); return; }
+  if (deps.allowContentGaps === true) { deps.log(`NOTE production content ${label}: ${reach.problems.join('; ')} (ALLOW_CONTENT_GAPS=1)`); return; }
+  refuse(`production content ${label}: ${reach.problems.join('; ')}${when === 'after' ? ' (the alias has moved: fix the set forward)' : ''} (QA 11-25 row 131; ALLOW_CONTENT_GAPS=1 under J381)`);
+}
+
+/**
  * @typedef {{ qa?: boolean, kind?: string, full?: boolean, build?: string, release?: string, url?: string, hold?: boolean,
  *   roomsSerial?: number, deploymentId?: string, proofs?: readonly { id?: string, pass?: boolean }[],
  *   scenarios?: readonly { id?: string, status?: string }[],
  *   findings?: readonly { scenario?: string, severity?: string, text?: string }[], problem?: string,
- *   deploy?: {zoneEntry?: ZoneEntryProof} }} QaVerdict
+ *   deploy?: {zoneEntry?: ZoneEntryProof}, contentBase?: string }} QaVerdict  `contentBase`: the content set staging QA
+ *   played (staging-deploy.mjs, QA 11-25 row 131).
  */
 
 /** @typedef {{build?:string,engine?:string,profile?:string,mode?:string,pass?:boolean,expected?:number,arrivals?:readonly {from:string,to:string}[],

@@ -45,6 +45,10 @@ export interface Deps {
   productionPacks?: (build: string) => Promise<string[]>;
   /** ALLOW_MISSING_PACKS=1 (J381). */
   allowMissingPacks?: boolean;
+  /** QA 11-25 row 131: production's page against its content set, before and after the alias move. */
+  contentReach?: (when: 'before' | 'after', stagingBase: string | undefined) => Promise<{ summary: string; problems: string[] }>;
+  /** ALLOW_CONTENT_GAPS=1 (J381). */
+  allowContentGaps?: boolean;
   readFile: (path: string) => Uint8Array;
   state: { read: (phase: Phase) => unknown; write: (phase: Phase, value: object) => void };
   git: { clean: () => boolean; head: () => string; remoteTag: (tag: string) => string | undefined };
@@ -64,7 +68,7 @@ export interface Deps {
 export const SMOKE_SCENARIOS: readonly string[];
 /** STAGING-QA SQ15: one staging-qa.mjs verdict, the candidate's or live staging's. */
 export interface ZoneEntryProof { build?: string; engine?: string; profile?: string; mode?: string; pass?: boolean; expected?: number; arrivals?: readonly {from: string; to: string}[]; failure?: {from: string; to: string; reason: string} }
-export interface QaVerdict { qa?: boolean; kind?: string; full?: boolean; build?: string; release?: string; url?: string; deploymentId?: string; roomsSerial?: number; proofs?: readonly { id?: string; pass?: boolean }[]; scenarios?: readonly { id?: string; status?: string }[]; hold?: boolean; findings?: readonly { scenario?: string; severity?: string; text?: string }[]; problem?: string; deploy?: {zoneEntry?: ZoneEntryProof} }
+export interface QaVerdict { qa?: boolean; kind?: string; full?: boolean; build?: string; release?: string; url?: string; deploymentId?: string; roomsSerial?: number; proofs?: readonly { id?: string; pass?: boolean }[]; scenarios?: readonly { id?: string; status?: string }[]; hold?: boolean; findings?: readonly { scenario?: string; severity?: string; text?: string }[]; problem?: string; deploy?: {zoneEntry?: ZoneEntryProof}; contentBase?: string }
 export const QA_LEGS: Readonly<{ candidate: readonly string[]; staging: readonly string[] }>;
 export function qaGap(qa: QaVerdict | undefined, build: string): string | undefined;
 export function zoneEntryGap(proof: ZoneEntryProof | undefined, build: string): string | undefined;

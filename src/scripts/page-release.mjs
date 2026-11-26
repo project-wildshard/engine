@@ -38,6 +38,7 @@ import {workersHost} from './page-release/hosts/workers.mjs';
 import {r2Packs} from './page-release/packs.mjs';
 import {publishContent, r2Content, r2Copies} from './page-release/content.mjs';
 import {deployStaging} from './page-release/staging-deploy.mjs';
+import {contentReach, fetchAnswer, pageReader, reachProblems, reachSummary} from './page-release/content-reach.mjs';
 import {openReleaseRun} from './release-run.mjs';
 
 /** SQ15: the staging-qa verdict.json, or why it could not be read. @param {string} file */
@@ -137,6 +138,15 @@ async function run(step, generatedQa) {
       // FR-A17: production moves only when every advertised head has packs for this build.
       productionPacks: channel === 'production' ? missingProductionPacks : undefined,
       allowMissingPacks: process.env.ALLOW_MISSING_PACKS === '1',
+      // QA 11-25 row 131: before the alias moves, the local build's names; after it, the live page's (J205: static reads only).
+      contentReach: channel === 'production' && flag('content') !== undefined ? async (when, stagingBase) => {
+        const origin = CHANNELS.production.origin;
+        const page = when === 'before' ? {page: host.outputDir(/** @type {any} */ ({root}))} : {};
+        const reach = await contentReach({origin, readPage: pageReader({origin, fetcher: agentFetch, ...page}), get: fetchAnswer(agentFetch),
+          ...(stagingBase === undefined ? {} : {stagingBase})});
+        return {summary: reachSummary(reach), problems: reachProblems(reach)};
+      } : undefined,
+      allowContentGaps: process.env.ALLOW_CONTENT_GAPS === '1',
       readFile: path => readFileSync(path),
       state: {
         read: name => readState()[name],

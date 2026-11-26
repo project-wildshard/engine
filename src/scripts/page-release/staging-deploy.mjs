@@ -139,8 +139,11 @@ export async function deployStaging({ root, build, release, source, out, observe
     if (problem !== undefined) findings.push({ scenario: step, key: 'deploy', severity: 'P1', source: 'check', text: problem });
     findings.sort(worstFirst);
     const hold = findings.some(row => row.severity === 'P0' || row.severity === 'P1');
+    // QA 11-25 row 131: the content set this QA played, so production compares its own set's bytes with it.
+    const contentBase = readState().build?.contentBase;
     write(reportPath, { ...(live ?? qa), build, release, status: hold ? 'hold' : 'pass', hold, worst: findings[0]?.severity ?? 'none', findings,
-      aliasMoved, deploy: { local: localQa?.build, qualification: qa, live, observation, zoneEntry } });
+      aliasMoved, ...(typeof contentBase === 'string' ? { contentBase } : {}),
+      deploy: { local: localQa?.build, qualification: qa, live, observation, zoneEntry } });
   };
   try {
     const gap = localQaGap(localQa, source, release);

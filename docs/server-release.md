@@ -170,6 +170,18 @@ scripts' `/api/*` 401 checks are gone: the page's API is
 If go-live fails after an `ALIAS MOVED` line, the alias did move; fix
 forward (J179).
 
+Production go-live reads the page against its content set twice (QA 11-25
+row 131, after v0.1.92's 357 missing paths): just before the alias moves
+(the local build) and after it (the live page). Every content path the
+page, its boot tables, its spawn books and their lists name must be in
+the set's `content.json` and answer 200 with play's CORS, and must hold
+the bytes of the set staging QA played (the staging verdict's
+`contentBase`; spawn books and lists are channel-bound and skipped).
+A miss refuses; after the move the alias stays, so fix the set forward.
+`ALLOW_CONTENT_GAPS=1` (J381) lets a fix-forward release through. By hand:
+`node src/scripts/page-release/content-reach.mjs [--page=dist]
+[--staging-base=<url>]` (J205: static reads, no join).
+
 `--dry-run` prints every step with the token as `<token>`, reads the
 live signed file and `/health`, and lists what would refuse today. It
 builds, uploads and aliases nothing.
