@@ -13,3 +13,8 @@
 - Proof on a working-tree preview with Pine's one-cell catalogue injected: Pine boots as cell (0, 0) on `/`, no URL names a
   zone, no other zone's level file is read (the in-game menu still shows 9 zone cards' art), and walking out from four
   sides stops at +-1977 m, the 7 x 7's outer road shoulder, as on the whole grid.
+- CP11 (opus-chunk2, later): against this engine, `wildshard dev` stopped at boot. The author's inline shard took the grid
+  path, then its home was claimed twice (an unplaced product is `external-<hash>`, the cell is its slug), and past that the
+  grid admits a cell only by a descriptor whose build owns its residency verdict (folderCost.ts), which an uncooked
+  candidate never has: the verdict is build-owned, never a network sidecar. So a page with its own `ws-shardfile` keeps its
+  one-shard boot on `/` (no `chunk` either way); the grid path for builder dev is CHUNK-PARAM-REMOVAL CP25.

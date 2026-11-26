@@ -46,7 +46,7 @@ test('the one cell boots as a grid page with no tap: its intent is this document
   expect(pendingGridEntry('pine-hollow')).toBe(false);
 });
 
-test('an author\'s inline shard (`wildshard dev`) boots in its own one cell, so its slug need not be a title row', () => {
+test('a zone no title row names boots in its own one cell', () => {
   installCatalogue(oneCell('my-shard'));
   enterOneCellWorld('my-shard', 'my-shard');
   expect(bootPageMode('my-shard')).toBe('grid');
@@ -54,10 +54,12 @@ test('an author\'s inline shard (`wildshard dev`) boots in its own one cell, so 
 
 test('the entry and the first paint read the one-cell world, and no address names its zone', () => {
   const entry = readFileSync('src/client/app/entry.ts', 'utf8');
-  expect(entry).toContain('inlineCell = requested === null && slugged === null && !exploreChannel() ? oneCellWorld(catalogue) : null;');
+  expect(entry, 'a page with its own inline shard (`wildshard dev`, `wildshard prepare`) keeps its own boot: the grid admits no uncooked candidate (CP25)')
+    .toContain("inlineCell = requested === null && slugged === null && !exploreChannel() && document.getElementById('ws-shardfile') === null\n    ? oneCellWorld(catalogue) : null;");
   expect(entry).toContain('if (inlineCell !== null) enterOneCellWorld(inlineCell.instance, inlineCell.slug);');
   expect(entry, 'a one-cell world reads its own zone\'s set, never its neighbours\' files').toContain("flow = inlineCell === null && (pageGridRecovery() !== null || pendingGridEntry(slug)) ? 'grid' : 'client'");
   const page = readFileSync('index.html', 'utf8');
   expect(page, 'the first paint shows the zone\'s loading card, never the title').toContain("document.documentElement.classList.remove('title-first', 'boot-menu');");
   expect(page).toContain("const loadShard = homeParams.get('chunk') || oneCellZone || 'driftwood-isle';");
+  expect(page).toContain("!homeParams.has('chunk') && !document.getElementById('ws-shardfile') && Array.isArray(cells) && cells.length === 1");
 });
