@@ -9,6 +9,7 @@
 import {existsSync, readFileSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {stampContentBase} from '../app-build/contentBase.mjs';
+import {contentGaps} from '../app-build/splitOutput.mjs';
 import {contentBaseOf, contentSet, scanContent} from './content.mjs';
 
 const dist = process.argv[2];
@@ -17,6 +18,9 @@ const page = resolve(dist), content = `${page}-content`, root = resolve(import.m
 if (!existsSync(content)) throw new Error(`${content} is missing: stamp a split page (pnpm build:game splits it)`);
 const files = scanContent(content);
 if (files.length === 0) throw new Error(`${content} holds no content`);
+// QA 11-25 row 121 (P0): the stamped page reads every content path from the set, so the cut refuses a gap.
+const gaps = contentGaps(page, new Set(files.map(file => file.path)));
+if (gaps.length > 0) throw new Error(`${dist} holds ${gaps.length} content path(s) its set lacks, so the stamped page would 404 on them: ${gaps.slice(0, 8).join(', ')}${gaps.length > 8 ? ', ...' : ''}`);
 const base = contentBaseOf(contentSet(files));
 writeFileSync(join(page, 'index.html'), stampContentBase(readFileSync(join(page, 'index.html'), 'utf8'), base));
 const {writeServiceWorker} = await import('../app-build/serviceWorker.ts');

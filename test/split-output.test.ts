@@ -1,12 +1,14 @@
 // @vitest-environment node
 // oxlint-disable-next-line import/no-nodejs-modules -- The fixture is a built page tree under the repository's tmp.
-import {existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync} from 'node:fs';
+// oxlint-disable-next-line import/no-nodejs-modules -- A real brotli pack for the content scan.
+import {brotliCompressSync} from 'node:zlib';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths stay under tmp.
 import {dirname, join, resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Run the CLI as build:game does.
 import {spawnSync} from 'node:child_process';
 import {afterEach, expect, test} from 'vitest';
-import {SPLITTING, contentDirOf, joinOutput, splitOutput} from '../src/scripts/app-build/splitOutput.mjs';
+import {SPLITTING, contentDirOf, contentGaps, joinOutput, splitOutput} from '../src/scripts/app-build/splitOutput.mjs';
 import {gatePage, pageSize} from '../src/scripts/page-size.mjs';
 
 const roots: string[] = [];
@@ -150,7 +152,7 @@ test('the CLI splits, gates and joins', () => {
   expect(whole.stderr).toContain(`dist/ holds ${CONTENT.length} content files`);
 });
 
-test('a kept build\'s content stays on the page (its tabs read it there) and the gate lets it pass', () => {
+test('a kept build\'s content stays on the page (its tabs read it there), reaches the set too, and the gate lets it pass', () => {
   const dist = fixture(), old = 'assets/boot-tables-87654321.json';
   writeFileSync(join(dist, old), 'old tables');
   writeFileSync(join(dist, 'deploy-chunks.json'), JSON.stringify({format: 2, builds: [
@@ -159,6 +161,33 @@ test('a kept build\'s content stays on the page (its tabs read it there) and the
   ]}));
   splitOutput(dist);
   expect(existsSync(join(dist, old))).toBe(true);
-  expect(tree(contentDirOf(dist))).toEqual([...CONTENT].sort());
+  expect(tree(contentDirOf(dist))).toEqual([...CONTENT, old].sort());
   expect(gatePage(pageSize(dist))).toEqual([]);
+  joinOutput(dist);
+  expect(tree(dist)).toEqual([...PAGE, ...CONTENT, old, 'deploy-chunks.json'].sort());
+});
+
+// QA 11-25 row 121 (P0): v0.1.92 published its content (`content: true`), so its own deploy-chunks graph named code only,
+// while its kept unmarked builds listed the boot tables, grid seams and title art it still used. The old split kept those
+// on the page only; the stamped page sent its client to the set, which lacked them, and prod could not load.
+test('a content path the build shares with a kept unmarked build reaches the set, and the cut refuses a set without it', () => {
+  const dist = fixture(), shared = ['assets/boot-tables-12345678.json', 'assets/grid-strip-mesh-12345678.bin', 'assets/title/card.webp'];
+  writeFileSync(join(dist, 'deploy-chunks.json'), JSON.stringify({format: 2, builds: [
+    {build: 'v0.1.92', content: true, files: [{path: 'b/c/main-aaaaaaaa.js', bytes: 1}]},
+    {build: 'v0.1.85', files: [...shared, 'b/c/main-bbbbbbbb.js'].map(path => ({path, bytes: path.length}))},
+  ]}));
+  splitOutput(dist);
+  const held = new Set(tree(contentDirOf(dist)));
+  for (const path of shared) { expect(held.has(path)).toBe(true); expect(existsSync(join(dist, path))).toBe(true); }
+  expect(contentGaps(dist, held)).toEqual([]);
+  // v0.1.92's shape: the set's index without the shared paths. The cut names every gap.
+  expect(contentGaps(dist, new Set([...held].filter(path => !shared.includes(path))))).toEqual([...shared].sort());
+  // The stamp, which runs at the cut, refuses the same gap before it stamps anything.
+  writeFileSync(join(contentDirOf(dist), 'assets/spawn/parts/0123456789abcdef.pack.br'), brotliCompressSync('pack'));
+  for (const path of shared) rmSync(join(contentDirOf(dist), path));
+  const page = readFileSync(join(dist, 'index.html'), 'utf8');
+  const refused = spawnSync(process.execPath, ['--import', './src/scripts/bake-loader.mjs', 'src/scripts/page-release/stamp-content.mjs', dist], {encoding: 'utf8'});
+  expect(refused.status).not.toBe(0);
+  expect(refused.stderr).toMatch(/holds 3 content path\(s\) its set lacks/u);
+  expect(readFileSync(join(dist, 'index.html'), 'utf8')).toBe(page);
 });

@@ -6,7 +6,7 @@
 // joins before it packages, and the jobs that serve the whole game from dist (nightly, hover contract) join too.
 //
 //   node src/scripts/app-build/splitOutput.mjs [dist] [--join]
-import {existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, rmdirSync, writeFileSync} from 'node:fs';
+import {constants, copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, rmdirSync, writeFileSync} from 'node:fs';
 import {dirname, join, resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {carriedPaths, classify, shardNames} from '../page-size.mjs';
@@ -80,13 +80,18 @@ export function splitOutput(dist, content = contentDirOf(dist)) {
     if (!lstatSync(target).isDirectory() || lstatSync(target).isSymbolicLink()) throw new Error('splitOutput: content root must be a real directory');
   } catch (error) { if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error; }
   if (!existsSync(join(root, 'index.html'))) throw new Error(`splitOutput: ${root} holds no index.html; give a built page`);
-  // a kept build's content (MF2 carry, PZ5: an unmarked build reads it from the page) stays on the page until it ages out
+  // a kept build's content (MF2 carry, PZ5: an unmarked build reads it from the page) stays on the page until it ages out.
+  // It goes to the set as well: a build that publishes its content names only its code in deploy-chunks.json, so a content
+  // path this build still uses looks carried whenever a kept unmarked build listed it too. v0.1.92 kept 357 such paths
+  // (boot tables, grid seams and strips, title art) on the page only, and its client, sent to the set, met 404s (QA 11-25
+  // row 121, P0).
   const carried = carriedPaths(root)?.paths ?? new Set();
-  const shards = shardNames(root), rows = files(root).filter(row => row.path !== SPLITTING && row.path !== `${SPLITTING}.tmp` && !carried.has(row.path) && isContent(row.path, shards));
+  const shards = shardNames(root), found = files(root).filter(row => row.path !== SPLITTING && row.path !== `${SPLITTING}.tmp` && isContent(row.path, shards));
+  const rows = found.filter(row => !carried.has(row.path)), kept = found.filter(row => carried.has(row.path));
   // The full desired path list makes pruning resumable too. An empty mark
   // from the previous implementation already had its old target removed.
-  if (rows.length > 0 && !existsSync(mark)) {
-    writeFileSync(`${mark}.tmp`, JSON.stringify(rows.map(row => row.path)));
+  if (found.length > 0 && !existsSync(mark)) {
+    writeFileSync(`${mark}.tmp`, JSON.stringify(found.map(row => row.path)));
     renameSync(`${mark}.tmp`, mark);
   }
   if (existsSync(mark) && readFileSync(mark, 'utf8') !== '') {
@@ -97,9 +102,24 @@ export function splitOutput(dist, content = contentDirOf(dist)) {
     for (const {path} of files(target)) if (!desired.has(path)) rmSync(join(target, path));
   }
   const moved = move(root, target, rows, true);
+  for (const {path} of kept) {
+    const source = join(root, path), copy = join(target, path);
+    if (existsSync(copy) && lstatSync(copy).isFile() && readFileSync(copy).equals(readFileSync(source))) continue;
+    rmSync(copy, {recursive: true, force: true});
+    mkdirSync(dirname(copy), {recursive: true});
+    copyFileSync(source, copy, constants.COPYFILE_FICLONE);
+  }
   rmSync(mark, {force: true});
   rmSync(`${mark}.tmp`, {force: true});
   return moved;
+}
+
+/** The content paths a split page still holds that its set's index lacks. The stamped page sends its client to the set
+ * for every content path, so each one must be there (QA 11-25 row 121, P0: v0.1.92's set lacked 357).
+ * @param {string} dist @param {ReadonlySet<string>} held the set index's paths @returns {string[]} */
+export function contentGaps(dist, held) {
+  const root = resolve(dist), shards = shardNames(root);
+  return files(root).filter(row => row.path !== SPLITTING && isContent(row.path, shards) && !held.has(row.path)).map(row => row.path).sort();
 }
 
 /** Put the content back into the page, one tree again, and remove dist-content.
@@ -107,7 +127,8 @@ export function splitOutput(dist, content = contentDirOf(dist)) {
 export function joinOutput(dist, content = contentDirOf(dist)) {
   const from = resolve(content);
   disjoint(resolve(dist), from);
-  const moved = move(from, resolve(dist), files(from));
+  // A kept build's content is on both sides (splitOutput copies it to the set too); the same bytes join as one file.
+  const moved = move(from, resolve(dist), files(from), true);
   rmSync(from, {recursive: true, force: true});
   return moved;
 }
