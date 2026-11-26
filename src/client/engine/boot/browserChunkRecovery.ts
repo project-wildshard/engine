@@ -5,8 +5,9 @@ import { beginLoadingWait, finishLoadingWait } from '../../../shared/engine/boot
 import { markReload, type ReloadReason } from './lastEnd';
 import { leaveAfterPaint } from './leaveAfterPaint';
 import { handZoneOnReload } from './titleArrival';
-import { createChunkRecovery, reloadIntoNewerBuild, sayingReload, type ChunkRecoveryPorts } from './chunkRecovery';
-import { captureBrowserError, engineScreenTags } from '../telemetry/browserErrors';
+import { createChunkRecovery, reloadIntoNewerBuild, sayingReload, staleChunkFailure, type ChunkRecoveryPorts } from './chunkRecovery';
+import { claimSessionReload, createOldTabHandler, missKind, paintOldTabCard, type OldTabMiss } from './oldTab';
+import { captureBrowserError } from '../telemetry/browserErrors';
 
 declare const __BUILD_ID__: string;
 function bootSelfReloadClaimed(): boolean {
@@ -99,9 +100,10 @@ async function leavePastWorker(why: string, cover: Promise<void> = Promise.resol
 }
 
 /** RL8: this build's own file is gone from the server. When /version.json names another build, this tab's build is out
- * of date: the full-page RELOADING cover goes up (reloadCover.ts listens for `ws:reloading`) and the page reloads past
- * its worker into the live build. Once per build and tab, so a broken deploy can't loop; false leaves the ordinary RETRY. */
-export async function reloadIfStaleBuild(): Promise<boolean> {
+ * of date: PV11's "Wildshard was updated" card goes up with its one event (oldTabMissed), then the RELOADING cover and a
+ * reload past the worker into the live build. Once per build and tab, so a broken deploy can't loop; false leaves the
+ * ordinary RETRY. */
+export async function reloadIfStaleBuild(url = ''): Promise<boolean> {
   if (typeof window === 'undefined' || typeof __BUILD_ID__ !== 'string') return false;
   const live = await latestVersion(() => !documentLeaving);
   if (live === null || live === __BUILD_ID__) return false;
@@ -111,12 +113,44 @@ export async function reloadIfStaleBuild(): Promise<boolean> {
     if (store.getItem('boot.staleBuild') === __BUILD_ID__) return false;
     store.setItem('boot.staleBuild', __BUILD_ID__);
   } catch { return false; }
-  // SENTRY-TRIAGE S18: the cover is a screen of a fault; the outbox keeps the report across the reload below
-  try { captureBrowserError(new Error(`stale build ${__BUILD_ID__}: its files are gone; the server runs ${live}`), engineScreenTags('stale-reload', 'chunk-recovery', 'running', { live })); }
-  catch { /* a report never holds the reload */ }
-  const cover = showReloadingSoon('This build is out of date · getting the new one');
-  void leavePastWorker('stale build: its files are gone from the server', cover);
+  // Fix-preview PV11: one card for every old-tab miss, with its one event (oldTab.ts); it reloads once when the tab may
+  oldTabMissed(missKind(url), url);
   return true;
+}
+
+/** opus-pvclient's event (PV4) for a zone whose cooked index the server no longer has: detail {slugs, cook}. */
+export const COOKED_ZONE_MISSING = 'wildshard:cooked-zone-missing';
+function cookedZoneMiss(event: Event): string {
+  const detail: unknown = event instanceof CustomEvent ? event.detail : undefined;
+  const slugs = typeof detail === 'object' && detail !== null && 'slugs' in detail && Array.isArray(detail.slugs) ? detail.slugs.filter(slug => typeof slug === 'string') : [];
+  return `cooked zone ${slugs.join(',')}`;
+}
+let oldTab: ReturnType<typeof createOldTabHandler> | undefined;
+/** Fix-preview PV11 (Jake, 2026-11-26: "this old tab tried to fetch code that no longer exists"): the one handler for a
+ *  code file, pack or book this tab's build names and the server no longer has. "Wildshard was updated" goes up with one
+ *  Sentry event; with no world running and the session's one reload unspent (OLD_TAB_RELOAD_KEY) the tab reloads past
+ *  its worker into the live build, otherwise the card keeps its Reload button, so a second miss never loops. */
+export function oldTabMissed(kind: OldTabMiss, what: string): 'reload' | 'card' | 'shown' {
+  if (document.getElementById('ws-old-tab') === null) oldTab = undefined; // the card on the page is its one card
+  oldTab ??= createOldTabHandler({
+    show: paintOldTabCard, build: typeof __BUILD_ID__ === 'string' ? __BUILD_ID__ : '',
+    capture: (error, tags) => { captureBrowserError(error, tags); },
+    claim: () => {
+      if (!recoveryAllowed()) return false;
+      try { return claimSessionReload(saveStorage('session')); } catch { return false; }
+    },
+    reload: () => { settleRefusedBuild(); void leavePastWorker('old tab: a file is gone from the server (PV11)', showReloadingSoon('Wildshard was updated · getting the new version')); },
+  });
+  return oldTab(kind, what);
+}
+/** A failed code file of this build, while /version.json names another live build: the old-tab card. Offline, or with
+ *  this build still live, it is no old tab, and the ordinary error pipeline has it as before. */
+async function codeMissed(error: unknown): Promise<void> {
+  if (typeof window === 'undefined' || typeof __BUILD_ID__ !== 'string' || !staleChunkFailure(error, location.href)) return;
+  const live = await latestVersion(() => !documentLeaving, VERSION_MS);
+  if (live === null || live === __BUILD_ID__) return;
+  const what = /(?:https?:\/\/[^\s"']+|\/(?:assets|builds|b)\/[^\s"']+)/u.exec(error instanceof Error ? error.message : '')?.[0] ?? '';
+  oldTabMissed('code', what);
 }
 
 /** The RELOADING cover, in this turn when its module is loaded (it answers `ws:reloading` with preventDefault). In an
@@ -141,6 +175,8 @@ export function installChunkRecovery(): void {
     if (!document.documentElement.classList.contains('title-first')) worldRunning = true;
   });
   pageScope.listen(document, 'ws:control-ready', () => { worldRunning = true; });
-  pageScope.listen(window, 'unhandledrejection', event => { void recoverChunkFailure(event.reason); });
-  pageScope.listen(window, 'vite:preloadError', event => { void recoverChunkFailure(Reflect.get(event, 'payload')); });
+  pageScope.listen(window, 'unhandledrejection', event => { void codeMissed(event.reason); });
+  pageScope.listen(window, 'vite:preloadError', event => { void codeMissed(Reflect.get(event, 'payload')); });
+  // PV11 with opus-pvclient's PV4: a zone whose cooked index is gone (game/grid/cookedZones.ts COOKED_ZONE_MISSING)
+  pageScope.listen(window, COOKED_ZONE_MISSING, event => { oldTabMissed('book', cookedZoneMiss(event)); });
 }

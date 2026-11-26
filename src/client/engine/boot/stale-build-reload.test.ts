@@ -4,7 +4,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 afterEach(async () => {
   (await import('../ui/reloadCover')).hideReloading();
   (await import('../../../shared/engine/app/resources')).pageScope.dispose();
-  document.body.replaceChildren(); sessionStorage.clear();
+  document.body.replaceChildren(); document.getElementById('ws-old-tab')?.remove(); sessionStorage.clear(); // PV11: the card goes with its page
   vi.restoreAllMocks(); vi.unstubAllGlobals();
 });
 
@@ -21,14 +21,26 @@ function oldBuildPage(live: string): { reload: () => void; files: Files & { mock
   return { reload, files };
 }
 
+// first in the file: the later tests dispose the page scope its listener lives on
+test('PV11: a zone whose cooked index is gone (opus-pvclient PV4\'s event) shows the updated card and reloads once', async () => {
+  const { reload } = oldBuildPage('d91507e-live');
+  const recovery = await import('./browserChunkRecovery');
+  recovery.installChunkRecovery();
+  window.dispatchEvent(new CustomEvent(recovery.COOKED_ZONE_MISSING, { detail: { slugs: ['driftwood-isle'], cook: 'abc' } }));
+  expect(document.getElementById('ws-old-tab')?.dataset['card']).toBe('old-tab-updated');
+  await vi.waitFor(() => { expect(reload).toHaveBeenCalledOnce(); }, { timeout: 8000 });
+});
+
 test('RL8: a file 404 on a build the server no longer serves reloads into the live build, with the Reloading cover, once', async () => {
   const { reload, files } = oldBuildPage('d91507e-live');
   await import('../ui/reloadCover');
   const { readContent } = await import('./contentRead');
   void readContent('https://example.com/assets/spawn/driftwood-isle-client-phone-old.json', 1000, { fetch: files });
-  await vi.waitFor(() => { expect(reload).toHaveBeenCalledOnce(); }, { timeout: 5000 }); // past a worker unregister that never answers (3 s cap)
+  // PV11: the old-tab card first, then the RELOADING cover and the reload, past a worker unregister that never answers (3 s cap)
+  await vi.waitFor(() => { expect(document.getElementById('ws-old-tab')?.dataset['card']).toBe('old-tab-updated'); });
+  await vi.waitFor(() => { expect(reload).toHaveBeenCalledOnce(); }, { timeout: 8000 });
   expect(files).toHaveBeenCalledTimes(2); // the one immediate retry, then the stale check: no RETRY wait
-  expect(document.getElementById('ws-reloading')?.textContent).toContain('out of date');
+  expect(document.getElementById('ws-reloading')?.textContent).toContain('Wildshard was updated');
   // the same build in the same tab never reloads twice (a broken deploy can't loop), even after an online server took
   // the build (settleRefusedBuild clears the shared self-reload claim, not this one): it falls back to the card's RETRY
   const recovery = await import('./browserChunkRecovery');
@@ -41,7 +53,7 @@ test('RL8: an HTML fallback with no HTML content type (sniffed from the body) co
   const page = vi.fn<Files>(() => Promise.resolve(Object.defineProperty(new Response('<!doctype html><html></html>', { status: 200, headers: { 'content-type': 'application/json' } }), 'url', { value: '' })));
   const { readContent } = await import('./contentRead');
   void readContent('https://example.com/assets/spawn/driftwood-isle-client-phone-old.json', 1000, { fetch: page });
-  await vi.waitFor(() => { expect(reload).toHaveBeenCalledOnce(); }, { timeout: 5000 });
+  await vi.waitFor(() => { expect(reload).toHaveBeenCalledOnce(); }, { timeout: 8000 });
 });
 
 test('RL8: a 404 while this build is still the live one keeps the default RETRY wait (no reload)', async () => {

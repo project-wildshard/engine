@@ -74,7 +74,7 @@ function paint(): void {
   }
   if (el.dataset['failmode'] !== undefined) { delete el.dataset['failmode']; el.title = ''; }
   text.textContent = !newer ? (narrow?.matches === true ? compactBuildLabel(runningLabel) : engineString('s_9e4fe13a912d', [runningLabel])) : isDev()
-    ? engineString('s_update_next_boundary_dev', [newLabel]) : engineString('s_update_next_boundary');
+    ? engineString('s_update_next_boundary_dev', [newLabel]) : engineString('s_old_tab_update_available'); // PV11: "Update available", never blocking play
 }
 scope.listen(window, 'ws-live-build-failed', event => {
   const value: unknown = event instanceof CustomEvent ? event.detail : null;

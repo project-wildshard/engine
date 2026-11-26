@@ -41,7 +41,7 @@ test('the wire release requires an upgrade once, then admits the new page', asyn
       await new ClientUpdater(sessionStorage).install(version, scope);
       await vi.waitFor(() => { expect(fetch).toHaveBeenCalled(); });
       if (olderClient(version, document.minClient)) {
-        await vi.waitFor(() => { expect(window.document.querySelector('#ws-force-update strong')?.textContent).toBe('Update required'); });
+        await vi.waitFor(() => { expect(window.document.querySelector('#ws-old-tab[data-card="old-tab-updated"]')?.textContent).toBe('Wildshard was updated. Reload to keep playing. Your progress is safe.'); });
         expect(reload).not.toHaveBeenCalled();
         await vi.waitFor(() => { expect(reload).toHaveBeenCalledOnce(); });
       }

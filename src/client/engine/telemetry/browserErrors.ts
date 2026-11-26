@@ -41,8 +41,10 @@ export interface BrowserErrorTags {
  *                 (telemetry/staleBuildReport.ts) since that page stops before Sentry can load
  *   loading-stall the loading card's RETRY for a content read that failed past its own retry (boot/contentRead.ts
  *                 retryFromCard, SENTRY-TRIAGE S18), once per page; a common screen, so it reports at warning level
- *   stale-reload  the RELOADING cover over a build whose files are gone from the server (boot/browserChunkRecovery.ts
- *                 reloadIfStaleBuild); the outbox carries it across the reload; warning (every deploy meets open tabs)
+ *   old-tab-updated  fix-preview PV11: "Wildshard was updated", the one card for an old tab whose code, pack or book is
+ *                 gone from the server (boot/oldTab.ts, browserChunkRecovery.ts oldTabMissed); one event per card, which the
+ *                 outbox carries across the reload; it replaced stale-reload's RELOADING cover
+ *   day-logout    fix-preview PV12: a client open 24 hours signs out and reloads (boot/oldTab.ts armDayLogout)
  *   self-reload   index.html's 12 s self-reload of a page whose entry never arrived, reported by the page it reloads into
  *                 (telemetry/staleBuildReport.ts reportSelfReload), since the inline script has no Sentry; warning
  *   save-failed   the grid's SAVE FAILED, RETRY at a border (game/grid/screenReports.ts), once a session
@@ -59,9 +61,11 @@ export interface BrowserErrorTags {
  * "The world is full", the reconnect banner (counted in `net` telemetry), title refusal lines and the Connection doctor.
  */
 export const ERROR_SCREENS = ['error-modal', 'stuck-step', 'glitch-chip', 'load-failure', 'title-drop', 'link-lost', 'link-refused', 'stale-build',
-  'loading-stall', 'stale-reload', 'self-reload', 'save-failed', 'cell-unavailable', 'map-tile-missing', 'release-unsigned', 'boot-fail'] as const;
+  'loading-stall', 'self-reload', 'save-failed', 'cell-unavailable', 'map-tile-missing', 'release-unsigned', 'boot-fail',
+  // fix-preview PV11, PV12: an old tab's cards, one event each (boot/oldTab.ts)
+  'old-tab-updated', 'day-logout'] as const;
 /** S18: screens common enough on a bad network that each is a Sentry warning, never an error */
-export const WARNING_SCREENS: readonly ErrorScreen[] = ['loading-stall', 'stale-reload', 'self-reload', 'cell-unavailable', 'map-tile-missing'];
+export const WARNING_SCREENS: readonly ErrorScreen[] = ['loading-stall', 'self-reload', 'cell-unavailable', 'map-tile-missing'];
 export type ErrorScreen = typeof ERROR_SCREENS[number];
 
 // A DSN is a public browser endpoint, not an auth token. Only real production pages report.

@@ -51,6 +51,7 @@ import { exploreSlugOfPath, retiredSlugs, slugOfPath, slugPathOf } from './slugP
 
 
 import { installForceUpdate } from '@wildshard/engine/boot/forceUpdate';
+import { installDayLogout } from '@wildshard/engine/boot/oldTab';
 import { replaceFresh } from '@wildshard/engine/boot/freshPage';
 
 declare const __BUILD_ID__: string;
@@ -481,6 +482,8 @@ function showDrop(drop: ReturnType<typeof takeDrop>, retry?: (drop: Drop) => voi
 // QA 11-19 row 19: the Web Analytics beacon loads a second after the title or a world is first interactive, never on the
 // `load` path. Armed here, as the page entry evaluates: a launch that stays on the title never runs start().
 armAnalyticsBeacon(entryScope);
+// fix-preview PV12 (Jake, 2026-11-26: "a logout after 24 hours of a game client being open is simplest")
+installDayLogout(entryScope);
 const clientVersion: unknown = Reflect.get(globalThis, '__WS_CLIENT_VERSION__');
 export const entered: Promise<unknown> = installForceUpdate(typeof clientVersion === 'string' ? clientVersion : '', entryScope).then(accepted => accepted ? enterPage() : undefined);
 guardBoot(entered);

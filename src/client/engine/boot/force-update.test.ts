@@ -45,7 +45,7 @@ test('a retired boot unregisters, wipes every download and only the pack databas
   books.set('old-shell', new Map()); books.set('old-packs', new Map());
   const client = new ClientUpdater(sessionStorage);
   await client.install('0.1.23', owner());
-  await vi.waitFor(() => { expect(document.querySelector('#ws-force-update strong')?.textContent).toBe('Update required'); });
+  await vi.waitFor(() => { expect(document.querySelector('#ws-old-tab[data-card="old-tab-updated"]')?.textContent).toBe('Wildshard was updated. Reload to keep playing. Your progress is safe.'); });
   expect(reload).not.toHaveBeenCalled();
   await vi.waitFor(() => { expect(reload).toHaveBeenCalledTimes(1); });
   await client.force();
@@ -53,7 +53,7 @@ test('a retired boot unregisters, wipes every download and only the pack databas
   expect(books.has('old-shell')).toBe(false); expect(books.has('old-packs')).toBe(false);
   expect(deletedDatabases).toEqual(['ws-built-home-v1']);
   expect(localStorage.getItem('account-sentinel')).toBe('keep'); expect(localStorage.getItem('settings-sentinel')).toBe('keep');
-  expect(document.getElementById('ws-force-update')?.textContent).toContain('Updating…');
+  expect(document.getElementById('ws-old-tab')?.dataset['card']).toBe('old-tab-updated');
 });
 
 test('foreground rechecks a raised floor; the accepted next client does not enter a reset loop', async () => {

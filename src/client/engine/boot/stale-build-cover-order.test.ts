@@ -15,8 +15,8 @@ test('RL8: a stale-build reload puts the RELOADING cover up even when the cover 
   vi.stubGlobal('fetch', () => Promise.resolve(Object.defineProperty(Response.json({ build: 'd91507e-live' }), 'url', { value: '' })));
   const { reloadIfStaleBuild } = await import('./browserChunkRecovery');
   await expect(reloadIfStaleBuild()).resolves.toBe(true);
-  await vi.waitFor(() => { expect(document.getElementById('ws-reloading')?.textContent).toContain('out of date'); });
-  await vi.waitFor(() => { expect(reload).toHaveBeenCalledOnce(); }, { timeout: 5000 });
+  await vi.waitFor(() => { expect(document.getElementById('ws-reloading')?.textContent).toContain('Wildshard was updated'); }, { timeout: 3000 });
+  await vi.waitFor(() => { expect(reload).toHaveBeenCalledOnce(); }, { timeout: 8000 });
   expect(coverAtReload).toEqual([true]);
   expect(document.querySelectorAll('#ws-reloading')).toHaveLength(1);
 });

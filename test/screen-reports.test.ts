@@ -145,7 +145,7 @@ walk('loading-stall', "a content read past its own retry offers the card's RETRY
   expect(opened()).toEqual(['loading-stall']);
 });
 
-walk('stale-reload', "a build whose files are gone puts up RELOADING and reports it once, before the reload (S18)", async () => {
+walk('old-tab-updated', "a build whose files are gone shows \"Wildshard was updated\" and reports it once, before the reload (PV11)", async () => {
   sessionStorage.clear();
   // the reload waits on the cover and a painted frame: the walk holds it, and sees the report came first
   const leaves: number[] = [];
@@ -157,16 +157,33 @@ walk('stale-reload', "a build whose files are gone puts up RELOADING and reports
   expect(await reloadIfStaleBuild()).toBe(true);
   // once per build and tab: a second failure on the same build neither reloads nor reports again
   expect(await reloadIfStaleBuild()).toBe(false);
-  expect(opened()).toEqual(['stale-reload']);
-  expect(reports[0]?.tags).toMatchObject({ system: 'chunk-recovery', build: 'fixture', fatal: false, diagnostic: { live: 'live-build' } });
-  expect(browserErrorLevel(reports[0]?.error, false, 'stale-reload')).toBe('warning');
-  await vi.waitFor(() => { expect(leaves).toEqual([1]); });
+  expect(opened()).toEqual(['old-tab-updated']);
+  expect(reports[0]?.tags).toMatchObject({ system: 'old-tab', build: 'fixture', fatal: false, diagnostic: { kind: 'pack', reload: true } });
+  // one Sentry event per card: not a warning
+  expect(browserErrorLevel(reports[0]?.error, false, 'old-tab-updated')).toBe('error');
+  await vi.waitFor(() => { expect(leaves).toEqual([1]); }, { timeout: 8000 });
   // the same live build is no stale screen
   reports.length = 0; sessionStorage.clear();
   vi.stubGlobal('fetch', () => Promise.resolve(Response.json({ build: 'fixture' })));
   expect(await reloadIfStaleBuild()).toBe(false);
   expect(opened()).toEqual([]);
   vi.doUnmock('../src/client/engine/boot/leaveAfterPaint');
+});
+
+walk('day-logout', 'a client open 24 hours shows its card and reports it once, then signs out (PV12)', async () => {
+  vi.useFakeTimers();
+  try {
+    const { armDayLogout, DAY_LOGOUT_MS } = await import('../src/client/engine/boot/oldTab');
+    const { Scope } = await import('../src/shared/engine/app/scope');
+    const { captureBrowserError } = await import('../src/client/engine/telemetry/browserErrors');
+    const scope = new Scope('test.walk-day-logout'), signedOut: number[] = [];
+    armDayLogout(scope, { build: 'fixture', now: () => Date.now(), show: () => undefined, capture: captureBrowserError,
+      signOut: () => { signedOut.push(reports.length); }, reload: () => undefined });
+    vi.advanceTimersByTime(DAY_LOGOUT_MS);
+    expect(opened()).toEqual(['day-logout']);
+    expect(signedOut).toEqual([1]);
+    scope.dispose();
+  } finally { vi.useRealTimers(); }
 });
 
 walk('self-reload', "index.html's 12 s self-reload is reported by the page it reloaded into, and only that page (S18)", async () => {

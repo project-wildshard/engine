@@ -5,6 +5,7 @@ import { saveStorage } from '../saves/slots';
 import { markReload } from './lastEnd';
 import { FORCE_UPDATE_RELOAD } from './dropNotice';
 import { forceCacheState, setForceCacheState, wipeDownloadedCaches } from '../pwa/forceCache';
+import { OLD_TAB_RELOAD_KEY, paintOldTabCard } from './oldTab';
 
 /** Compare declared versions, never hashes or a possibly stale git-describe label. */
 export function olderClient(current: string, minimum: unknown): boolean {
@@ -15,14 +16,18 @@ export function olderClient(current: string, minimum: unknown): boolean {
   for (let i = 0; i < 3; i++) { const a = ours[i] ?? 0, b = floor[i] ?? 0; if (a !== b) return a < b; }
   return false;
 }
-const RETRIED = 'boot.force-cache.j383';
+const RETRIED = OLD_TAB_RELOAD_KEY;
+/** PV11: a retired client's forced update shows the one old-tab card ("Wildshard was updated"), with its one event. */
 function updating(): void {
-  if (document.getElementById('ws-force-update') !== null) return;
-  const card = document.createElement('div'); card.id = 'ws-force-update'; card.setAttribute('role', 'status');
-  card.style.cssText = 'position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);transform:translateX(-50%);z-index:2147483647;padding:12px 16px;border-radius:8px;background:#07131d;color:white;font:14px system-ui;text-align:center;pointer-events:none';
-  const title = document.createElement('strong'); title.style.display = 'block'; title.textContent = engineString('s_force_update_required');
-  card.append(title, engineString('s_force_updating'));
-  document.documentElement.append(card);
+  if (document.getElementById('ws-old-tab') !== null) return;
+  paintOldTabCard('old-tab-updated', engineString('s_old_tab_updated'));
+  void reportUpdating();
+}
+async function reportUpdating(): Promise<void> {
+  try {
+    const errors = await import('../telemetry/browserErrors');
+    errors.captureBrowserError(new Error('old tab: a retired client is forced to update (PV11)'), errors.engineScreenTags('old-tab-updated', 'old-tab', 'boot', { kind: 'client' }));
+  } catch { /* a report never holds the update */ }
 }
 /** One page's recovery lifetime. Construction installs no listeners or services. */
 export class ClientUpdater {

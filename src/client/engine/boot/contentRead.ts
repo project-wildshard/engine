@@ -252,7 +252,7 @@ export async function readContent(url: string, maximum: number, options: Content
         // build's hashed files, so a missing built-in file on a build the server no longer serves can never arrive.
         // Instead of RETRY forever, the page reloads past its worker into the live build (once per build and tab).
         if (options.retry === undefined && error.missing && typeof document !== 'undefined'
-          && await (await import('./browserChunkRecovery')).reloadIfStaleBuild()) await new Promise<void>(() => { /* never settles: the page is navigating */ });
+          && await (await import('./browserChunkRecovery')).reloadIfStaleBuild(error.url)) await new Promise<void>(() => { /* never settles: the page is navigating */ });
         await (options.retry === undefined ? retryFromCard(error, options.signal, reads) : options.retry(error)); retried = false;
       }
     }
