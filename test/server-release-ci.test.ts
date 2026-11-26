@@ -267,6 +267,19 @@ test('J234: every run signs with main\'s publisher and builds in the source\'s o
   expect(sign).toContain('node src/scripts/server-release/publish.mjs');
 });
 
+test('meta QA 11-25 row 127: production moves the API pointers right after it signs, with the admin token', () => {
+  const workflow = readFileSync('.github/workflows/server-release.yml', 'utf8');
+  const publish = workflow.slice(workflow.indexOf('\n  publish:'), workflow.indexOf('\n  devserver-client:'));
+  const sign = publish.indexOf('- name: Sign and advance the channel release file'), move = publish.indexOf("- name: Move the API's production pointers to the signed file");
+  expect(sign).toBeGreaterThan(0);
+  expect(move).toBeGreaterThan(sign);
+  const step = publish.slice(move).split('\n      - ')[0] ?? '';
+  expect(step).toContain("if: env.RELEASE_CHANNEL == 'production'");
+  expect(step).toContain('ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}');
+  expect(step).toContain('run: node src/scripts/server-release/production-pointers.mjs');
+  expect(step).not.toMatch(/working-directory|continue-on-error/u);
+});
+
 test('FS28: signing and client archives queue independently for the exact release', () => {
   const workflow = readFileSync('.github/workflows/server-release.yml', 'utf8');
   const jobs = workflow.indexOf('\njobs:'), publish = workflow.indexOf('\n  publish:');
