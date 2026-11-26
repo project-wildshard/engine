@@ -5,7 +5,7 @@ import {spawnSync} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
 import {resolve,join} from 'node:path';
 import {observerArguments,observerIdentities,runObserver} from '../src/scripts/mmo-release-observer.mjs';
-import {observerCommand} from '../src/scripts/mmo-observer-client.mjs';
+import {observerCommand,prepareObserverClient} from '../src/scripts/mmo-observer-client.mjs';
 
 const cleanups:(()=>void|Promise<void>)[]=[];
 afterEach(async()=>{for(const cleanup of cleanups.splice(0).reverse())await cleanup();});
@@ -62,4 +62,37 @@ test('private observer identities survive bounded runs and reject exposed files'
  assert.equal(lstatSync(join(base,'identities.json')).mode&0o777,0o600);
  chmodSync(join(base,'identities.json'),0o644);
  assert.throws(()=>observerIdentities(base),/private/u);
+});
+
+// QA 11-25 row 120: staging's baseline is the build it serves, which can predate the lean layout (f928fdae2). From
+// v0.1.94 on, prepare ran src/scripts/build-server.mjs inside v0.1.93's source, which keeps it in scripts/, so the
+// observer refused with client-prepare and never armed. Both layouts must build a native client.
+function sourceRepo(){
+ const root=folder(),git=(...args:string[])=>{const result=spawnSync('git',args,{cwd:root,encoding:'utf8'});assert.equal(result.status,0,result.stderr);return result.stdout.trim();};
+ const write=(path:string,body:string)=>{mkdirSync(resolve(root,path,'..'),{recursive:true});writeFileSync(resolve(root,path),body);};
+ git('init','--quiet');git('config','user.email','observer@example.invalid');git('config','user.name','observer');git('config','commit.gpgsign','false');
+ write('package.json','{"name":"observer-source","private":true}\n');
+ write('src/scripts/.kit/worktree.mjs','export function withStoreUse(_env,_what,run){return run();}\n');
+ for(const name of ['roomBot.ts','mmoBotsGuard.ts','releaseObserverBot.ts'])write(`test/fixtures/dedicated/${name}`,'export {};\n');
+ const builder=["import {mkdirSync,writeFileSync} from 'node:fs';import {parseArgs} from 'node:util';",
+  "const {values}=parseArgs({options:{build:{type:'string'},out:{type:'string'},entry:{type:'string',multiple:true}}});",
+  "mkdirSync(values.out,{recursive:true});",
+  "writeFileSync(values.out+'/releaseObserverBot.mjs','export const sourceBuild='+JSON.stringify(values.build)+';export function connect(){}\\n');"].join('\n');
+ const commit=(path:string)=>{write(path,builder);git('add','-A');git('commit','--quiet','--no-verify','-m',path);return git('rev-parse','HEAD');};
+ const preLean=commit('scripts/build-server.mjs');
+ git('rm','--quiet','scripts/build-server.mjs');
+ const lean=commit('src/scripts/build-server.mjs');
+ git('rm','--quiet','src/scripts/build-server.mjs');write('README','no builder\n');git('add','-A');git('commit','--quiet','--no-verify','-m','none');
+ return {root,preLean,lean,none:git('rev-parse','HEAD')};
+}
+test('the observer builds a native client from a pre-lean and a lean baseline, and refuses one with no builder',{timeout:60000},async()=>{
+ const {root,preLean,lean,none}=sourceRepo(),signal=new AbortController().signal;
+ for(const build of [preLean,lean]){
+  const work=resolve(root,'tmp',build);mkdirSync(work,{recursive:true});
+  const client=await prepareObserverClient({release:{engineBuild:build}} as Parameters<typeof prepareObserverClient>[0],signal,{root,work});
+  assert.equal(client.sourceBuild,build);assert.equal(typeof client.connect,'function');
+  await client.dispose?.();
+ }
+ const work=resolve(root,'tmp',none);mkdirSync(work,{recursive:true});
+ await assert.rejects(prepareObserverClient({release:{engineBuild:none}} as Parameters<typeof prepareObserverClient>[0],signal,{root,work}),/no build-server\.mjs/u);
 });

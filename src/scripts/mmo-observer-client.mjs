@@ -43,6 +43,14 @@ export async function observerCommand(command,args,{cwd,signal,log,storeUse}){
  }
 }
 
+/** The baseline is whatever staging serves, which can predate the lean layout (f928fdae2): v0.1.93 keeps its builder in
+ * scripts/, so a lean-only path refused every staging observer from v0.1.94 on (QA 11-25 row 120).
+ * @param {string} tree @returns {string} the builder, relative to the archived source tree */
+export function observerBuilder(tree){
+ for(const path of ['src/scripts/build-server.mjs','scripts/build-server.mjs'])if(existsSync(join(tree,path)))return path;
+ throw new Error('Observer source has no build-server.mjs in src/scripts/ or scripts/');
+}
+
 /** The directory is a newly created run folder, never a shared checkout or a caller's existing tree.
  * @param {import('../../test/fixtures/dedicated/releaseObserver').ObservationSnapshot} snapshot
  * @param {AbortSignal} signal @param {{root:string,work:string}} options
@@ -57,7 +65,11 @@ export async function prepareObserverClient(snapshot,signal,{root,work}){
  /** @param {string} command @param {string[]} args @param {string} cwd @param {string} [storeUse] */
  const run=async(command,args,cwd,storeUse)=>{
   const code=await observerCommand(command,args,{cwd,signal,log,...(storeUse===undefined?{}:{storeUse})});
-  if(code!==0)throw new Error(`Observer client ${command} refused with exit ${code}`);
+  if(code!==0){
+   // The cause lives in the build log, which this run's scratch deletes; carry its tail (row 120 hid behind "exit 1").
+   const tail=existsSync(log)?readFileSync(log,'utf8').trim().split('\n').slice(-6).join('\n'):'';
+   throw new Error(`Observer client ${command} refused with exit ${code}${tail===''?'':`:\n${tail}`}`);
+  }
  };
  const dispose=()=>{
   const failures=[];
@@ -88,7 +100,7 @@ export async function prepareObserverClient(snapshot,signal,{root,work}){
    "if(result.error)throw result.error;process.exitCode=result.status??1;",
   ].join('\n');
   await run(process.execPath,['--input-type=module','--eval',install],root,use);
-  await run(process.execPath,['src/scripts/build-server.mjs','--build',build,'--out',out,
+  await run(process.execPath,[observerBuilder(tree),'--build',build,'--out',out,
    '--entry','releaseObserverBot=test/fixtures/dedicated/releaseObserverBot.ts'],tree);
   const module=await import(pathToFileURL(join(out,'releaseObserverBot.mjs')).href);
   if(module.sourceBuild!==build||typeof module.connect!=='function')throw new Error('Compiled observer source identity differs');

@@ -158,8 +158,11 @@ export async function deployStaging({ root, build, release, source, out, observe
           await running.baseline();
         }
       }
-    } catch {
-      noteObserver('baseline-unavailable', 'The staging observer could not arm or read its baseline.');
+    } catch (error) {
+      // Say why, and keep the observer's log: its scratch goes with this run (QA 11-25 row 120 hid for a day behind a bare note).
+      const why = read(observedPath)?.reason ?? (error instanceof Error ? error.message : String(error));
+      keepReleaseProof(work, out, ['mmo.log']);
+      noteObserver('baseline-unavailable', `The staging observer could not arm or read its baseline (${why}; mmo.log kept).`);
     }
     if (!alreadyLive) {
       step = 'page upload';

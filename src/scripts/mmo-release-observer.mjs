@@ -66,7 +66,7 @@ export async function runObserver(args,root=ROOT){
     mkdirSync(clientWork,{mode:0o700});
     return await prepareObserverClient(snapshot,signal,{root,work:clientWork});
    }
-    catch(error){if(signal.aborted)throw signal.reason;throw new ObservationRefusedError('client-prepare',error);}},
+    catch(error){if(signal.aborted)throw signal.reason;console.error(`observer client-prepare: ${error instanceof Error?error.message:String(error)}`);throw new ObservationRefusedError('client-prepare',error);}},
    devices:observerIdentities(realBase),
    labels:[`E7-${id.slice(0,6)}-0`,`E7-${id.slice(0,6)}-1`],durationMs:seconds*1000,signal:cancel.signal,requireDurableBaseline:true,reloadClient:true,
    retryMs:60_000,

@@ -19,31 +19,7 @@ test('staging moves a qualified alias when rooms have switched and MS9 has no wi
   const ran = ids => ids.map(id => ({ id, status: 'ran' }));
   const base = { qa: true, full: true, release, hold: false };
   const childOutputs = [];
-  spawn.mockImplementation((_file, args) => {
-    const child = Object.assign(new EventEmitter(), { stdout: new PassThrough(), exitCode: null });
-    queueMicrotask(() => {
-      const qualification = args.includes('--deploy-checks');
-      const kind = qualification ? 'candidate' : 'staging';
-      const tour = args.some(arg => arg.endsWith('/zone-entry-tour.mjs'));
-      const dir = tour
-        ? args.find(arg => arg.startsWith('--out=')).slice('--out='.length)
-        : args[args.indexOf('--out') + 1];
-      childOutputs.push(dir);
-      mkdirSync(dir, { recursive: true });
-      const proof = tour ? {
-        build, engine: 'webkit', profile: 'phone', pass: true, expected: 2,
-        arrivals: [
-          { from: 'driftwood-isle', to: 'far-reach' },
-          { from: 'far-reach', to: 'driftwood-isle' },
-        ],
-      } : { ...base, build, kind, url: origin, scenarios: ran(QA_LEGS[kind]) };
-      writeFileSync(join(dir, tour ? 'zone-entry.json' : 'verdict.json'), JSON.stringify(proof));
-      child.stdout.end();
-      child.exitCode = 0;
-      child.emit('close', 0);
-    });
-    return child;
-  });
+  spawn.mockImplementation(fakeJobs({ build, base, ran, origin, childOutputs }));
   const phase = vi.fn(async () => undefined);
   try {
     await deployStaging({
@@ -65,6 +41,71 @@ test('staging moves a qualified alias when rooms have switched and MS9 has no wi
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// QA 11-25 row 120: every staging train from v0.1.94 noted only "could not arm or read its baseline", and the observer's
+// log went with the run's scratch, so the cause (a pre-lean baseline's builder path) hid for a day.
+test('an observer that cannot arm says why and keeps its log', async () => {
+  const root = mkdtempSync('tmp/staging-ms9-');
+  const out = join(root, 'delivery');
+  const build = 'a'.repeat(40), source = 'b'.repeat(40), release = 'v0.1.65';
+  const { origin } = CHANNELS.staging;
+  const ran = ids => ids.map(id => ({ id, status: 'ran' }));
+  const base = { qa: true, full: true, release, hold: false };
+  spawn.mockImplementation(fakeJobs({ build, base, ran, origin, childOutputs: [] }));
+  try {
+    await deployStaging({
+      root, out, build, source, release, phase: vi.fn(async () => undefined), log: vi.fn(),
+      localQa: { ...base, kind: 'local', build: source, url: 'http://localhost:4400', scenarios: ran(LEGS.local) },
+      readState: () => ({ upload: {}, check: { deployment: { url: 'https://candidate.example' }, serial: 131 } }),
+      get: async url => url === CHANNELS.staging.release ? { engineBuild: 'c'.repeat(40) } : { build: source },
+    });
+    const verdict = JSON.parse(readFileSync(join(out, 'verdict.json'), 'utf8'));
+    expect(verdict.findings).toEqual([expect.objectContaining({ key: 'baseline-unavailable', severity: 'P2',
+      text: expect.stringMatching(/could not arm or read its baseline \(client-prepare; mmo\.log kept\)/u) })]);
+    expect(readFileSync(join(out, 'mmo.log'), 'utf8')).toMatch(/"reason":"client-prepare"/u);
+    expect(JSON.parse(readFileSync(join(out, 'mmo-observer.json'), 'utf8'))).toMatchObject({ status: 'refused', reason: 'client-prepare' });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+/** Fake QA, tour and observer jobs; the observer refuses before its baseline, as v0.1.94 and v0.1.95 did. */
+function fakeJobs({ build, base, ran, origin, childOutputs }) {
+  return (_file, args) => {
+    const child = Object.assign(new EventEmitter(), { stdout: new PassThrough(), exitCode: null });
+    queueMicrotask(() => {
+      if (args.some(arg => arg.endsWith('/mmo-release-observer.mjs'))) {
+        const shared = args[args.indexOf('--work-dir') + 1], report = join(shared, 'report.json');
+        mkdirSync(shared, { recursive: true });
+        writeFileSync(report, JSON.stringify({ status: 'refused', reason: 'client-prepare' }));
+        child.stdout.end(`${JSON.stringify({ status: 'refused', reason: 'client-prepare', report })}\n`);
+        child.exitCode = 1;
+        setTimeout(() => child.emit('close', 1), 10);
+        return;
+      }
+      const qualification = args.includes('--deploy-checks');
+      const kind = qualification ? 'candidate' : 'staging';
+      const tour = args.some(arg => arg.endsWith('/zone-entry-tour.mjs'));
+      const dir = tour
+        ? args.find(arg => arg.startsWith('--out=')).slice('--out='.length)
+        : args[args.indexOf('--out') + 1];
+      childOutputs.push(dir);
+      mkdirSync(dir, { recursive: true });
+      const proof = tour ? {
+        build, engine: 'webkit', profile: 'phone', pass: true, expected: 2,
+        arrivals: [
+          { from: 'driftwood-isle', to: 'far-reach' },
+          { from: 'far-reach', to: 'driftwood-isle' },
+        ],
+      } : { ...base, build, kind, url: origin, scenarios: ran(QA_LEGS[kind]) };
+      writeFileSync(join(dir, tour ? 'zone-entry.json' : 'verdict.json'), JSON.stringify(proof));
+      child.stdout.end();
+      child.exitCode = 0;
+      child.emit('close', 0);
+    });
+    return child;
+  };
+}
 
 // v0.1.94: after the lean move the deploy's scratch, observer and QA jobs ran from src/, and its src/tmp/ dirtied the
 // release clone mid go-live, so the page upload refused it.
