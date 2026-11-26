@@ -9,16 +9,16 @@ import { chromium } from '../scripts/browser-playwright.mjs';
 import { KEYCHAIN_ARGS } from '../scripts/.kit/chromium-keychain.mjs';
 
 // Meta QA 11-25 row 124 (J205, J209: production is humans only). On 2026-11-26 a lane's marked boots of
-// play.wildshard.io clicked ENTER THE MMO and Zone Select (`/?chunk=nalati-grasslands`); this is what stops the next.
+// play.wildshard.io clicked ENTER THE MMO and Zone Select (a zone address past the title); this is what stops the next.
 
 test('only prod\'s bare title page passes; staging, preview and local are untouched', () => {
   for (const url of ['https://play.wildshard.io/', 'https://play.wildshard.io/?agent=opus-lane',
     'https://play.wildshard.io/?mute=1&nolock=1&sw=0&agent=opus-lane', 'https://play.wildshard.io/index.html',
-    'https://staging.wildshard.io/?chunk=nalati-grasslands', 'wss://rooms-staging.wildshard.io/world',
-    'https://preview.wildshard.io/slug/nalati', 'http://localhost:5173/?chunk=x', 'about:blank', 'not a url']) {
+    'https://staging.wildshard.io/?zone=nalati-grasslands', 'wss://rooms-staging.wildshard.io/world',
+    'https://preview.wildshard.io/slug/nalati', 'http://localhost:5173/?zone=x', 'about:blank', 'not a url']) {
     assert.equal(prodNavigationRefusal(url), undefined, url);
   }
-  for (const url of ['https://play.wildshard.io/?chunk=nalati-grasslands', 'https://play.wildshard.io/slug/nalati',
+  for (const url of ['https://play.wildshard.io/?zone=nalati-grasslands', 'https://play.wildshard.io/slug/nalati',
     'https://PLAY.wildshard.io./?zone=dunes', 'wss://rooms.wildshard.io/world', 'https://rooms.wildshard.io/zone-select/enter']) {
     assert.match(prodNavigationRefusal(url) ?? '', /humans only \(J205\)/u, url);
   }
@@ -51,7 +51,7 @@ test('a marked page refuses goto past prod\'s title and routes its context befor
   const opened = await (await webkit.launch()).newPage({ userAgent: 'Phone UA' });
   await opened.goto('http://localhost:5173/');
   assert.equal(routes.length, 0, 'no routing (it turns the HTTP cache off) until a page opens prod');
-  await assert.rejects(opened.goto('https://play.wildshard.io/?chunk=nalati-grasslands'), /browser-prod-guard refused/u);
+  await assert.rejects(opened.goto('https://play.wildshard.io/?zone=nalati-grasslands'), /browser-prod-guard refused/u);
   await assert.rejects(opened.goto('wss://rooms.wildshard.io/world'), /browser-prod-guard refused/u);
   await opened.goto('https://play.wildshard.io/?agent=opus-lane');
   await opened.goto('https://play.wildshard.io/');
@@ -83,7 +83,7 @@ test('the context route aborts a navigation past the title and every rooms reque
   const quiet = console.error;
   console.error = () => undefined;
   try {
-    assert.equal(await outcome('https://play.wildshard.io/?chunk=nalati-grasslands'), 'abort');
+    assert.equal(await outcome('https://play.wildshard.io/?zone=nalati-grasslands'), 'abort');
     assert.equal(await outcome('https://rooms.wildshard.io/zone-select/enter', false), 'abort');
     assert.equal(await outcome('https://rooms.wildshard.io/zone-select', false), 'abort');
     assert.equal(await outcome('https://play.wildshard.io/assets/index-abc.js?v=1', false), 'pass');
@@ -101,6 +101,6 @@ test.skipIf(!existsSync(executablePath))('a marked Chromium can\'t resolve the p
     const client = await page.context().newCDPSession(page);
     const { errorText } = /** @type {{ errorText?: string }} */ (await client.send('Page.navigate', { url: 'https://rooms.wildshard.io/health' }));
     assert.equal(errorText, 'net::ERR_NAME_NOT_RESOLVED');
-    await assert.rejects(page.goto('https://play.wildshard.io/?chunk=nalati-grasslands'), /browser-prod-guard refused/u);
+    await assert.rejects(page.goto('https://play.wildshard.io/?zone=nalati-grasslands'), /browser-prod-guard refused/u);
   } finally { await browser.close(); }
 });
