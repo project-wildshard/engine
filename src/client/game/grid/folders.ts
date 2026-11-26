@@ -7,7 +7,7 @@ import { graphFileCandidate } from '../shardfile/graphFileCandidate';
 import { findShard } from '../shard/registry';
 import { findTitleManifest } from '../shard/titleList';
 import { admitFolder, boundedResponse, checkBuiltIndex, readIndexBytes, readFolderDescriptor, type AdmittedFolder, type FolderOptions } from '../shardfile/folder';
-import { browserShardfileOptions } from '../shardfile/runtimeFolder';
+import { browserShardfileOptions, manifestAdmittedSource } from '../shardfile/runtimeFolder';
 import { SHARDFILE_ADMISSION_LIMITS as limits } from '@wildshard/format/admissionLimits';
 import {builtIndexHash} from '@wildshard/format/builtIndexes';
 import { FolderLeases } from './folderLeases';
@@ -427,9 +427,12 @@ export function gridShardfileFolder(slug: string, owner: GridFolderOwner, mode?:
         ...(present === undefined ? {} : { verifiedPresent: (hash: string, bytes: number) => priority.read(slug, () => present(hash, bytes)) }),
       } }),
     };
-    const input = options.buildRead===undefined
+    // QA 11-25 row 109: the page's own home was read and parsed under its catalogue manifest before the grid opened (the same
+    // descriptor); admit that source rather than read and parse its descriptor and sections a second time
+    const installed = options.buildRead===undefined || manifest===undefined ? undefined : manifestAdmittedSource(manifest);
+    const input = installed ?? (options.buildRead===undefined
       ? await readIndexBytes(await boundedResponse(await options.fetch(url.href), limits.sourceBytes), options)
-      : await readFolderDescriptor(options,url);
+      : await readFolderDescriptor(options,url));
     // GC9: the runtime-only wires released below are never read here (Pine's read fetched and hashed ~1,500 files twice)
     const admitted = await timeClientPreparation(slug, 'product.read', () => admitFolder(input, { ...options, reserve, deferred: source => neighbourFolderFilesPaced(source, options.pause) }));
     // GC9: the files admission left unread stay selected inputs (approach and tile admissions read them back by name)

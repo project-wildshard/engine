@@ -102,6 +102,9 @@ export function browserShardfileOptions(base: string, granted = false): FolderOp
   const quality = Object.fromEntries(Object.entries(TIER_CONFIG).filter((entry): entry is [string, number | boolean] => entry[0].includes('.') && (typeof entry[1] === 'number' || typeof entry[1] === 'boolean')));
   const readable = granted || builtIndexHash(new URL('shard.json', new URL('.', base)).pathname) !== null;
   const buildRead: NonNullable<FolderOptions['buildRead']> = async (url, bytes, read, hash, priority) => {
+    // QA 11-25 row 109: a file a manifest's admission still holds is read once, not again (`heldAdmissionBytes`)
+    const held = hash === undefined ? undefined : heldAdmissionBytes(hash);
+    if (held !== undefined && (bytes === undefined || held.length === bytes)) { read?.(held.length); return held; }
     const address = new URL(resolve(url), base).href;
     const storage = typeof caches === 'undefined' ? undefined : caches;
     const result = await waitFor(`Read ${folderResourceRole(address)}`, readAsset(address, bytes, {
@@ -274,9 +277,28 @@ export async function loadShardFolder(expectedIdentity: string, options: FolderO
 }
 
 const manifestAdmissions = new WeakMap<ShardManifest, { readonly admitted: AdmittedFolder; readonly options: FolderOptions; readonly reader?: ClientAssets }>();
+// QA 11-25 row 109: the admitted maps a page's manifests hold, weakly (a replaced manifest's admission is not kept alive here)
+const heldAdmissions = new Set<WeakRef<ReadonlyMap<string, Uint8Array>>>();
 /** An installed data-client manifest already owns an admission (and its client's asset reader); its context reuses it. */
 export function provideManifestAdmission(manifest: ShardManifest, admitted: AdmittedFolder, options: FolderOptions, reader?: ClientAssets): void {
   manifestAdmissions.set(manifest, { admitted, options, ...(reader === undefined ? {} : { reader }) });
+  heldAdmissions.add(new WeakRef(admitted.assets));
+}
+/**
+ * QA 11-25 row 109: the bytes a manifest's admission still holds for `hash` (a file, or a `commons:` wire), else undefined.
+ * A grid page's home is admitted under its catalogue manifest before the grid opens; the grid's own admission of that home,
+ * its input leases and its cell's readers read the same immutable files (content-addressed) and take these bytes instead of
+ * reading each file again (Nine's one-cell boot read ~1,000 of them a second time). Once the boot releases the admission
+ * (`releaseBootTransport`) a read goes to the cache or the network as before.
+ */
+export function heldAdmissionBytes(hash: string): Uint8Array | undefined {
+  for (const ref of heldAdmissions) {
+    const assets = ref.deref();
+    if (assets === undefined) { heldAdmissions.delete(ref); continue; }
+    const bytes = assets.get(hash) ?? assets.get(`commons:${hash}`);
+    if (bytes !== undefined) return bytes;
+  }
+  return undefined;
 }
 /** The asset reader recorded with a manifest's admission (an installed manifest passes its data client's on). */
 export function manifestReader(manifest: ShardManifest): ClientAssets | undefined { return manifestAdmissions.get(manifest)?.reader; }
@@ -284,7 +306,8 @@ export function manifestReader(manifest: ShardManifest): ClientAssets | undefine
  * js-heap H6: once a page's boot has built what its admitted product's transport fed, neither the admission nor its client
  * keeps that transport. Every file the content cache holds (or, online, the immutable product URL serves) leaves both
  * maps; a later read rechecks the cache or the network, as released tiles already do. A grid cell's resident product
- * releases through its own reader (finish.ts).
+ * releases through its own reader (finish.ts); a grid page's home is admitted under its catalogue manifest, not the page's
+ * shell (`releaseBootTransport`).
  */
 export async function releaseManifestTransport(manifest: ShardManifest): Promise<void> {
   const installed = manifestAdmissions.get(manifest); if (installed === undefined) return;
@@ -292,6 +315,15 @@ export async function releaseManifestTransport(manifest: ShardManifest): Promise
     const released = await installed.admitted.releasePreparedTransport?.(installed.admitted.source.files.map(file => file.hash), 'cache-or-fetch') ?? [];
     installed.reader?.releaseTransport(released);
   } catch (error) { console.warn('[boot] transport release failed (the transport stays resident):', error); }
+}
+/**
+ * QA 11-25 row 109: at the end of a boot, the page manifest's admission and its home's. A grid page boots a shell
+ * (pageShell.ts) while its home cell's product was admitted under the cell's catalogue manifest (`findShard(slug)`: the
+ * same slug, another object), so releasing only the page's kept every admitted file of the home for the whole visit (Nine:
+ * 415 files, 37.6 MB). By then the grid has read what it built through that admission (`heldAdmissionBytes`), never twice.
+ */
+export async function releaseBootTransport(page: ShardManifest, home: ShardManifest | undefined): Promise<void> {
+  await Promise.all([releaseManifestTransport(page), ...home === undefined || home === page ? [] : [releaseManifestTransport(home)]]);
 }
 /** I2: only the active page's after-control hook may complete its deferred offline copy. */
 export async function completeManifestCache(manifest: ShardManifest, scope: Scope, product?: ShardFolder): Promise<void> {

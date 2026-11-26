@@ -41,7 +41,8 @@ import { shardArea } from '../grid/area';
 import { primeStaticMerges } from '../grid/staticViewMerge';
 import { kitBatchOn, primeBatchPrograms, primeKitBatches } from '../grid/kitBatch';
 import { farBatchOn, multiDraws } from '../grid/farBatch';
-import { admittedRuntimeFolder, completeManifestCache, releaseManifestTransport } from '../shardfile/runtimeFolder';
+import { admittedRuntimeFolder, completeManifestCache, releaseBootTransport } from '../shardfile/runtimeFolder';
+import { findShard } from '../shard/registry';
 import { enterSkyClock } from './clockSettings';
 import { settleEntryPrograms } from './settlePrograms';
 import { prepareSpawnView } from '../shardfile/controlRefinement';
@@ -453,8 +454,9 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   // DL20: the download's outcome reaches telemetry from its own settle (reportSpawnOutcomes, session.ts), failures too
   // js-heap H6: the boot has built everything its admitted product's transport fed (clientAssets.ts `releaseAll`)
   admittedRuntimeFolder(slug)?.assets.releaseAll();
-  // and a solo page's own admission (its manifest's); an offline cache check never holds the boot
-  void releaseManifestTransport(manifest);
+  // and the page's own admission (its manifest's), and on a grid page its home cell's (QA 11-25 row 109: the home is admitted
+  // under its catalogue manifest, not the page's shell); an offline cache check never holds the boot
+  void releaseBootTransport(manifest, findShard(slug));
   // the programs the first frame did not draw, a few a frame in play (the Shaders step built only the drawn ones)
   const levelScope = game.levelScope;
   // A page that opens straight into the Explorer walks no world: the cards draw first, and the world's undrawn
