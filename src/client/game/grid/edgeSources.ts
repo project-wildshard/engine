@@ -15,6 +15,7 @@
  * A product that writes `world/edge`'s `edgeObservations` (format PR6f1, the sdk since PR6f2) is read from that field
  * instead: its per-side geometry and open water replace the registry's (`ground.structures`, `minimap.openWater`).
  */
+import { bakedFile } from '@wildshard/engine/boot/zoneAssets';
 import { versionedUrl } from '@wildshard/engine/boot/bytes';
 import type { GridCell } from '../../../shared/game/grid/assembly';
 import type { GridEdgeObservations, GridEdgeSource } from '../../../shared/game/grid/edgeProfiles';
@@ -123,7 +124,7 @@ export async function readGridEdges(cell: GridCell, reader: GridEdgeReaderPorts)
   // STAGING-BUGBASH SB12: a cell this page has no shard data for (a shard the API placed and carded from its catalogue name,
   // SA46) has no committed bake either; asking 404'd in the console on every grid page. Its edges stay closed at road level
   if (manifest === undefined) return { kind: 'declared', profiles: latticeRows(LATTICE, () => 0, () => [...NEUTRAL]), observations: observe([], undefined) };
-  const response = await reader.fetch(versionedUrl(`/assets/baked/${cell.slug}/terrain.bin`));
+  const response = await reader.fetch(versionedUrl(bakedFile(cell.slug, 'terrain.bin')));
   if (!response.ok) throw new Error(`terrain.bin ${cell.slug}: ${String(response.status)}`);
   const { res, heights } = bakeHeights(new Uint8Array(await response.arrayBuffer()));
   const rows = latticeRows(res, (i, j) => heights[j * res + i] ?? 0, colour);

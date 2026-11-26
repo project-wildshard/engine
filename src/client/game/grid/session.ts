@@ -1,3 +1,4 @@
+import { bakedFile } from '@wildshard/engine/boot/zoneAssets';
 import { prelinkGridViews } from './prelinkViews';
 import { cellPresence } from './cellPresence';
 import type { RoadTileBacking } from './roadTileBacking';
@@ -273,7 +274,7 @@ function neighbourTiles(scope: Scope, prepare: (tile: PreparedRingTile) => Promi
 }
 
 /** Whether the page's inventory lists a baked far for `slug` (the build baked one; its server may still not serve it). */
-const bakedFarListed = (slug: string): boolean => publicBytes()[`/assets/baked/${slug}/far.json`] !== undefined;
+const bakedFarListed = (slug: string): boolean => publicBytes()[bakedFile(slug, 'far.json')] !== undefined;
 /** The far proxy and its row, fetched from the shard's baked folder (`public/assets/baked/<slug>/far.*`). */
 async function loadFar(slug: string): Promise<{ prepared: FarPrepared; bytes: number }> {
   // Pure authored projects have no repo bake: their proxy comes from their product's sections and far files (O26: read
@@ -281,7 +282,7 @@ async function loadFar(slug: string): Promise<{ prepared: FarPrepared; bytes: nu
   // a slug the build baked no far for (an upload with no mesh collision) reads its product's far row whatever its world
   // QA 11-25 row 133: decided by what the page's server serves, not only by its inventory (`farSource.ts`)
   const source = await farSource(slug, bakedFarListed(slug), { product: anyWorld => readGridShardfileFar(slug, anyWorld),
-    baked: () => fetch(versionedUrl(`/assets/baked/${slug}/far.json`)) });
+    baked: () => fetch(versionedUrl(bakedFile(slug, 'far.json'))) });
   if (source.kind === 'product') return loadShardfileFar(source.far.rows, source.far.read);
   const { response } = source;
   if (!response.ok) throw new Error(`far.json ${slug}: ${String(response.status)}`);
@@ -289,11 +290,11 @@ async function loadFar(slug: string): Promise<{ prepared: FarPrepared; bytes: nu
   const look = farLook(row), bytes = farBytes(row), impostorRow = farImpostorRow(row);
   // G539: its camera-facing impostor beside it (a far row baked before G539 has none: the proxy draws at every distance)
   const impostor = impostorRow === undefined ? null : await (async () => {
-    const image = await fetch(versionedUrl(`/assets/baked/${slug}/far-impostor.png`));
+    const image = await fetch(versionedUrl(bakedFile(slug, 'far-impostor.png')));
     if (!image.ok) throw new Error(`far-impostor.png ${slug}: ${String(image.status)}`);
     return decodeFarImpostor(impostorRow, new Uint8Array(await image.arrayBuffer()));
   })();
-  const gltf = await (await prepareRigLoader()).createRigLoader().loadAsync(versionedUrl(`/assets/baked/${slug}/far.glb`));
+  const gltf = await (await prepareRigLoader()).createRigLoader().loadAsync(versionedUrl(bakedFile(slug, 'far.glb')));
   const meshes: BufferGeometry[] = [];
   gltf.scene.traverse((node) => { if (!(node instanceof Mesh)) return; const found: unknown = node.geometry; if (found instanceof BufferGeometry) meshes.push(found as BufferGeometry); });
   const geometry = meshes[0];

@@ -13,13 +13,14 @@
  * (art/pine-hollow/round-14-look-loop/, fitted over the three zones' 27 frames).
  */
 import { publicBytes } from '../../../shared/engine/boot/tables';
+import { zoneFirst } from '../../../shared/engine/boot/zoneAssets';
 import * as THREE from 'three';
 import { LookupTexture } from 'postprocessing';
 import { LUT_SIZE, fetchLut } from '../render/lut';
 
 /** the shard's LUT file when the build has one, else null */
 export function lutUrl(slug: string): string | null {
-  const url = `/assets/lut/${slug}.bin`;
+  const url = zoneFirst(slug, 'lut.bin', `/assets/lut/${slug}.bin`);
   return url in publicBytes() ? url : null;
 }
 

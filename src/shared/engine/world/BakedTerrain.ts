@@ -18,6 +18,7 @@ import { captureHeightfield, type HeightfieldBinding } from './Heightfield';
 import { SEED } from '../core/config';
 import type { TerrainField } from '../level/data';
 import { levelBakedId } from '../level/spec';
+import { bakedFile } from '../boot/zoneAssets';
 import { bakedTerrainSource, installDeclaredBakedTerrain, loadRequiredGround, type BakedTerrainSource, type RequiredGround } from './bakedTerrainField';
 
 /** Existing runtime grid type is defined by the pure byte reader. */
@@ -28,7 +29,7 @@ export type BakedPlacement = terrainBytes.BakedPlacement;
 export const parseBakedTerrain: (input: ArrayBuffer | Uint8Array, expected?: { res?: number; size?: number; seed?: number; }) => terrainBytes.BakedGrid | null = terrainBytes.parseBakedTerrain;
 
 export const bakedTerrainUrl = (slug: string): string | null => {
-  const url = `/assets/baked/${slug}/terrain.bin`;
+  const url = bakedFile(slug, 'terrain.bin');
   return url in publicBytes() ? url : null;
 };
 

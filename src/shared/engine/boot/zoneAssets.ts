@@ -10,6 +10,8 @@
  * `musicDir` and `sfxDir` find its files without knowing the slug.
  */
 
+import { publicBytes } from './tables';
+
 const SLUG = '[a-z0-9]+(?:-[a-z0-9]+)*';
 /** a slug or a manifest key: lower-case words joined by single hyphens */
 const ZONE_SLUG = new RegExp(`^${SLUG}$`, 'u');
@@ -24,6 +26,27 @@ export function zoneAssetUrl(slug: string, rest: string): string {
   if (rest === '' || rest.startsWith('/') || rest.split('/').some(part => part === '' || part === '.' || part === '..')) throw new Error(`Not a zone asset path: ${rest}`);
   return `/assets/${slug}/${rest}`;
 }
+
+/** `/assets/<slug>/<rest>` when this page's byte table lists it (the zone carries its own copy), else `legacy`. */
+export function zoneFirst(slug: string, rest: string, legacy: string): string {
+  if (!ZONE_SLUG.test(slug)) return legacy;
+  const own = `/assets/${slug}/${rest}`;
+  return own in publicBytes() ? own : legacy;
+}
+/** The folder `/assets/<slug>/<rest>/` when the byte table lists a file under it, else `legacy` (a folder too). */
+export function zoneFolderFirst(slug: string, rest: string, legacy: string): string {
+  if (!ZONE_SLUG.test(slug)) return legacy;
+  const own = `/assets/${slug}/${rest}/`;
+  return Object.keys(publicBytes()).some(url => url.startsWith(own)) ? own : legacy;
+}
+/** A zone's baked file: `/assets/<slug>/baked/<file>`, else the engine-wide `/assets/baked/<slug>/<file>`. */
+export const bakedFile = (slug: string, file: string): string => zoneFirst(slug, `baked/${file}`, `/assets/baked/${slug}/${file}`);
+
+/** SF4: a ground layer (PBR set) named by its folder URL, `/assets/<slug>/tex/<id>`, or by an engine-wide id
+ *  (`/assets/tex/<id>`); `kind` is its map's stem (`diffuse`, `nor_gl`, `arm`). */
+export const texBase = (id: string, kind: string): string => id.startsWith('/assets/') ? `${id}/${kind}` : `/assets/tex/${id}/${kind}`;
+/** SF4: a sky named by its stem URL, `/assets/<slug>/hdri/<name>`, or by an engine-wide name (`/assets/hdri/<name>`). */
+export const hdriStem = (hdri: string): string => hdri.startsWith('/assets/') ? hdri : `/assets/hdri/${hdri}`;
 
 /** An audio manifest's table row from its URL: legacy `/assets/<kind>/<key>/<kind>.json` (no `dir`, the engine-wide
  *  folder) or zone `/assets/<slug>/<kind>/<key>/<kind>.json` (its folder as `dir`); null for any other URL. */

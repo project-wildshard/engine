@@ -12,6 +12,7 @@
  * baked one (the file only carries pixels). Names are per chunk; use `common/` for chunk-independent
  * ones via `commonTexture`.
  */
+import { zoneFolderFirst } from '../../../shared/engine/boot/zoneAssets';
 import { publicBytes } from '../../../shared/engine/boot/tables';
 import { bootFileList } from './filePolicy';
 import * as THREE from 'three';
@@ -52,7 +53,7 @@ async function cacheCommon(url: string): Promise<void> {
   if (raw.set(url, bytes, bytes.byteLength)) adoptBuffer(bytes, { owner: raw.limit.owner, asset: url });
 }
 
-const dir = (slug: string) => `/assets/baked/${slug}/tex/`;
+const dir = (slug: string): string => zoneFolderFirst(slug, 'baked/tex', `/assets/baked/${slug}/tex/`);
 /** chunk-independent lossless bakes (raw bytes, never given phone / KTX2 copies): fetched when the level's boot declares them */
 const COMMON = '/assets/baked/common/';
 

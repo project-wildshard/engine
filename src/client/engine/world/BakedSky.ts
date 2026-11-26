@@ -9,6 +9,7 @@
  * Both planes are decoded and recombined in a Worker (createImageBitmap + OffscreenCanvas, no colour conversion): one
  * lookup per channel in a 256 × 256 half-float table (gain × colour byte). The main thread only builds the texture.
  */
+import { hdriStem } from '../../../shared/engine/boot/zoneAssets';
 import { publicBytes } from '../../../shared/engine/boot/tables';
 import * as THREE from 'three';
 import { nextDrawnFrame, presenting } from '../../../shared/engine/core/framePacing';
@@ -19,7 +20,7 @@ const GAIN_MAX = 16;
 /** The pair's URLs for this HDRI when the build has them and nothing asks for the raw file (`?nobake`), else null. */
 export function bakedSkyUrls(hdri: string): { color: string; gain: string } | null {
   if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('nobake')) return null;
-  const color = `/assets/hdri/${hdri}_2k.sky.jpg`, gain = `/assets/hdri/${hdri}_2k.gain.png`;
+  const stem = hdriStem(hdri), color = `${stem}_2k.sky.jpg`, gain = `${stem}_2k.gain.png`;
   return color in publicBytes() && gain in publicBytes() ? { color, gain } : null;
 }
 

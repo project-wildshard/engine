@@ -1,3 +1,4 @@
+import { texBase } from '../../../shared/engine/boot/zoneAssets';
 import { GPU_FILES as ENGINE_GPU_FILES } from './ktx2.generated';
 import { publicBytes } from '../../../shared/engine/boot/tables';
 import type { Tier } from '../core/tier';
@@ -19,7 +20,7 @@ export function filePolicy(tier: Tier, mode: TexMode, table: Ktx2Table, inventor
   const gpu = (url: string): string => { const mapped = phone(url); return mode === 'ktx2' ? files[mapped] ?? mapped : mapped; };
   const layer = (url: string): string => { const mapped = phone(url); return mode === 'ktx2' ? files[`${mapped}#layer`] ?? mapped : mapped; };
   const pbr = (id: string): string[] => ['diffuse', 'nor_gl', 'arm'].map((kind) => {
-    const base = `/assets/tex/${id}/${kind}`;
+    const base = texBase(id, kind);
     return tier === 'phone' && `${base}_1k.jpg` in inventory ? `${base}_1k.jpg` : `${base}.jpg`;
   });
   return { phone, gpu, layer, pbr };

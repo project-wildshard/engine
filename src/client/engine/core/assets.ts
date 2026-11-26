@@ -1,3 +1,4 @@
+import { texBase } from '../../../shared/engine/boot/zoneAssets';
 import type { RigLoader } from '../anim/rigParser';
 import { publicBytes } from '../../../shared/engine/boot/tables';
 import * as THREE from 'three';
@@ -177,7 +178,7 @@ export async function loadTexture(url: string, srgb = false, repeat = 1, request
  * (scripts/tex-tiers.mjs: ≤ 1024², q82 — a quarter of the bytes) when the build has one.
  */
 export function texUrl(id: string, kind: 'diffuse' | 'nor_gl' | 'arm'): string {
-  const base = `/assets/tex/${id}/${kind}`;
+  const base = texBase(id, kind);
   if (TIER_CONFIG.maxTexture <= 1024 && `${base}_1k.jpg` in publicBytes()) return `${base}_1k.jpg`;
   return `${base}.jpg`;
 }

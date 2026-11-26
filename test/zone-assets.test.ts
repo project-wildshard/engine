@@ -4,7 +4,13 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
-import { ZONE_DIR, audioDirOf, audioManifestRow, isAudioUrl, zoneAssetUrl } from '../src/shared/engine/boot/zoneAssets';
+import { ZONE_DIR, audioDirOf, audioManifestRow, bakedFile, hdriStem, isAudioUrl, texBase, zoneAssetUrl, zoneFirst, zoneFolderFirst } from '../src/shared/engine/boot/zoneAssets';
+import { navmeshUrl } from '../src/shared/engine/physics/navmeshUrl';
+import { bakedTerrainUrl } from '../src/shared/engine/world/BakedTerrain';
+import { lutUrl } from '../src/client/engine/world/lut';
+import { bakedNearFiles } from '../src/client/game/grid/nearPlaceholderView';
+import { filePolicy } from '../src/client/engine/boot/filePolicy';
+import { bakedSkyUrls } from '../src/client/engine/world/BakedSky';
 import { musicDir, sfxDir, cueFile } from '../src/shared/engine/audio/bootAudio';
 import { withAssetTables } from '../src/shared/engine/boot/tables';
 import { audioTableSource } from '../src/scripts/app-build/gen';
@@ -63,4 +69,52 @@ test('the build table reads zone audio folders and refuses one key in two places
     put('public/assets/sfx/alien-plain/sfx.json', { beds: {} });
     expect(() => audioTableSource(root)).toThrow("a second sfx manifest for 'alien-plain'");
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// SF4 slice 2: the baked readers (terrain, navmesh, sky, near and far views, baked textures, the LUT) read a zone's own
+// /assets/<slug>/baked/ copy when the page's byte table lists it, the engine-wide /assets/baked/<slug>/ copy otherwise.
+const BAKED = { versions: {}, packs: {}, music: {}, sfx: {}, bytes: {
+  '/assets/sunscar-dunes/baked/terrain.bin': 1, '/assets/sunscar-dunes/baked/navmesh.bin': 1, '/assets/sunscar-dunes/baked/tex/sand.png': 1,
+  '/assets/sunscar-dunes/lut.bin': 1, '/assets/baked/far-reach/terrain.bin': 1, '/assets/baked/far-reach/navmesh.bin': 1, '/assets/lut/far-reach.bin': 1 } };
+
+test('baked files: the zone copy first, the engine-wide copy second', () => withAssetTables(BAKED, () => {
+  expect(bakedFile('sunscar-dunes', 'terrain.bin')).toBe('/assets/sunscar-dunes/baked/terrain.bin');
+  expect(bakedFile('far-reach', 'terrain.bin')).toBe('/assets/baked/far-reach/terrain.bin');
+  expect(bakedFile('sunscar-dunes', 'sky.json')).toBe('/assets/baked/sunscar-dunes/sky.json');
+  expect(bakedTerrainUrl('sunscar-dunes')).toBe('/assets/sunscar-dunes/baked/terrain.bin');
+  expect(bakedTerrainUrl('far-reach')).toBe('/assets/baked/far-reach/terrain.bin');
+  expect(navmeshUrl('sunscar-dunes')).toBe('/assets/sunscar-dunes/baked/navmesh.bin');
+  expect(navmeshUrl('nalati-grasslands')).toBeNull();
+  expect(lutUrl('sunscar-dunes')).toBe('/assets/sunscar-dunes/lut.bin');
+  expect(lutUrl('far-reach')).toBe('/assets/lut/far-reach.bin');
+  expect(zoneFolderFirst('sunscar-dunes', 'baked/tex', '/assets/baked/sunscar-dunes/tex/')).toBe('/assets/sunscar-dunes/baked/tex/');
+  expect(zoneFolderFirst('far-reach', 'baked/tex', '/assets/baked/far-reach/tex/')).toBe('/assets/baked/far-reach/tex/');
+  // a name that is no slug never builds a zone path
+  expect(zoneFirst('../x', 'baked/terrain.bin', '/assets/baked/x/terrain.bin')).toBe('/assets/baked/x/terrain.bin');
+}));
+
+test('a near view reads the zone baked folder first', () => {
+  expect(bakedNearFiles('sunscar-dunes', { '/assets/sunscar-dunes/baked/near.json': 1, '/assets/sunscar-dunes/baked/near.glb': 2 }))
+    .toEqual({ row: '/assets/sunscar-dunes/baked/near.json', mesh: '/assets/sunscar-dunes/baked/near.glb' });
+  expect(bakedNearFiles('far-reach', { '/assets/baked/far-reach/near.json': 1, '/assets/baked/far-reach/near.glb': 2 }))
+    .toEqual({ row: '/assets/baked/far-reach/near.json', mesh: '/assets/baked/far-reach/near.glb' });
+  expect(bakedNearFiles('far-reach', {})).toBeNull();
+});
+
+// SF4 slice 3: a zone names its own ground layers and sky by URL (`/assets/<slug>/tex/<id>`, `/assets/<slug>/hdri/<name>`);
+// a bare id or name is still the engine-wide set, so a zone not yet re-packed reads what it read before.
+test('ground layers and skies: a URL is the zone copy, a bare name the engine-wide one', () => {
+  expect(texBase('/assets/nalati-grasslands/tex/leafy_grass', 'diffuse')).toBe('/assets/nalati-grasslands/tex/leafy_grass/diffuse');
+  expect(texBase('leafy_grass', 'arm')).toBe('/assets/tex/leafy_grass/arm');
+  expect(hdriStem('/assets/nalati-grasslands/hdri/kloofendal_48d_partly_cloudy_puresky')).toBe('/assets/nalati-grasslands/hdri/kloofendal_48d_partly_cloudy_puresky');
+  expect(hdriStem('kloofendal_48d_partly_cloudy_puresky')).toBe('/assets/hdri/kloofendal_48d_partly_cloudy_puresky');
+  const bytes = { '/assets/nalati-grasslands/tex/leafy_grass/diffuse_1k.jpg': 1 };
+  expect(filePolicy('phone', 'img', { phone: {}, desktop: {} }, bytes).pbr('/assets/nalati-grasslands/tex/leafy_grass'))
+    .toEqual(['/assets/nalati-grasslands/tex/leafy_grass/diffuse_1k.jpg', '/assets/nalati-grasslands/tex/leafy_grass/nor_gl.jpg', '/assets/nalati-grasslands/tex/leafy_grass/arm.jpg']);
+  expect(filePolicy('desktop', 'img', { phone: {}, desktop: {} }, bytes).pbr('leafy_grass'))
+    .toEqual(['/assets/tex/leafy_grass/diffuse.jpg', '/assets/tex/leafy_grass/nor_gl.jpg', '/assets/tex/leafy_grass/arm.jpg']);
+  withAssetTables({ ...BAKED, bytes: { '/assets/nalati-grasslands/hdri/k_2k.sky.jpg': 1, '/assets/nalati-grasslands/hdri/k_2k.gain.png': 1 } }, () => {
+    expect(bakedSkyUrls('/assets/nalati-grasslands/hdri/k')).toEqual({ color: '/assets/nalati-grasslands/hdri/k_2k.sky.jpg', gain: '/assets/nalati-grasslands/hdri/k_2k.gain.png' });
+    expect(bakedSkyUrls('k')).toBeNull();
+  });
 });

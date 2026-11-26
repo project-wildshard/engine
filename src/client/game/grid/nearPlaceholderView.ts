@@ -21,7 +21,9 @@ const LEAN_MOVE = 1, LEAN_UPDATES = 30;
 
 /** A legacy near view exists only when both files are in this build's asset inventory. */
 export function bakedNearFiles(slug: string, files: Readonly<Record<string, number>>): { readonly row: string; readonly mesh: string } | null {
-  const base = `/assets/baked/${slug}/near`, row = `${base}.json`, mesh = `${base}.glb`;
+  // SF4: a re-packed zone's own baked folder first
+  const pick = (file: string): string => files[`/assets/${slug}/baked/${file}`] === undefined ? `/assets/baked/${slug}/${file}` : `/assets/${slug}/baked/${file}`;
+  const row = pick('near.json'), mesh = pick('near.glb');
   return files[row] === undefined || files[mesh] === undefined ? null : { row, mesh };
 }
 

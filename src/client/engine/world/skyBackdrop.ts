@@ -1,3 +1,4 @@
+import { bakedFile, hdriStem } from '../../../shared/engine/boot/zoneAssets';
 import { publicBytes } from '../../../shared/engine/boot/tables';
 import * as THREE from 'three';
 import { prepareOffscreenBuild } from '../render/offscreenBuild';
@@ -22,7 +23,7 @@ export const PLANET_DIST = 1700;
 
 /** public/assets/baked/<slug>/sky.json — the HDR's sun direction and horizon colour, scanned at build time (scripts/bake-sky.mjs). */
 async function loadBakedSky(levelId: string, hdri: string): Promise<{ sunDir: [number, number, number]; horizon: [number, number, number] } | null> {
-  const url = `/assets/baked/${levelId}/sky.json`;
+  const url = bakedFile(levelId, 'sky.json');
   if (!(url in publicBytes()) || new URLSearchParams(location.search).has('nobake')) return null;
   try {
     const j = await (await fetch(url)).json() as { hdri: string; sunDir: [number, number, number]; horizon: [number, number, number] };
@@ -114,7 +115,7 @@ export class SkyBackdropView {
     // baked procedural textures (clouds, fur…) and the baked sun / horizon (scripts/bake-sky.mjs) ride along with the HDR
     // the HDR itself: the gain-mapped JPEG + PNG pair (~0.3 MB, BakedSky.ts) when the build has it, else the 4–5 MB .hdr
     const pair = bakedSkyUrls(hdriName);
-    const hdrUrl = `/assets/hdri/${hdriName}_2k.hdr`;
+    const hdrUrl = `${hdriStem(hdriName)}_2k.hdr`;
     // `ChunkSky.sun` places the sun by hand; `ChunkSky.painted` paints the whole sky around it (nothing downloaded)
     if (S.sun) this.sunDir.copy(compassDir(S.sun.azimuth, S.sun.elevation));
     const painted = S.painted ?? null;
