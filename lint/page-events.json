@@ -699,7 +699,8 @@
    "name": "onKill",
    "bus": "page",
    "listeners": [
-    "src/client/game/session/play.ts"
+    "src/client/game/session/play.ts",
+    "src/client/game/grid/cellPresentation.ts"
    ],
    "producers": [
     {
@@ -721,7 +722,8 @@
    "bus": "page",
    "listeners": [
     "src/client/game/session/play.ts",
-    "src/client/game/audio/sceneDirector.ts"
+    "src/client/game/audio/sceneDirector.ts",
+    "src/client/game/grid/cellPresentation.ts"
    ],
    "producers": [
     {
@@ -759,7 +761,8 @@
    "name": "onDamage",
    "bus": "page",
    "listeners": [
-    "src/client/engine/ui/Combat.ts"
+    "src/client/engine/ui/Combat.ts",
+    "src/client/game/grid/cellPresentation.ts"
    ],
    "producers": [
     {
