@@ -518,7 +518,8 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
     if (mode === 'standalone') stallProfile = await startStallProfile(page);
     await page.goto(url.href, { waitUntil: 'domcontentloaded', timeout: 30000 });
     if (mode !== 'arrival') {
-    await until(page, faults, async observed => await page.evaluate(titleViewVisible) && titleCaptureReady(observed, mode === 'grid'), 'rendered usable title with completed warm-up', deadline);
+    // CP16 (J522): with no zone in the address no world warms behind the title, for a standalone case as for the grid's
+    await until(page, faults, async observed => await page.evaluate(titleViewVisible) && titleCaptureReady(observed, true), 'rendered usable title with completed warm-up', deadline);
     phases.titleMs = Date.now() - started;
     await observeTitleCapture(page, join(out, `${receipt}-title`), () => captureBootFrame(page, 'title', deadline, frames));
     if (mode !== 'grid') {
