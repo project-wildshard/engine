@@ -27,7 +27,7 @@ const collisionOnly = process.argv[3] === '--collision-only';
 // A deploy that names its catalogue (`bakeCatalogue`) gets seams for that grid, or the page's catalogue and its seams differ.
 if (process.env.WILDSHARD_CATALOGUE !== undefined) installCatalogue(JSON.parse(await readFile(process.env.WILDSHARD_CATALOGUE, 'utf8')));
 /** @param {string} path */
-const fetchFile = async path => {
+const pinnedFile = async path => {
   const url = new URL(path, base), product = url.pathname.startsWith('/shardfiles/');
   const relative = decodeURIComponent(url.pathname.slice(product ? '/shardfiles/'.length : 1));
   const folder = resolve(root, product ? 'out' : 'public'), file = resolve(folder, relative);
@@ -35,6 +35,25 @@ const fetchFile = async path => {
   try { return new Response(new Uint8Array(await readFile(file))); }
   catch (error) { if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT') return new Response(null, { status: 404 }); throw error; }
 };
+// Fix preview PV6: with a zone table (`WS_ZONE_TABLE`, PV2) the road reads each zone's edge data from the cook, through its index
+// (`WS_COOKED_ORIGIN`, default cooked.wildshard.io, or a `file:` folder laid out like it), never an installed pin or its registry.
+const zoneTable = process.env.WS_ZONE_TABLE;
+const cooked = zoneTable === undefined || zoneTable === '' ? undefined : await (async () => {
+  const { readZoneTable } = await import('../shared/game/grid/zoneTable.ts');
+  const { cookedReader } = await import('./cooked-reads.mjs');
+  const reader = await cookedReader(readZoneTable(JSON.parse(await readFile(zoneTable, 'utf8'))), process.env.WS_COOKED_ORIGIN ? { origin: process.env.WS_COOKED_ORIGIN } : {});
+  console.error(`[grid bake] zones from the cook: ${reader.zones} indexes, ${reader.objects} objects`);
+  return reader;
+})();
+/** A page path's bytes: a cooked zone's object first, then the engine's own `public/` (never `out/` when the zones come from the cook).
+ * @param {string} path */
+const fetchFile = async path => {
+  if (cooked === undefined) return pinnedFile(path);
+  const answer = await cooked.fetchFile(path);
+  return answer.status !== 404 || new URL(path, base).pathname.startsWith('/shardfiles/') ? answer : pinnedFile(path);
+};
+/** The zone's `shard.json` page path: the cook's header, or the installed pin's descriptor. @param {string} slug */
+const descriptorOf = slug => cooked === undefined ? findShard(slug)?.shardfile : cooked.header(slug);
 const plans = new Map(), seen = new Map(), products = new Map(), sources = new Map(), entryModes = new Map();
 /** ZE4: each source's whole road, baked once as shared blocks. @type {import('../cook/game/gridStripPages.ts').GridStripSource[]} */
 const compiled = [];
@@ -50,7 +69,7 @@ for (const developer of modes) for (const devserver of modes) for (const nineDra
   const edges = await loadGridEdgeProfiles(assembly.cells, async cell => {
     try {
       const source = await readGridEdges(cell, { fetch: fetchFile, edges: slug => {
-        const manifest = findShard(slug), descriptor = manifest?.shardfile;
+        const descriptor = descriptorOf(slug);
         if (descriptor === undefined) return null;
         let pending = products.get(slug);
         if (pending === undefined) {
