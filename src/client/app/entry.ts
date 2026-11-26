@@ -176,8 +176,8 @@ async function enterPage(): Promise<unknown> {
     search.set('chunk', requested);
     history.replaceState(history.state, '', `${location.pathname}?${search.toString()}${location.hash}`);
   }
-  // SA36: a `/slug/<slug>` link opens that one shard's page; its PLAY leaves for `/?chunk=<slug>`, so a world never boots here.
-  // SA37: on every host, a world build too: PLAY's `/?chunk=` page enters the world's grid at the shard's cell (GO7 below)
+  // SA36: a `/slug/<slug>` link opens that one shard's page; its PLAY leaves for `/` with the tap (CP6), so a world never boots here.
+  // SA37: on every host, a world build too: PLAY's page enters the world's grid at the shard's cell (GO7 below)
   const slugged = exploreChannel() ? null : slugOfPath(location.pathname);
   // CP10 (J522): a page that carries a one-cell world (a tool's zone alone) boots that world at its only cell on a bare `/`, with no
   // tap: the grid path players take (a grid intent at the cell), never the one-shard page. A page with its own inline shard
@@ -412,7 +412,7 @@ async function showPageTitle(refusal = ''): Promise<void> {
 
 /**
  * SA36 (Jake, grill Q14 to Q16): the `/slug/<slug>` page, one shard's card and hero (src/client/game/slugPage.ts). PLAY travels to
- * `/?chunk=<slug>` as a Shard select tap does, so that page enters the grid at the shard's cell (grid/oneWayIn.ts); a shard the
+ * `/` with the tap as a Shard select tap does (CHUNK-PARAM CP6), so that page enters the grid at the shard's cell (grid/oneWayIn.ts); a shard the
  * grid doesn't place keeps PLAY disabled. A slug no title row names goes to the title with the unlisted line.
  */
 async function showSlugPage(slug: string): Promise<void> {
@@ -431,7 +431,7 @@ async function showSlugPage(slug: string): Promise<void> {
   const grid = installGridTitle();
   const placed = shardCell(manifest.slug) !== undefined;
   const enter = (card: { readonly slug: string }): void => {
-    // the shard's page is `/?chunk=`: travel keeps this document's path, so the link's path goes first
+    // the shard's page is `/` with its tap: travel keeps this document's path, so the link's path goes first
     history.replaceState(history.state, '', home());
     travel({ to: card.slug, mode: 'enter' });
   };
