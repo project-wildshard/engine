@@ -4,7 +4,7 @@ import {chmodSync,mkdirSync,mkdtempSync,rmSync,symlinkSync,unlinkSync,writeFileS
 import {join,resolve} from 'node:path';
 import {installMachineBrowserAdmission} from './browser-machine-loader.mjs';
 
-const context={path:'/config/browser-admission.json',uid:501,read:()=>Promise.resolve({bytes:JSON.stringify({version:1,module:'/canonical/browser-policy.mjs'}),uid:501,mode:0o100600,regular:true}),load:()=>Promise.resolve({install:()=>Promise.resolve()})};
+const context={path:'/config/browser-admission.json',uid:501,read:()=>Promise.resolve({bytes:JSON.stringify({version:1,module:'/canonical/browser-policy.mjs'}),uid:501,mode:0o100600,regular:true}),load:()=>Promise.resolve({install:()=>Promise.resolve()}),exists:()=>true};
 await test('absent policy leaves portable authors unchanged',async()=>{
  const absent=Object.assign(new Error('missing'),{code:'ENOENT'});let loads=0;
  const enabled=await installMachineBrowserAdmission({}, {...context,read:()=>Promise.reject(absent),load:()=>{loads++;return Promise.resolve();}});
@@ -36,4 +36,23 @@ await test('actual private policy loads; unsafe mode, oversize and symlink refus
   chmodSync(path,0o600);writeFileSync(path,' '.repeat(4097));await assert.rejects(installMachineBrowserAdmission({}, {path}),/size limit/);
   unlinkSync(path);symlinkSync(module,path);await assert.rejects(installMachineBrowserAdmission({}, {path}));
  }finally{rmSync(directory,{recursive:true,force:true});}
+});
+
+// QA 11-25 row 103: the MacBook's policy named engine/scripts/ after the lean move and every admitted browser refused.
+/** @param {string} module @param {readonly string[]} present */
+function movedContext(module,present){
+ return {...context,read:()=>Promise.resolve({bytes:JSON.stringify({version:1,module}),uid:501,mode:0o100600,regular:true}),exists:(/** @type {string} */name)=>present.includes(name)};
+}
+await test('a policy naming the pre-lean scripts/ folder follows the move and names the line to write',async()=>{
+ const old='/repos/sharddev/node_modules/engine/scripts/policy.mjs',moved='/repos/sharddev/node_modules/engine/src/scripts/policy.mjs';
+ const warnings=/** @type {string[]} */([]),loads=/** @type {string[]} */([]);
+ assert.equal(await installMachineBrowserAdmission({},{...movedContext(old,[moved]),warn:message=>{warnings.push(message);},load:url=>{loads.push(url);return Promise.resolve({install:()=>Promise.resolve()});}}),true);
+ assert.deepEqual(loads,[`file://${moved}`]);
+ assert.equal(warnings.length,1);assert.match(warnings[0]??'',/\/config\/browser-admission\.json/);assert.ok(warnings[0]?.includes(JSON.stringify(moved)));
+});
+await test('a provider path that exists nowhere refuses, naming the policy file and the lean path',async()=>{
+ let loaded=false;
+ await assert.rejects(installMachineBrowserAdmission({},{...movedContext('/repos/engine/scripts/policy.mjs',[]),load:()=>{loaded=true;return Promise.resolve();}}),(/** @type {Error} */error)=>error.message.includes('/config/browser-admission.json')&&error.message.includes('/repos/engine/src/scripts/policy.mjs')&&error.message.includes('src/scripts/browser-machine-policy.mjs'));
+ assert.equal(loaded,false);
+ await assert.rejects(installMachineBrowserAdmission({},movedContext('/gone/provider.mjs',[])),/\/config\/browser-admission\.json names \/gone\/provider\.mjs, which does not exist;/);
 });

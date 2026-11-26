@@ -34,8 +34,10 @@ async function readPolicy(filename){
 }
 
 /** @param {BrowserMachineOptions} options */
+function policyFile(options){return options.path??path.join(homedir(),'.config','wildshard','browser-admission.json');}
+/** @param {BrowserMachineOptions} options */
 async function optionalPolicy(options){
- const filename=options.path??path.join(homedir(),'.config','wildshard','browser-admission.json');
+ const filename=policyFile(options);
  try{return await(options.read??readPolicy)(filename);}
  catch(error){if(error instanceof Error&&'code'in error&&error.code==='ENOENT'){return undefined;}throw error;}
 }
@@ -53,6 +55,33 @@ function providerPath(bytes){
  return policy.module;
 }
 
+const POLICY_MODULE='browser-machine-policy.mjs';
+/** The repo-kit lean layout (engine f928fdae2) moved <repo>/scripts/ to
+ * <repo>/src/scripts/; a policy written before it names the old folder.
+ * @param {string} configured @returns {string|undefined} */
+function leanMove(configured){
+ const folder=path.dirname(configured),repo=path.dirname(folder);
+ return path.basename(folder)==='scripts'&&path.basename(repo)!=='src'?path.join(repo,'src','scripts',path.basename(configured)):undefined;
+}
+/** QA 11-25 row 103: a provider path that no longer exists either follows the
+ * lean move, saying which line to write, or refuses naming the policy file.
+ * @param {string} configured @param {BrowserMachineOptions} options */
+function providerModule(configured,options){
+ const exists=options.exists??existsSync,filename=policyFile(options);
+ // Engine worktrees and clean gate copies carry their own implementation.
+ // Vite cannot import the canonical checkout's module outside its root.
+ // Portable consumers have no sibling provider and retain the machine path.
+ const local=path.join(import.meta.dirname,POLICY_MODULE);
+ if(path.basename(configured)===POLICY_MODULE&&exists(local)){return local;}
+ if(exists(configured)){return configured;}
+ const moved=leanMove(configured);
+ if(moved!==undefined&&exists(moved)){
+  (options.warn??console.warn)(`browser admission: ${filename} names ${configured}, which moved to ${moved}; using it. Write {"version":1,"module":${JSON.stringify(moved)}} to ${filename}.`);
+  return moved;
+ }
+ throw new Error(`Browser admission policy ${filename} names ${configured}, which does not exist${moved===undefined?'':` (nor does the lean layout's ${moved})`}; write the provider's current absolute path there, such as <engine>/src/scripts/${POLICY_MODULE}`);
+}
+
 /** @param {unknown} provider @returns {provider is BrowserMachineProvider} */
 function validProvider(provider){return provider!==null&&typeof provider==='object'&&'install'in provider&&typeof provider.install==='function';}
 /** @param {string} url @returns {Promise<unknown>} */
@@ -62,12 +91,7 @@ async function machineProvider(options){
  const record=await optionalPolicy(options);
  if(record===undefined){return undefined;}
  if(!privatePolicy(record,options.uid??process.getuid?.())){throw new Error('Browser admission policy must be a private owned regular file');}
- const configured=providerPath(record.bytes);
- // Engine worktrees and clean gate copies carry their own implementation.
- // Vite cannot import the canonical checkout's module outside its root.
- // Portable consumers have no sibling provider and retain the machine path.
- const local=path.join(import.meta.dirname,'browser-machine-policy.mjs');
- const module=path.basename(configured)==='browser-machine-policy.mjs'&&existsSync(local)?local:configured;
+ const module=providerModule(providerPath(record.bytes),options);
  const provider=await(options.load??importProvider)(pathToFileURL(module).href);
  if(!validProvider(provider)){throw new Error('Browser admission provider has no installer');}
  return provider;
