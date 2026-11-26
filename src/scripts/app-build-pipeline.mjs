@@ -27,10 +27,11 @@ import { buildLabelOf, stampBuildDocuments } from "./app-build/buildIdentity.mjs
 import { engineRelease } from "./changelog.mjs";
 import { homeIconChannel, writeHomeIcons } from "./app-build/homeIcons.mjs";
 import { carryPreviousDeploy, channelOrigin, previousDeployOptional } from "./app-build/previousDeploy.mjs";
-import { PAGE_LIMITS, pageSize } from "./page-size.mjs";
+import { PAGE_LIMITS, pageSize, shardNames } from "./page-size.mjs";
 import { assertAssetLimits, describeAssetLimits } from "./app-build/assetLimits.mjs";
 import { shardfileValidationRevision } from "./shardfile-validation-revision.mjs";
 import { checkBakedTextures } from "./app-build/bakedTextures.mjs";
+import { checkZoneless, dropZoneFiles, isZoneFile } from "./app-build/zoneless.mjs";
 
 import { assertHeavyLease } from "./heavy-lane-lease.mjs";
 
@@ -242,6 +243,10 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
   checkOneThree(outDir, buildId);
   // PZ12 (J274): an isolated channel's page origin sends COOP and COEP on every path; the worker reads the same rule
   if (writeIsolationRule(outDir, process.env.WS_CHANNEL)) console.log(`cross-origin isolated: ${process.env.WS_CHANNEL}`);
+  // Fix preview PV3: a page with a zone table reads every zone from the cook (PV4), so the zone files the engine's public/ copy and the
+  // entry bake wrote leave before the service worker lists the bundle, and no product folder is copied in below
+  const zoneless = (process.env.WS_ZONE_TABLE ?? "") !== "";
+  if (zoneless) console.log(`zoneless page: ${dropZoneFiles(outDir).length} zone files dropped`);
   // the service worker over the bundle as written (was vite/pwa-plugin.ts): sw.js and its content-named core
   step([
     "--import",
@@ -262,7 +267,7 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
   );
 
   // the data products beside the app (was vite/outputFolders.ts)
-  copyOutputFolders(process.cwd(), outDir);
+  if (!zoneless) copyOutputFolders(process.cwd(), outDir);
   // DL20: the deploy drops the loose copies nothing reads by URL
   const dropped = pruneLooseCopies(outDir);
   checkBakedTextures(process.cwd(), outDir);
@@ -307,11 +312,14 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
       optional,
       contentBase,
       ...(solo ? {} : { keepFile: path => !standaloneServerFile(path) }),
+      // PV3: a zoneless page carries no earlier build's zone file either
+      ...(zoneless ? { keepFile: (shards => path => !isZoneFile(path, shards))(shardNames(outDir)) } : {}),
       ...(budget === undefined ? {} : { budget }),
     }),
   );
 
   checkServerOutput(outDir, solo);
+  if (zoneless) checkZoneless(outDir);
   // QA 11-26 row 14: no video and no measuring rig in a page build
   checkNoJunk(outDir);
 
