@@ -13,7 +13,7 @@ test('selected-worker durable redial preserves actual peer worker native frames'
  const db=await openPglite();closers.push(db.close);await migrate(db);
  const saves=playerSavesOver(db,0,()=>{}),server=await roomBench({cells:['driftwood-isle','nalati-grasslands'],workers:2,saves});
  closers.push(server.close);
- const a=new RoomBot(server.url,'bench','device:worker-a','worker-a'),b=new RoomBot(server.url+'?chunk=nalati-grasslands','bench','device:worker-b','worker-b');
+ const a=new RoomBot(server.url,'bench','device:worker-a','worker-a'),b=new RoomBot(server.url,'bench','device:worker-b','worker-b',0,0,{cell:'nalati-grasslands',spawn:false});
  for(const bot of [a,b])closers.push(()=>{bot.drop();return Promise.resolve();});
  expect(await a.arrived()).toBe(true);expect(await b.arrived()).toBe(true);
  const table=server.world.health().table,target=table['driftwood-isle'],peer=table['nalati-grasslands'];

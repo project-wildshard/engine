@@ -12,7 +12,7 @@ import type { MenuMode } from '../src/client/game/grid/menu';
 import { catalogueBeforePlacements } from './fixtures/catalogue-before-placements';
 
 // OFFLINE OF3 (J298, J300): on a world build, a shard the world doesn't open is never entered. A card whose shard the kept world word
-// leaves out, or that the catalogue doesn't place, reads "Not in this world yet" with ENTER WORLD off; a `?chunk=` link to it lands on
+// leaves out, or that the catalogue doesn't place, reads "Not in this world yet" with ENTER WORLD off; a link that names it lands on
 // the title with that line. This replaces ba88ac9a's "unplaced plays solo". Prod's two-shard word is the fixture (the plan keeps it).
 const WORLD = { release: 'https://packs.example/releases/prod.json', key: 'ab' };
 const PROD_WORD = ['driftwood-isle', 'nalati-grasslands'];
@@ -92,7 +92,7 @@ test('no kept word: every placed card enters (J300); only a shard the grid does 
   expect(view(deckOf(worldOpens(undefined)))['Open Plot · Thin Ice'], 'preview: no world, no closed card').toBe('Open Plot · Thin Ice');
 });
 
-test('a ?chunk= page of a shard the world leaves out never takes a grid entry, and the entry lands on the title with the line', async () => {
+test('a page of a shard the world leaves out never takes a grid entry, and the entry lands on the title with the line', async () => {
   const kept = memory();
   const cell = await enterByShard({ online: true, slug: 'pine-hollow', kept: false }, WORLD, world => worldHosted(world, 1000, kept, async () => ({ grid: true, shards: PROD_WORD })), slug => worldOpens(WORLD, kept)(slug));
   expect(cell, 'prod\'s word leaves Pine out: no grid entry at its cell').toBeNull();

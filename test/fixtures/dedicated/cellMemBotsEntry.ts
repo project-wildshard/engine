@@ -1,4 +1,4 @@
-// SERVER-CELLS (draft, opus-cellmem): one real-socket bot per cell, each deep-linked with `/?chunk=<instance>` (GO7) as a page's
+// SERVER-CELLS (draft, opus-cellmem): one real-socket bot per cell, each asking for its cell in its first word (CHUNK-PARAM CP5, GO7) as a page's
 // Shard select is, walking a ring where it lands. Built and run only by scripts/cell-mem-bench.mjs against its loopback replica.
 //   node cellMemBots.mjs <url> <build> <cell,cell,...> <seconds> <tag> <result.json>
 // Each bot says its own address from 198.18.0.0/15 (RFC 2544), as mmoBotsEntry does, so the door's per-address caps never bind.
@@ -31,7 +31,7 @@ for (const [index, cell] of cells.entries()) {
   const Native = globalThis.WebSocket, headers = { 'x-forwarded-for': `198.18.${String(Math.floor(index / 250))}.${String(index % 250 + 1)}` };
   globalThis.WebSocket = class extends Native { constructor(at: string | URL) { super(at, { headers } as unknown as string[]); } };
   let bot: RoomBot;
-  try { bot = new RoomBot(`${parsed.origin}/?chunk=${cell}`, build, `device:${tag}-${cell}`, `Bot ${String(index)}`); } finally { globalThis.WebSocket = Native; }
+  try { bot = new RoomBot(`${parsed.origin}/`, build, `device:${tag}-${cell}`, `Bot ${String(index)}`, 0, 0, { cell, spawn: false }); } finally { globalThis.WebSocket = Native; }
   const walker: Walker = { bot, cell, cursor: null, laps: 0, joinedMs: null, rtt: [], started: performance.now() };
   bot.client.onFrame(() => { if (walker.joinedMs === null) walker.joinedMs = Math.round(performance.now() - walker.started); });
   let tick = 0;

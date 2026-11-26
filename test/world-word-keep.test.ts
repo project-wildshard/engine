@@ -36,7 +36,7 @@ test('a word heard on one page answers the next page in the tab for a minute, wi
   await new Promise<void>(resolve => { origin.listen(0, '127.0.0.1', resolve); });
   const config = { release: `http://127.0.0.1:${String((origin.address() as AddressInfo).port)}/release.json`, key: key.publicKey.export({ type: 'spki', format: 'der' }).toString('hex') };
   const world = { release: config.release, key: config.key };
-  // the page's read, as Shard select and a `?chunk=` page make it: online.js's worldWord, with the page's keep lent
+  // the page's read, as Shard select and a deep link make it: online.js's worldWord, with the page's keep lent
   const heard = async ({ online, page }: { readonly online: Online; readonly page: Page }): Promise<unknown> => page.readHosted(world, 3000, () => Promise.resolve(online));
   const WORD = { grid: false, shards: [SHARD] };
   try {

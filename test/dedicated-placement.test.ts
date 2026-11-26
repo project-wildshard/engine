@@ -211,7 +211,7 @@ test('a placed cell opens on a running world: /health lists it, a player can be 
   expect(bench.world.health(), 'the new cell on a worker of its own').toMatchObject({ cells: 2, workers: 2, players: 1, table: { [home]: 0, [PLACED.instance]: 1 } });
   expect(await bench.world.openCells([PLACED.instance]), 'opened once').toEqual([]);
 
-  const comer = bot(`${bench.url}?chunk=${PLACED.instance}`, 'bench', 'device:comer');
+  const comer = bot(bench.url, 'bench', 'device:comer', 'Bot', 0, 0, { cell: PLACED.instance, spawn: false });
   expect(await comer.arrived()).toBe(true);
   expect(JSON.parse(comer.resume ?? '{}')).toMatchObject({ shard: PLACED.slug, cell: PLACED.instance });
   expect(comer.client.latest?.cell, 'its frames carry the placed frame').toBe(cellFrame(PLACED.instance));
@@ -294,7 +294,7 @@ test('SA47: a placed cell whose pack only the cook has opens on a running world,
   const activated = {uploadId: '11111111-1111-1111-1111-111111111111', slug: PLACED.slug, hash: HASH, channel: 'staging' as const};
   expect(await activate(activated)).toMatchObject({...activated, build: BUILD, instances: [PLACED.instance]});
   expect(await activate(activated), 'lost acknowledgement retries the real opened world').toMatchObject({preloaded: true, instances: [PLACED.instance]});
-  const comer = bot(`${bench.url}?chunk=${PLACED.instance}`, 'bench', 'device:comer');
+  const comer = bot(bench.url, 'bench', 'device:comer', 'Bot', 0, 0, { cell: PLACED.instance, spawn: false });
   expect(await comer.arrived()).toBe(true);
   expect(JSON.parse(comer.resume ?? '{}')).toMatchObject({ shard: PLACED.slug, cell: PLACED.instance });
   expect(reads.fetched + reads.cached, 'the room read the cooked parts').toBeGreaterThan(0);

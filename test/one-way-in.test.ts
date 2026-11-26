@@ -55,7 +55,7 @@ test('J311: a solo build (preview) enters its in-page grid at the shard\'s cell,
   for (const cell of assembly.cells) expect(oneWayIn({ online: false, hosted: false, slug: cell.slug, kept: false }, assembly)?.instance, cell.slug).toBe(shardCell(cell.slug, assembly)?.instance);
   expect(oneWayIn({ online: false, hosted: false, slug: 'driftwood-isle', kept: true }, assembly)).toBeNull();
   expect(oneWayIn({ online: false, hosted: false, slug: 'open-plot-thin-ice', kept: false }, assembly)).toBeNull();
-  // the page asks only for a title tap, so a bare `?chunk=` link and the harness URLs still open the shard alone
+  // the page asks only for a title tap, so a bare zone address and the harness URLs still open the shard alone
   expect(readFileSync('src/client/app/entry.ts', 'utf8')).toContain("(online || pendingTitleArrival(requested ?? '') !== null) && requested !== null");
   // the in-page server is handed the chosen cell (gridServer.ts starts there: test/standalone-grid-goto.test.ts)
   expect(readFileSync('src/client/game/shardfile/clientWorker.ts', 'utf8')).toContain('const goto = lone ? null : chosenCell(), enter = goto === null ? null : chosenArrival();');

@@ -25,7 +25,7 @@ test('F48: a new upload reaches its already-open cell: a live player keeps the o
   expect(loaded).toEqual([OLD]);
   const first = bench.room(PLACED.instance);
 
-  const author = bot(`${bench.url}?chunk=${PLACED.instance}`, 'bench', 'device:author');
+  const author = bot(bench.url, 'bench', 'device:author', 'Bot', 0, 0, { cell: PLACED.instance, spawn: false });
   expect(await author.arrived()).toBe(true);
   await upload(NEW);
   await new Promise(resolve => { setTimeout(resolve, 1000); });
@@ -35,7 +35,7 @@ test('F48: a new upload reaches its already-open cell: a live player keeps the o
   // The author's page reloads on the new upload: its old socket drops (the seat is held), and the new page dials in.
   author.drop();
   await vi.waitFor(() => { expect(loaded, 'the held seat no longer pins the old world').toEqual([OLD, NEW]); }, { timeout: 10_000, interval: 50 });
-  const reloaded = bot(`${bench.url}?chunk=${PLACED.instance}`, 'bench', 'device:author');
+  const reloaded = bot(bench.url, 'bench', 'device:author', 'Bot', 0, 0, { cell: PLACED.instance, spawn: false });
   expect(await reloaded.arrived()).toBe(true);
   const second = bench.room(PLACED.instance);
   expect(second).not.toBe(first);

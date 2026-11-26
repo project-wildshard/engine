@@ -88,7 +88,7 @@ test('a seat in a cell the page has not loaded says so, and takes no body', { ti
   expect(bench.room(SHARD)?.holds(IDENTITY.player)).toBe(false);
 });
 
-test('GO4: a grid page in its seat\'s cell takes its body there; a seat in another cell re-enters the grid, never a `?chunk=` page', { timeout: 60_000 }, async () => {
+test('GO4: a grid page in its seat\'s cell takes its body there; a seat in another cell re-enters the grid, never a one-shard page', { timeout: 60_000 }, async () => {
   const saves = memoryPlayerSaves();
   saves.write({ player: IDENTITY.player, name: 'Jake', shard: 'brasscap-mesa', cell: 'blender-template', build: 'bench', saveVersion: 0, seq: 1, reason: 'test', doc: null, receipts: [] });
   bench = await roomBench({ cells: [SHARD, 'blender-template'], workers: 2, saves });
@@ -97,7 +97,7 @@ test('GO4: a grid page in its seat\'s cell takes its body there; a seat in anoth
   const away = connectOnline({ socket: bench.url, build: 'bench', loaded: SHARD, identity: IDENTITY, gridCell: SHARD }, view);
   await vi.waitFor(() => { expect(regrids).toEqual(['blender-template']); }, { timeout: 5000 });
   expect(placed).toEqual([{ cell: 'blender-template', at: expect.objectContaining({ x: expect.any(Number), z: expect.any(Number) }) as unknown }]);
-  expect(reloads, 'no `?chunk=` reload').toEqual([]);
+  expect(reloads, 'no one-shard reload').toEqual([]);
   expect(bench.room('blender-template')?.holds(IDENTITY.player), 'no body while the page goes').toBe(false);
   away.dispose();
   shell = connectOnline({ socket: bench.url, build: 'bench', loaded: 'brasscap-mesa', identity: IDENTITY, gridCell: 'blender-template' }, view);
