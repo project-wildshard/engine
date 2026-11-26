@@ -979,16 +979,16 @@
    "why": "STR22: first hosted memory-footprint run on main to judge the walk (44468967622 at 41d629f2), median of 3 (3.44-3.83 MB/s); the mini's 7.30 pin is not comparable"
   },
   "nine/boot/retained-geometry": {
-   "value": 8027535,
+   "value": 14152535,
    "contentKey": "nine-dragon-stack@11",
-   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "commit": "ac477377dd086b67de75059a52b52d87b0439436",
+   "why": "one-cell grid entry (b732d1199): residency leases ~15.7 MB, grid code 2.5 MB, deck 0.90 MB; home admission cut (54d03770d)"
   },
   "nine/boot/live-heap": {
-   "value": 183551763,
+   "value": 215556042,
    "contentKey": "nine-dragon-stack@11",
-   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "commit": "ac477377dd086b67de75059a52b52d87b0439436",
+   "why": "one-cell grid entry (b732d1199): residency leases ~15.7 MB, grid code 2.5 MB, deck 0.90 MB; home admission cut (54d03770d)"
   },
   "nine/street/triangles95": {
    "value": 904000,
