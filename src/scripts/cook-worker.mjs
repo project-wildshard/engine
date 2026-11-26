@@ -55,12 +55,12 @@ const maxBytes = Number(env.COOK_MAX_SHARDFILE_BYTES ?? MAX_SHARDFILE_BYTES);
 const renderer = (() => { try { return rendererRevision(root); } catch { return undefined; } })();
 /** SA48: the validator each job validates with; an index stamped with it lets a page of the same validator admit the shard. */
 const validator = (() => { try { return shardfileValidationRevision(root); } catch { return undefined; } })();
-/** SHARD-COMPAT SP7, the recook rule: a build whose cook revision is unchanged carries another build's index for the same
+/** SHARD-COMPAT SP7, the recook rule: a build whose cook hash is unchanged carries another build's index for the same
  *  bytes instead of cooking them again. A host that can't compute it cooks every head, as before. */
-let cookRevisionError = '';
-const cookRevisionId = await (async () => { try { return (await import('./cook-revision.ts')).cookRevision(root).revision; } catch (error) { cookRevisionError = error instanceof Error ? error.message : String(error); return undefined; } })();
-if (cookRevisionId === undefined) console.warn(`cook-worker: no cook revision (${cookRevisionError}), so every head cooks again for this build (SP7)`);
-else console.log(`cook-worker: cook revision ${cookRevisionId}`);
+let cookHashError = '';
+const cookHashId = await (async () => { try { return (await import('./cookHash.ts')).cookHash(root).cookHash; } catch (error) { cookHashError = error instanceof Error ? error.message : String(error); return undefined; } })();
+if (cookHashId === undefined) console.warn(`cook-worker: no cook hash (${cookHashError}), so every head cooks again for this build (SP7)`);
+else console.log(`cook-worker: cook hash ${cookHashId}`);
 if (validator === undefined) console.warn('cook-worker: no shardfile validator revision, so no index carries a verdict and no page enters a placed slug from it (SA48)');
 const uploadApi = env.COOK_SIGNING_KEY === undefined || env.COOK_SIGNING_KEY === '' ? undefined : cookApi(need('WILDSHARD_API_URL'), env.COOK_SIGNING_KEY, fetch, Date.now, maxBytes);
 const publicSource = apiSource(env.WILDSHARD_API_URL ?? 'https://api.wildshard.io', fetch, maxBytes);
@@ -93,7 +93,7 @@ const listingFile = (() => {
 const worker = () => createCookWorker({ alarm: cookAlarm, ...(listingFile === undefined ? {} : { listingFile }),
   build: need('WILDSHARD_BUILD'), store, source: uploadSource, log: line => { console.log(line); }, reclaim,
   serverPacks: resolve(env.COOK_SERVER_PACKS ?? 'tmp/cook/server'), scratch,
-  ...(validator === undefined ? {} : { validator }), ...(cookRevisionId === undefined ? {} : { cook: cookRevisionId }),
+  ...(validator === undefined ? {} : { validator }), ...(cookHashId === undefined ? {} : { cook: cookHashId }),
   launcher: {
     root, execPath: process.execPath, loader: fileURLToPath(new URL('bake-loader.mjs', import.meta.url)), script: fileURLToPath(new URL('cook-job.mjs', import.meta.url)),
     wrap: JSON.parse(env.COOK_JOB_WRAP ?? '[]'), ...(renderer === undefined ? {} : { renderer }), ...(sidecars === undefined ? {} : { sidecars }),

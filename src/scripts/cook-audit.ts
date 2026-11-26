@@ -5,17 +5,17 @@ import {pathToFileURL} from 'node:url';
 import {folderStore} from '../cook/game/packStore';
 import type {CookIndex} from '../cook/game/cookWorker';
 import {readSpawnManifest} from '../shared/game/shardfile/spawnManifest';
-import {cookRevision,type CookRevision} from './cook-revision';
+import {cookHash,type CookHash} from './cookHash';
 
 interface ManifestAudit {tier:string;set:string;hash:string;raw:number;wire:number;parts:{url:string;bytes:number;hash:string}[]}
 interface FolderAudit {slug:string;shardfile:string;manifests:ManifestAudit[]}
-export interface CookAudit {version:1;cook:CookRevision;products:FolderAudit[]}
+export interface CookAudit {version:1;cook:CookHash;products:FolderAudit[]}
 
 /** Read the actual served manifests and compressed bodies, not a serialization of private cook state. */
 export async function auditCook(receiptFile:string):Promise<CookAudit> {
-  const receipt=JSON.parse(readFileSync(receiptFile,'utf8')) as {cook?:CookRevision;store:string;heads:{slug:string;hash:string}[];indexes:CookIndex[]};
-  if(receipt.cook===undefined)throw new Error('Cook receipt has no source revision; run ring-cook again');
-  if(receipt.cook.revision!==cookRevision().revision)throw new Error('Cook receipt source revision is stale; run this cook again');
+  const receipt=JSON.parse(readFileSync(receiptFile,'utf8')) as {cook?:CookHash;store:string;heads:{slug:string;hash:string}[];indexes:CookIndex[]};
+  if(receipt.cook===undefined)throw new Error('Cook receipt has no source hash; run ring-cook again');
+  if(receipt.cook.cookHash!==cookHash().cookHash)throw new Error('Cook receipt source hash is stale; run this cook again');
   const store=folderStore(receipt.store),products:FolderAudit[]=[];
   const hash=(bytes:Uint8Array):string=>createHash('sha256').update(bytes).digest('hex');
   const read=async(key:string):Promise<Uint8Array>=>{const body=await store.get(key);if(body===undefined)throw new Error(`Cook has no ${key}`);return body;};
@@ -39,7 +39,8 @@ export async function auditCook(receiptFile:string):Promise<CookAudit> {
 /** A report, not a new gate. Deliberate representation changes remain reviewable by tier, parts and bytes. */
 export function reportCook(audit:CookAudit,baselineFile=resolve('test/pins/cooked.json')):void {
   const previous=existsSync(baselineFile)?JSON.parse(readFileSync(baselineFile,'utf8')) as CookAudit:undefined;
-  console.log(`cook revision ${audit.cook.revision}; baseline ${previous?.cook.revision??'unrecorded'}`);
+  const prior = previous?.cook as (CookHash & {revision?: string}) | undefined;
+  console.log(`cook hash ${audit.cook.cookHash}; baseline ${prior?.cookHash ?? prior?.revision ?? 'unrecorded'}`);
   for(const product of audit.products)for(const manifest of product.manifests) {
     const before=previous?.products.find(row=>row.slug===product.slug)?.manifests.find(row=>row.tier===manifest.tier&&row.set===manifest.set);
     const old=new Set(before?.parts.map(row=>row.hash)),current=new Set(manifest.parts.map(row=>row.hash));
@@ -52,7 +53,7 @@ if(process.argv[1]!==undefined&&import.meta.url===pathToFileURL(resolve(process.
   const receipt=process.argv[2];if(receipt===undefined)throw new Error('usage: cook-audit <receipt.json> [--record]');
   const audit=await auditCook(receipt);reportCook(audit);
   if(process.argv.includes('--record')) {
-    if(audit.cook.revision!==cookRevision().revision)throw new Error('Cannot record a stale cook revision');
+    if(audit.cook.cookHash!==cookHash().cookHash)throw new Error('Cannot record a stale cook hash');
     writeFileSync('test/pins/cooked.json',`${JSON.stringify(audit,null,2)}\n`);
   }
 }

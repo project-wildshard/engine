@@ -102,7 +102,7 @@ export interface CookIndex {
   /** SA48: the page's admission row for these bytes (`folderVerdict`'s, but for its path), under the validator revision the worker
    *  cooks with (`CookWorkerOptions.validator`). A page whose validator differs, or an index with none, leaves the shard out. */
   readonly verdict?: NonNullable<CookJobReport['receipt']> & {readonly revision: string};
-  /** SHARD-COMPAT SP7: the cook revision (`src/scripts/cook-revision.ts`) whose code made these bytes, then `+` and the validator
+  /** SHARD-COMPAT SP7: the cook revision (`src/scripts/cookHash.ts`) whose code made these bytes, then `+` and the validator
    *  revision when the worker had one (`carryKey`). An index with none never carries to another build. */
   readonly cook?: string;
   /** SP7: the build this index was carried from, unchanged but for `build`; absent on an index this build cooked. */
@@ -436,6 +436,15 @@ export const RECLAIM_HEADROOM = 0.15;
 export const needsReclaim = (after: number, budget: number): boolean => after > budget * (1 - RECLAIM_HEADROOM);
 
 const filesUnder = (root: string): string[] => readdirSync(root, {recursive: true, withFileTypes: true}).filter(row => row.isFile()).map(row => relative(root, join(row.parentPath, row.name)).split(sep).join('/'));
+/** Byte digest of both products from a job. Runtime timings and verdict metadata are outside these products. */
+export function cookOutputDigest(root: string): string {
+  const digest = createHash('sha256');
+  for (const key of filesUnder(root).sort()) {
+    digest.update(key).update('\0').update(createHash('sha256').update(readFileSync(join(root, key))).digest());
+  }
+  return digest.digest('hex');
+}
+
 
 export interface CookWorkerOptions {
   readonly build: string;

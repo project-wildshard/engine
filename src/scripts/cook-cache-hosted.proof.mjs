@@ -1,3 +1,4 @@
+import { rendererRevision } from './renderer-revision.mjs';
 // TC28: actual cold/reused/cold cooks run only on a hosted runner. No hook
 // discovery, no local cook and no reuse of a simulation verdict.
 import assert from 'node:assert/strict';
@@ -15,11 +16,11 @@ const {createCookWorker,indexKey}=await import('../cook/game/cookWorker.ts');
 const {MAX_SHARDFILE_BYTES}=await import('@wildshard/format/uploadCaps');
 const {folderStore}=await import('../cook/game/packStore.ts');
 const {wholeBrasscapProduct}=await import('./pin-format.ts');
-const {cookRevision}=await import('./cook-revision.ts');
+const {cookHash}=await import('./cookHash.ts');
 const directory=resolve('tmp/cook-cache-proof'),reports=resolve(process.env.WS_COOK_CACHE_REPORT??'tmp/cook-cache-report');
 mkdirSync(directory,{recursive:true});mkdirSync(reports,{recursive:true});
 const work=mkdtempSync(join(directory,'run-')),started=performance.now(),build='cache-proof';
-const sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),recipe=cookRevision(root);
+const sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),recipe=cookHash(root);
 /** @param {Uint8Array} bytes */
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 
@@ -35,7 +36,7 @@ function cacheEntries(folder){
 }
 try{
  const quick=JSON.parse(readFileSync(join(reports,'quick.json'),'utf8'));
- assert.equal(quick.version,1);assert.equal(quick.complete,true);assert.equal(quick.cases,3);assert.equal(quick.sha,sha);assert.equal(quick.cookRevision,recipe.revision);
+ assert.equal(quick.version,1);assert.equal(quick.complete,true);assert.equal(quick.cases,3);assert.equal(quick.sha,sha);assert.equal(quick.cookHash,recipe.cookHash);
  const product=wholeBrasscapProduct(),head={slug:product.pin.slug,hash:product.pin.hash};
  const script=join(root,'src/scripts/cook-job.mjs');
  const shared=join(work,'shared-jobs'),coldJobs=join(work,'cold-jobs');
@@ -46,7 +47,7 @@ try{
   /** @type {string[]} */const notes=[];
   const worker=createCookWorker({build,store,serverPacks:server,scratch:jobs,log:line=>{notes.push(line);},
    source:{heads:()=>Promise.resolve([{...head,revision:1}]),download:hash=>{assert.equal(hash,head.hash);return Promise.resolve(product.bytes);}},
-   launcher:{root,execPath:process.execPath,loader:join(root,'src/scripts/bake-loader.mjs'),script,wrap:[],renderer:recipe.renderer,
+   launcher:{root,execPath:process.execPath,loader:join(root,'src/scripts/bake-loader.mjs'),script,wrap:[],renderer:rendererRevision(root),
     limits:{seconds:120,memoryMB:4096,heapMB:2048,cpuSlots:2}}});
   const began=performance.now(),row=await worker.cook(head),elapsedMs=performance.now()-began;
   assert.ok(notes.every(line=>!/: try \d+ failed:/u.test(line)),notes.join(' | '));
@@ -74,10 +75,10 @@ try{
  assert.deepEqual(deterministicCookIndex(warm.index),deterministicCookIndex(cold.index));
  assert.deepEqual(deterministicCookIndex(first.index),deterministicCookIndex(warm.index));
  assert.deepEqual(first.objects,warm.objects);assert.deepEqual(first.serverFiles,warm.serverFiles);
- assert.equal(cookRevision(root).revision,recipe.revision,'Cook inputs must not change during the three real cooks');
+ assert.equal(cookHash(root).cookHash,recipe.cookHash,'Cook inputs must not change during the three real cooks');
  /** @param {Awaited<ReturnType<typeof run>>} row */
  const observation=row=>({elapsedMs:row.elapsedMs,seconds:row.seconds,peakMB:row.peakMB,proof:row.index.proof,preparation:row.index.preparation,uniqueParts:row.entries.length,scriptTiming:row.index.check?.performance.scripts.scripts??null,rawBytes:row.entries.reduce((n,e)=>n+e.rawBytes,0),wireBytes:row.entries.reduce((n,e)=>n+e.wireBytes,0)});
- const report={version:1,complete:true,sha,run:process.env.GITHUB_RUN_ID,cookRevision:recipe.revision,slug:head.slug,hash:head.hash,source:product.source,quick,
+ const report={version:1,complete:true,sha,run:process.env.GITHUB_RUN_ID,cookHash:recipe.cookHash,slug:head.slug,hash:head.hash,source:product.source,quick,
   prime:observation(first),reused:observation(warm),cold:observation(cold),warmCacheUnchanged:true,objects:Object.keys(warm.objects).length,
   serverFiles:Object.keys(warm.serverFiles).length,keys:warm.storeKeys,cache:content(warm.entries),seconds:(performance.now()-started)/1000};
  writeFileSync(join(reports,'receipt.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));

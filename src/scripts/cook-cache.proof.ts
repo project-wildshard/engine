@@ -6,7 +6,7 @@ import {createHash} from 'node:crypto';
 import {copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync} from 'node:fs';
 import {dirname, join, resolve} from 'node:path';
 import {test} from 'node:test';
-import {cookRevision} from './cook-revision.ts';
+import {cookHash} from './cookHash.ts';
 import {rendererCandidate, RENDER_ROOT} from './renderer-revision.mjs';
 import {committedSourceFiles} from './source-input-proof.mjs';
 import {collectGarbage, createCookWorker, indexKey, type CookIndex} from '../cook/game/cookWorker.ts';
@@ -32,36 +32,32 @@ async function fixture(run: (root: string) => void | Promise<void>): Promise<voi
   completed++;
 }
 
-await test('every actual cook input and the pinned format change cookRevision', () => fixture(root => {
-  const baseline = cookRevision(engine);
+await test('every actual cook input and the pinned format change cookHash', () => fixture(root => {
+  const baseline = cookHash(engine);
   const renderFiles = committedSourceFiles(engine).filter(rendererCandidate);
   const rendererInput = renderFiles.find(file => file.startsWith(RENDER_ROOT) && file.endsWith('.ts') && !baseline.files.includes(file));
   assert.ok(rendererInput);
   // The real cook closure plus one actual renderer file exercises the
   // renderer seam without copying/re-hashing the entire app 25 times.
-  const copied = [...new Set([...baseline.files, rendererInput, 'package.json'])];
+  const copied = [...new Set([...baseline.files, rendererInput, 'package.json', 'pnpm-lock.yaml'])];
   for (const file of copied) {
     mkdirSync(dirname(join(root, file)), {recursive: true}); copyFileSync(join(engine, file), join(root, file));
   }
   const git = (...args: string[]) => execFileSync('git', ['-c', 'user.name=Cook proof', '-c', 'user.email=cook@example.invalid', ...args],
     {cwd: root, encoding: 'utf8', stdio: 'pipe', env: {...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))), GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null'}});
   git('init', '--quiet', '--initial-branch=main');git('add', '--', ...copied);git('commit', '--quiet', '-m', 'cook input fixture');
-  const expected = cookRevision(root);
+  const expected = cookHash(root);
   assert.deepEqual(expected.files, baseline.files);
   for (const file of ['src/scripts/bake-loader.mjs', 'src/scripts/format-hook.mjs']) assert.ok(baseline.files.includes(file), file);
   for (const file of baseline.files) {
     const at = join(root, file), bytes = readFileSync(at);
     writeFileSync(at, Buffer.concat([bytes, Buffer.from('\n')]));
-    // Meta QA 11-24 row 44 (MA14b): package.json joins the closure (engineFloor's literal URL) but none of its bytes move
-    // the revision (src/scripts/cook-revision.ts revisionBytes), so a release's version bump carries every head; its one cook
-    // input, the format pin, is hashed on its own (the 'format dependency' case below).
-    if (file === 'package.json') assert.equal(cookRevision(root).revision, expected.revision, file);
-    else assert.notEqual(cookRevision(root).revision, expected.revision, file);
+    assert.notEqual(cookHash(root).cookHash, expected.cookHash, file);
     writeFileSync(at, bytes);
   }
   const rendererPath = join(root, rendererInput), rendererBytes = readFileSync(rendererPath);
   writeFileSync(rendererPath, Buffer.concat([rendererBytes, Buffer.from('\n')]));
-  assert.notEqual(cookRevision(root).revision, expected.revision, 'renderer-only input');
+  assert.equal(cookHash(root).cookHash, expected.cookHash, 'renderer-only input');
   writeFileSync(rendererPath, rendererBytes);
   // A newly imported producer input must join the closure without
   // teaching this proof or a hand-maintained inventory its name.
@@ -69,21 +65,27 @@ await test('every actual cook input and the pinned format change cookRevision', 
   const added = join(root, 'src/cook/game/tc28-new-input.ts');
   writeFileSync(added, 'export const input = 1;\n');
   writeFileSync(entry, Buffer.concat([source, Buffer.from("\nimport './tc28-new-input';\n")]));
-  const expanded = cookRevision(root);
+  const expanded = cookHash(root);
   assert.ok(expanded.files.includes('src/cook/game/tc28-new-input.ts'));
   writeFileSync(added, 'export const input = 2;\n');
-  assert.notEqual(cookRevision(root).revision, expanded.revision);
+  assert.notEqual(cookHash(root).cookHash, expanded.cookHash);
   writeFileSync(entry, Buffer.concat([source, Buffer.from("\nimport {} from './tc28-new-input';\n")]));
-  const emptyImport = cookRevision(root);
+  const emptyImport = cookHash(root);
   assert.ok(emptyImport.files.includes('src/cook/game/tc28-new-input.ts'));
   writeFileSync(added, 'export const input = 3;\n');
-  assert.notEqual(cookRevision(root).revision, emptyImport.revision, 'Empty imports still execute their module');
+  assert.notEqual(cookHash(root).cookHash, emptyImport.cookHash, 'Empty imports still execute their module');
+  writeFileSync(entry, Buffer.concat([source, Buffer.from("\nrequire('./tc28-new-input');\n")]));
+  const required = cookHash(root);
+  assert.ok(required.files.includes('src/cook/game/tc28-new-input.ts'));
+  assert.ok(required.files.includes('src/cook/game/cookWorker.ts'));
+  writeFileSync(added, 'export const input = 4;\n');
+  assert.notEqual(cookHash(root).cookHash, required.cookHash, 'literal require input');
   writeFileSync(entry, source);
   const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {dependencies: Record<string, string>};
   pkg.dependencies['@wildshard/format'] += '-changed';
   writeFileSync(join(root, 'package.json'), JSON.stringify(pkg));
-  assert.notEqual(cookRevision(root).revision, expected.revision, 'format dependency');
-  console.log(JSON.stringify({criterion: 'cook-inputs', files: baseline.files.length, revision: baseline.revision}));
+  assert.notEqual(cookHash(root).cookHash, expected.cookHash, 'format dependency');
+  console.log(JSON.stringify({criterion: 'cook-inputs', files: baseline.files.length, revision: baseline.cookHash}));
 }));
 
 const slug = 'sunscar-dunes', header = `shardfiles/${slug}/shard.json`;
@@ -167,4 +169,4 @@ await test('GC before the new index commits cannot delete a reused part', () => 
 
 assert.equal(completed, 3, 'Every quick fixture, including cleanup, must complete before publishing its receipt');
 writeFileSync(quickReceipt, JSON.stringify({version: 1, complete: true, cases: completed,
-  sha: execFileSync('git', ['rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(), cookRevision: cookRevision(engine).revision}, null, 2));
+  sha: execFileSync('git', ['rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(), cookHash: cookHash(engine).cookHash}, null, 2));

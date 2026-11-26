@@ -10,7 +10,7 @@ import {createHash} from 'node:crypto';
 import {appendFileSync,existsSync,readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import './format-hook.mjs';
-import {cookRevision} from './cook-revision.ts';
+import {cookHash} from './cookHash.ts';
 import {narrowedRendererHash,publishedRenderer} from './renderer-revision.mjs';
 import {committedSourceFiles} from './source-input-proof.mjs';
 
@@ -89,7 +89,7 @@ async function main():Promise<void> {
   if(base===undefined||base===''||/^0+$/u.test(base)){console.info('fingerprints: no base to compare (a new branch): skipped');return;}
   let lines:readonly string[];
   try {
-    const {files}=cookRevision(ROOT);
+    const {files}=cookHash(ROOT);
     lines=fingerprintLines(base,{head:fingerprintsOf(sideAt(head),files),base:fingerprintsOf(sideAt(base),files)},head==='HEAD'?await formatOf():undefined).lines;
   } catch(error) {lines=[`fingerprints against ${short(base)}: unknown (${error instanceof Error?error.message:String(error)})`];}
   for(const line of lines)console.info(line);

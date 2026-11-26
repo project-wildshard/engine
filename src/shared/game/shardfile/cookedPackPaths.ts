@@ -40,3 +40,40 @@ export function cookedObjectKey(ref: CookedShardRef, objects: Readonly<Record<st
   }
   return key;
 }
+
+/** Address fields common to the client, the room and the cook's collection. */
+export interface CookedIndexAddress extends CookedShardRef {
+  readonly hash: string;
+  readonly objects: Readonly<Record<string, string>>;
+  readonly mounts?: Readonly<Record<string, string>>;
+}
+
+const record = (input: unknown): input is Record<string, unknown> =>
+  typeof input === 'object' && input !== null && !Array.isArray(input);
+
+function readObjects(input: unknown, ref: CookedShardRef): Readonly<Record<string, string>> {
+  if (!record(input)) throw new Error('Cook index has no object table');
+  const objects = Object.fromEntries(Object.entries(input).map(([path, key]) => {
+    if (!path.split('/').every(part => PATH_SEGMENT.test(part)) || typeof key !== 'string') throw new Error('Invalid cook object');
+    return [path, key];
+  }));
+  for (const path of Object.keys(objects)) cookedObjectKey(ref, objects, path);
+  return objects;
+}
+
+export function readCookedIndexAddress(input: unknown): CookedIndexAddress {
+  if (!record(input)) throw new Error('Invalid cook index');
+  const {slug, shardVersion, cookVersion, cookHash, hash} = input;
+  if (typeof slug !== 'string' || typeof shardVersion !== 'string' || typeof cookVersion !== 'string'
+    || typeof cookHash !== 'string' || typeof hash !== 'string' || !HASH.test(hash)) throw new Error('Invalid cook index identity');
+  const ref = {slug, shardVersion, cookVersion, cookHash};
+  cookedIndexKey(ref);
+  const objects = readObjects(input['objects'], ref);
+  if (input['mounts'] === undefined) return {...ref, hash, objects};
+  if (!record(input['mounts'])) throw new Error('Invalid cook mounts');
+  const mounts = Object.fromEntries(Object.entries(input['mounts']).map(([url, key]) => {
+    if (!url.startsWith('/') || typeof key !== 'string' || cookedObjectKey(ref, objects, url) !== key) throw new Error('Invalid cook mount');
+    return [url, key];
+  }));
+  return {...ref, hash, objects, mounts};
+}

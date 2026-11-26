@@ -66,7 +66,7 @@ try{
   const hashes=value=>new Set(value.products.flatMap(product=>product.manifests.flatMap(manifest=>manifest.parts.map(part=>part.hash))));
   assert.ok(baseline.value&&changed.value);
   const before=hashes(baseline.value),after=hashes(changed.value),moved=[...after].filter(hash=>!before.has(hash)).length;
-  assert.notEqual(changed.value.cook.revision,baseline.value.cook.revision);
+  assert.notEqual(changed.value.cook.cookHash,baseline.value.cook.cookHash);
   assert.ok(moved>0&&rawBytes(changedReceipt)>rawBytes(baselineReceipt),'Actual grown parts must be reported');
   assert.match(changed.text,/parts \+[1-9]/u,'Production cook-diff must name changed parts');
   const healed=await audit(await cold('healed-cold'),'healed-audit',baseline.file);assert.equal(healed.code,0);

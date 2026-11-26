@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { COOKED_ORIGIN, cookedIndexKey, cookedObjectKey, cookedShardPrefix, cookedVersionPrefix } from '../src/shared/game/shardfile/cookedPackPaths';
+import { COOKED_ORIGIN, cookedIndexKey, cookedObjectKey, cookedShardPrefix, cookedVersionPrefix, readCookedIndexAddress } from '../src/shared/game/shardfile/cookedPackPaths';
 
 const ref = { slug: 'driftwood-isle', shardVersion: '0.2.13', cookVersion: '1.0.0', cookHash: 'a'.repeat(64) };
 
@@ -19,4 +19,12 @@ test('paths resolve only to objects in the named shard version and cook', () => 
   expect(cookedObjectKey(ref, objects, '/shardfiles/driftwood-isle/map.png')).toBe(map);
   expect(cookedObjectKey(ref, objects, '/absent')).toBeUndefined();
   expect(() => cookedObjectKey({ ...ref, cookVersion: '2.0.0' }, objects, 'shardfiles/driftwood-isle/map.png')).toThrow('outside its shard version');
+});
+
+test('the index address and mount both resolve the same version-owned object', () => {
+  const path = 'assets/driftwood-isle/image.png';
+  const key = `${cookedShardPrefix(ref)}common/${'b'.repeat(64)}.png`;
+  const address = {...ref, hash: 'c'.repeat(64), objects: {[path]: key}, mounts: {[`/${path}`]: key}};
+  expect(readCookedIndexAddress(address)).toEqual(address);
+  expect(() => readCookedIndexAddress({...address, mounts: {[`/${path}`]: 'wrong'}})).toThrow('Invalid cook mount');
 });

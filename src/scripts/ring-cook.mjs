@@ -9,7 +9,7 @@ import { parseArgs } from 'node:util';
 await import('./bake-loader.mjs');
 const { createCookWorker, indexKey, DEFAULT_LIMITS } = await import('../cook/game/cookWorker.ts');
 const { folderStore } = await import('../cook/game/packStore.ts');
-const { cookRevision } = await import('./cook-revision.ts');
+const { cookHash } = await import('./cookHash.ts');
 const { ringCookInputs } = await import('./ring-cook-inputs.ts');
 const { rendererRevision } = await import('./renderer-revision.mjs');
 const { shardfileValidationRevision } = await import('./shardfile-validation-revision.mjs');
@@ -48,7 +48,7 @@ const worker = createCookWorker({ build: values.build, store, serverPacks: join(
   launcher: { root, execPath: process.execPath, loader:join(root,'src/scripts/bake-loader.mjs'), script:join(root,'src/scripts/cook-job.mjs'),
     wrap:[], limits, renderer: rendererRevision(root) },
   log: line => console.log(line) });
-const recipe = cookRevision(), indexes = [];
+const recipe = cookHash(), indexes = [];
 for (const head of heads) {
   const started = performance.now(), row = await worker.cook(head);
   if (row.state !== 'cooked') throw new Error(`${head.slug}: ${row.state}: ${row.detail ?? 'no cook result'}`);
@@ -58,7 +58,7 @@ for (const head of heads) {
   console.log(`${head.slug}: ${index.proof}, ${index.keys.length} stored objects, ${((performance.now()-started)/1000).toFixed(1)}s${index.preparation === undefined || index.preparation === 'none' ? '' : `, ${index.preparation} preparation`}`);
   if (index.preparation === 'stale') console.warn(`stale preparation: ${head.slug}`);
 }
-if (cookRevision().revision !== recipe.revision) throw new Error('Cook source changed during the batch');
+if (cookHash().cookHash !== recipe.cookHash) throw new Error('Cook source changed during the batch');
 const receipt = { build:values.build, cook:recipe, store:join(out,'store'), heads, indexes };
 writeFileSync(join(out,'receipt.json'),JSON.stringify(receipt));
 console.log(JSON.stringify({receipt:join(out,'receipt.json')}));

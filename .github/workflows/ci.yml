@@ -166,6 +166,11 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.before || github.event.pull_request.base.sha || '' }}
         run: node src/scripts/fingerprints.ts --base "${BASE_SHA:-HEAD~1}" || true
+      - name: Check cook version
+        if: steps.code.outputs.run == 'true' && matrix.job == 1
+        env:
+          COOK_BASE_SHA: ${{ github.event.before || github.event.pull_request.base.sha || '' }}
+        run: node src/scripts/cookVersion.ts --base "${COOK_BASE_SHA:-HEAD~1}"
       # BROWSER-TESTS-BENCH BB2/BB5 (J231): e2e's headless shell and products' Chromium, cached by Playwright version.
       - id: playwright
         if: steps.code.outputs.run == 'true'
