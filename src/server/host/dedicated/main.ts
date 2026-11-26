@@ -14,7 +14,7 @@ import { Worker } from 'node:worker_threads';
 import { loadRapier } from '@wildshard/engine/physics/rapier';
 import type { WorkerNews } from './cellProtocol';
 import type { CellWorkerData } from './cellWorker';
-import { readPackFolder, readPackHeader, readReleaseItems, type PackReads } from './packReader';
+import { readPackFolder, readRawShardVersion, releaseCookedPack, type PackReaderOptions, readPackHeader, readReleaseItems, type PackReads } from './packReader';
 import { openPlayerSaves, memoryPlayerSaves } from './playerSaves';
 import { guestExpiryDays, startGuestExpiry } from './saves/expiry';
 import { accountRoutes } from './accountRoutes';
@@ -74,6 +74,13 @@ async function installedRelease(): Promise<ReleaseFile> {
   return selected;
 }
 const release = await installedRelease();
+const versionedRooms = process.env['ROOMS_VERSIONED_COOK'] === '1';
+function roomPacks(file: ReleaseFile, slug: string, placed?: {readonly hash?: string; readonly shardVersion?: string}): PackReaderOptions {
+  if (!versionedRooms) return {origin, cache};
+  const cooked = releaseCookedPack(file, slug, placed);
+  if (cooked === undefined) throw new Error('A versioned room needs a signed cook address');
+  return {origin, cache, cooked};
+}
 const itemReads: PackReads = { fetched: 0, fetchedBytes: 0, cached: 0, refused: 0 };
 const catalogue = await readReleaseItems(release.items, { origin, cache }, itemReads);
 // C5, C11, GO3: the cells, by grid instance, fixed at startup; a player with no save lands in the first. `grid` opens every grid cell
@@ -115,7 +122,7 @@ const playtest=process.env['PLAYTEST']==='1'?new PlaytestFile({directory:setting
 
 /** One row of the table is one worker thread, started once (J182). */
 function bootWorker(slugs: readonly string[]): WorkerLink {
-  const data: CellWorkerData = { slugs, build, origin, cache, catalogue, placed: placedCells(), ...(hold === undefined ? {} : { holdMs: Number(hold) }), ...(empty === undefined ? {} : { emptyMs: Number(empty) }), crossing, ...(metrics === undefined ? {} : { metrics: true }), ...(sessions === undefined ? {} : { metricEvents: true }),...(playtest===undefined?{}:{playtest:true}),
+  const data: CellWorkerData = { slugs, build, origin, cache, catalogue, ...(versionedRooms ? {release} : {}), placed: placedCells(), ...(hold === undefined ? {} : { holdMs: Number(hold) }), ...(empty === undefined ? {} : { emptyMs: Number(empty) }), crossing, ...(metrics === undefined ? {} : { metrics: true }), ...(sessions === undefined ? {} : { metricEvents: true }),...(playtest===undefined?{}:{playtest:true}),
     ...(authorProduct === undefined ? {} : { authorProduct }) };
   const worker = new Worker(new URL('cellWorker.mjs', import.meta.url), { workerData: data });
   let stopped = false;
@@ -145,7 +152,7 @@ const ticketKey = setting('PLAYER_TICKET_PUBLIC_KEY');
 if (ticketKey !== undefined) log({ at: 'tickets.key', pinned: false, key: ticketKey.slice(-16) });
 // ONE-FORMAT OF31h2: each cell's own shard file may say what it costs awake and whose worker it shares; one that says nothing keeps
 // the measured table's row. An author's local product has one cell and no book to read.
-const declared: DeclaredCells = authorProduct === undefined ? await declaredCells(cells, cell => readPackHeader(cellShard(cell), build, { origin, cache }, itemReads)) : new Map();
+const declared: DeclaredCells = authorProduct === undefined ? await declaredCells(cells, cell => readPackHeader(cellShard(cell), build, roomPacks(release, cellShard(cell)), itemReads)) : new Map();
 if (declared.size > 0) log({ at: 'world.declared', cells: Object.fromEntries(declared) });
 const world: World = await World.open({ build, cells, declared, roads: crossing, ...worldSettings(release.channel, process.env), ...trust, refuseAgents, ...(ticketKey === undefined ? {} : { ticketKey }), secret: seatSecret, saves, log, boot: bootWorker, ...(grace === undefined ? {} : { graceMs: Number(grace) }),
   ...(arrivals === undefined ? {} : { entered: (seat, slug, actor) => { if (arrivals.entered(seat, slug, actor)) metrics?.entered(slug, actor.actor); } }),
@@ -257,7 +264,7 @@ const watch = new ReleaseWatch({ read: readRelease, serving: release, ...(poll =
   },
   changed: async (next, shards) => {
     const nextCatalogue = await readReleaseItems(next.items, { origin, cache }, reads);
-    for (const slug of shards) await readPackFolder(slug, next.engineBuild, await rapier(), { origin, cache }, reads, undefined, nextCatalogue);
+    for (const slug of shards) await readPackFolder(slug, next.engineBuild, await rapier(), roomPacks(next, slug), reads, undefined, nextCatalogue);
     world.beginGrace(next.engineBuild);
   } });
 // SA33: a cell the API placed opens on this running server within a look, on a worker of its own, with no grace and no restart. Its shard's
@@ -278,7 +285,7 @@ placements = placementAt === undefined || placementKey === undefined || listed.t
   },
   // QA 11-24 row 61: a cell the world already runs counts as opened once placed, so no later look reads its pack again.
   open: placementOpener({
-    read: async row => { await readPackFolder(row.slug, build, await rapier(), { origin, cache }, reads, row.hash, catalogue); },
+    read: async row => { await readPackFolder(row.slug, build, await rapier(), roomPacks(release, row.slug, row), reads, row.hash, catalogue); },
     place: (row, file) => { placeCell(row, file); }, running: instance => world.hasCell(instance), open: instances => world.openCells(instances),
     refused: (row, error) => { log({ at: 'placement.refused', instance: row.instance, slug: row.slug, error: String(error) }); },
   }) });
@@ -287,9 +294,11 @@ if (activationToken !== undefined) {
   if (placementAt === undefined || placementKey === undefined || listed.trim() !== WHOLE_GRID) throw new Error('Upload activation needs a whole-grid placement receiver');
   activationReceiver = uploadActivationReceiver(activationToken, uploadActivator({channel: release.channel, build,
     read: () => fetchPlacementFile(placementAt, placementKey),
-    preload: async (slug, hash) => {
-      const input = await readPackFolder(slug, build, await rapier(), {origin, cache}, reads, hash, catalogue, true);
-      return {clientPlan: rawServerPlan(input.sections, input.product)};
+    preload: async (slug, hash, shardVersion) => {
+      const rawVersion = shardVersion ?? (versionedRooms ? await readRawShardVersion(catalogueAt, slug, hash) : undefined);
+      const pack = roomPacks(release, slug, {hash, ...(rawVersion === undefined ? {} : {shardVersion: rawVersion})});
+      const input = await readPackFolder(slug, build, await rapier(), pack, reads, hash, catalogue, true);
+      return {clientPlan: rawServerPlan(input.sections, input.product), ...(rawVersion === undefined ? {} : {shardVersion: rawVersion})};
     },
     place: (row, file) => {placeCell(row, file);}, open: instances => world.activateCells(instances),
     opened: instance => Object.hasOwn(world.health().table, instance), catalogue: catalogueCell,

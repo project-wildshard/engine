@@ -36,7 +36,8 @@ const { folderStore, r2Store } = await import('../cook/game/packStore.ts');
 const { rendererRevision } = await import('./renderer-revision.mjs');
 const { shardfileValidationRevision } = await import('./shardfile-validation-revision.mjs');
 const { liveDeployBuilds } = await import('./app-build/previousDeploy.mjs');
-const { COOKED_BUCKET } = await import('../shared/game/shardfile/cookedPackPaths.ts');
+const { COOKED_BUCKET, cookedIndexKey } = await import('../shared/game/shardfile/cookedPackPaths.ts');
+const { pruneCookedStore } = await import('./cook-retention.ts');
 const { serverSentry } = await import('../server/host/dedicated/serverSentry.ts');
 
 const env = process.env;
@@ -112,6 +113,20 @@ const worker = () => createCookWorker({ alarm: cookAlarm, ...(listingFile === un
   },
 });
 
+/** @param {boolean} dryRun */
+const versionedGc = async dryRun => {
+  if (recipe === undefined) throw new Error('Cook pruning needs a versioned store');
+  const stages = /** @type {const} */ (['live', 'staging', 'preview']);
+  const current = (await Promise.all(stages.map(stage => publicSource.heads(stage)))).flat();
+  const protectedKeys = current.map(head => {
+    if (head.shardVersion === undefined) throw new Error(`Cook prune cannot identify ${head.slug}`);
+    return cookedIndexKey({slug: head.slug, shardVersion: head.shardVersion, ...recipe});
+  });
+  const plan = await pruneCookedStore(store, fetch, protectedKeys, {now: Date.now(), dryRun});
+  return {dryRun, keptIndexes: plan.keptIndexes.length, keptObjects: plan.keptObjects, indexes: plan.indexes.length,
+    objects: plan.objects.length, bytes: plan.bytes};
+};
+
 if (command === 'serve') {
   const cook = worker(), port = Number(env.COOK_PORT ?? 8792), host = env.COOK_HOST ?? '127.0.0.1';
   notifyServer(cook, need('COOK_NOTIFY_TOKEN')).listen(port, host, () => { console.log(`cook worker on ${host}:${port}`); });
@@ -122,12 +137,16 @@ if (command === 'serve') {
   console.log(`cook worker polls the catalogue every ${everyMs / 1000} s`);
   // Meta QA 11-24 row 43 (MA13): with a recorder named, the record pass runs first and the boot recook waits for it, so a
   // render change ends `cooked, prepared by cook`; the poll (new uploads) starts at once beside it.
-  bootCook(cook, { everyMs, log: line => { console.log(line); }, before: record() });
+  const boot = bootCook(cook, { everyMs, log: line => { console.log(line); }, before: record() });
   // J505: the nightly protected collection (a publish also runs it under 15% headroom)
   const nightly = async () => {
-    try { await reclaim(); } catch (/** @type {unknown} */ error) { console.warn(`pack store reclaim failed: ${error instanceof Error ? error.message : String(error)}`); }
+    try {
+      if (versioned) console.log(JSON.stringify({cookedPrune: await cook.maintain(() => versionedGc(false))}));
+      else await reclaim();
+    } catch (/** @type {unknown} */ error) { console.warn(`pack store reclaim failed: ${error instanceof Error ? error.message : String(error)}`); }
   };
-  if (!versioned) setInterval(() => { void nightly(); }, 24 * 3600_000).unref();
+  if (versioned) void boot.recooked.then(nightly);
+  setInterval(() => { void nightly(); }, 24 * 3600_000).unref();
   if (uploadApi !== undefined && privateSource !== undefined) {
     // The initial rollout is staging only; production keeps its existing upload law.
     need('COOK_STAGING_ACTIVATION_URL'); need('COOK_STAGING_ACTIVATION_TOKEN');
@@ -180,12 +199,16 @@ if (command === 'serve') {
   if (added.length > 0) refreshServiceWorker(out, page);
   console.log(JSON.stringify(added));
 } else if (command === 'gc') {
-  if (versioned) throw new Error('Build-key garbage collection cannot sweep the cooked bucket');
-  // PZ5: a carried build's book, parts and content stay on R2, so a build any channel still carries is never collected.
-  const channels = await liveDeployBuilds();
-  const required = channels.flatMap(row => row.builds);
-  const builds = [...new Set([...rest, ...required])];
-  console.log(JSON.stringify({ channels, ...await collectGarbage(store, builds, Number(env.COOK_BUDGET_BYTES ?? PACK_BUDGET_BYTES), Date.now(), undefined, required) }));
+  if (versioned) {
+    if (rest.includes('--dry-run') === false) throw new Error('The versioned cook service applies the sweep; use gc --dry-run here');
+    console.log(JSON.stringify({cookedPrune: await versionedGc(true)}));
+  } else {
+    // PZ5: a carried build's book, parts and content stay on R2, so a build any channel still carries is never collected.
+    const channels = await liveDeployBuilds();
+    const required = channels.flatMap(row => row.builds);
+    const builds = [...new Set([...rest, ...required])];
+    console.log(JSON.stringify({ channels, ...await collectGarbage(store, builds, Number(env.COOK_BUDGET_BYTES ?? PACK_BUDGET_BYTES), Date.now(), undefined, required) }));
+  }
 } else if (command === 'reclaim') {
   if (versioned) throw new Error('Build-key garbage collection cannot sweep the cooked bucket');
   // J505: the protected collection by hand (the same one a publish and the nightly run make)

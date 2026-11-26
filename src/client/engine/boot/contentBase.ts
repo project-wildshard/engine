@@ -12,6 +12,7 @@
  * content URL is looked up by `pageURL()` of it. This leaf imports nothing; the spawn download and the engine both use it.
  */
 let parsed: { readonly text: string; readonly base: string } | undefined;
+const cacheOrigins = new Set<string>();
 let bankRead: { readonly element: Element; readonly first: ChildNode | null; readonly text: string } | undefined;
 
 /**
@@ -56,6 +57,17 @@ export function contentBase(): string {
   }
   parsed = { text, base };
   return base;
+}
+
+/** A store installed by the page can participate in Clear downloads. */
+export function addContentCacheOrigin(base: string): void {
+  const checked = readContentBase(base);
+  if (checked !== '') cacheOrigins.add(new URL(checked).origin);
+}
+
+export function contentCacheOrigins(): readonly string[] {
+  const base = contentBase();
+  return base === '' ? [...cacheOrigins] : [...new Set([new URL(base).origin, ...cacheOrigins])];
 }
 
 /** A path the content base serves: shard products, programs, and `/assets/` art and books, not code or physics. */

@@ -15,7 +15,7 @@ export interface UploadActivationPorts {
   readonly read: () => Promise<PlacementFile>;
   /** Must select the cook index for this exact raw hash even if the release book holds an older slug. It hands back the
    * product's `client/plan` section, if it has one, for the production debug refusal (OF18c). */
-  readonly preload: (slug: string, hash: string) => Promise<{ readonly clientPlan?: unknown } | undefined>;
+  readonly preload: (slug: string, hash: string, shardVersion?: string) => Promise<{ readonly clientPlan?: unknown; readonly shardVersion?: string } | undefined>;
   /** `file`: every cell the signed file names, so the row keeps its place in it (MA10k). */
   readonly place: (row: PlacedCell, file: readonly PlacedCell[]) => void;
   readonly open: (instances: readonly string[]) => Promise<readonly string[]>;
@@ -35,11 +35,13 @@ export function uploadActivator(ports: UploadActivationPorts): (notice: UploadAc
     const listed = placement.cells.filter(row => new Set([notice.slug]).has(row.slug));
     // 2026-11-19: staging withheld every catalogue slug's upload for 14 h; the file never lists them, the baked grid holds them.
     const own = listed.length === 0 && notice.place !== false ? ports.catalogue?.(notice.slug) : undefined;
-    const rows = own === undefined ? listed : [{...own, hash: notice.hash}];
+    const rows: readonly PlacedCell[] = own === undefined ? listed : [{...own, hash: notice.hash}];
     if ((rows.length === 0 && notice.place !== false) || rows.some(row => row.hash !== notice.hash)) throw new Error('Placement does not publish the upload hash');
-    const loaded = await ports.preload(notice.slug, notice.hash);
+    const shardVersion = rows[0]?.shardVersion;
+    const loaded = shardVersion === undefined ? await ports.preload(notice.slug, notice.hash)
+      : await ports.preload(notice.slug, notice.hash, shardVersion);
     if (ports.channel === 'production') refuseProductionDebug(loaded?.clientPlan);
-    for (const row of rows) ports.place(row, placement.cells);
+    for (const row of rows) ports.place(loaded?.shardVersion === undefined ? row : {...row, shardVersion: loaded.shardVersion}, placement.cells);
     const instances = rows.map(row => row.instance);
     await ports.open(instances);
     if (instances.some(instance => !ports.opened(instance))) throw new Error('Upload placement has not opened');

@@ -8,12 +8,13 @@ import { readFile } from 'node:fs/promises';
 // oxlint-disable-next-line import/no-nodejs-modules -- A worker is one row of the table (J182).
 import { parentPort, workerData } from 'node:worker_threads';
 import { loadRapier } from '@wildshard/engine/physics/rapier';
-import { readPackGrid, readPackFolder, type PackReads } from './packReader';
+import { readPackGrid, readPackFolder, releaseCookedPack, type PackReads } from './packReader';
 import { loadCookedFolder } from '../headlessFolder';
 import { runCells, type CellPort } from './cellHost';
-import { placeCell, placedHash, type PlacedCell } from './gridCells';
+import { placeCell, placedUpload, type PlacedCell } from './gridCells';
 import { loopLag } from './loopLag';
 import { gcPauses } from './gcPauses';
+import type { ReleaseFile } from '../../../shared/host/releaseRows';
 import type { LedgerCatalogueItem } from '@wildshard/engine/game/ledger';
 
 declare const __DEVSERVER__: boolean;
@@ -21,6 +22,7 @@ declare const __DEVSERVER__: boolean;
 /** What the door boots a worker with. */
 export interface CellWorkerData { readonly slugs: readonly string[]; readonly build: string; readonly origin: string; readonly cache: string; readonly holdMs?: number;readonly playtest?:boolean;
   readonly catalogue?: readonly LedgerCatalogueItem[];
+  readonly release?: ReleaseFile;
   /** J107's start-over wait, a proof's override (`EMPTY_MS`): 5 minutes when absent. */
   readonly emptyMs?: number;
   /** Online grid cells host a road; an author's local world has one cell. */
@@ -31,7 +33,7 @@ export interface CellWorkerData { readonly slugs: readonly string[]; readonly bu
   /** SERVER-CELLS SC1: `METRICS_PORT` is set, so this worker measures its event-loop lag for `/metrics`. */
   readonly metrics?: boolean; readonly metricEvents?: boolean }
 
-const { slugs, build, origin, cache, holdMs, emptyMs, playtest, crossing, placed, metrics, metricEvents, catalogue, authorProduct } = workerData as CellWorkerData, port = parentPort;
+const { slugs, build, origin, cache, holdMs, emptyMs, playtest, crossing, placed, metrics, metricEvents, catalogue, authorProduct, release } = workerData as CellWorkerData, port = parentPort;
 if (port === null) throw new Error('A cell runs in a worker');
 for (const row of placed ?? []) placeCell(row);
 const reads: PackReads = { fetched: 0, fetchedBytes: 0, cached: 0, refused: 0 };
@@ -46,7 +48,10 @@ runCells(port as unknown as CellPort, { slugs, build, developerBoost: process.en
     if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__ && authorProduct !== undefined) {
       return loadCookedFolder(authorProduct, rapier, slug);
     }
-    const input = await readPackFolder(slug, build, rapier, { origin, cache }, reads, placedHash(slug), catalogue, placedHash(slug) !== undefined);
+    const upload = placedUpload(slug), hash = upload?.hash;
+    const cooked = release === undefined ? undefined : releaseCookedPack(release, slug, upload);
+    if (release !== undefined && cooked === undefined) throw new Error('A versioned room needs a signed cook address');
+    const input = await readPackFolder(slug, build, rapier, { origin, cache, ...(cooked === undefined ? {} : {cooked}) }, reads, hash, catalogue, hash !== undefined);
     console.info(JSON.stringify({ at: 'cell.pack', slug, ...reads }));
     return input;
   } });

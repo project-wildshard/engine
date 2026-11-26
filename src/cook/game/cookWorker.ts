@@ -94,6 +94,7 @@ export interface CookIndex {
   /** The room's folder, and the pack C2 cooks for a build's server worker. */
   readonly server: CookJobReport['server'];
   readonly serverPack?: NonNullable<CookJobReport['cook']['server']>;
+  readonly ktx2?: unknown;
   readonly proof: 'proved' | 'unmeasured';
   /** Absent in legacy indexes: never use them to approve a pending upload. */
   readonly check?: CookJobReport['check'];
@@ -532,6 +533,7 @@ export interface CookWorker {
   readonly recook: (stages: readonly CookStage[]) => Promise<readonly CookRow[]>;
   readonly enqueue: (notice: CookNotice) => void;
   readonly idle: () => Promise<void>;
+  readonly maintain: <T>(task: () => Promise<T>) => Promise<T>;
   readonly rows: () => readonly CookRow[];
   /** SP6: read the catalogue once and cook, in line, each upload this process has not settled (cooked, present or refused); a
    *  failed one waits out its backoff. Answers the rows it cooked. Throws only when the catalogue can't be read. */
@@ -627,13 +629,17 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     rmSync(parked, {recursive: true, force: true}); mkdirSync(dirname(target), {recursive: true});
     cpSync(join(work, 'out/server'), parked, {recursive: true}); rmSync(target, {recursive: true, force: true}); renameSync(parked, target);
   };
-  const indexOf = (report: CookJobReport, hash: string, keys: readonly string[]): CookIndex => ({
-    version: 1, build, slug: report.slug, hash, header: report.header, manifests: report.cook.manifests, keys,
-    server: report.server, serverPack: report.cook.server, proof: indexProof(report.proof), check: report.check, seconds: report.seconds,
-    ...(report.cook.preparation === undefined ? {} : {preparation: report.cook.preparation}),
-    ...(report.receipt === undefined || options.validator === undefined ? {} : {verdict: {...report.receipt, revision: options.validator}}),
-    ...(carryKey === undefined ? {} : {cook: carryKey}),
-  });
+  const indexOf = (report: CookJobReport, hash: string, keys: readonly string[]): CookIndex => {
+    const ktx2: unknown = Reflect.get(report.cook, 'ktx2');
+    return {
+      version: 1, build, slug: report.slug, hash, header: report.header, manifests: report.cook.manifests, keys,
+      server: report.server, serverPack: report.cook.server, proof: indexProof(report.proof), check: report.check, seconds: report.seconds,
+      ...(report.cook.preparation === undefined ? {} : {preparation: report.cook.preparation}),
+      ...(report.receipt === undefined || options.validator === undefined ? {} : {verdict: {...report.receipt, revision: options.validator}}),
+      ...(ktx2 === undefined ? {} : {ktx2}),
+      ...(carryKey === undefined ? {} : {cook: carryKey}),
+    };
+  };
   const publish = async (work: string, report: CookJobReport, hash: string): Promise<void> => {
     const client = join(work, 'out/client'), keys = filesUnder(client);
     if (keys.some(key => !cookOutputKey(key))) throw new Error('Cook output names a key outside its publication paths');
@@ -700,6 +706,13 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     cookedIndexKey(ref);
     return ref;
   };
+  // Serialize versioned index writes and the bucket sweep. A new index cannot adopt a common object the sweep marked.
+  let storeWork = Promise.resolve<unknown>(undefined);
+  const storeExclusive = <T>(task: () => Promise<T>): Promise<T> => {
+    const next = storeWork.then(task, task);
+    storeWork = next.catch(() => undefined);
+    return next;
+  };
   let versionedUsage: {readonly at: number; readonly sizes: Map<string, number>} | undefined;
   const reserveVersioned = async (recipe: VersionedCook, objects: readonly {readonly key: string; readonly bytes: number}[]): Promise<void> => {
     if (versionedUsage === undefined || clock() - versionedUsage.at >= LISTING_MAX_AGE_MS) {
@@ -754,7 +767,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     const client = join(work, 'out/client'), report = outcome.report;
     if (report.cook.map === undefined || !(['full', 'cell'] as const).every(size => existsSync(join(client, cookedMapPath(report.slug, size)))))
       return {...head, state: 'failed', detail: 'The cook drew no map (J450): its index would list no cooked-map-v1'};
-    try { await publishProduct(work, outcome.report, head); }
+    try { await storeExclusive(() => publishProduct(work, outcome.report, head)); }
     catch (error) { if (error instanceof PackBudgetError && error.never) return {...head, state: 'refused', detail: error.message}; throw error; }
     const {preparation} = outcome.report.cook;
     return {...head, state: 'cooked', check: outcome.report.check, seconds: outcome.report.seconds, peakMB: outcome.peakMB, ...(preparation === undefined ? {} : {preparation})};
@@ -840,7 +853,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     const known = verdicts.get(head.hash);
     if (known?.state === 'refused' && new Set([head.slug]).has(known.slug)) return known;
     if (versioned !== undefined) {
-      const held = head.shardVersion === undefined ? undefined : await versionedHit(versioned, head);
+      const held = head.shardVersion === undefined ? undefined : await storeExclusive(() => versionedHit(versioned, head));
       if (held !== undefined) return held;
     } else {
       const held = await store.get(indexKey(build, head.hash));
@@ -948,6 +961,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     enqueue: notice => { void schedule({slug: notice.shard, hash: notice.hash, uploadNumber: notice.uploadNumber, shardVersion: notice.shardVersion}, true); },
     idle: async () => { while (pending.size > 0) await Promise.all([...pending.values()].map(job => job.done)); },
     rows: () => [...verdicts.values()],
+    maintain: storeExclusive,
     sweep: async stages => {
       const heads = await headsOf(stages);
       const due = (hash: string): boolean => {

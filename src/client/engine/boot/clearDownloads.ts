@@ -1,5 +1,5 @@
 import { saveStorage,jsonSlot } from '../saves/slots';
-import { contentBase } from './contentBase';
+import { contentCacheOrigins } from './contentBase';
 import { isForeign, pageCacheChannel, PRODUCTION_MARK } from '../pwa/cacheNames';
 // oxlint-disable-next-line import/no-empty-named-blocks, unicorn/require-module-specifiers -- Its ambient Window type is the point.
 import type {} from './shardPrefetch'; // Window.__ws_prefetch, for a program that reaches this file alone.
@@ -100,11 +100,11 @@ export async function clearDownloads(): Promise<ClearReport> {
   // 5. the HTTP cache (Clear-Site-Data: "cache"): offline this fails, and the reload is cold for Cache Storage only
   let httpCache = false;
   try {
-    const base = contentBase();
     // the content origin's: Chromium ignores Clear-Site-Data on a request whose credentials mode is not `include`, and the
     // CDN's CORS rule allows no credentials, so it is a credentialed no-cors read; an opaque answer is an answer
     const asks = await Promise.allSettled([fetch(CLEAR_HTTP_URL, { cache: 'no-store' }),
-      ...base === '' ? [] : [fetch(new URL('/clear-cache.json', base).href, { cache: 'no-store', mode: 'no-cors', credentials: 'include' })]]);
+      ...contentCacheOrigins().map(base => fetch(new URL('/clear-cache.json', base).href,
+        { cache: 'no-store', mode: 'no-cors', credentials: 'include' }))]);
     httpCache = asks.every(ask => ask.status === 'fulfilled' && (ask.value.ok || ask.value.type === 'opaque'));
   } catch { /* offline, or a broken bank */ }
   const report: ClearReport = { before, after: await storageUsed(), cached, caches: deleted, workers, markers, httpCache, at: Date.now() };

@@ -17,7 +17,7 @@ interface GridNames { readonly instances: readonly string[]; readonly frames: Re
   readonly spots: ReadonlyMap<string, string> }
 /** SA33: one cell a signed placement file names: the API's placement of a new slug (SA30), on a spot the catalogue leaves empty. SA47:
  *  `hash` is its shardfile, for a pack the build's book lacks. */
-export interface PlacedCell { readonly instance: string; readonly slug: string; readonly cell: readonly [number, number]; readonly hash?: string;
+export interface PlacedCell { readonly instance: string; readonly slug: string; readonly cell: readonly [number, number]; readonly hash?: string; readonly shardVersion?: string;
   /** The grid row's speed class, so the board's cap in a placed road-class cell matches the page's (QA 11-15 row 8). */
   readonly speedClass?: 'road';
   /** MA10k: the row's place among the file's cells a page adds after the catalogue (`addPlacedCells`), so its frame is the page's
@@ -27,7 +27,8 @@ export interface PlacedCell { readonly instance: string; readonly slug: string; 
  *  placement watch's first look places them again. */
 const placed: PlacedCell[] = [];
 /** SA47: each placed slug's shardfile hash, when its placement named one. */
-const hashes = new Map<string, string>();
+interface PlacedUpload {readonly hash: string; readonly shardVersion?: string}
+const uploads = new Map<string, PlacedUpload>();
 /** MZ33: moves on every change to `placed` (a row added, dropped or re-slotted), so the cached names and assembly follow it. */
 let version = 0;
 let read: { readonly from: unknown; readonly placed: number; readonly names: GridNames } | null = null;
@@ -75,9 +76,10 @@ export function placeCell(given: PlacedCell, file?: readonly PlacedCell[]): bool
   const slot = file === undefined ? given.slot : placementSlots(file).get(given.instance);
   const { slot: _given, ...plain } = given, row: PlacedCell = slot === undefined ? plain : { ...plain, slot };
   const { shards, cells, spots } = gridNames(), [x, z] = row.cell, spot = `${String(x)},${String(z)}`;
+  const upload = row.hash === undefined ? undefined : {hash: row.hash, ...(row.shardVersion === undefined ? {} : {shardVersion: row.shardVersion})};
   if (shards.has(row.instance)) {
     // SA47: a new upload moves the cell's hash; F48: its open room starts over on it once no live player is in it (`cellHost.ts`).
-    if (cells.get(row.slug) === row.instance && spots.get(spot) === row.instance) { if (row.hash !== undefined) hashes.set(row.slug, row.hash); return false; }
+    if (cells.get(row.slug) === row.instance && spots.get(spot) === row.instance) { if (upload !== undefined) uploads.set(row.slug, upload); return false; }
     throw new Error(`${row.instance} is already placed elsewhere`);
   }
   if (!Number.isInteger(x) || !Number.isInteger(z) || Math.abs(x) > GRID_RADIUS || Math.abs(z) > GRID_RADIUS) throw new Error(`${row.instance}'s cell ${spot} is off the grid`);
@@ -85,15 +87,16 @@ export function placeCell(given: PlacedCell, file?: readonly PlacedCell[]): bool
   if (cells.has(row.instance)) throw new Error(`${row.instance} is a placed shard's name`);
   const taken = spots.get(spot);
   if (taken !== undefined) throw new Error(`${spot} is ${taken}'s`);
-  placed.push({ instance: row.instance, slug: row.slug, cell: [x, z], ...(row.hash === undefined ? {} : { hash: row.hash }), ...(row.speedClass === undefined ? {} : { speedClass: row.speedClass }), ...(row.slot === undefined ? {} : { slot: row.slot }) });
+  placed.push({ instance: row.instance, slug: row.slug, cell: [x, z], ...(row.speedClass === undefined ? {} : { speedClass: row.speedClass }), ...(row.slot === undefined ? {} : { slot: row.slot }) });
   version++;
-  if (row.hash !== undefined) hashes.set(row.slug, row.hash);
+  if (upload !== undefined) uploads.set(row.slug, upload);
   return true;
 }
 /** The installed catalogue's cell for an uploaded shard slug (a grid slug may carry a leading `_`), undefined when it has none. */
 export function catalogueCell(slug: string): PlacedCell | undefined { return catalogueCells().find(row => new Set([slug]).has(shardSlugOf(row.slug))); }
 /** SA47: the shardfile hash the placement named for a placed slug, so its room can open from the cook's index; undefined for any other. */
-export function placedHash(slug: string): string | undefined { return hashes.get(slug); }
+export function placedHash(slug: string): string | undefined { return placedUpload(slug)?.hash; }
+export function placedUpload(slug: string): PlacedUpload | undefined { return uploads.get(slug); }
 /** SHARD-COMPAT NB2 (J494): the world word's `revisions`, each open shard's upload hash the rooms run; none for a door with no upload. */
 export function worldRevisions(shards: readonly string[], hashOf: (slug: string) => string | undefined = placedHash): { readonly revisions?: Readonly<Record<string, string>> } {
   const revisions = Object.fromEntries(shards.flatMap(slug => { const hash = hashOf(slug); return hash === undefined ? [] : [[slug, hash]]; }));
@@ -115,10 +118,10 @@ export function gridAssembly(placedToo = true): GridAssembly {
 export function placedCells(): readonly PlacedCell[] {
   // An activated revision of a baked-grid slug also reaches existing and newly booted workers.
   const baked: PlacedCell[] = gridAssembly(false).cells.flatMap(row => {
-    const hash = hashes.get(row.slug);
-    return hash === undefined ? [] : [{instance: row.instance, slug: row.slug, cell: [row.cell[0], row.cell[1]], hash}];
+    const upload = placedUpload(row.slug);
+    return upload === undefined ? [] : [{instance: row.instance, slug: row.slug, cell: [row.cell[0], row.cell[1]], ...upload}];
   });
-  return [...baked, ...placed.map(row => {const hash = hashes.get(row.slug); return hash === undefined ? row : {...row, hash};})];
+  return [...baked, ...placed.map(row => ({...row, ...placedUpload(row.slug)}))];
 }
 /**
  * MOSSGATE-ZONE MZ33: the placed cells a placement file still names, re-slotted as a page numbers them. A `wildshard delete` drops a row
@@ -132,7 +135,7 @@ export function keepPlacedCells(keep: ReadonlyMap<string, number | undefined>): 
   let moved = false;
   for (let index = placed.length - 1; index >= 0; index--) {
     const row = placed[index] as PlacedCell;
-    if (!keep.has(row.instance)) { placed.splice(index, 1); hashes.delete(row.slug); gone.unshift(row.instance); continue; }
+    if (!keep.has(row.instance)) { placed.splice(index, 1); uploads.delete(row.slug); gone.unshift(row.instance); continue; }
     const slot = keep.get(row.instance);
     if (slot === row.slot) continue;
     const { slot: _old, ...plain } = row;
@@ -143,7 +146,7 @@ export function keepPlacedCells(keep: ReadonlyMap<string, number | undefined>): 
   return gone;
 }
 /** Tests only: forget every placed cell. */
-export function forgetPlacedCells(): void { placed.length = 0; hashes.clear(); version++; read = null; assembled = null; }
+export function forgetPlacedCells(): void { placed.length = 0; uploads.clear(); version++; read = null; assembled = null; }
 
 /** The instance a name means: an instance stands, a grid shard's slug becomes its cell, and anything else is its own name. */
 export function cellName(name: string): string { const { shards, cells } = gridNames(); return shards.has(name) ? name : cells.get(name) ?? name; }

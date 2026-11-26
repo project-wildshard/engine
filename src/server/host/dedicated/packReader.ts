@@ -10,6 +10,8 @@ import type { Rapier } from '@wildshard/engine/physics/rapier';
 import type { HeadlessRuntimeInput } from '../headlessRuntime';
 import type { GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
 import { readGridCollisionPack, readServerFolder, readServerHeader, type CookedServerSource, type ServerRead } from '../standalone/serverFolder';
+import * as v from 'valibot';
+import { cookedIndexKey } from '@wildshard/engine/game/shardfile/cookedPackPaths';
 import type { ReleaseFile } from '../../../shared/host/releaseRows';
 import { readPlatformItemCatalogue, type PlatformItemCatalogue } from '@wildshard/engine/game/loot/platformCatalogue';
 import { admitLedgerRewards, type LedgerCatalogueItem } from '@wildshard/engine/game/ledger';
@@ -23,6 +25,37 @@ export interface PackReaderOptions {
   readonly cooked?: CookedServerSource;
   /** Where parts are kept, one folder per part's SHA-256. */
   readonly cache: string;
+}
+interface ReleaseCook {
+  readonly cook?: {readonly version: string; readonly hash: string};
+  readonly shards: readonly {readonly slug: string; readonly shardVersion?: string; readonly hash?: string}[];
+}
+
+/** The signed placement can advance a slug after the signed release named its initial upload. */
+export function releaseCookedPack(release: ReleaseCook, slug: string, placed?: {readonly hash?: string; readonly shardVersion?: string}): CookedServerSource | undefined {
+  if (release.cook === undefined) return undefined;
+  const {version: cookVersion, hash: cookHash} = release.cook;
+  const slugOf = (name: string): string => name.replace(/^_/u, '');
+  const current = release.shards.find(row => slugOf(row.slug) === slugOf(slug) && (placed?.hash === undefined || row.hash === placed.hash));
+  const hash = placed?.hash ?? current?.hash, shardVersion = placed?.shardVersion ?? current?.shardVersion;
+  if (hash === undefined || shardVersion === undefined) {
+    throw new Error(`Signed cook address is incomplete for ${slug}`);
+  }
+  const ref = {slug: slugOf(slug), shardVersion, cookVersion, cookHash};
+  cookedIndexKey(ref);
+  return {ref, hash};
+}
+const RawVersions = v.object({shardfiles: v.array(v.object({hash: v.string(), shard: v.optional(v.string()), shardVersion: v.optional(v.string())}))});
+
+/** A catalogue cell's activation can precede a placement row. Read its exact raw identity from the API. */
+export async function readRawShardVersion(api: URL, slug: string, hash: string): Promise<string> {
+  const url = new URL('/api/shardfiles', api);
+  const response = await fetch(url, {redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(15_000)});
+  if (!response.ok) { await response.body?.cancel(); throw new Error(`Shardfile versions answered ${response.status}`); }
+  const {shardfiles} = v.parse(RawVersions, await response.json());
+  const version = shardfiles.find(row => row.hash === hash && row.shard === slug.replace(/^_/u, ''))?.shardVersion;
+  if (version === undefined) throw new Error(`Missing raw shardVersion for ${slug}`);
+  return version;
 }
 const sha256 = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 const originBytes = async (url: URL, path: string, origin: string): Promise<Uint8Array> => {
@@ -44,7 +77,7 @@ function undone(bytes: Uint8Array, hash: string): Uint8Array {
 /** E7.3: `ServerRead` for a Node room: the book from the origin each boot, and each part from `cache` if it still hashes true. No `location`, no `caches`. */
 export function packRead(options: PackReaderOptions, reads: PackReads): ServerRead {
   return async (url, path, hash) => {
-    if (hash === undefined) return originBytes(url, path, options.origin);
+    if (hash === undefined) return originBytes(url, path, options.cooked?.origin ?? options.origin);
     const folder = join(options.cache, hash), file = join(folder, 'body');
     const kept = await readFile(file).catch(() => null);
     if (kept !== null) {
@@ -52,7 +85,7 @@ export function packRead(options: PackReaderOptions, reads: PackReads): ServerRe
       reads.refused++; // a cached byte went bad: this copy is refused, and the network's stands in
       await rm(file, { force: true });
     }
-    const body = undone(await originBytes(url, path, options.origin), hash);
+    const body = undone(await originBytes(url, path, options.cooked?.origin ?? options.origin), hash);
     if (sha256(body) !== hash) throw new Error(`Server input hash mismatch: ${path}`);
     reads.fetched++; reads.fetchedBytes += body.byteLength;
     await mkdir(folder, { recursive: true });

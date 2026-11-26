@@ -61,6 +61,7 @@ if [ "$mode" = code ]; then
   # TC28 (J503, AD2): cook-cache input closure, persistent hit, revision isolation and GC race (no real cook; the
   # nightly's hosted companion cooks for real). Red in nightly 45246927061 until 9a18860d0 drew the double's maps.
   check cook-cache proof bake-loader.mjs src/scripts/cook-cache.proof.ts
+  check cooked-retention proof bake-loader.mjs src/scripts/cook-retention.proof.ts
 fi
 check asks node src/scripts/.kit/asks.mjs check --all
 if [ "$mode" = docs ]; then

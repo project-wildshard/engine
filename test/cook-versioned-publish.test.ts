@@ -10,6 +10,7 @@ import {publishCooked, readVersionedCook, verifyCookReuse} from '../src/cook/gam
 import {sourceOnlyParts} from '../src/cook/game/cookObjectProvenance';
 import type {CookIndex} from '../src/cook/game/cookWorker';
 import {cookedIndexKey, cookedObjectKey} from '../src/shared/game/shardfile/cookedPackPaths';
+import {releaseCookedPack} from '../src/server/host/dedicated/packReader';
 import type {SpawnManifest} from '../src/shared/game/shardfile/spawnManifest';
 import {legacyDouble} from '@wildshard/engine/test/FakeGame';
 
@@ -70,4 +71,14 @@ test('new hash verifies two independent zones and refuses changed bytes', async 
   await verifyCookReuse(samples, cook);
   expect(cook.mock.calls).toEqual([['driftwood-isle'], ['brasscap-mesa']]);
   await expect(verifyCookReuse(samples, slug => Promise.resolve(slug === 'driftwood-isle' ? 'driftwood bytes' : 'changed'))).rejects.toThrow('Cook output changed for brasscap-mesa');
+});
+
+test('a room reads the signed cook address and accepts the placement version for an advanced upload', () => {
+  const legacy = {shards: [{slug: identity.slug, hash, shardVersion: identity.shardVersion}]};
+  expect(releaseCookedPack(legacy, identity.slug)).toBeUndefined();
+  const release = {...legacy, cook: {version: identity.cookVersion, hash: identity.cookHash}};
+  expect(releaseCookedPack(release, identity.slug)).toEqual({ref: identity, hash});
+  const advanced = {hash: 'e'.repeat(64), shardVersion: '0.3.0-candidate.1'};
+  expect(releaseCookedPack(release, identity.slug, advanced)).toEqual({ref: {...identity, shardVersion: advanced.shardVersion}, hash: advanced.hash});
+  expect(() => releaseCookedPack(release, identity.slug, {hash: advanced.hash})).toThrow('Signed cook address is incomplete');
 });
