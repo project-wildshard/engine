@@ -17,7 +17,7 @@ import { NetIdentitySchema } from '@wildshard/engine/net/identity';
 import { PLAYER_TICKET_PUBLIC_KEY, admit, passOf } from './ticket';
 import { decodeFirstMessage, encodeHello, type Hello } from '@wildshard/wire/handshake';
 import { WIRE_MINOR } from '@wildshard/wire/major';
-import { decodeEnter, decodeSavesAsk, decodeWhereAsk, encodeArrive, encodeCountdown, encodeEnter, encodeSaves, encodeWhere, type RoomSave, type WorldWord } from '@wildshard/engine/net/socketFrames';
+import { decodeEnter, decodeGoto, decodeSavesAsk, decodeWhereAsk, encodeArrive, encodeCountdown, encodeEnter, encodeSaves, encodeWhere, type RoomSave, type WorldWord } from '@wildshard/engine/net/socketFrames';
 import { deviceLine, readDeviceWord, type DeviceSnapshot, type DeviceWho } from '@wildshard/engine/net/deviceWord';
 import { AGENT_HEADER, classifyActor, type ActorMark, type ActorTags } from '@wildshard/engine/app/actor';
 import {CorrectionSchema} from '@wildshard/engine/net/measurements';
@@ -82,21 +82,6 @@ const GONE_MS = 2 * 60 * 60 * 1000;
 const SETTLED_ACCOUNTS = 65_536;
 /** J177: one address, and no slug on it. */
 const WORLD_PATH = /^\/(?:\?.*)?$/u;
-/** GO7: the cell a page asks to be seated in (`/?chunk=<instance>`, `gotoSocket` in the online shell: the page's own `?chunk=` turned into
- *  a goto, ZS5), or null. Only a name shaped like a grid instance is kept; whether this world opens it is the door's question (`cellFor`). */
-export function gotoCell(path: string | undefined): string | null {
-  const query = path?.indexOf('?') ?? -1, cell = query < 0 ? null : new URLSearchParams(path?.slice(query + 1)).get('chunk');
-  return cell !== null && /^_?[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(cell) && cell.length <= 64 ? cell : null;
-}
-/** QA 11-19 row 52: a goto a fresh ZONE SELECT pick made (`&at=spawn`, `gotoSocket`) seats the player at the cell's spawn, never where
- *  its save last stood (the step out onto the road, which handed them straight back to it). Only until the page is first seated: a
- *  redial of the same page asks without it and comes back where it stood. An older page never says it. `at` is the harness's own
- *  spawn-pose name (lint/url-params.json), read here on the world's socket only, never on a page. */
-export function gotoSpawn(path: string | undefined): boolean {
-  const query = path?.indexOf('?') ?? -1;
-  return query >= 0 && gotoCell(path) !== null && new URLSearchParams(path?.slice(query + 1)).get('at') === 'spawn';
-}
-
 /** IPv6 privacy addresses share their household /64; mapped IPv4 keeps its IPv4 bucket. */
 function connectionKey(address: string): string {
   if (isIP(address) === 4) return address;
@@ -541,14 +526,13 @@ export class World {
   private admitUpgrade(request: IncomingMessage, socket: Duplex, head: Buffer, key: string, passed: boolean): void {
     const attempt = this.attempt(key, passed);
     if (attempt === null) { this.refuse('connections'); socket.end('HTTP/1.1 429 Too Many Requests\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'); return; }
-    const goto = gotoCell(request.url), spawn = gotoSpawn(request.url);
     const queryAt = request.url?.indexOf('?') ?? -1;
     const header = request.headers[AGENT_HEADER];
     const actor = classifyActor({ userAgent: request.headers['user-agent'] ?? '',
       header: (Array.isArray(header) ? header[0] : header) ?? null,
       query: queryAt < 0 ? null : new URLSearchParams(request.url?.slice(queryAt + 1)).get('agent'),
       doorPass: passed ? passText(request.headers['sec-websocket-protocol']) : undefined });
-    this.server.handleUpgrade(request, socket, head, ws => { this.opened(ws, key, attempt, goto, spawn, actor); });
+    this.server.handleUpgrade(request, socket, head, ws => { this.opened(ws, key, attempt, actor); });
   }
   /** SB42: the budget a live proof pass draws on (`pass:<lane>`), or null: no pass, a bad one, or an address past its bad passes. */
   private async passKey(text: string, ip: string): Promise<string | null> {
@@ -600,12 +584,15 @@ export class World {
     if (!this.words.has(key) && this.words.size >= MAX_TRACKED_IPS) { const oldest = this.words.keys().next().value; if (oldest !== undefined) this.words.delete(oldest); }
     words.push(now); this.words.set(key, words); this.refund(key, attempt);
   }
-  private opened(socket: WebSocket, ip: string, attempt: ConnectAttempt, goto: string | null, spawn: boolean, actor: ActorMark): void {
+  private opened(socket: WebSocket, ip: string, attempt: ConnectAttempt, actor: ActorMark): void {
     const end = new SocketTransport(socket);
     this.actors.set(end, { mark: actor });
     this.sockets.set(ip, (this.sockets.get(ip) ?? 0) + 1); this.ends.add(end);
     // SB42: whether a hello came, and whether the door closed it for want of one
     let spoke = false, timedOut = false;
+    // CHUNK-PARAM CP5 (J522, Q3 (a)): the cell the page picked, said in its `goto` word before its hello (GO7, ZS5), or null: the
+    // seat the world keeps (GO5). `spawn`: a fresh ZONE SELECT pick seats at the cell's spawn (QA 11-19 row 52)
+    let goto: string | null = null, spawn = false;
     end.onClose(reason => {
       if (reason === 'retry') this.refund(ip, attempt);
       // the page read the door's word and closed (GO4 `worldWord`), cleanly and before any hello: its own budget
@@ -626,13 +613,14 @@ export class World {
     // QA 11-23-b row 19: `where: 1` says this door answers a title's `where` word (the cell it would seat that player in), before any hello
     // OB6: `stats: 1` says this door reads a page's 10 s stats word, when it has somewhere to put it (`/metrics`)
     const stats = this.options.link === undefined ? {} : { stats: 1 as const };
-    end.control('world', new TextEncoder().encode(JSON.stringify({...this.discovery(),device:1,...moving,...saves,where:1,...stats} satisfies WorldWord)).buffer);
+    end.control('world', new TextEncoder().encode(JSON.stringify({...this.discovery(),device:1,...moving,...saves,where:1,goto:1,...stats} satisfies WorldWord)).buffer);
     this.watchLink(end);
     let whereAsked = false;
     end.onControl((control, bytes) => {
       if (control === 'device') this.deviceWord(end, bytes);
       else if (control === 'saves') void this.savesWord(end, bytes);
       else if (control === 'where' && !spoke && !whereAsked) { whereAsked = true; void this.whereWord(end, bytes); }
+      else if (control === 'goto' && !spoke && goto === null) { const said = decodeGoto(bytes); if (said === null) this.refuse('goto-word'); else ({ cell: goto, spawn } = said); }
     });
     const timer = this.scope.timeout(this.options.helloMs ?? HELLO_MS, () => { timedOut = true; this.refuse('hello-timeout'); end.close('refused'); });
     const off = end.onMessage((_channel, bytes) => { spoke = true; off(); this.scope.cancelTimer(timer); void this.joining(end, bytes, goto, spawn); });

@@ -120,8 +120,8 @@ test('the scrape and health count confirmed linked humans and agents by zone', {
   try {
     served.watch(door.world);
     const port = await served.listen(0);
-    expect(await door.admit('203.0.113.1', 'device:person', { 'user-agent': 'Mozilla/5.0 iPhone Safari/604.1' }, `?chunk=${HOME}&at=spawn`)).toBe(true);
-    expect(await door.admit('203.0.113.2', 'device:bot', {}, `?chunk=${SOUTH}&at=spawn&agent=metrics-proof`)).toBe(true);
+    expect(await door.admit('203.0.113.1', 'device:person', { 'user-agent': 'Mozilla/5.0 iPhone Safari/604.1' }, '', [], { cell: HOME, spawn: true })).toBe(true);
+    expect(await door.admit('203.0.113.2', 'device:bot', {}, '?agent=metrics-proof', [], { cell: SOUTH, spawn: true })).toBe(true);
     expect(door.world.health()).toMatchObject({ players: 2, humans: 0, agents: 0 });
     for (const { device, slug, body, admission } of door.seats) {
       if (admission === undefined) throw new Error('Seat has no admission');

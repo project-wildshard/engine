@@ -6,12 +6,13 @@ import { Scope } from '@wildshard/engine/app/scope';
 import { NetClient } from '@wildshard/engine/net/client';
 import type { NetIdentity } from '@wildshard/engine/net/identity';
 import { Redial, type LinkCause, type LinkProgress, type LinkState } from '@wildshard/engine/net/redial';
-import { decodeArrive, decodeCountdown, decodeEnter, decodeSavesAnswer, encodeEnter, encodeSaves, worldReadsSaves, type ArriveWord, type Countdown, type RoomSave, type SavesAsk, type WorldWord } from '@wildshard/engine/net/socketFrames';
+import { decodeArrive, decodeCountdown, decodeEnter, decodeSavesAnswer, encodeEnter, encodeSaves, worldReadsSaves, type ArriveWord, type GotoWord, type Countdown, type RoomSave, type SavesAsk, type WorldWord } from '@wildshard/engine/net/socketFrames';
 import { encodeDeviceWord, worldReadsDevice } from '@wildshard/engine/net/deviceWord';
 import { encodeStatsWord, STATS_EVERY_MS, worldReadsStats } from '@wildshard/engine/net/statsWord';
 import { LinkStats } from '@wildshard/engine/net/linkStats';
 import { subscribePersistence, type PersistenceWord } from '@wildshard/engine/net/persistenceWord';
 import { WebSocketTransport } from '@wildshard/engine/net/webSocketTransport';
+import { gotoFirst } from '@wildshard/engine/net/gotoFirst';
 import {NetRecords} from '@wildshard/engine/net/netRecord';
 import { pageActor } from '@wildshard/engine/telemetry/pageActor';
 import { actorTags } from '@wildshard/engine/app/actor';
@@ -63,6 +64,8 @@ export interface OnlineConfig {
   readonly socket: string;
   /** OF4: the address each later dial takes, when a fresh release file can name another after the first dial. */
   readonly address?: () => string;
+  /** CHUNK-PARAM CP5 (J522): the cell each dial asks the door for, in a `goto` word before its hello (`gotoFirst`); none: the kept seat. */
+  readonly goto?: () => GotoWord | undefined;
   /** This page's build: the door refuses another one (J54). */
   readonly build: string;
   /** The cell this page has loaded. */
@@ -248,6 +251,7 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
     if (shard !== undefined && shard !== config.loaded) { view.elsewhere(shard); return; }
     arrive({ tick: client.latest?.tick ?? 0, restored: true });
   });
+  client.sayFirst(gotoFirst(config.goto ?? ((): undefined => undefined)));
   client.hello(config.build, config.identity);
   const tickOf = (): number => client.latest?.tick ?? 0, idle = (): void => undefined;
   // row 9: one `saves` word on the live link and its answer: `pick` reads the answer it waits for, `closed` what a close means
@@ -368,7 +372,7 @@ export interface StartOnline {
     /** GO5: enter the grid again in `cell` on this page, handing this link to the next session, now or once it can (GO5b); `reload`
      *  is GO4's way if it can't. False when this page never enters in place (`reload` is the caller's to run). */
     readonly reenterInPage?: (cell: string, reload: () => void) => boolean;
-    /** GO7: Shard select sent this page to `cell`, so every dial asks the door to seat it there (`gotoSocket`). */
+    /** GO7: Shard select sent this page to `cell`, so every dial asks the door to seat it there (its goto word, `gotoFirst`, CP5). */
     readonly goto?: boolean;
     /** QA 11-19 row 52: a fresh ZONE SELECT pick (no gate's arrival): until the page is first seated, its dials ask for the cell's spawn */
     readonly spawn?: boolean };
@@ -396,17 +400,6 @@ export interface OnlineSession {
 /** E7.5 prep: ask the page to leave for the Connection doctor, saying which screen asked. The page's own bundle answers
  *  (src/client/engine/ui/errorScreen.ts): it holds the save hold and the loading card's report, which this module can't see. */
 const doctor = (from: string): void => { document.dispatchEvent(new CustomEvent('ws:doctor', { detail: from })); };
-
-/** GO7: the address a page dials. A page Shard select sent to a grid cell names it (`?chunk=`, the shard page's own name for where it
- *  enters, ZS5), and the door seats it there when it
- *  hosts that cell; any other page dials the bare address and takes the seat the world keeps (GO5). An older door ignores the query. */
-export function gotoSocket(socket: string, cell: string | undefined, spawn = false): string {
-  if (cell === undefined) return socket;
-  const url = new URL(socket); url.searchParams.set('chunk', cell);
-  // QA 11-19 row 52: a ZONE SELECT pick starts at the cell's spawn, never where its save last stood (the step out onto the road)
-  if (spawn) url.searchParams.set('at', 'spawn');
-  return url.href;
-}
 
 /** FM4b modes 5 to 8: how long the game's own site gets to answer. */
 const SITE_ANSWER_MS = 5000;
@@ -593,7 +586,7 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
   const telemetry=onlineTelemetry(),tag=recordTag??release.channel;
   // GO4: a grid page re-enters the grid in the seat's cell: the tap that brought it here comes along (QA row 16), and the URL stays bare.
   const regrid = (cell: string): void => { entering(loadedNow); leaving.unload(`online seat in another grid cell (${cell})`); gridNow?.reenter(cell); };
-  const shell = connectOnline({ ...link, ...(grid === undefined ? {} : { gridCell: grid.cell, gridCells: grid.cells }), socket: gotoSocket(socket, goto, spawn), address: () => gotoSocket(dialing, goto, spawn), identity: named,record:{install:telemetry.install,session:crypto.randomUUID(),send:telemetry.send,...(tag===undefined?{}:{tag})} }, {
+  const shell = connectOnline({ ...link, ...(grid === undefined ? {} : { gridCell: grid.cell, gridCells: grid.cells }), socket, address: () => dialing, goto: () => (goto === undefined ? undefined : { cell: goto, spawn }), identity: named,record:{install:telemetry.install,session:crypto.randomUUID(),send:telemetry.send,...(tag===undefined?{}:{tag})} }, {
     link: (state, reason) => {
       waitingForSeat = state === 'full'; screens.link(state, reason); saves.link(state === 'live'); tooOld.link(state === 'live');
       // FM8b mode 27: each drop asks the account service for a fresh ticket before the redial needs it, so a session that ended is

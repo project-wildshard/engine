@@ -11,8 +11,10 @@ import { bootPageMode } from '../src/client/game/grid/pageEntry';
 import { titlePrefetchChoice } from '../src/client/game/grid/titlePrefetchChoice';
 import { saves } from '../src/shared/engine/saves/runtime';
 import { gridEntryShown } from '../src/client/game/grid/menu';
-import { gotoSocket } from '../src/client/host/online/shell';
-import { gotoCell, gotoSpawn } from '../src/server/host/dedicated/world';
+import { decodeGoto, encodeGoto, framed, SOCKET_GOTO, SOCKET_RELIABLE, SOCKET_WORLD, worldReadsGoto } from '../src/shared/engine/net/socketFrames';
+import { gotoFirst } from '../src/client/engine/net/gotoFirst';
+import { WebSocketTransport } from '../src/client/engine/net/webSocketTransport';
+import { WebSocketServer } from 'ws';
 import { memoryPlayerSaves } from '../src/server/host/dedicated/playerSaves';
 import { roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
 import { RoomBot } from './fixtures/dedicated/roomBot';
@@ -99,30 +101,47 @@ test('Infinite Wildshard stays Developer-only, even on a world that hosts the gr
   expect(title, 'the title never reveals the grid card from the world\'s word').not.toMatch(/worldHosted/u);
 });
 
-test('the dial names the goto cell; the door reads only a well-formed one', () => {
-  expect(gotoSocket('wss://play.example/', undefined)).toBe('wss://play.example/');
-  expect(gotoSocket('wss://play.example/', 'driftwood-isle')).toBe('wss://play.example/?chunk=driftwood-isle');
-  // QA 11-19 row 52: a fresh ZONE SELECT pick asks for the cell's spawn; the door hears it only beside a goto
-  expect(gotoSocket('wss://play.example/', 'driftwood-isle', true)).toBe('wss://play.example/?chunk=driftwood-isle&at=spawn');
-  expect(gotoSocket('wss://play.example/', undefined, true)).toBe('wss://play.example/');
-  expect([gotoSpawn('/?chunk=driftwood-isle&at=spawn'), gotoSpawn('/?chunk=driftwood-isle'), gotoSpawn('/?at=spawn'), gotoSpawn(undefined)]).toEqual([true, false, false, false]);
-  expect([gotoCell('/'), gotoCell('/?chunk=driftwood-isle'), gotoCell('/?chunk=template-2&x=1'), gotoCell('/?chunk=../etc'), gotoCell(undefined)])
-    .toEqual([null, 'driftwood-isle', 'template-2', null, null]);
+test('the goto word names the cell, never the dial; the door reads only a well-formed one (CHUNK-PARAM CP5)', () => {
+  const word = (said: unknown): ArrayBuffer => new TextEncoder().encode(JSON.stringify(said)).buffer;
+  expect(decodeGoto(encodeGoto({ cell: 'driftwood-isle', spawn: true }))).toEqual({ cell: 'driftwood-isle', spawn: true });
+  expect([word({ cell: '../etc', spawn: false }), word({ cell: 'template-2' }), word({ cell: 'A', spawn: false }), word('x'), word({ cell: 'a'.repeat(65), spawn: false })]
+    .map(decodeGoto)).toEqual([null, null, null, null, null]);
+  expect([worldReadsGoto(word({ cells: 1, goto: 1 })), worldReadsGoto(word({ cells: 1 })), worldReadsGoto(word('junk'))]).toEqual([true, false, false]);
+  const shell = readFileSync('src/client/host/online/shell.ts', 'utf8');
+  expect(shell, 'every dial takes the release\'s bare address').toMatch(/socket, address: \(\) => dialing, goto: /u);
+  expect(shell).not.toMatch(/searchParams\.set\('(?:chunk|at)'/u);
   const source = readFileSync('src/client/game/shardfile/clientWorker.ts', 'utf8');
   expect(source, 'a grid page asks for its booted cell only when Shard select sent it there, and its spawn only for a pick with no gate arrival')
     .toMatch(/gridOf\(booted, pageGoto\(\) === booted, chosenCell\(\) === booted && chosenArrival\(\) === null\)/u);
+});
+
+test.each([[true, [SOCKET_GOTO, SOCKET_RELIABLE]], [false, [SOCKET_RELIABLE]]] as const)('CP5: a page says its goto before its hello only to a door that reads one (goto word: %s)', async (reads, heard) => {
+  const server = new WebSocketServer({ port: 0 }), got: number[] = [];
+  server.on('connection', socket => {
+    socket.send(framed(SOCKET_WORLD, new TextEncoder().encode(JSON.stringify({ cells: 1, shards: ['driftwood-isle'], ...(reads ? { goto: 1 } : {}) })).buffer));
+    socket.on('message', (data: Buffer) => { if (data[0] !== 2) got.push(data[0] ?? -1); });
+  });
+  await new Promise<void>(resolve => { server.once('listening', () => { resolve(); }); });
+  const port = (server.address() as { port: number }).port;
+  const transport = new WebSocketTransport(`ws://127.0.0.1:${String(port)}/`);
+  let hello = 0;
+  gotoFirst(() => ({ cell: 'driftwood-isle', spawn: true }))(transport, () => { hello++; transport.send('reliable', new Uint8Array([1]).buffer); });
+  try {
+    await vi.waitFor(() => { expect(got).toEqual(heard); }, { timeout: 5000 });
+    expect(hello, 'the hello goes once, an older door or not').toBe(1);
+  } finally { transport.close(); await new Promise<void>(resolve => { server.close(() => { resolve(); }); }); }
 });
 
 test('the door seats a goto in the cell it names, over the player\'s last place; a cell it doesn\'t open falls back to that place', { timeout: 120_000 }, async () => {
   const saves = memoryPlayerSaves();
   saves.write({ player: 'device:goer', name: 'G', shard: 'brasscap-mesa', cell: 'blender-template', build: 'bench', saveVersion: 0, seq: 1, reason: 'test', doc: null, receipts: [] });
   bench = await roomBench({ cells: ['driftwood-isle', 'blender-template'], saves, workers: 1 });
-  const goer = bot(`${bench.url}?chunk=driftwood-isle`, 'bench', 'device:goer');
+  const goer = bot(bench.url, 'bench', 'device:goer', 'Bot', 0, 0, { cell: 'driftwood-isle', spawn: false });
   expect(await goer.arrived()).toBe(true);
   expect(JSON.parse(goer.resume ?? '{}'), 'Shard select → Driftwood: seated in Driftwood').toMatchObject({ shard: 'driftwood-isle', cell: 'driftwood-isle' });
   goer.transport.control('ready', new Uint8Array([1]).buffer);
   await vi.waitFor(() => { expect(bench?.room('driftwood-isle')?.holds('device:goer')).toBe(false); });
-  const back = bot(`${bench.url}?chunk=nalati-grasslands`, 'bench', 'device:goer');
+  const back = bot(bench.url, 'bench', 'device:goer', 'Bot', 0, 0, { cell: 'nalati-grasslands', spawn: false });
   expect(await back.arrived()).toBe(true);
   expect(JSON.parse(back.resume ?? '{}'), 'a cell this world does not open: the last place').toMatchObject({ cell: 'driftwood-isle' });
   expect(bench.crashes).toEqual([]);
@@ -147,13 +166,13 @@ test('the hosting read answers within its deadline, the module import included',
 
 test('FM7b2: a goto from a held seat brings its own seat, so a full world\'s line never takes it', { timeout: 120_000 }, async () => {
   bench = await roomBench({ cells: ['driftwood-isle', 'blender-template'], saves: memoryPlayerSaves(), workers: 1, seats: 1 });
-  const first = bot(`${bench.url}?chunk=driftwood-isle`, 'bench', 'device:mover');
+  const first = bot(bench.url, 'bench', 'device:mover', 'Bot', 0, 0, { cell: 'driftwood-isle', spawn: false });
   expect(await first.arrived()).toBe(true);
-  const waiting = bot(`${bench.url}?chunk=driftwood-isle`, 'bench', 'device:waiting');
+  const waiting = bot(bench.url, 'bench', 'device:waiting', 'Bot', 0, 0, { cell: 'driftwood-isle', spawn: false });
   await vi.waitFor(() => { expect(waiting.closedWith).toMatchObject({ code: 'queue', position: 1 }); }, { timeout: 10_000 });
   first.drop();
   await vi.waitFor(() => { expect(bench?.room('driftwood-isle')?.holds('device:mover')).toBe(true); }, { timeout: 10_000 });
-  const moved = bot(`${bench.url}?chunk=blender-template`, 'bench', 'device:mover');
+  const moved = bot(bench.url, 'bench', 'device:mover', 'Bot', 0, 0, { cell: 'blender-template', spawn: false });
   expect(await moved.arrived(), JSON.stringify(bench.lines.slice(-4))).toBe(true);
   expect(JSON.parse(moved.resume ?? '{}')).toMatchObject({ cell: 'blender-template' });
   expect(moved.closedWith, 'never put in the line behind a device that holds no seat').toBeNull();
@@ -162,13 +181,13 @@ test('FM7b2: a goto from a held seat brings its own seat, so a full world\'s lin
 
 test('a seat held in another cell lets go on a goto, and the late leave never unseats the new one', { timeout: 120_000 }, async () => {
   bench = await roomBench({ cells: ['driftwood-isle', 'blender-template'], saves: memoryPlayerSaves(), workers: 1 });
-  const first = bot(`${bench.url}?chunk=driftwood-isle`, 'bench', 'device:mover');
+  const first = bot(bench.url, 'bench', 'device:mover', 'Bot', 0, 0, { cell: 'driftwood-isle', spawn: false });
   expect(await first.arrived()).toBe(true);
   await vi.waitFor(() => { expect(bench?.room('driftwood-isle')?.holds('device:mover')).toBe(true); }, { timeout: 10_000 });
   first.drop();
   await new Promise(resolve => { setTimeout(resolve, 300); });
   expect(bench.room('driftwood-isle')?.holds('device:mover'), 'the dropped link\'s body is held').toBe(true);
-  const moved = bot(`${bench.url}?chunk=blender-template`, 'bench', 'device:mover');
+  const moved = bot(bench.url, 'bench', 'device:mover', 'Bot', 0, 0, { cell: 'blender-template', spawn: false });
   expect(await moved.arrived(), JSON.stringify(bench.lines.slice(-4))).toBe(true);
   expect(JSON.parse(moved.resume ?? '{}'), 'Shard select → the Brasscap cell, over the held Driftwood body').toMatchObject({ cell: 'blender-template' });
   await vi.waitFor(() => { expect(bench?.room('driftwood-isle')?.holds('device:mover')).toBe(false); }, { timeout: 10_000 });

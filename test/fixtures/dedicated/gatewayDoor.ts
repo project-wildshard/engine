@@ -9,7 +9,7 @@ import { World, type WorldOptions, type WorkerLink } from '../../../src/server/h
 import { memoryPlayerSaves } from '../../../src/server/host/dedicated/playerSaves';
 import type { CellOrder, WorkerNews } from '../../../src/server/host/dedicated/cellProtocol';
 import { helloMessage } from '../../../src/shared/engine/net/wireMessages';
-import { framed, SOCKET_RELIABLE } from '../../../src/shared/engine/net/socketFrames';
+import { encodeGoto, framed, SOCKET_GOTO, SOCKET_RELIABLE, type GotoWord } from '../../../src/shared/engine/net/socketFrames';
 
 /** The header a loopback proxy of this kind sets for a client (VH10). */
 const PROXY_HEADER = { caddy: 'x-forwarded-for', cloudflare: 'cf-connecting-ip', none: 'x-forwarded-for' } as const;
@@ -31,12 +31,13 @@ export async function gatewayDoor(options: Partial<WorldOptions> = {}) {
     socket.once('connect', () => { const headers = Object.entries({ [proxyHeader]: ip, ...extra }).map(([key, value]) => `${key}: ${value}\r\n`).join(''); socket.write(`GET / HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: ${randomBytes(16).toString('base64')}\r\n${headers}\r\n`); });
     socket.once('data', bytes => { socket.destroy(); resolve(bytes.toString().split('\r\n')[0] ?? ''); });
   });
-  const admit = (ip: string, device: string, extra: Readonly<Record<string, string>> = {}, query = '', protocols: string[] = []): Promise<boolean> => new Promise(resolve => {
+  const admit = (ip: string, device: string, extra: Readonly<Record<string, string>> = {}, query = '', protocols: string[] = [], goto?: GotoWord): Promise<boolean> => new Promise(resolve => {
     const socket = new WebSocket(`ws://127.0.0.1:${String(address.port)}/${query}`, protocols, { headers: { [proxyHeader]: ip, ...extra } }); sockets.push(socket);
     arrivals.set(device, () => { arrivals.delete(device); resolve(true); });
     socket.on('error', () => { arrivals.delete(device); resolve(false); });
     socket.on('close', code => { closes.push(code); arrivals.delete(device); resolve(false); });
-    socket.once('open', () => { socket.send(framed(SOCKET_RELIABLE, helloMessage({ build: 'bench', player: device, name: 'Guest', ledger: 0 }).buffer)); });
+    // CHUNK-PARAM CP5 (J522): a Zone Select page's cell goes in its goto word, before its hello
+    socket.once('open', () => { if (goto !== undefined) socket.send(framed(SOCKET_GOTO, encodeGoto(goto))); socket.send(framed(SOCKET_RELIABLE, helloMessage({ build: 'bench', player: device, name: 'Guest', ledger: 0 }).buffer)); });
     // The door's `world` word (GO4) comes first; `ready` answers its `resume`.
     const ready = (data: Buffer): void => { if (data[0] !== 4) return; socket.off('message', ready); socket.send(Buffer.from([5])); };
     socket.on('message', ready);

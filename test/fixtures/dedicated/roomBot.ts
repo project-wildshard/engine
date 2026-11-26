@@ -2,6 +2,8 @@ import type { NetCommand } from '@wildshard/wire/netCommand';
 import { NetClient } from '../../../src/client/engine/net/client';
 import { WebSocketTransport } from '../../../src/client/engine/net/webSocketTransport';
 import type { SocketCloseInfo } from '../../../src/shared/engine/net/socketClose';
+import type { GotoWord } from '../../../src/shared/engine/net/socketFrames';
+import { gotoFirst } from '../../../src/client/engine/net/gotoFirst';
 
 /** Where a bot means to go, or swing: what its thumb says each command. */
 export type BotThumb = (tick: number) => Omit<NetCommand, 'seq'>;
@@ -19,7 +21,8 @@ export class RoomBot {
   thumb: BotThumb = stillThumb;
   private timer: ReturnType<typeof setInterval> | undefined;
   private tick = 0;
-  constructor(url: string, build: string, device: string, name = 'Bot', ledger = 0, loadMs = 0) {
+  /** `goto`: the cell it asks for before its hello, as a page Shard select sent there does (CHUNK-PARAM CP5, `gotoFirst`). */
+  constructor(url: string, build: string, device: string, name = 'Bot', ledger = 0, loadMs = 0, goto?: GotoWord) {
     this.transport = new WebSocketTransport(url); this.client = new NetClient(this.transport);
     this.transport.onClose((reason, info) => { this.closed = reason; this.closedWith = info ?? null; this.stop(); });
     this.transport.onControl((control, bytes) => {
@@ -27,6 +30,7 @@ export class RoomBot {
       this.resume = new TextDecoder().decode(bytes);
       setTimeout(() => { this.transport.control('ready'); }, loadMs);
     });
+    this.client.sayFirst(gotoFirst(() => goto));
     this.client.hello(build, { player: device, name }, ledger);
     this.timer = setInterval(() => {
       if (this.client.latest === null) return;

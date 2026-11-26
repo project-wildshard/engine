@@ -1,7 +1,7 @@
 import { Scope } from '@wildshard/engine/app/scope';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { CLIENT_FLOOD_DEBT, CLIENT_MESSAGES_PER_TICK, MAX_CLIENT_MESSAGES, MAX_CLIENT_MESSAGE_BYTES } from '@wildshard/engine/net/room';
-import { channelPrefix, closeCode, closeReason, controlPrefix, decodePing, encodePong, FRAME_SKIP_BYTES, framed, PING_FLOOR_MS, SILENCE_MS, SOCKET_DEVICE, SOCKET_ENTER, SOCKET_PING, SOCKET_PLAYTEST, SOCKET_READY, SOCKET_RELIABLE, SOCKET_SAVES, SOCKET_STATS, SOCKET_UNRELIABLE, SOCKET_WHERE, SOCKET_VOICE, STALL_CLOSE_BYTES, type SocketControl } from '@wildshard/engine/net/socketFrames';
+import { channelPrefix, closeCode, closeReason, controlPrefix, decodePing, encodePong, FRAME_SKIP_BYTES, framed, PING_FLOOR_MS, SILENCE_MS, SOCKET_DEVICE, SOCKET_GOTO, SOCKET_ENTER, SOCKET_PING, SOCKET_PLAYTEST, SOCKET_READY, SOCKET_RELIABLE, SOCKET_SAVES, SOCKET_STATS, SOCKET_UNRELIABLE, SOCKET_WHERE, SOCKET_VOICE, STALL_CLOSE_BYTES, type SocketControl } from '@wildshard/engine/net/socketFrames';
 import { encodeSocketCloseInfo, type SocketCloseInfo } from '@wildshard/engine/net/socketClose';
 import type { NetChannel, Transport, TransportStats } from '@wildshard/engine/net/transport';
 import type { RawData, ServerOptions, WebSocket } from 'ws';
@@ -114,6 +114,7 @@ export class SocketTransport implements Transport {
     else if (prefix === SOCKET_SAVES) for (const listener of this.controls) listener('saves', body);
     else if (prefix === SOCKET_WHERE) for (const listener of this.controls) listener('where', body);
     else if (prefix === SOCKET_STATS) for (const listener of this.controls) listener('stats', body);
+    else if (prefix === SOCKET_GOTO) for (const listener of this.controls) listener('goto', body);
     else this.close('refused');
   }
   private ping(bytes: Buffer): void {

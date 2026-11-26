@@ -21,27 +21,27 @@ test('the door counts confirmed Zone Select seats and walk-ins by actor', async 
   const door = await gatewayDoor({ ticketKey, workers: 1, cells: [home, other], entered: (_seat, slug, { actor, lane }) => {
     visits.push({ slug, actor, ...(lane === undefined ? {} : { lane }) });
   } });
-  const visit = `?chunk=${home}&at=spawn`;
+  const visit = { cell: home, spawn: true }, walk = { cell: home, spawn: false };
   const confirm = (): void => {
     const seat = door.seats.at(-1);
     if (seat?.admission === undefined) throw new Error('No claimed seat');
     door.heard({ kind: 'seated', slug: seat.slug, device: seat.device, body: seat.body, seats: door.seats.length, admission: seat.admission });
   };
   try {
-    expect(await door.admit('203.0.113.11', 'device:one', human, visit)).toBe(true);
+    expect(await door.admit('203.0.113.11', 'device:one', human, '', [], visit)).toBe(true);
     expect(visits).toEqual([]);
     confirm();
     confirm();
-    expect(await door.admit('203.0.113.12', 'device:two', human, `?chunk=${home}`)).toBe(true);
+    expect(await door.admit('203.0.113.12', 'device:two', human, '', [], walk)).toBe(true);
     confirm();
     const road = roadName(home);
     door.heard({ kind: 'crossed', from: home, to: road, device: 'device:two', body: 'body', name: 'Guest', moved: true, stays: false });
     door.heard({ kind: 'crossed', from: road, to: other, device: 'device:two', body: 'body', name: 'Guest', moved: true, stays: false });
-    expect(await door.admit('203.0.113.13', 'device:ua', { 'user-agent': 'Safari WildshardAgent/1 (qa)' }, visit)).toBe(true);
+    expect(await door.admit('203.0.113.13', 'device:ua', { 'user-agent': 'Safari WildshardAgent/1 (qa)' }, '', [], visit)).toBe(true);
     confirm();
-    expect(await door.admit('203.0.113.14', 'device:pass', human, visit, protocols)).toBe(true);
+    expect(await door.admit('203.0.113.14', 'device:pass', human, '', protocols, visit)).toBe(true);
     confirm();
-    expect(await door.admit('203.0.113.15', 'device:one', human, `?chunk=${home}`)).toBe(true);
+    expect(await door.admit('203.0.113.15', 'device:one', human, '', [], walk)).toBe(true);
     confirm();
     expect(visits).toEqual([
       { slug: home, actor: 'human' }, { slug: other, actor: 'human' },

@@ -120,10 +120,16 @@ export class NetClient {
     this.transport = transport; this.now = now;
     this.off = this.listen(transport);
   }
+  /** CHUNK-PARAM CP5 (J522): what a link says before its hello (the page's `goto` word, `gotoFirst`), then sends it; null: at once. */
+  private helloFirst: ((transport: Transport, hello: () => void) => void) | null = null;
+  /** CP5: every hello, the first and each redial's, goes through `first`. */
+  sayFirst(first: ((transport: Transport, hello: () => void) => void) | null): void { this.helloFirst = first; }
   /** Begin the handshake. `build` is this client's engine build id; `identity` is who it says it is (J111). */
   hello(build = '', identity: NetIdentity = GUEST, ledger = 0): void {
     this.ledgerSerial = ledger; this.said = { build, identity };
-    this.transport.send('reliable', helloMessage({ build, player: identity.player, name: identity.name, ledger }).buffer);
+    const transport = this.transport;
+    const send = (): void => { if (this.transport === transport) transport.send('reliable', helloMessage({ build, player: identity.player, name: identity.name, ledger }).buffer); };
+    if (this.helloFirst === null) send(); else this.helloFirst(transport, send);
   }
   /**
    * The link died and `transport` is its replacement (E7.1, C2): a fresh `hello` on it. What was held named the old link, so it

@@ -38,3 +38,11 @@
   crashResume.slug` in its own search and the address only loses a stale `at`. The session already resumes from the record
   (`session.recovery`), so `glreload` was redundant there. `<html data-resume>` marks the resumed page for the journey proof,
   which read the address. `?crash=revision|seat` name the running level, not the address.
+
+# The world's door hears the picked cell in a word, not the address (opus-chunk, CP5)
+
+- Jake's Q3 (a): the page dialed `/?chunk=<cell>&at=spawn`; it now dials the bare address and says `goto {cell, spawn}` before
+  its hello (`gotoFirst`, every dial), only once the door's first word says `goto: 1`. An older door would close `refused` on
+  a prefix it doesn't know, so against one the hello goes alone and the page is seated where the world keeps it (Q3's stated
+  cost for the deploy window, either way round). The door dropped `gotoCell` and `gotoSpawn`; a bad word is counted, not fatal.
+- The client's hello waits for the door's first word only on a page with a cell to ask for (at most 3 s), so nothing else moves.

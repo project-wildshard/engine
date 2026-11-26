@@ -4,7 +4,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import type { LinkState } from '../src/client/engine/net/redial';
 import { readSignedRelease } from '../src/client/host/online/release';
 import { browserErrorLevel } from '../src/client/engine/telemetry/browserErrors';
-import { connectOnline, gotoSocket, worldHostsGrid, worldWord, type OnlineShell } from '../src/client/host/online/shell';
+import { connectOnline, worldHostsGrid, worldWord, type OnlineShell } from '../src/client/host/online/shell';
 import { hostsGrid } from '../src/client/game/shardfile/serverRoute';
 // oxlint-disable-next-line import/no-nodejs-modules -- The release file's own origin.
 import { createServer, type Server } from 'node:http';
@@ -174,8 +174,8 @@ test('NB2: a fresh one-shard pick that asks for its shard moves the held seat th
   await first.booted; first.ready();
   await vi.waitFor(() => { expect(bench?.room('blender-template')?.holds(IDENTITY.player)).toBe(true); }, { timeout: 5000 });
   clearInterval(pump); first.dispose();
-  // the title's pick of SHARD inside the hold: startOnline's one-shard page dials gotoSocket(socket, its slug)
-  shell = connectOnline({ socket: gotoSocket(bench.url, SHARD), build: 'bench', loaded: SHARD, identity: IDENTITY, shardCells: shards }, view);
+  // the title's pick of SHARD inside the hold: startOnline's one-shard page asks for its slug in its goto word (CP5), on a bare address
+  shell = connectOnline({ socket: bench.url, goto: () => ({ cell: SHARD, spawn: false }), build: 'bench', loaded: SHARD, identity: IDENTITY, shardCells: shards }, view);
   const { client, booted, ready } = shell;
   pump = setInterval(() => { client.present(); client.flush(); }, 16);
   await booted; ready();
@@ -290,8 +290,8 @@ test('GO4 gate: a world with Driftwood alone does not host the grid; one with mo
   };
   try {
     // opus-route2 (QA row 28): the word names the shards the world opens, so a one-shard page of any other shard plays in-page.
-    expect(await asked([SHARD]), 'WORLD_CELLS unset: the solo grid, Driftwood alone').toEqual({ hosts: false, word: { cells: 1, shards: [SHARD], device: 1, saves: 1, where: 1 } });
-    expect(await asked([SHARD, 'blender-template']), 'the world hosts the grid, each cell named by its shard').toEqual({ hosts: true, word: { cells: 2, shards: [SHARD, 'brasscap-mesa'], device: 1, saves: 1, where: 1 } });
+    expect(await asked([SHARD]), 'WORLD_CELLS unset: the solo grid, Driftwood alone').toEqual({ hosts: false, word: { cells: 1, shards: [SHARD], device: 1, saves: 1, where: 1, goto: 1 } });
+    expect(await asked([SHARD, 'blender-template']), 'the world hosts the grid, each cell named by its shard').toEqual({ hosts: true, word: { cells: 2, shards: [SHARD, 'brasscap-mesa'], device: 1, saves: 1, where: 1, goto: 1 } });
     expect(await worldWord({ release: 'http://127.0.0.1:9/release.json', key: signedFile(RELEASE).publicKey }, 500), 'unreachable: no word').toBeNull();
     expect(await worldHostsGrid({ release: 'http://127.0.0.1:9/release.json', key: signedFile(RELEASE).publicKey }, hostsGrid, 500), 'unreachable: solo').toBe(false);
     const stalled = createServer(() => undefined);

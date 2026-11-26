@@ -275,7 +275,7 @@ export async function tapJourney(page, { card, path = 'select', budgetMs = 90_00
     while (Date.now() < until) {
       // an older shell names its world in the address; this one marks the page it resumes (CHUNK-PARAM CP4, J522)
       if (/[?&](glreload=1|chunk=)/u.test(page.url())) resuming = true;
-      if (!resuming && await page.evaluate(() => document.documentElement.dataset['resume'] !== undefined).catch(() => false) === true) resuming = true;
+      if (!resuming && await page.evaluate(() => document.documentElement.dataset.resume !== undefined).catch(() => false)) resuming = true;
       if (await target.isVisible().catch(() => false)) return false;
       if (resuming) {
         await skipName().catch(() => undefined);
