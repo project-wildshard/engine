@@ -122,9 +122,9 @@ describe('the cook worker', () => {
   // QA 11-25 row 57: this test failed twice on CI (runs 45664266724 and 45686413697, tests (6), about 1.4 s) and passed each rerun.
   // Its child said its verdict on stdout just before exit, and CI's arm runs it under sudo, which may relay a child's output
   // through a pseudo-terminal (Ubuntu's `use_pty`) and drop a quick exit's last line, so the verdict read as a bare refusal. The
-  // child now writes it where a real cook job does (`<out>.result.json`, scripts/cook-job.mjs), each run to its own file. STOPGAP:
-  // one CI-only retry stays until CI shows no `row57` line for a day; a miss prints that line, naming what each child returned.
-  it('takes a job off the network through the host wrap', {retry: process.env['CI'] === undefined ? 0 : 1, timeout: 30_000}, async () => {
+  // child now writes it where a real cook job does (`<out>.result.json`, scripts/cook-job.mjs), each run to its own file. No retry:
+  // a miss prints a `row57` line naming what each child returned.
+  it('takes a job off the network through the host wrap', {timeout: 30_000}, async () => {
     const work = join(mkdtempSync(join(h.scratch, 'limit-')), 'job'), script = join(work, 'net.mjs');
     mkdirSync(work);
     let reached = 0;
