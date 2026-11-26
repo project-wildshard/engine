@@ -22,13 +22,13 @@ test('the encoder keeps the tap\'s facts and time, and the session document keep
   assert.deepEqual(JSON.parse(raw), { slug: 'pine-hollow', mode: 'enter', name: 'Pine Hollow', at: 1000, from: 7 });
   const doc = JSON.parse(tapSessionDocument(JSON.stringify({ keys: { loadAttempt: { v: 1, data: 2 } } }), raw));
   assert.deepEqual(doc.keys.loadAttempt, { v: 1, data: 2 });
-  assert.deepEqual(doc.keys.titleArrival, { v: 1, data: raw });
-  assert.deepEqual(JSON.parse(tapSessionDocument('not json', raw)).keys, { titleArrival: { v: 1, data: raw } });
+  assert.deepEqual(doc.keys.titleArrival, { v: 1, data: JSON.parse(raw) });
+  assert.deepEqual(JSON.parse(tapSessionDocument('not json', raw)).keys, { titleArrival: { v: 1, data: JSON.parse(raw) } });
 });
 
 test('tapDocument is the title\'s record for the zone, and refuses what is not a zone or a mode', () => {
   const doc = JSON.parse(tapDocument({ zone: 'driftwood-isle', at: 5 }));
-  assert.deepEqual(JSON.parse(doc.keys.titleArrival.data), { slug: 'driftwood-isle', mode: 'enter', at: 5 });
+  assert.deepEqual(doc.keys.titleArrival.data, { slug: 'driftwood-isle', mode: 'enter', at: 5 });
   assert.throws(() => tapDocument({ zone: 'Pine Hollow' }), /not a zone slug/u);
   assert.throws(() => tapDocument({ zone: 'pine-hollow', mode: 'walk' }), /not enter, explore or arena/u);
 });
@@ -38,7 +38,7 @@ test('the init script writes the same tap into the tab, keeping its other keys',
   runInNewContext(initScript('nalati-grasslands', 'explore'), { sessionStorage, Date: { now: () => 42 }, JSON });
   const doc = JSON.parse(sessionStorage.items.get(`${SAVE_PREFIX}session`));
   assert.deepEqual(doc.keys.loadAttempt, { v: 1, data: 1 });
-  assert.deepEqual(JSON.parse(doc.keys.titleArrival.data), { slug: 'nalati-grasslands', mode: 'explore', at: 42 });
+  assert.deepEqual(doc.keys.titleArrival.data, { slug: 'nalati-grasslands', mode: 'explore', at: 42 });
   const printed = execFileSync(process.execPath, ['scripts/zone-entry.mjs', '--init', 'pine-hollow'], { encoding: 'utf8' });
   assert.match(printed, /"pine-hollow"/u);
   assert.doesNotMatch(printed, /chunk/u);

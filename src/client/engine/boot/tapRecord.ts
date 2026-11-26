@@ -15,7 +15,8 @@ export function tapRecord(tap: TapFacts, at: number, extra: Readonly<Record<stri
 }
 
 /** The session store's document (`<savePrefix>session`, `{ keys: { name: { v, data } } }`) with `raw` as the tap, keeping
- *  every other key it held; `held` is the document's current text, or null. */
+ *  every other key it held; `held` is the document's current text, or null. The store keeps `data` as the parsed record, as
+ *  saveStorage writes it: a string there reads back as a string, which the entry refuses and the page shows the title. */
 export function tapSessionDocument(held: string | null, raw: string): string {
   let doc: { keys: Record<string, unknown> } = { keys: {} };
   try {
@@ -24,6 +25,6 @@ export function tapSessionDocument(held: string | null, raw: string): string {
       doc = { ...parsed, keys: { ...(parsed.keys as Record<string, unknown>) } };
     }
   } catch { /* an unreadable document is replaced */ }
-  doc.keys[TAP_KEY] = { v: 1, data: raw };
+  doc.keys[TAP_KEY] = { v: 1, data: JSON.parse(raw) as unknown };
   return JSON.stringify(doc);
 }

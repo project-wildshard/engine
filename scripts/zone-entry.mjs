@@ -36,7 +36,7 @@ export function initScript(zone, mode = 'enter', prefix = SAVE_PREFIX) {
   const key = JSON.stringify(`${prefix}session`);
   return `(() => { const key = ${key}; const held = sessionStorage.getItem(key);
   let doc = { keys: {} }; try { const parsed = JSON.parse(held ?? 'null'); if (parsed && typeof parsed.keys === 'object' && parsed.keys) doc = { ...parsed, keys: { ...parsed.keys } }; } catch {}
-  doc.keys.titleArrival = { v: 1, data: JSON.stringify({ slug: ${JSON.stringify(zone)}, mode: ${JSON.stringify(mode)}, at: Date.now() }) };
+  doc.keys.titleArrival = { v: 1, data: { slug: ${JSON.stringify(zone)}, mode: ${JSON.stringify(mode)}, at: Date.now() } };
   sessionStorage.setItem(key, JSON.stringify(doc)); })();`;
 }
 
