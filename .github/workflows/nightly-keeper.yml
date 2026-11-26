@@ -1,0 +1,42 @@
+name: nightly-keeper
+
+# Meta QA 11-25 row 142: nightly.yml's 07:17 UTC cron fires 7 to 11 hours late here (GitHub's schedule is best
+# effort), with gaps up to 28 h, and TC22 holds a tag on a nightly over 26 h old. On each push to main (many a day),
+# this dispatches a production `nightly release proof` when no release nightly started in the last 20 h, so one is
+# always under about 22 h old. Its own cron is only a fallback for a day with no push. src/scripts/nightly-keeper.ts
+# decides; main-watch alarms with a `main NIGHTLY STALE` receipt if this ever stops working.
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '41 */4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: nightly-keeper
+  cancel-in-progress: false
+
+jobs:
+  keep:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            src/scripts/nightly-keeper.ts
+            package.json
+            .node-version
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - name: Dispatch a release nightly when none started in 20 h
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node src/scripts/nightly-keeper.ts kick

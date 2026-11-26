@@ -5,8 +5,9 @@ import {appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync
 import {homedir} from 'node:os';
 import {dirname, join, resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {DISPATCH, STALE_MS, hours, isReleaseNightly, type NightlyRun} from './nightly-keeper.ts';
 
-interface Latest {id: number; head_sha: string; status: string; conclusion: string; event: string; display_title?: string}
+type Latest = NightlyRun & {conclusion: string};
 interface Report {version: number; run: string; sha: string; pins: string; testList: string;
   failures: {key: string; error?: string}[]; newFailures: string[]}
 
@@ -43,10 +44,6 @@ function logRunnerFault(id: number, keys: string[]): void {
   if (existsSync(dirname(file))) appendFileSync(file, `${line}\n`);
 }
 
-function isReleaseNightly(run: Latest | null): boolean {
-  return run?.event === 'schedule' || (run?.event === 'workflow_dispatch' && run.display_title === 'nightly release proof');
-}
-
 export function requireNoNewFailures(value: unknown, latest: Latest): string[] {
   const report = value as Partial<Report> | null;
   if (report === null || typeof report !== 'object' || report.version !== 2 ||
@@ -66,15 +63,58 @@ export function requireNoNewFailures(value: unknown, latest: Latest): string[] {
   return faults;
 }
 
-export function checkReleaseNightly(): void {
+// Meta QA 11-25 row 142: the verdict must be fresh and on the tag's line. A nightly over STALE_MS old holds the tag,
+// and so does one whose head the tag neither contains nor extends by release stamps only (`chore(release): v…`):
+// that nightly judged a tree the tag does not carry. Judging the tag's own commit would put the nightly's 80 minutes
+// into every train (J505), so a nightly before the cut, which the tag contains, still qualifies within 26 h.
+// ALLOW_STALE_NIGHTLY=1 (J381) prints the refusal and lets the tag through.
+export function requireFresh(latest: Pick<NightlyRun, 'id' | 'created_at'>, now: number): void {
+  const at = Date.parse(latest.created_at ?? '');
+  if (!Number.isFinite(at)) throw new Error(`TC22: nightly ${latest.id} has no start time; release held`);
+  if (now - at > STALE_MS)
+    throw new Error(`TC22: newest release nightly ${latest.id} started ${hours(now - at)} h ago, over ${hours(STALE_MS)} h; release held. Dispatch one on main: ${DISPATCH}`);
+}
+
+export type Git = (...args: string[]) => string;
+
+/** Commits the tag carries past the nightly's head, or an error when the nightly is off the tag's line. */
+export function requireCovers(latest: Pick<NightlyRun, 'id' | 'head_sha'>, tag: string, git: Git): number {
+  try {git('cat-file', '-e', `${latest.head_sha}^{commit}`);} catch {
+    try {git('fetch', '--quiet', 'origin', latest.head_sha);} catch {/* judged below */}
+  }
+  let base: string;
+  try {base = git('merge-base', tag, latest.head_sha).trim();} catch {
+    throw new Error(`TC22: nightly ${latest.id}'s head ${latest.head_sha.slice(0, 10)} is not in this clone; release held`);
+  }
+  const past = git('log', '--format=%s', `${base}..${tag}`).split('\n').filter(Boolean);
+  if (base === latest.head_sha) return past.length;
+  if (past.every(subject => /^chore\(release\): v\d+\.\d+\.\d+\b/u.test(subject))) return 0;
+  throw new Error(`TC22: nightly ${latest.id} (${latest.head_sha.slice(0, 10)}) is off the tag's line: the tag carries ${past.length} commits past their fork that are not release stamps; release held`);
+}
+
+function judgeLine(latest: Latest, tag: string, now: number): void {
+  const git: Git = (...args) => execFileSync('git', args, {encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 60_000});
+  try {
+    requireFresh(latest, now);
+    const past = requireCovers(latest, tag, git);
+    console.log(`TC22: nightly ${latest.id} started ${hours(now - Date.parse(latest.created_at ?? ''))} h ago and covers the tag`
+      + (past > 0 ? ` (the tag carries ${past} commits past its head)` : ''));
+  } catch (error) {
+    if (process.env.ALLOW_STALE_NIGHTLY !== '1') throw error;
+    console.log(`TC22: ALLOW_STALE_NIGHTLY=1 (J381), letting through: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+export function checkReleaseNightly(tag = 'HEAD', now = Date.now()): void {
   const runs = JSON.parse(execFileSync('gh', ['api',
     'repos/project-wildshard/engine/actions/workflows/nightly.yml/runs?branch=main&status=completed&per_page=100',
-    '--jq', '.workflow_runs | map({id, head_sha, status, conclusion, event, display_title})',
+    '--jq', '.workflow_runs | map({id, head_sha, status, conclusion, event, display_title, created_at})',
   ], {encoding: 'utf8', timeout: 20000, maxBuffer: 1024 * 1024})) as (Latest | null)[];
   // Diagnostics and staging dispatches cannot replace the current production proof.
   const latest = runs.find(isReleaseNightly);
   if (latest === undefined || latest === null || !Number.isSafeInteger(latest.id) || latest.id < 1)
     throw new Error('TC22: no completed hosted nightly; release held');
+  judgeLine(latest, tag, now);
   const parent = resolve('tmp/release-nightly');
   mkdirSync(parent, {recursive: true});
   const folder = mkdtempSync(join(parent, 'verdict-'));
@@ -87,14 +127,21 @@ export function checkReleaseNightly(): void {
   } finally {rmSync(folder, {recursive: true, force: true});}
 }
 
-export function releaseTagPush(refs: string): boolean {
-  return refs.split('\n').some(line => {
+/** The commit of the first version tag a push creates or moves, or null when the push carries none. */
+export function releaseTagCommit(refs: string): string | null {
+  for (const line of refs.split('\n')) {
     const [, local = '', remote = ''] = line.trim().split(/\s+/u);
-    return /^[a-f0-9]{40}$/u.test(local) && !/^0+$/u.test(local) && /^refs\/tags\/v\d+\.\d+\.\d+$/u.test(remote);
-  });
+    if (/^[a-f0-9]{40}$/u.test(local) && !/^0+$/u.test(local) && /^refs\/tags\/v\d+\.\d+\.\d+$/u.test(remote)) return `${local}^{commit}`;
+  }
+  return null;
+}
+
+export function releaseTagPush(refs: string): boolean {
+  return releaseTagCommit(refs) !== null;
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   if (process.argv.length !== 3 || process.argv[2] !== 'refs') throw new Error('Use release-nightly.ts refs (Git push ref lines on stdin)');
-  if (releaseTagPush(readFileSync(0, 'utf8'))) checkReleaseNightly();
+  const tag = releaseTagCommit(readFileSync(0, 'utf8'));
+  if (tag !== null) checkReleaseNightly(tag);
 }

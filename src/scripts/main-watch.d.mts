@@ -23,6 +23,8 @@ export interface Io {
   budgetRuns?:()=>Run[];
   failmodeRuns?:()=>Run[];
   fpsRuns?:()=>Run[];
+  /** Meta QA 11-25 row 142: nightly.yml's main runs, for the 26 h freshness alarm. */
+  nightlyRuns?:()=>Run[];
   budgetAnnotations?:(id:number)=>string;
   memoryQa?:(rows:MemoryQa[])=>void;
   quotaReset?:()=>number;

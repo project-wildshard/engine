@@ -29,6 +29,7 @@ import {execFileSync,spawn} from 'node:child_process';
 import {appendFileSync,existsSync,mkdirSync,openSync,readFileSync,renameSync,rmSync,writeFileSync} from 'node:fs';
 import {homedir,hostname} from 'node:os';
 import {dirname,join,resolve} from 'node:path';
+import {staleReceipt} from './nightly-keeper.ts';
 import {setTimeout} from 'node:timers/promises';
 import {pathToFileURL} from 'node:url';
 import {stripVTControlCharacters} from 'node:util';
@@ -510,6 +511,9 @@ export function liveIo(env=process.env){
     // FM11 (meta MMO-FAILURE-MODES, J229): the failure-mode browser proof (nightly, related pushes) reports beside ci.
     failmodeRuns:()=>sharedRuns(`${runsCache}.failmodes`,()=>/** @type {Run[]} */(
       JSON.parse(read(['api',`repos/${repo}/actions/workflows/failmodes.yml/runs?branch=main&per_page=15`])).workflow_runs)),
+    // Meta QA 11-25 row 142: nightly.yml's main runs (any status), for the 26 h freshness alarm.
+    nightlyRuns:()=>sharedRuns(`${runsCache}.nightly`,()=>/** @type {Run[]} */(
+      JSON.parse(read(['api',`repos/${repo}/actions/workflows/nightly.yml/runs?branch=main&per_page=30`])).workflow_runs)),
     // DF7 (meta DRIFTWOOD-FPS): the mini's nightly Driftwood floors report; after DF15 a red one is a fix row.
     fpsRuns:()=>sharedRuns(`${runsCache}.driftwood-fps`,()=>/** @type {Run[]} */(
       JSON.parse(read(['api',`repos/${repo}/actions/workflows/driftwood-fps.yml/runs?branch=main&per_page=15`])).workflow_runs)),
@@ -816,6 +820,12 @@ export function sweep(io,hint={}){
       catch{/* a build main-watch cannot read still gets its receipt */}
       io.receipt(`main DRIFTWOOD-FPS ${short(night.build)} run ${run.id} failure: a floor miss or a p95 more than 10% over the last green night`
         +` ${night.since===null?'(none)':short(night.since)}; a fix row for ${pushers.length>0?pushers.join(', '):'no land receipt (pushed by hand or the queue)'}, never a red main (DF7, J444)`);
+    }
+    // Meta QA 11-25 row 142: no release nightly started in the last 26 h means TC22 holds the next tag. One receipt per
+    // stale newest run, so a lane's wait on the receipts sees it once; nightly-keeper.yml is what should have prevented it.
+    if(io.nightlyRuns!==undefined){
+      try{const line=staleReceipt(io.nightlyRuns(),io.now?.()??Date.now(),io.receipts());if(line!==null)io.receipt(line);}
+      catch(error){io.receipt(`nightly status unavailable: ${error instanceof Error?error.message.split('\n')[0]:String(error)}`);}
     }
     if(state.memoryQa.length>0&&io.memoryQa!==undefined){
       try{io.memoryQa(state.memoryQa);state.memoryQa=[];writeState(io.state,state);}catch(error){

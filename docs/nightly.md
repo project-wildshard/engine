@@ -1,7 +1,18 @@
 # Ring 2 nightly
 
-`.github/workflows/nightly.yml` runs at 02:17 Cancún daily and by manual
-dispatch. It checks the event's exact commit, never a later moving main.
+`.github/workflows/nightly.yml` is scheduled for 02:17 Cancún daily and runs
+by manual dispatch. It checks the event's exact commit, never a later moving main.
+
+GitHub fires that schedule 7 to 11 hours late here (11-08 to 11-25 every
+scheduled run started between 09:10 and 14:14 Cancún, gaps up to 28 h), so
+the schedule alone cannot keep a nightly under a day old (meta QA 11-25 row
+142). `.github/workflows/nightly-keeper.yml` runs on each push to main (and
+every four hours as a fallback): when no release nightly (a scheduled run or
+a production `nightly release proof` dispatch) started in the last 20 h, it
+dispatches one (`src/scripts/nightly-keeper.ts kick`; `check` prints the
+age). main-watch writes one `main NIGHTLY STALE newest <run>` receipt when
+none started in the last 26 h. By hand: `gh workflow run nightly -R
+project-wildshard/engine --ref main -f pins_channel=production`.
 It reads every committed head in `test/pins/shardfiles.json` and the
 existing `test/pins/ring-2-tests.json`. Updating pins is a separate reviewed
 change: a nightly does not silently substitute live catalogue heads.
@@ -100,6 +111,12 @@ The guard downloads the latest completed scheduled main nightly's
 `nightly-verdict` artifact (production pins). It refuses `newFailures` before
 using a cached full check or starting a fresh one. Missing artifacts,
 malformed reports and mismatched run/source identities also hold release.
+So does a verdict whose run started over 26 h ago, or one off the tag's
+line: its head must be in the tag, or the tag may add only `chore(release):
+vX.Y.Z` stamps past their fork (meta QA 11-25 row 142). The tag's own commit
+is not required, since that would put the nightly's 80 minutes into every
+train (J505); the keeper keeps a release nightly under about 22 h old.
+`ALLOW_STALE_NIGHTLY=1` (J381) prints the age or line refusal and passes.
 Ordinary pushes and deleted tags keep their existing checks. The legacy
 `src/scripts/release-check.mjs` also calls the guard before cached or fresh
 checks; its `--probe` only queries the local cache and cannot release.
