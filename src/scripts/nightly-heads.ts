@@ -14,7 +14,7 @@ import {serve} from './parity/serve.mjs';
 import {levelDownloadFixtures, saveFixture} from './debug-settings.mjs';
 import {coldGridRows, headGroups, plan, read, requireBuild, type HeadResult, type HeadsReport, type PacksBookRows} from './nightly-model.ts';
 import type {CookIndex} from '../cook/game/cookWorker.ts';
-import type {StandaloneCatalogue} from '@wildshard/format/standaloneCatalogue';
+import type {StandaloneCatalogue} from './standalone-catalogue.ts';
 import { KEYCHAIN_ARGS } from './.kit/chromium-keychain.mjs';
 
 await import('./bake-loader.mjs');

@@ -24,10 +24,10 @@ async function fixture(run: (root: string, api: string, requests: string[], docu
   mkdirSync('tmp/codex-pins', {recursive: true});
   const root = mkdtempSync(resolve('tmp/codex-pins/staging-')), requests: string[] = [], live: {release: string | null} = {release};
   // A slug whose folder is its own name: the Template's `template` → `_template` alias went with its staging cell (meta TEMPLATE-E2E TR-9).
-  const document = {shards: [{slug: 'open-plot-thin-ice', revision: 6, hash: 'a'.repeat(64)}], missing: [], placements: [{slug: 'open-plot-thin-ice'}], grid: {cells: [{slug: 'open-plot-thin-ice'}]}};
+  const document = {shards: [{slug: 'open-plot-thin-ice', uploadNumber: 6, hash: 'a'.repeat(64)}], missing: [], placements: [{slug: 'open-plot-thin-ice'}], grid: {cells: [{slug: 'open-plot-thin-ice'}]}};
   const server = createServer((request, response) => {
     requests.push(request.url ?? '');
-    const body = request.url === '/api/catalogue.json?channel=staging' ? document : request.url === '/api/shardfiles' ? {shardfiles: [{hash: 'a'.repeat(64), bytes: 512}]} : undefined;
+    const body = request.url === '/api/catalogue.json?channel=staging&wire=upload' ? document : request.url === '/api/shardfiles' ? {shardfiles: [{hash: 'a'.repeat(64), bytes: 512}]} : undefined;
     const headers: Record<string, string> = {'content-type': 'application/json'};
     if (body === document && live.release !== null) headers[RELEASE_HASH_HEADER] = live.release;
     response.writeHead(body === undefined ? 404 : 200, headers).end(JSON.stringify(body ?? {}));
@@ -46,7 +46,7 @@ async function fixture(run: (root: string, api: string, requests: string[], docu
 test('refresh pins staging-only revisions, leaves production alone, and both rings select the exact snapshot', async () => fixture(async (root, api, requests, document) => {
   const refreshed = await execute(script, root, api, 'refresh', '--channel', 'staging');
   expect(refreshed.code, refreshed.output).toBe(0);
-  expect(requests.sort()).toEqual(['/api/catalogue.json?channel=staging', '/api/shardfiles']);
+  expect(requests.sort()).toEqual(['/api/catalogue.json?channel=staging&wire=upload', '/api/shardfiles']);
   expect(readFileSync(join(root, 'test/pins/shardfiles.json'), 'utf8')).toBe(prod);
   expect(readFileSync(join(root, 'test/pins/catalogue.json'), 'utf8')).toBe(prod);
   const snapshot = JSON.parse(readFileSync(join(root, 'test/pins/staging.json'), 'utf8')) as StagingPins;
@@ -71,7 +71,7 @@ test('an incomplete refresh and a tampered snapshot refuse before replacing exis
   const changed = JSON.parse(before) as StagingPins;
   const changedHead = changed.catalogue.shards[0];
   if (changedHead === undefined) throw new Error('Missing exported head');
-  changedHead.revision++;
+  changedHead.uploadNumber++;
   writeFileSync(path, JSON.stringify(changed));
   expect((await execute(selector, root, api, 'select')).code).not.toBe(0);
   expect(readFileSync(join(root, 'test/pins/shardfiles.json'), 'utf8')).toBe(prod);

@@ -7,7 +7,7 @@ import {packsBookPath, readSpawnManifest} from '../../shared/game/shardfile/spaw
 import {prepareAssetDecoders} from '@wildshard/format/shardfileAssets';
 import {validateShardfileFolder} from '@wildshard/format/shardfileValidation';
 import {assertKtx2TableTargets} from '../../shared/game/shardfile/ktx2Targets';
-import {StandaloneCatalogueSchema, type StandaloneCatalogue} from '@wildshard/format/standaloneCatalogue';
+import {parseStandaloneCatalogue, type StandaloneCatalogue} from '../standalone-catalogue.ts';
 import {CELL_HEIGHT, CHUNK_SIZE} from '@wildshard/format/contentBounds';
 import {readTar} from '@wildshard/format/tar';
 import type {CookIndex} from '../../cook/game/cookWorker';
@@ -72,7 +72,7 @@ export function folderTitleRows(products: string, outDir?: string): readonly Tit
 }
 
 export function writeCatalogueDocument(outDir: string, document: unknown): void {
-  const text = JSON.stringify(v.parse(StandaloneCatalogueSchema, document));
+  const text = JSON.stringify(parseStandaloneCatalogue(document));
   writeFileSync(join(outDir, 'catalogue.json'), text);
   const file = join(outDir, 'index.html'), html = readFileSync(file, 'utf8');
   if (!html.includes('</head>')) throw new Error('No document head for the catalogue');
@@ -117,7 +117,7 @@ export function inTreeCatalogue(root: string, products: string, listed: readonly
     const folder = join(products, row.slug), header = join(folder, 'shard.json');
     if (!existsSync(header)) { missing.push(row.slug); continue; }
     const index = JSON.parse(readFileSync(header, 'utf8')) as {readonly identity: {readonly slug: string; readonly name: string}};
-    shards.push({slug: index.identity.slug, name: index.identity.name, revision: 1, hash: createHash('sha256').update(folderTarball(folder)).digest('hex')});
+    shards.push({slug: index.identity.slug, name: index.identity.name, uploadNumber: 1, hash: createHash('sha256').update(folderTarball(folder)).digest('hex')});
   }
   return {version: grid.version, stage: 'live', placements, grid: grid.grid, shards, missing};
 }
@@ -126,7 +126,7 @@ export function inTreeCatalogue(root: string, products: string, listed: readonly
 export async function bakeCatalogue(outDir: string, root: string): Promise<void> {
   const {WILDSHARD_CATALOGUE: source} = process.env;
   const rows = folderTitleRows(join(root, 'out'), outDir);
-  const document = source === undefined ? inTreeCatalogue(root, join(root, 'out'), rows) : v.parse(StandaloneCatalogueSchema, JSON.parse(readFileSync(source, 'utf8')));
+  const document = source === undefined ? inTreeCatalogue(root, join(root, 'out'), rows) : parseStandaloneCatalogue(JSON.parse(readFileSync(source, 'utf8')));
   writeCatalogueDocument(outDir, document);
   writeTitleRows(outDir, rows);
   const {WS_RELEASE: release} = process.env;
@@ -307,7 +307,7 @@ export async function addStoredShards(out: string, heads: readonly {readonly slu
     }
     if (added.length > 0) {
       const slugs = added.map(row => row.slug);
-      writeCatalogueDocument(out, catalogueWithAdded(v.parse(StandaloneCatalogueSchema, JSON.parse(readFileSync(join(out, 'catalogue.json'), 'utf8'))), live, slugs));
+      writeCatalogueDocument(out, catalogueWithAdded(parseStandaloneCatalogue(JSON.parse(readFileSync(join(out, 'catalogue.json'), 'utf8'))), live, slugs));
       addCookedShards(out, added, scratch, {...home, shards: [...home.shards, ...slugs], ...(Object.keys(loose).length === 0 ? {} : {loose})});
     }
     return added.map(row => row.slug);

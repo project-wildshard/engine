@@ -15,7 +15,7 @@ const hash = (body: Uint8Array): string => createHash('sha256').update(body).dig
 const discovery = /^mounts\/shardfiles\/([^/]+)\/discovery\.json$/u;
 interface Mount {readonly url: string; readonly path: string}
 interface LocalProduct {
-  readonly pin: {readonly slug: string; readonly revision: number; readonly hash: string; readonly bytes: number};
+  readonly pin: {readonly slug: string; readonly uploadNumber: number; readonly hash: string; readonly bytes: number};
   readonly bytes: Uint8Array;
   readonly folder: string;
   readonly preservedMounts: readonly string[];
@@ -124,6 +124,6 @@ export async function localProduct(path: string, root: string): Promise<LocalPro
   insideTree(root, `out/${folder}`);
   const preservedMounts = conflicts(root, folder, mounts(files));
   const bytes = writeTar(files);
-  return {pin: {slug, revision: saveRevision(index.identity), hash: hash(bytes), bytes: bytes.length}, bytes, folder, preservedMounts,
+  return {pin: {slug, uploadNumber: saveRevision(index.identity), hash: hash(bytes), bytes: bytes.length}, bytes, folder, preservedMounts,
     source: {kind: 'local-directory', path: canonical, indexHash: hash(indexBytes)}};
 }

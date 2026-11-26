@@ -4,7 +4,7 @@ export const KEY_EXEMPT: Readonly<Record<string, string>>;
 export interface PinDescriptor {
   readonly slug: string;
   readonly hash: string;
-  readonly revision: number;
+  readonly uploadNumber: number;
   readonly bytes: number;
 }
 export interface PinOwner {
@@ -35,8 +35,8 @@ export function pinsCompatibilityKey(root: string, revision: string): string;
 export function pinsKey(root: string, revision: string, inputs?: string): string;
 export function pinDescriptor(pin: PinDescriptor): string;
 export function dropManifest(root: string): void;
-export function stalePinFolders(root: string, hashes?: readonly string[]): { folder: string; revision: unknown }[];
-export function pruneStalePinProducts(root: string, hashes?: readonly string[]): { folder: string; revision: unknown }[];
+export function stalePinFolders(root: string, hashes?: readonly string[]): { folder: string; uploadNumber: unknown }[];
+export function pruneStalePinProducts(root: string, hashes?: readonly string[]): { folder: string; uploadNumber: unknown }[];
 export function verifiedPinsOutputs(root: string): { paths: Set<string>; key: string };
 export function writeManifest(root: string, key: string, products: Manifest['products'], mounts: Manifest['mounts'], incremental?: Incremental): void;
 export function lockPins(root: string, options?: { wait?: boolean }): (() => void) | undefined;

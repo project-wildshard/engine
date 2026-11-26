@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { CELL_HEIGHT, CHUNK_SIZE } from '@wildshard/format/contentBounds';
-import type { StandaloneCatalogue } from '@wildshard/format/standaloneCatalogue';
+import type { StandaloneCatalogue } from '../src/scripts/standalone-catalogue.ts';
 import { nightlyHeadCatalogue } from '../src/scripts/app-build/catalogue';
 import { coldGridRows, plan } from '../src/scripts/nightly-model';
 import { bareSlug } from '../src/shared/game/grid/catalogueSlot';
@@ -24,7 +24,7 @@ test('FS30 a cold staging-only head gets its reviewed placement in the nightly c
   const head = {slug: 'mirror-salt', hash: 'a'.repeat(64)};
   const cell = {instance: head.slug, slug: head.slug, cell: [2, 3] as [number, number]};
   const built = {...pins, placements: [], grid: {...pins.grid, cells: []}};
-  const reviewed = {...built, shards: [{...head, name: 'Mirror Salt', revision: 5}], grid: {...built.grid, cells: [cell]}};
+  const reviewed = {...built, shards: [{...head, name: 'Mirror Salt', uploadNumber: 5}], grid: {...built.grid, cells: [cell]}};
   const fixture = nightlyHeadCatalogue(built, reviewed, head);
   expect(fixture.placements).toEqual([{...cell, size: [CHUNK_SIZE, CELL_HEIGHT, CHUNK_SIZE]}]);
   expect(fixture.grid).toBe(built.grid);

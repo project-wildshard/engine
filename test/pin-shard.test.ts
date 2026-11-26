@@ -5,13 +5,13 @@ import {expect, test} from 'vitest';
 import {movePianoStems, movePin, moveSavePin, productMounts} from '../src/scripts/pin-shard.ts';
 
 const a = 'a'.repeat(64), b = 'b'.repeat(64);
-const pins = {api: 'x', shards: [{slug: 'dunes', revision: 1, hash: a, bytes: 10}, {slug: 'nine', revision: 1, hash: a, bytes: 20}]};
-const document = {shards: [{slug: 'nine', name: 'Nine', revision: 1, hash: a}, {slug: 'dunes', name: 'Dunes', revision: 1, hash: a}]};
+const pins = {api: 'x', shards: [{slug: 'dunes', uploadNumber: 1, hash: a, bytes: 10}, {slug: 'nine', uploadNumber: 1, hash: a, bytes: 20}]};
+const document = {shards: [{slug: 'nine', name: 'Nine', uploadNumber: 1, hash: a}, {slug: 'dunes', name: 'Dunes', uploadNumber: 1, hash: a}]};
 
 test('moves only the published slug, in place, in both files', () => {
-  const moved = movePin(pins, document, {slug: 'nine', revision: 2, hash: b, bytes: 30});
-  expect(moved.pins.shards).toEqual([pins.shards[0], {slug: 'nine', revision: 2, hash: b, bytes: 30}]);
-  expect(moved.document.shards).toEqual([{slug: 'nine', name: 'Nine', revision: 2, hash: b}, document.shards[1]]);
+  const moved = movePin(pins, document, {slug: 'nine', uploadNumber: 2, hash: b, bytes: 30});
+  expect(moved.pins.shards).toEqual([pins.shards[0], {slug: 'nine', uploadNumber: 2, hash: b, bytes: 30}]);
+  expect(moved.document.shards).toEqual([{slug: 'nine', name: 'Nine', uploadNumber: 2, hash: b}, document.shards[1]]);
 });
 
 // Meta SHARD-COMPAT NB10: the pin commit moves the slug's released save fixture with it, so released-save-play needs
@@ -25,25 +25,25 @@ test('a re-pin moves the released save fixture to the new pin, a refusal staying
 });
 
 test('refuses a slug engine never pinned', () => {
-  expect(() => movePin(pins, document, {slug: 'new', revision: 1, hash: b, bytes: 1})).toThrow(/no pin to move/u);
+  expect(() => movePin(pins, document, {slug: 'new', uploadNumber: 1, hash: b, bytes: 1})).toThrow(/no pin to move/u);
 });
 
 // Meta MOSSGATE-ZONE MZ26: a staging-only shard (production live: null) takes its first preview pin only when the
 // dispatch asks for it (`first`), named from staging's catalogue row; without it a new slug is still refused.
 test('a first pin appends the slug to both files when asked', () => {
-  const moved = movePin(pins, document, {slug: 'moss', revision: 21, hash: b, bytes: 5}, {name: 'Moss Hollow'});
-  expect(moved.pins.shards).toEqual([...pins.shards, {slug: 'moss', revision: 21, hash: b, bytes: 5}]);
-  expect(moved.document.shards).toEqual([...document.shards, {slug: 'moss', name: 'Moss Hollow', revision: 21, hash: b}]);
+  const moved = movePin(pins, document, {slug: 'moss', uploadNumber: 21, hash: b, bytes: 5}, {name: 'Moss Hollow'});
+  expect(moved.pins.shards).toEqual([...pins.shards, {slug: 'moss', uploadNumber: 21, hash: b, bytes: 5}]);
+  expect(moved.document.shards).toEqual([...document.shards, {slug: 'moss', name: 'Moss Hollow', uploadNumber: 21, hash: b}]);
 });
 
 test('a first pin of a slug already pinned just moves it', () => {
-  const moved = movePin(pins, document, {slug: 'nine', revision: 2, hash: b, bytes: 30}, {name: 'Nine'});
-  expect(moved.pins.shards).toEqual([pins.shards[0], {slug: 'nine', revision: 2, hash: b, bytes: 30}]);
+  const moved = movePin(pins, document, {slug: 'nine', uploadNumber: 2, hash: b, bytes: 30}, {name: 'Nine'});
+  expect(moved.pins.shards).toEqual([pins.shards[0], {slug: 'nine', uploadNumber: 2, hash: b, bytes: 30}]);
 });
 
 test('a first pin refuses a slug half pinned', () => {
-  const half = {...pins, shards: [...pins.shards, {slug: 'moss', revision: 1, hash: a, bytes: 1}]};
-  expect(() => movePin(half, document, {slug: 'moss', revision: 2, hash: b, bytes: 1}, {name: 'Moss'})).toThrow(/no pin to move/u);
+  const half = {...pins, shards: [...pins.shards, {slug: 'moss', uploadNumber: 1, hash: a, bytes: 1}]};
+  expect(() => movePin(half, document, {slug: 'moss', uploadNumber: 2, hash: b, bytes: 1}, {name: 'Moss'})).toThrow(/no pin to move/u);
 });
 
 test('shard-pin passes a first input through to pin-shard.ts', () => {
@@ -53,8 +53,8 @@ test('shard-pin passes a first input through to pin-shard.ts', () => {
 });
 
 test('refuses to move a pin backwards', () => {
-  const ahead = {...pins, shards: [{slug: 'nine', revision: 5, hash: a, bytes: 1}]};
-  expect(() => movePin(ahead, document, {slug: 'nine', revision: 2, hash: b, bytes: 1})).toThrow(/newer than 2/u);
+  const ahead = {...pins, shards: [{slug: 'nine', uploadNumber: 5, hash: a, bytes: 1}]};
+  expect(() => movePin(ahead, document, {slug: 'nine', uploadNumber: 2, hash: b, bytes: 1})).toThrow(/newer than 2/u);
 });
 
 // Main red at dfb768cd0 (2026-11-19): Nalati rev 4's pin kept rev 3's Ring 1 slice row, so `pins.ts install --ring 1`
@@ -133,3 +133,10 @@ test.skipIf(!existsSync(pinned))('the pinned Driftwood product mounts exactly th
   const stale = manifest.replaceAll(/island-calm-[a-f0-9]{8}/gu, 'island-calm-00000000');
   expect(movePianoStems(stale, mounts).manifest).toBe(manifest);
 }, 60_000);
+
+test('committed pin heads name their catalogue upload number', () => {
+  for (const file of ['test/pins/shardfiles.json', 'test/pins/catalogue.json', 'test/pins/staging.json']) {
+    const pinned = JSON.parse(readFileSync(file, 'utf8')) as {shards: Record<string, unknown>[]};
+    expect(pinned.shards.every(row => Number.isSafeInteger(row['uploadNumber']) && !('revision' in row)), file).toBe(true);
+  }
+});

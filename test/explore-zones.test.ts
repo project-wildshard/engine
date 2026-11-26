@@ -11,7 +11,7 @@ const titles = [title('mossgate', 'Mossgate'), title('driftwood-isle', 'Driftwoo
 const catalogue: CatalogueDocument = {
   placements: [],
   grid: { cells: [...titles.slice(0, 4), { slug: 'new-cell' }].map(row => ({ instance: row.slug, slug: row.slug })) },
-  shards: [{ slug: 'new-cell', name: 'New cell', revision: 1, hash: 'a'.repeat(64) }],
+  shards: [{ slug: 'new-cell', name: 'New cell', uploadNumber: 1, hash: 'a'.repeat(64) }],
 };
 
 test('the offline list shows every visible placement in title order (OF31i4: no built Featured list)', () => {

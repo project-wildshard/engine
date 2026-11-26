@@ -28,7 +28,7 @@ export function saveFailedReporter(slugOf: (instance: string | null) => string, 
 /** The installed catalogue's revision of `slug`, or null when the page has none (a test, a shell). */
 export function catalogueRevision(slug: string): number | null {
   const heads = installedCatalogue()?.shards ?? [];
-  return new Map(heads.map(head => [head.slug, head.revision])).get(slug) ?? null;
+  return new Map(heads.map(head => [head.slug, head.uploadNumber])).get(slug) ?? null;
 }
 
 /** S18: a neighbour that can't load shows UNAVAILABLE on Shard Select. One report per cell a session, at warning level.

@@ -45,6 +45,7 @@
     "**/*.tsx",
     "fixtures/**/*.json",
     "engine/fixtures/**/*.json",
+    "../src/scripts/standalone-catalogue.ts",
     "../src/**/*.d.ts",
     "../src/**/*.d.mts",
     "../src/**/*.d.*.ts",

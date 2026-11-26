@@ -11,11 +11,14 @@ import {ShardfileHashSchema, ShardSlugSchema} from '@wildshard/format/uploadWire
 import {MAX_SHARDFILE_BYTES} from '@wildshard/format/uploadCaps';
 import {readCapped, type CookRow, type CookWorker, type ShardfileSource} from './cookWorker';
 
+import {hasUploadNumber, wireUploadFields} from './uploadFields';
+import {catalogueUpload, type UploadIdentity} from '../../shared/game/grid/uploadIdentity';
+
 const Id = v.pipe(v.string(), v.regex(/^[a-f0-9-]{36}$/u));
 const identity = {uploadId: Id, hash: ShardfileHashSchema, slug: ShardSlugSchema};
-const Pending: v.GenericSchema<PendingUpload> = v.object({...identity, revision: v.pipe(v.number(), v.safeInteger(), v.minValue(1)), formatVersion: v.string(), shardVersion: v.optional(v.string()), armed: v.optional(v.boolean())});
+const Pending: v.GenericSchema<unknown, PendingUpload> = v.pipe(v.object({...identity, ...wireUploadFields, formatVersion: v.string(), armed: v.optional(v.boolean())}), v.check(row => hasUploadNumber(row), 'Missing uploadNumber'), v.transform(row => catalogueUpload(row)));
 const Activation: v.GenericSchema<ActivationNotice> = v.object({...identity, channels: v.array(v.picklist(['preview', 'staging', 'production'])), place: v.optional(v.boolean())});
-export interface PendingUpload {readonly uploadId: string; readonly hash: string; readonly slug: string; readonly revision: number; readonly formatVersion: string; readonly shardVersion?: string | undefined;
+export interface PendingUpload extends UploadIdentity {readonly uploadId: string; readonly hash: string; readonly slug: string; readonly formatVersion: string;
   /** FORMAT-PRUNE FP27c: the catalogue's armed word for the slug (`memory_armed`); an older API sends none. */
   readonly armed?: boolean | undefined}
 export interface ActivationNotice {readonly uploadId: string; readonly hash: string; readonly slug: string; readonly channels: readonly ('preview' | 'staging' | 'production')[]; readonly place?: boolean | undefined}
@@ -51,7 +54,7 @@ export function cookApi(base: string, key: string, read: typeof fetch = fetch, n
     const response = await read(new URL(path, origin), {method, redirect: 'manual', headers: cookHeaders(key, method, path, body, now()), ...(method === 'GET' ? {} : {body}), signal: AbortSignal.timeout(300_000)});
     return response;
   };
-  const pages = async function* pages<T>(path: string, schema: v.GenericSchema<T>, query: Readonly<Record<string, string>> = {}): AsyncIterable<T> {
+  const pages = async function* pages<T>(path: string, schema: v.GenericSchema<unknown, T>, query: Readonly<Record<string, string>> = {}): AsyncIterable<T> {
     const page = v.object({uploads: v.array(schema), cursor: v.optional(Id)});
     let cursor: string | undefined;
     do {
@@ -171,7 +174,7 @@ export function uploadDelivery(options: UploadDeliveryOptions): {readonly sweep:
       if (outbox.blocked(job.uploadId) || !outbox.due(job.uploadId, (options.now ?? Date.now)())) return;
       if (outbox.read(job.uploadId) === undefined) {
         source.bind(job);
-        const row: CookRow = await worker.cook({slug: job.slug, hash: job.hash, shardVersion: job.shardVersion, ...(job.armed === undefined ? {} : {armed: job.armed})});
+        const row: CookRow = await worker.cook({slug: job.slug, hash: job.hash, uploadNumber: job.uploadNumber, ...(job.shardVersion === undefined ? {} : {shardVersion: job.shardVersion}), ...(job.armed === undefined ? {} : {armed: job.armed})});
         if (row.hash !== job.hash || !new Set([job.slug]).has(row.slug)) throw new Error('The cook reported another upload');
         if (row.state === 'failed') {outbox.defer(job.uploadId, (options.now ?? Date.now)()); log(`upload ${job.uploadId}: cook failed; retry next poll`); return;}
         if (row.state !== 'refused' && !row.check?.pass) throw new Error('No successful full check for pending upload');

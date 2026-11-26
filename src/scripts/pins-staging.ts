@@ -1,10 +1,11 @@
 // Row 23: a reviewed staging snapshot, independent of production's live pointers.
+import {catalogueUpload, type WireUploadIdentity} from '../shared/game/grid/uploadIdentity.ts';
 import {createHash} from 'node:crypto';
 import {mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
 import {catalogueSlugs, documentSlugs, unlistedMessage, unlistedSlugs} from './pins-catalogue.ts';
 
-interface Pin {slug: string; revision: number; hash: string; bytes: number}
+interface Pin {slug: string; uploadNumber: number; hash: string; bytes: number; shardVersion?: string | undefined}
 interface Document {shards: Omit<Pin, 'bytes'>[]; missing: unknown[]; placements: {slug: string}[]; grid: {cells: {slug: string}[]}}
 export interface StagingPins {version: 1; channel: 'staging'; api: string; catalogueHash: string; releaseHash: string; catalogue: Document; shards: Pin[]}
 const file = 'test/pins/staging.json';
@@ -18,8 +19,8 @@ export function checkStaging(value: StagingPins): void {
   if (value.version !== 1 || value.channel !== 'staging' || !isReleaseHash(value.releaseHash) || value.catalogueHash !== hash(value.catalogue)) throw new Error('Invalid staging snapshot identity');
   const {catalogue, shards} = value;
   if (!Array.isArray(catalogue.missing) || catalogue.missing.length > 0 || !Array.isArray(shards) || shards.length === 0 || new Set(shards.map(row => row.slug)).size !== shards.length) throw new Error('Incomplete staging catalogue');
-  if (shards.some(row => !/^[a-z0-9-]+$/u.test(row.slug) || !/^[a-f0-9]{64}$/u.test(row.hash) || !Number.isSafeInteger(row.revision) || row.revision < 1 || !Number.isSafeInteger(row.bytes) || row.bytes <= 0)) throw new Error('Invalid staging pin');
-  if (catalogue.shards.length !== shards.length || catalogue.shards.some(row => !shards.some(pin => pin.slug === row.slug && pin.hash === row.hash && pin.revision === row.revision))) throw new Error('Staging pins disagree with catalogue');
+  if (shards.some(row => !/^[a-z0-9-]+$/u.test(row.slug) || !/^[a-f0-9]{64}$/u.test(row.hash) || !Number.isSafeInteger(row.uploadNumber) || row.uploadNumber < 1 || !Number.isSafeInteger(row.bytes) || row.bytes <= 0)) throw new Error('Invalid staging pin');
+  if (catalogue.shards.length !== shards.length || catalogue.shards.some(row => !shards.some(pin => pin.slug === row.slug && pin.hash === row.hash && pin.uploadNumber === row.uploadNumber))) throw new Error('Staging pins disagree with catalogue');
   const unlisted = unlistedSlugs(catalogueSlugs(catalogue), {staging: documentSlugs(catalogue)});
   if (unlisted.length > 0) throw new Error(unlistedMessage(unlisted));
 }
@@ -30,13 +31,14 @@ export async function refreshStaging(api: string): Promise<void> {
     if (!response.ok) throw new Error(`${path}: HTTP ${response.status}`);
     return response;
   };
-  const [document, shardfiles] = await Promise.all([get('/api/catalogue.json?channel=staging'), get('/api/shardfiles')]);
+  const [document, shardfiles] = await Promise.all([get('/api/catalogue.json?channel=staging&wire=upload'), get('/api/shardfiles')]);
   const releaseHash = document.headers.get(RELEASE_HASH_HEADER);
-  if (!isReleaseHash(releaseHash)) throw new Error(`/api/catalogue.json?channel=staging names no ${RELEASE_HASH_HEADER} (api-server AP-26)`);
-  const [catalogue, listing] = [await document.json() as Document, await shardfiles.json() as unknown];
+  if (!isReleaseHash(releaseHash)) throw new Error(`/api/catalogue.json?channel=staging&wire=upload names no ${RELEASE_HASH_HEADER} (api-server AP-26)`);
+  const [wire, listing] = [await document.json() as Omit<Document, 'shards'> & {shards: (WireUploadIdentity & {slug: string; hash: string})[]}, await shardfiles.json() as unknown];
+  const catalogue = {...wire, shards: wire.shards.map(catalogueUpload)};
   const sizes = new Map((listing as {shardfiles: {hash: string; bytes: number}[]}).shardfiles.map(row => [row.hash, row.bytes]));
   const snapshot: StagingPins = {version: 1, channel: 'staging', api, catalogueHash: hash(catalogue),
-    releaseHash, catalogue, shards: catalogue.shards.map(row => ({slug: row.slug, revision: row.revision, hash: row.hash, bytes: sizes.get(row.hash) ?? 0}))};
+    releaseHash, catalogue, shards: catalogue.shards.map(row => ({slug: row.slug, uploadNumber: row.uploadNumber, ...(row.shardVersion === undefined ? {} : {shardVersion: row.shardVersion}), hash: row.hash, bytes: sizes.get(row.hash) ?? 0}))};
   checkStaging(snapshot);
   mkdirSync('test/pins', {recursive: true});
   writeFileSync(file, json(snapshot));
@@ -52,7 +54,7 @@ export function readStaging(): StagingPins {
 
 /** The committed snapshot is the release staging serves: its release hash matches the live catalogue's. */
 export async function verifyStaging(snapshot: StagingPins = readStaging()): Promise<void> {
-  const response = await fetch(`${snapshot.api}/api/catalogue.json?channel=staging`, {cache: 'no-store'});
+  const response = await fetch(`${snapshot.api}/api/catalogue.json?channel=staging&wire=upload`, {cache: 'no-store'});
   if (!response.ok) throw new Error(`staging catalogue: HTTP ${response.status}`);
   const live = response.headers.get(RELEASE_HASH_HEADER);
   if (live !== snapshot.releaseHash) throw new Error(`staging release drifted: snapshot ${snapshot.releaseHash}, live ${live ?? 'none'}; run pins.ts refresh --channel staging`);

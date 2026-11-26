@@ -13,7 +13,7 @@ import {cookApi, uploadDelivery, VerdictOutbox, type CookApi, type PendingUpload
 /** FORMAT-PRUNE FP27c: the format keeps the memory lines and the API keeps the armed list, so the cook feed carries the
  *  catalogue's armed word for each upload and the cook's admission passes it to validation. */
 const bytes = new TextEncoder().encode('armed fixture'), hash = createHash('sha256').update(bytes).digest('hex');
-const job: PendingUpload = {uploadId: '33333333-3333-3333-3333-333333333333', hash, slug: 'armed-fixture', revision: 1, formatVersion: '0.1.0.4', armed: true};
+const job: PendingUpload = {uploadId: '33333333-3333-3333-3333-333333333333', hash, slug: 'armed-fixture', uploadNumber: 1, formatVersion: '0.1.0.4', armed: true};
 const folders: string[] = [];
 const scratch = (): string => { const root = resolve('tmp/opus-pr6'); mkdirSync(root, {recursive: true}); const path = mkdtempSync(join(root, 'armed-')); folders.push(path); return path; };
 afterEach(() => { for (const path of folders.splice(0)) rmSync(path, {recursive: true, force: true}); });

@@ -227,9 +227,9 @@ describe('pins reuse', () => {
 
   test('a pin edit retains only unchanged verified products and their mounts', async () => {
     const {root} = repos();
-    const first = {slug: 'dunes', hash: PIN, revision: 1, bytes: 100};
-    const second = {slug: 'pine', hash: 'c'.repeat(64), revision: 2, bytes: 200};
-    const changed = {...second, hash: 'd'.repeat(64), revision: 3};
+    const first = {slug: 'dunes', hash: PIN, uploadNumber: 1, bytes: 100};
+    const second = {slug: 'pine', hash: 'c'.repeat(64), uploadNumber: 2, bytes: 200};
+    const changed = {...second, hash: 'd'.repeat(64), uploadNumber: 3};
     const shared = 'public/assets/a/m.bin', tracked = 'public/assets/a/tracked.bin';
     const pineMount = 'public/assets/a/pine.bin';
     const inputs = pinsCompatibilityKey(root, 'r1');

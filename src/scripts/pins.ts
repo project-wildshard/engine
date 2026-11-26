@@ -35,6 +35,7 @@
 // match its committed hash, byte count and file count exactly. Coverage rows 4 and 5.
 // oxlint-disable-next-line import/no-unassigned-import -- Its hooks are the point, and they must run first.
 import './bake-loader.mjs';
+import {catalogueDocumentWithUploads, uploadIdentity, type WireUploadIdentity} from '../shared/game/grid/uploadIdentity.ts';
 import { agentFetch as fetch } from './agent-requests.mjs';
 import { createHash } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -55,12 +56,12 @@ import { assertTestsDropped } from './pin-test-names.ts';
 import {clearLocalCandidates, recordLocalCandidate} from './local-candidates.ts';
 import type {localProduct} from './pin-local.ts';
 
-interface Pin { readonly slug: string; readonly revision: number; readonly hash: string; readonly bytes: number }
+interface Pin { readonly slug: string; readonly uploadNumber: number; readonly shardVersion?: string | undefined; readonly hash: string; readonly bytes: number }
 interface PinFile { readonly api: string; readonly shards: readonly Pin[] }
 interface Slice { readonly slug: string; readonly from: string; readonly hash: string; readonly bytes: number; readonly files: number }
 interface Ring { readonly products: readonly string[]; readonly slices: readonly string[] }
 interface Ledger { readonly revision: string; readonly published: readonly string[] }
-interface CatalogueRow { readonly slug: string; readonly live?: { readonly revision: number; readonly hash: string } }
+interface CatalogueRow { readonly slug: string; readonly live?: WireUploadIdentity & { readonly hash: string } }
 interface ListedRow { readonly hash: string; readonly bytes: number }
 
 const API = process.env.WILDSHARD_API ?? 'https://api.wildshard.io';
@@ -117,21 +118,21 @@ async function getJson(path: string): Promise<unknown> {
 /** Re-pin to the catalogue's live heads. A slug the catalogue no longer lists (DEL9: deleted) is refused, never silently
  *  dropped: whatever names it (a ring, a release variable, a proof list) has to drop it first, then `--drop <slug>`. */
 async function refresh(drop: readonly string[]): Promise<void> {
-  const [catalogue, listed, document] = await Promise.all([getJson('/api/catalogue'), getJson('/api/shardfiles'), getJson('/api/catalogue.json?stage=live')]);
+  const [catalogue, listed, document] = await Promise.all([getJson('/api/catalogue'), getJson('/api/shardfiles'), getJson('/api/catalogue.json?stage=live&wire=upload')]);
   const pinned = existsSync(PINS) ? pinnedSlugs(readJson(PINS)) : [], liveSlugs = catalogueSlugs(catalogue);
   const wrongDrop = drop.filter(slug => !pinned.includes(slug) || liveSlugs.has(servedSlug(slug)));
   if (wrongDrop.length > 0) throw new Error(`pins refresh refused: --drop ${wrongDrop.join(',')} names no pin, or one GET /api/catalogue still lists`);
   assertTestsDropped(drop);
   const held = pinned.filter(slug => !drop.includes(slug));
-  const unlisted = unlistedSlugs(liveSlugs, { [PINS]: held, 'GET /api/catalogue.json?stage=live': documentSlugs(document), ...releaseNamed(process.env) });
+  const unlisted = unlistedSlugs(liveSlugs, { [PINS]: held, 'GET /api/catalogue.json?stage=live&wire=upload': documentSlugs(document), ...releaseNamed(process.env) });
   if (unlisted.length > 0) throw new Error(`pins refresh refused, nothing written:\n${unlistedMessage(unlisted)}\n`
     + `A deleted pin: drop it from what names it, then run pins.ts refresh --drop <slug>.`);
   const { shards } = catalogue as { shards: readonly CatalogueRow[] }, rows = Array.isArray(listed) ? listed as readonly ListedRow[] : (listed as { shardfiles: readonly ListedRow[] }).shardfiles;
   const sizes = new Map(rows.map(row => [row.hash, row.bytes]));
-  const pins = shards.flatMap(({ slug, live }): Pin[] => (live === undefined ? [] : [{ slug, revision: live.revision, hash: live.hash, bytes: sizes.get(live.hash) ?? 0 }]));
+  const pins = shards.flatMap(({ slug, live }): Pin[] => (live === undefined ? [] : [{ slug, ...uploadIdentity(live), hash: live.hash, bytes: sizes.get(live.hash) ?? 0 }]));
   mkdirSync(dirname(PINS), { recursive: true });
   writeFileSync(PINS, json({ api: API, shards: pins }));
-  writeFileSync(CATALOGUE, json(document));
+  writeFileSync(CATALOGUE, json(catalogueDocumentWithUploads(document)));
   console.log(`pinned ${pins.length} shardfiles, ${(pins.reduce((sum, row) => sum + row.bytes, 0) / 1e9).toFixed(2)} GB`);
 }
 
@@ -279,7 +280,7 @@ function mountsOf(folder: string): Set<string> {
 
 /** A full install leaves no out/ product the pins don't name, so land's gen:inputs has nothing stale to refuse (pins-reuse.mjs). */
 function pruneStale(root: string): void {
-  for (const row of pruneStalePinProducts(root)) console.log(`pins: removed out/${row.folder} (revision ${String(row.revision)}), a product no pin names`);
+  for (const row of pruneStalePinProducts(root)) console.log(`pins: removed out/${row.folder} (revision ${String(row.uploadNumber)}), a product no pin names`);
 }
 
 /** One install of this tree at a time, full or reused: out/.pins.lock (pins-reuse.mjs). */
@@ -434,7 +435,7 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
         writeFileSync(join(target, path), body);
         written.set(path, digest(body));
       }
-      const validation = `${JSON.stringify({ ...receipt, revision, pin: { hash: pin.hash, revision: pin.revision }, ...(pin.slug === dependency?.pin.slug ? {source: dependency.source} : {}) })}\n`;
+      const validation = `${JSON.stringify({ ...receipt, revision, pin: { hash: pin.hash, uploadNumber: pin.uploadNumber }, ...(pin.slug === dependency?.pin.slug ? {source: dependency.source} : {}) })}\n`;
       writeFileSync(join(target, 'validation.json'), validation);
       written.set('validation.json', sha256(Buffer.from(validation)));
       folderHashes.set(folder, Object.fromEntries(written));
@@ -508,7 +509,7 @@ function ringCatalogue(pins: readonly Pin[]): void {
   const shards = catalogue.shards.filter(row => kept.has(row.slug));
   for (const row of shards) {
     const pin = pins.find(candidate => candidate.slug === row.slug);
-    if (pin !== undefined) Object.assign(row, {hash: pin.hash, revision: pin.revision});
+    if (pin !== undefined) Object.assign(row, {hash: pin.hash, uploadNumber: pin.uploadNumber, shardVersion: pin.shardVersion});
   }
   const home = catalogue.grid.cells.find(row => row.cell[0] === 0 && row.cell[1] === 0);
   const replaceHome = home === undefined || !kept.has(home.slug);

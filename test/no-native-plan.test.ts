@@ -8,14 +8,14 @@ import { expect, test } from 'vitest';
 import { builtFolder } from '../src/test/game/builtFolder';
 
 const PLAN_FILE = 'server/native-assembly.json';
-interface PinRow { readonly slug: string; readonly revision: number }
+interface PinRow { readonly slug: string; readonly uploadNumber: number }
 
 test('no pinned shard ships a native plan file (FP21)', () => {
   const pins = (JSON.parse(readFileSync('test/pins/shardfiles.json', 'utf8')) as { shards: readonly PinRow[] }).shards;
   expect(pins.length).toBeGreaterThan(0);
   const shipping = pins.flatMap(pin => {
     const shard = JSON.parse(readFileSync(`${builtFolder(pin.slug)}/shard.json`, 'utf8')) as { admission?: { server?: readonly { readonly name?: string }[] } };
-    return (shard.admission?.server ?? []).some(row => row.name === PLAN_FILE) ? [`${pin.slug} r${pin.revision}`] : [];
+    return (shard.admission?.server ?? []).some(row => row.name === PLAN_FILE) ? [`${pin.slug} r${pin.uploadNumber}`] : [];
   });
   expect(shipping, `pinned shards still ship ${PLAN_FILE}`).toEqual([]);
 });

@@ -23,7 +23,7 @@ const pinsTool = (cwd: string, env: NodeJS.ProcessEnv, ...args: readonly string[
 const install = (cwd: string, env: NodeJS.ProcessEnv): Promise<string> => pinsTool(cwd, env, 'install');
 /** Stderr without the format's deprecation warnings: a pinned head on an old spelling still installs (FP6, format 0.68). */
 const refusals = (stderr: string): string => stderr.split('\n').filter(line => line !== '' && !line.startsWith('warning ')).join('\n');
-const pins = JSON.parse(readFileSync('test/pins/shardfiles.json', 'utf8')) as { api: string; shards: { slug: string; revision: number; hash: string; bytes: number }[] };
+const pins = JSON.parse(readFileSync('test/pins/shardfiles.json', 'utf8')) as { api: string; shards: { slug: string; uploadNumber: number; hash: string; bytes: number }[] };
 const servers: Server[] = [], folders: string[] = [];
 
 afterEach(() => {
@@ -127,7 +127,7 @@ test('bytes that are not the pin never reach the cache or out/', async () => {
   const root = mkdtempSync(join(tmpdir(), 'pins-'));
   folders.push(root);
   mkdirSync(join(root, 'test/pins'), { recursive: true });
-  writeFileSync(join(root, 'test/pins/shardfiles.json'), JSON.stringify({ api: 'local', shards: [{ slug: 'tampered', revision: 1, hash, bytes: body.length }] }));
+  writeFileSync(join(root, 'test/pins/shardfiles.json'), JSON.stringify({ api: 'local', shards: [{ slug: 'tampered', uploadNumber: 1, hash, bytes: body.length }] }));
   writeFileSync(join(root, 'package.json'), '{}');
   writeFileSync(join(root, 'pnpm-lock.yaml'), '');
   // The dead mirror is a miss that may pass, so the tool retries it (QA 11-25 row 39); this test is about the bytes, so
@@ -153,7 +153,7 @@ async function droppedHead(held: boolean): Promise<{ root: string; env: NodeJS.P
   const root = mkdtempSync(join(tmpdir(), 'pins-'));
   folders.push(root);
   mkdirSync(join(root, 'test/pins'), { recursive: true });
-  writeFileSync(join(root, 'test/pins/shardfiles.json'), JSON.stringify({ api: 'local', shards: [{ slug: 'dropped', revision: 1, hash, bytes: body.length }] }));
+  writeFileSync(join(root, 'test/pins/shardfiles.json'), JSON.stringify({ api: 'local', shards: [{ slug: 'dropped', uploadNumber: 1, hash, bytes: body.length }] }));
   return { root, hash, env: { ...process.env, WILDSHARD_API: `http://127.0.0.1:${address.port}`, WILDSHARD_PIN_MIRROR: `http://127.0.0.1:${address.port}/mirror`, WILDSHARD_PIN_CACHE: join(root, 'cache') } };
 }
 

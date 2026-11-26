@@ -26,7 +26,7 @@ describe('the cook worker', () => {
     const server: Server = notifyServer(cook, 'a-long-enough-test-token');
     await new Promise<void>(resolve => { server.listen(0, '127.0.0.1', resolve); });
     const address = server.address(), port = typeof address === 'object' && address !== null ? address.port : 0, url = `http://127.0.0.1:${port}`;
-    const notice = {event: 'shardfile.new', stage: 'preview', shard: slug, revision: 1, hash};
+    const notice = {event: 'shardfile.new', stage: 'preview', shard: slug, uploadNumber: 1, hash};
     const post = (token: string, value: unknown): Promise<Response> => fetch(`${url}/notify`, {method: 'POST', headers: {authorization: `Bearer ${token}`}, body: JSON.stringify(value)});
     try {
       expect((await post('wrong', notice)).status).toBe(401);

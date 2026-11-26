@@ -27,10 +27,12 @@ import {promisify} from 'node:util';
 import * as v from 'valibot';
 import {Scope} from '@wildshard/engine/app/scope';
 import {shardSlugOf} from '@wildshard/format/standaloneCatalogue';
-import {ShardfileHashSchema, ShardSlugSchema, RevisionNumberSchema} from '@wildshard/format/uploadWire';
+import {ShardfileHashSchema, ShardSlugSchema} from '@wildshard/format/uploadWire';
 import {SHARDFILE_VERSION} from '@wildshard/format/version';
 import {MAX_SHARDFILE_BYTES} from '@wildshard/format/uploadCaps';
 import type {CookJobReport} from './cookJob';
+import {hasUploadNumber, wireUploadFields} from './uploadFields';
+import {catalogueUpload, type UploadIdentity} from '../../shared/game/grid/uploadIdentity';
 import {expectedCopyOf, provenanceRefusal, type ExpectedCopy, type ListedCopy} from './cookProvenance';
 import {stalePreparationLine, type PreparationState} from './shardCook';
 import {cookPreparedLine, sidecarPath} from './cookSidecar';
@@ -43,36 +45,35 @@ import {cookedIndexKey, type CookedShardRef} from '../../shared/game/shardfile/c
 import {publishCooked, readVersionedCook, verifyCookReuse, writeVersionedCook, type VersionedCookIndex} from './publishCooked';
 
 /** `expected`: the API's migrated copy of this head at the engine's format (CP2b2b), which the cook's own copy must match. */
-export interface CatalogueRow {readonly slug: string; readonly revision?: number; readonly shardVersion?: string | undefined; readonly hash: string; readonly expected?: ExpectedCopy}
+export interface CatalogueRow extends Partial<UploadIdentity> {readonly slug: string; readonly hash: string; readonly expected?: ExpectedCopy}
 /** A head the cook can be asked for. `live` is production and `preview` the preview channel (the old two stages); MS2.4:
  *  `staging` is the staging channel's pointer, which is where `upload --channel staging` puts a new author's shard. */
 export type CookStage = 'live' | 'preview' | 'staging';
 /** The shape `api-server` POSTs (its `ShardfileNoticeSchema`, J30). */
-export interface CookNotice {
+export interface CookNotice extends UploadIdentity {
   readonly event: 'shardfile.new' | 'catalogue.flip';
   readonly stage: 'preview' | 'live';
   readonly shard: string;
-  readonly revision: number;
   readonly hash: string;
 }
-const NoticeSchema: v.GenericSchema<CookNotice> = v.strictObject({
+const NoticeSchema: v.GenericSchema<unknown, CookNotice> = v.pipe(v.strictObject({
   event: v.picklist(['shardfile.new', 'catalogue.flip']),
   stage: v.picklist(['preview', 'live']),
   shard: ShardSlugSchema,
-  revision: RevisionNumberSchema,
+  ...wireUploadFields,
   hash: ShardfileHashSchema,
-});
-interface RevisionRef {readonly revision: number; readonly hash: string; readonly shardVersion?: string | undefined}
-const RevisionSchema: v.GenericSchema<RevisionRef> = v.object({revision: RevisionNumberSchema, hash: ShardfileHashSchema, shardVersion: v.optional(v.string())});
+}), v.check(row => hasUploadNumber(row), 'Missing uploadNumber'), v.transform(row => catalogueUpload(row)));
+interface UploadRef extends UploadIdentity {readonly hash: string}
+const UploadRefSchema: v.GenericSchema<unknown, UploadRef> = v.pipe(v.object({...wireUploadFields, hash: ShardfileHashSchema}), v.check(row => hasUploadNumber(row), 'Missing uploadNumber'), v.transform(row => catalogueUpload(row)));
 /** `GET /api/catalogue`: it answers before a grid is set, unlike the `catalogue.json` a build bakes. */
 /** J275 (AC17): a channel's pointer names the raw upload (`raw`); the cook downloads and migrates that, as for `live`. The API
  *  sends every channel's block for every slug and leaves `raw` out where the channel has no pointer. */
 /** CP2b2b: each block also lists the API's migrated copies (`migrations`), whose digest the cook's own copy must match. */
-interface ChannelHead {readonly raw?: string | undefined; readonly shardVersion?: string | undefined; readonly migrations?: readonly ListedCopy[] | undefined}
+interface ChannelHead {readonly shardVersion?: string | undefined; readonly uploadNumber?: number | undefined; readonly raw?: string | undefined; readonly migrations?: readonly ListedCopy[] | undefined}
 const ListedCopySchema: v.GenericSchema<ListedCopy> = v.object({raw: ShardfileHashSchema, format: v.string(), hash: v.optional(ShardfileHashSchema), chainId: v.string(), status: v.string()});
-const ChannelHeadSchema: v.GenericSchema<ChannelHead> = v.object({raw: v.optional(ShardfileHashSchema), shardVersion: v.optional(v.string()), migrations: v.optional(v.array(ListedCopySchema))});
+const ChannelHeadSchema: v.GenericSchema<unknown, ChannelHead> = v.pipe(v.object({...wireUploadFields, raw: v.optional(ShardfileHashSchema), migrations: v.optional(v.array(ListedCopySchema))}), v.transform(({uploadNumber, revision, shardVersion, version, ...row}) => ({...row, uploadNumber: uploadNumber ?? revision, shardVersion: shardVersion ?? version})));
 interface Channels {readonly staging?: ChannelHead | undefined; readonly preview?: ChannelHead | undefined; readonly production?: ChannelHead | undefined}
-const CatalogueSchema: v.GenericSchema<{readonly shards: readonly {readonly slug: string; readonly live?: RevisionRef | undefined; readonly preview?: RevisionRef | undefined; readonly channels?: Channels | undefined}[]}> = v.object({shards: v.array(v.object({slug: ShardSlugSchema, live: v.optional(RevisionSchema), preview: v.optional(RevisionSchema), channels: v.optional(v.object({staging: v.optional(ChannelHeadSchema), preview: v.optional(ChannelHeadSchema), production: v.optional(ChannelHeadSchema)}))}))});
+const CatalogueSchema: v.GenericSchema<unknown, {readonly shards: readonly {readonly slug: string; readonly live?: UploadRef | undefined; readonly preview?: UploadRef | undefined; readonly channels?: Channels | undefined}[]}> = v.object({shards: v.array(v.object({slug: ShardSlugSchema, live: v.optional(UploadRefSchema), preview: v.optional(UploadRefSchema), channels: v.optional(v.object({staging: v.optional(ChannelHeadSchema), preview: v.optional(ChannelHeadSchema), production: v.optional(ChannelHeadSchema)}))}))});
 /** The head with the API's copy of it attached when one is listed at the engine's format. */
 function withExpected(head: CatalogueRow, channels: Channels | undefined): CatalogueRow {
   const listed = [channels?.staging, channels?.preview, channels?.production].flatMap(block => block?.migrations ?? []);
@@ -282,16 +283,17 @@ export function apiSource(base: string, read: typeof fetch = fetch, maxBytes: nu
         const hash = stage === 'staging' ? channel?.raw : head?.hash;
         if (hash === undefined) return [];
         const shardVersion = head?.shardVersion ?? (channel?.raw === hash ? channel.shardVersion : undefined);
-        return [withExpected({slug: row.slug, hash, ...(head === undefined ? {} : {revision: head.revision}), ...(shardVersion === undefined ? {} : {shardVersion})}, row.channels)];
+        const uploadNumber = head?.uploadNumber ?? (channel?.raw === hash ? channel.uploadNumber : undefined);
+        return [withExpected({slug: row.slug, hash, ...(uploadNumber === undefined ? {} : {uploadNumber}), ...(shardVersion === undefined ? {} : {shardVersion})}, row.channels)];
       });
       if (!versioned || heads.every(head => head.shardVersion !== undefined)) return heads;
       // Channel blocks on older API versions carry a hash without the author's label. Join raw uploads by exact hash.
       const listed = await read(`${base}/api/shardfiles`, {signal: AbortSignal.timeout(30_000)});
       if (!listed.ok) throw new Error(`Shardfile versions answered ${listed.status}`);
       const rows = v.parse(v.object({shardfiles: v.array(v.object({
-        hash: ShardfileHashSchema, shardVersion: v.optional(v.string()),
+        hash: ShardfileHashSchema, shardVersion: v.optional(v.string()), version: v.optional(v.string()),
       }))}), await listed.json()).shardfiles;
-      const versions = new Map(rows.map(row => [row.hash, row.shardVersion]));
+      const versions = new Map(rows.map(row => [row.hash, row.shardVersion ?? row.version]));
       for (const head of heads) {
         const shardVersion = versions.get(head.hash);
         if (head.shardVersion === undefined && shardVersion !== undefined) Object.assign(head, {shardVersion});
@@ -466,7 +468,7 @@ export function cookOutputDigest(root: string): string {
 }
 
 
-type CookHead = Pick<CatalogueRow, 'slug' | 'hash' | 'shardVersion'>;
+type CookHead = Pick<CatalogueRow, 'slug' | 'hash' | 'uploadNumber' | 'shardVersion'>;
 export interface VersionedCook {
   readonly store: ImmutablePackStore;
   readonly cookVersion: string;
@@ -774,7 +776,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   /** SP7, the recook rule: a build whose cook revision is unchanged copies another build's index for the same bytes, so a
    *  docs-only release cooks nothing. Same cook revision, same validator, a passing check, the same slug and the room's
    *  folder on this host; anything else, or a store that can't list, cooks. */
-  const carry = async (head: {readonly slug: string; readonly hash: string}): Promise<CookRow | undefined> => {
+  const carry = async (head: CatalogueRow): Promise<CookRow | undefined> => {
     if (carryKey === undefined) return undefined;
     let donors: readonly string[];
     try { donors = await donorsOf(head.hash); } catch { return undefined; }
@@ -927,7 +929,8 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   const headsOf = async (stages: readonly CookStage[]): Promise<CookHead[]> => {
     const seen = new Map<string, CookHead>();
     for (const stage of stages) for (const row of await source.heads(stage)) {
-      seen.set(row.hash, {slug: row.slug, hash: row.hash, shardVersion: row.shardVersion});
+      const {expected: _expected, ...identity} = row;
+      seen.set(row.hash, {...seen.get(row.hash), ...identity});
       if (row.expected !== undefined) expectations.set(row.hash, row.expected);
     }
     advertised = new Map([...seen.keys()].map((hash, at) => [hash, at]));
@@ -942,7 +945,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
       log(`recook ${build}: ${rows.length} heads in ${((clock() - started) / 1000).toFixed(1)} s`);
       return rows;
     },
-    enqueue: notice => { void schedule({slug: notice.shard, hash: notice.hash}, true); },
+    enqueue: notice => { void schedule({slug: notice.shard, hash: notice.hash, uploadNumber: notice.uploadNumber, shardVersion: notice.shardVersion}, true); },
     idle: async () => { while (pending.size > 0) await Promise.all([...pending.values()].map(job => job.done)); },
     rows: () => [...verdicts.values()],
     sweep: async stages => {

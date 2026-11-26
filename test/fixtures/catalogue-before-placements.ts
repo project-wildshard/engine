@@ -2,9 +2,8 @@
 // Keep the selected pins' metadata, but a new staging placement cannot
 // retroactively become part of the older build these tests exercise.
 import {readFileSync} from 'node:fs';
-import * as v from 'valibot';
-import {StandaloneCatalogueSchema, type StandaloneCatalogue} from '@wildshard/format/standaloneCatalogue';
+import {parseStandaloneCatalogue, type StandaloneCatalogue} from '../../src/scripts/standalone-catalogue.ts';
 import bundled from '../../test/pins/catalogue.json' with {type: 'json'};
 
 const selected = JSON.parse(readFileSync('test/pins/catalogue.json', 'utf8')) as StandaloneCatalogue;
-export const catalogueBeforePlacements = v.parse(StandaloneCatalogueSchema, {...selected, grid: bundled.grid});
+export const catalogueBeforePlacements = parseStandaloneCatalogue({...selected, grid: bundled.grid});

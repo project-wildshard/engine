@@ -88,7 +88,7 @@ async function shardTree(script: (hash: string) => Record<string, number[]>): Pr
   const root = mkdtempSync(join(tmpdir(), 'pins-retry-'));
   folders.push(root);
   mkdirSync(join(root, 'test/pins'), { recursive: true });
-  writeFileSync(join(root, 'test/pins/shardfiles.json'), JSON.stringify({ api: 'local', shards: [{ slug: 'nalati', revision: 1, hash, bytes: body.length }] }));
+  writeFileSync(join(root, 'test/pins/shardfiles.json'), JSON.stringify({ api: 'local', shards: [{ slug: 'nalati', uploadNumber: 1, hash, bytes: body.length }] }));
   const env = { ...process.env, WILDSHARD_API: base, WILDSHARD_PIN_MIRROR: `${base}/mirror`, WILDSHARD_PIN_CACHE: join(root, 'cache'), WILDSHARD_PIN_RETRY_MS: '1' };
   return { root, env, hash, seen, base };
 }

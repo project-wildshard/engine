@@ -5,9 +5,8 @@ import {tmpdir} from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- This test bakes a build folder of its own.
 import {join} from 'node:path';
 import {afterEach, describe, expect, it} from 'vitest';
-import * as v from 'valibot';
 import {packsBookPath} from '../src/shared/game/shardfile/spawnManifest';
-import {StandaloneCatalogueSchema} from '@wildshard/format/standaloneCatalogue';
+import {parseStandaloneCatalogue} from '../src/scripts/standalone-catalogue.ts';
 import {addCookedShards, appendValidationVerdicts, catalogueWithAdded, stagingZoneSelect, writeCatalogueDocument, writeTitleRows, writeZoneSelectDocument} from '../src/scripts/app-build/catalogue';
 import {stampBuildHtml} from '../src/scripts/app-build/buildIdentity.mjs';
 import {refreshServiceWorker, workerScripts} from '../src/scripts/app-build/serviceWorker';
@@ -21,7 +20,7 @@ import {instanceSaveIdentity} from '../src/shared/game/instanceSaves';
 import {admittedShardInstance, assertShardSlug} from '../src/shared/game/shardfile/identity';
 
 /** C3 (J61, D7): what a page reads at boot, and a shard added to it after the build. */
-const fresh = {slug: 'test-shard', name: 'Test Shard', revision: 1, hash: 'a'.repeat(64)};
+const fresh = {slug: 'test-shard', name: 'Test Shard', uploadNumber: 1, hash: 'a'.repeat(64)};
 const added = {...shipped, placements: [...shipped.placements, {instance: 'test-shard-solo', slug: 'test-shard', cell: [9, 9], size: [500, 500, 500], order: 99}],
   grid: {...shipped.grid, cells: shipped.grid.cells.map(row => (row.cell[0] === 2 && row.cell[1] === 2 ? {instance: 'test-shard', slug: 'test-shard', cell: row.cell} : row))}, shards: [fresh]};
 const card = {thumb: 'a', portrait: 'b', landscape: 'c'};
@@ -119,7 +118,7 @@ describe('the bake', () => {
       const html = readFileSync(join(out, 'index.html'), 'utf8'), body = /id="ws-catalogue">([^<]*)<\/script>/u.exec(html)?.[1] ?? '';
       expect(html.match(/ws-catalogue/gu)).toHaveLength(1);
       const baked: unknown = JSON.parse(readFileSync(join(out, 'catalogue.json'), 'utf8')), inlined: unknown = JSON.parse(body);
-      expect(v.parse(StandaloneCatalogueSchema, baked).shards[0]?.name).toBe('</script><b>');
+      expect(parseStandaloneCatalogue(baked).shards[0]?.name).toBe('</script><b>');
       expect(inlined).toEqual(baked);
     } finally { rmSync(out, {recursive: true, force: true}); }
   });
@@ -144,9 +143,9 @@ describe('the bake', () => {
   });
 
   it('adds a stored head by the deploy\'s rows, and leaves what the build shipped', () => {
-    const row = {slug: 'driftwood-isle', name: 'Driftwood Isle', revision: 1, hash: 'b'.repeat(64)};
+    const row = {slug: 'driftwood-isle', name: 'Driftwood Isle', uploadNumber: 1, hash: 'b'.repeat(64)};
     const built = {version: 0, stage: 'live', placements: shipped.placements, grid: shipped.grid, shards: [row], missing: []} as unknown as Parameters<typeof catalogueWithAdded>[0];
-    const live = {...built, placements: [...shipped.placements.map(place => ({...place, order: 7})), added.placements.at(-1)], shards: [{...row, revision: 9}, fresh]} as typeof built;
+    const live = {...built, placements: [...shipped.placements.map(place => ({...place, order: 7})), added.placements.at(-1)], shards: [{...row, uploadNumber: 9}, fresh]} as typeof built;
     const merged = catalogueWithAdded(built, live, ['test-shard']);
     expect(merged.shards).toEqual([row, fresh]);
     expect(merged.grid).toBe(shipped.grid);

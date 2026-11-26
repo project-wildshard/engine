@@ -24,7 +24,7 @@ test('the pass is off until the host names a sidecar folder, a recorder, its cli
   expect(cookSidecars({COOK_SIDECARS: 'tmp/sidecars'})).toBe(resolve('tmp/sidecars'));
   const off = (env: Record<string, string>): unknown => recordPorts(env, MOVED, root, quiet);
   expect(off({})).toEqual({off: 'no COOK_SIDECARS'});
-  expect(recordPorts(full, undefined, root, quiet)).toEqual({off: 'no renderer revision'});
+  expect(recordPorts(full, undefined, root, quiet)).toEqual({off: 'no renderer uploadNumber'});
   expect(off({...full, COOK_RECORDER: ''})).toEqual({off: 'no COOK_RECORDER'});
   expect(off({...full, COOK_PREPARATION_CLIENT: ''})).toEqual({off: 'no COOK_PREPARATION_CLIENT'});
   expect(off({...full, COOK_RECORD_CANARY: ''})).toEqual({off: 'no COOK_RECORD_CANARY'});
@@ -56,7 +56,7 @@ test('a recook records every stale head first through the recorder process, and 
     `fs.cpSync(path.join(${JSON.stringify(recorded)}, String(fenced)), dir, {recursive: true});`,
   ].join('\n'));
   const byHash = new Map([canary, other, current].map(row => [row.hash, row.tarball]));
-  const source = {heads: (stage: string) => Promise.resolve(stage === 'live' ? [canary, other].map(row => ({slug: row.slug, hash: row.hash, revision: 1})) : stage === 'staging' ? [{slug: current.slug, hash: current.hash, revision: 1}] : []),
+  const source = {heads: (stage: string) => Promise.resolve(stage === 'live' ? [canary, other].map(row => ({slug: row.slug, hash: row.hash, uploadNumber: 1})) : stage === 'staging' ? [{slug: current.slug, hash: current.hash, uploadNumber: 1}] : []),
     download: (hash: string) => { const bytes = byHash.get(hash); return bytes === undefined ? Promise.reject(new Error('unknown')) : Promise.resolve(bytes); }};
   const sidecars = join(root, 'sidecars'), lines: string[] = [];
   const env = {COOK_SIDECARS: sidecars, COOK_RECORDER: JSON.stringify([process.execPath, script]), COOK_PREPARATION_CLIENT: join(root, 'client'), COOK_RECORD_CANARY: 'brasscap-mesa', COOK_JOB_WRAP: '[]'};

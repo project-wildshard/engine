@@ -10,7 +10,7 @@ import { afterEach, expect, test } from 'vitest';
 import { catalogueSlugs, documentSlugs, pinnedSlugs, releaseNamed, releaseNames, unlistedMessage, unlistedSlugs } from '../src/scripts/pins-catalogue.ts';
 
 const PINS = 'test/pins/shardfiles.json';
-const pins = JSON.parse(readFileSync(PINS, 'utf8')) as { api: string; shards: { slug: string; revision: number; hash: string; bytes: number }[] };
+const pins = JSON.parse(readFileSync(PINS, 'utf8')) as { api: string; shards: { slug: string; uploadNumber: number; hash: string; bytes: number }[] };
 const pinnedCatalogue = JSON.parse(readFileSync('test/pins/catalogue.json', 'utf8')) as unknown;
 const servers: Server[] = [], folders: string[] = [];
 
@@ -83,7 +83,7 @@ test('pins refresh refuses a pinned slug the catalogue no longer lists, and --dr
   // Deleted: a pin no release names, so only the pin itself names it.
   const gone = pins.shards.find(row => row.slug === 'open-plot-thin-ice') ?? pins.shards.at(-1);
   if (gone === undefined) throw new Error('Expected a pinned shard');
-  const live = { shards: pins.shards.filter(row => row !== gone).map(row => ({ slug: row.slug, live: { revision: row.revision, hash: row.hash } })) };
+  const live = { shards: pins.shards.filter(row => row !== gone).map(row => ({ slug: row.slug, live: { uploadNumber: row.uploadNumber, hash: row.hash } })) };
   const root = tree(), env = { PATH: process.env['PATH'], WILDSHARD_API: await api(live, gone.slug) };
   const refused = await tool('src/scripts/pins.ts', root, env, 'refresh');
   expect(refused.code).not.toBe(0);

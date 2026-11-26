@@ -110,8 +110,8 @@ function readState() {
     const rows = publishedRows(readPublished(repo));
     if (rows.length > 0) repos.push({repo, rows, tags: readTags(repo, rows)});
   }
-  const shardfiles = /** @type {{shards: {slug: string, revision: number}[]}} */ (JSON.parse(readFileSync('test/pins/shardfiles.json', 'utf8')));
-  const pins = new Map(shardfiles.shards.map(pin => [pin.slug, pin.revision]));
+  const shardfiles = /** @type {{shards: {slug: string, uploadNumber: number}[]}} */ (JSON.parse(readFileSync('test/pins/shardfiles.json', 'utf8')));
+  const pins = new Map(shardfiles.shards.map(pin => [pin.slug, pin.uploadNumber]));
   const branches = new Set(execFileSync('git', ['ls-remote', '--heads', 'origin', 'plan/pin-*'], {encoding: 'utf8'}).split('\n')
     .map(line => line.split('\t')[1]?.replace(/^refs\/heads\//u, '') ?? '').filter(Boolean));
   const dispatch = {...process.env, GH_TOKEN: process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN};

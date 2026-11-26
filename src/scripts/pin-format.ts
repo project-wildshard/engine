@@ -15,7 +15,7 @@ import {readTar, writeTar} from '@wildshard/format/tar';
 import { saveRevision } from '../shared/game/shardfile/saveRevision';
 
 interface FormatTemplate {
-  readonly pin: {readonly slug: string; readonly revision: number; readonly hash: string; readonly bytes: number};
+  readonly pin: {readonly slug: string; readonly uploadNumber: number; readonly hash: string; readonly bytes: number};
   readonly bytes: Uint8Array;
   readonly source: {readonly kind: string; readonly path: string; readonly indexHash: string};
 }
@@ -77,6 +77,6 @@ export function formatTemplate(slug: string): FormatTemplate {
   if (index.identity.slug !== slug) throw new Error('Format dependency contains another product');
   checkEngineFloor(index);
   const bytes = writeTar(files), hash = createHash('sha256').update(bytes).digest('hex');
-  return {pin: {slug, revision: saveRevision(index.identity), hash, bytes: bytes.length}, bytes,
+  return {pin: {slug, uploadNumber: saveRevision(index.identity), hash, bytes: bytes.length}, bytes,
     source: {kind: 'format-dependency', path: `@wildshard/format/${folder}`, indexHash: createHash('sha256').update(indexBytes).digest('hex')}};
 }

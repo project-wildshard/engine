@@ -2,8 +2,8 @@
 // SHARD-SIZE row 1, judged by BUDGET-CAPS BC4 (meta docs/plans/BUDGET-CAPS-PLAN.md; J444, J437): every web build reads
 // each shard's phone download from the packs book (`client.<slug>.phone.wireBytes`, what the page really downloads) and
 // judges it with src/scripts/budgets/verdict.mjs. The hard cap is budgets/caps.json `download/phone/*` (J338, 100 MB). The
-// baseline is budgets/baselines.json `download/phone/<slug>`, tied to the shard's pinned revision: a new revision is new
-// content and only the hard cap applies until it is recorded; the same revision 10% over its baseline is a regression.
+// baseline is budgets/baselines.json `download/phone/<slug>`, tied to the shard's pinned uploadNumber: a new uploadNumber is new
+// content and only the hard cap applies until it is recorded; the same uploadNumber 10% over its baseline is a regression.
 // Nothing fails for getting smaller. budgets/shard-size-baseline.json keeps the measured history and how it was measured.
 //
 //   node src/scripts/shard-size-gate.mjs [dist]                 judge (src/scripts/build-app.mjs runs this)
@@ -46,11 +46,11 @@ export function readPhoneDownloads(dist) {
   return Object.fromEntries(Object.entries(client).map(([slug, row]) => [slug, row.phone.wireBytes + (cooked(row) ? engine : 0)]));
 }
 
-/** Each pinned shard's content key, `<slug>@<revision>`, from the pins this tree builds.
+/** Each pinned shard's content key, `<slug>@<uploadNumber>`, from the pins this tree builds.
  * @param {string} [root] @returns {Record<string, string>} */
 export function pinnedContentKeys(root = resolve(import.meta.dirname, '..', '..')) {
   const { shards } = JSON.parse(readFileSync(resolve(root, PINS_FILE), 'utf8'));
-  return Object.fromEntries(shards.map((/** @type {{ slug: string, revision: number }} */ pin) => [pin.slug, `${pin.slug}@${pin.revision}`]));
+  return Object.fromEntries(shards.map((/** @type {{ slug: string, uploadNumber: number }} */ pin) => [pin.slug, `${pin.slug}@${pin.uploadNumber}`]));
 }
 
 /** The downloads as budget measures; a product with no pin is the engine's own content.

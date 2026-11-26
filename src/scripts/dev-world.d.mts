@@ -39,7 +39,7 @@ export function openDevWorld(options: {
   /** the page and the world socket as another device reaches them through an HTTPS proxy (serve-local.mjs) */
   readonly publicOrigin?: string
   readonly publicSocket?: string
-  readonly staging?: readonly { readonly slug: string; readonly revision: number }[]
+  readonly staging?: readonly { readonly slug: string; readonly uploadNumber: number }[]
   /** a fixed loopback port for the world socket (0: the OS's) */
   readonly socketPort?: number
   readonly log?: (line: string) => void

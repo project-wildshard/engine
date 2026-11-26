@@ -9,8 +9,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterEach, expect, test } from 'vitest';
-import * as v from 'valibot';
-import { StandaloneCatalogueSchema } from '@wildshard/format/standaloneCatalogue';
+import { parseStandaloneCatalogue } from '../src/scripts/standalone-catalogue.ts';
 import { borrowGrid, borrowedCells, sameCells, type Cell } from '../src/scripts/preview-grid.ts';
 import { catalogueBeforePlacements } from './fixtures/catalogue-before-placements';
 
@@ -28,7 +27,7 @@ test('a staging placement lands at the same cell, after the pinned 25, and the d
   expect(out.document.grid.cells.slice(pin.grid.cells.length)).toEqual([thinIce, fresh]);
   // A pinned shard has its head; a slug this build has none for is placed with no head at this stage.
   expect(out.document.missing).toEqual([...pin.missing, 'brand-new']);
-  expect(() => v.parse(StandaloneCatalogueSchema, out.document)).not.toThrow();
+  expect(() => parseStandaloneCatalogue(out.document)).not.toThrow();
   expect(borrowedCells(pin, out.document)).toEqual([thinIce, fresh]);
 });
 

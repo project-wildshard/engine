@@ -8,7 +8,7 @@ import { expect, test } from 'vitest';
 import { DEFAULT_SPAWN } from '@wildshard/format/level-start';
 import { builtFolder } from '../src/test/game/builtFolder';
 
-interface PinRow { readonly slug: string; readonly revision: number }
+interface PinRow { readonly slug: string; readonly uploadNumber: number }
 interface Spawn { readonly x: number; readonly y?: number; readonly z: number; readonly yaw: number }
 const read = <T>(path: string): T => JSON.parse(readFileSync(path, 'utf8')) as T;
 
@@ -23,7 +23,7 @@ test('every pinned product with no level manifest declares the spawn its discove
     const declared = !(spawn.x === DEFAULT_SPAWN.x && spawn.y === DEFAULT_SPAWN.y && spawn.z === DEFAULT_SPAWN.z && spawn.yaw === DEFAULT_SPAWN.yaw);
     const same = discovery !== undefined && discovery.x === spawn.x && discovery.z === spawn.z && discovery.yaw === spawn.yaw
       && (discovery.y === undefined || discovery.y === spawn.y);
-    return declared && (same || discovery === undefined) ? [] : [`${pin.slug} r${pin.revision}`];
+    return declared && (same || discovery === undefined) ? [] : [`${pin.slug} r${pin.uploadNumber}`];
   });
   expect(differ, 'pins whose world/spawn is undeclared or differs from the discovery spawn').toEqual([]);
 });

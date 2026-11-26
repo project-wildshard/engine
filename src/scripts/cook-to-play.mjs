@@ -39,7 +39,7 @@ try {
   const archive=execFileSync('git',['archive','HEAD'],{maxBuffer:512*1024*1024});
   execFileSync('tar',['-x','-C',tree],{input:archive});linkNodeModules(root,tree);
   node(['src/scripts/pins.ts','install','sunscar-dunes'],tree);
-  /** @type {import('@wildshard/format/standaloneCatalogue').StandaloneCatalogue} */
+  /** @type {import('./standalone-catalogue.ts').StandaloneCatalogue} */
   const live=JSON.parse(readFileSync('out/.ring-catalogue.json','utf8'));
   const selected={...live,shards:live.shards.filter(row=>row.slug==='sunscar-dunes'),placements:live.placements.filter(row=>bareSlug(row.slug)==='sunscar-dunes')};
   const catalogue=join(work,'catalogue.json');writeFileSync(catalogue,JSON.stringify(selected));

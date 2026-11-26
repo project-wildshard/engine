@@ -1,3 +1,5 @@
+import {catalogueUpload, type WireUploadIdentity} from './uploadIdentity';
+
 /** C3 (J61, D7): the catalogue a page read at boot. A build bakes `catalogue.json` and inlines it in `index.html`, so the
  * first paint waits on no fetch and a head or placement changes with no client rebuild. This holds no data, so the
  * title's chunk can carry it: `catalogueDocument.ts` adds the default that Node tools and tests read. */
@@ -10,7 +12,7 @@ export interface CataloguePlacement {
   readonly status?: string;
 }
 /** A head of the catalogue's stage: the revision of a shard this build runs. */
-export interface CatalogueHead {readonly slug: string; readonly name: string; readonly revision: number; readonly hash: string}
+export interface CatalogueHead {readonly slug: string; readonly name: string; readonly uploadNumber: number; readonly shardVersion?: string | undefined; readonly hash: string}
 export interface CatalogueDocument {
   readonly placements: readonly CataloguePlacement[];
   /** Parsed by `parseGridCatalogue`, which owns its shape. */
@@ -27,7 +29,8 @@ const isDocument = (value: unknown): value is CatalogueDocument => typeof value 
 /** The composition root installs what it read; a worker gets the page's copy. One slot per realm, like the shard list. */
 export function installCatalogue(document: unknown): void {
   if (!isDocument(document)) throw new Error('Invalid catalogue');
-  Reflect.set(globalThis, SLOT, document);
+  const shards = document.shards as readonly (Omit<CatalogueHead, 'uploadNumber'> & WireUploadIdentity)[] | undefined;
+  Reflect.set(globalThis, SLOT, shards?.some(row => 'revision' in row || 'version' in row) === true ? {...document, shards: shards.map(catalogueUpload)} : document);
 }
 export function installedCatalogue(): CatalogueDocument | undefined {
   const installed: unknown = Reflect.get(globalThis, SLOT);

@@ -7,7 +7,7 @@ import { expect, test } from 'vitest';
 import { builtFolder } from '../src/test/game/builtFolder';
 import { declaredCurrency } from '../src/shared/game/loot/currency';
 
-interface PinRow { readonly slug: string; readonly revision: number }
+interface PinRow { readonly slug: string; readonly uploadNumber: number }
 const read = <T>(path: string): T => JSON.parse(readFileSync(path, 'utf8')) as T;
 
 test('every pinned product with a loot row declares its currency (FP31)', () => {
@@ -16,7 +16,7 @@ test('every pinned product with a loot row declares its currency (FP31)', () => 
     const path = `${builtFolder(pin.slug)}/sections/economy/loot.json`;
     if (!existsSync(path)) return [];
     const rows = read<{ rows: { loot: readonly { readonly economy?: unknown }[] } }>(path).rows.loot;
-    return rows.length > 0 && declaredCurrency(rows) === null ? [`${pin.slug} r${pin.revision}`] : [];
+    return rows.length > 0 && declaredCurrency(rows) === null ? [`${pin.slug} r${pin.uploadNumber}`] : [];
   });
   expect(undeclared, 'pins with a loot row and no currency would lose their purse, Bag loot row and shop').toEqual([]);
 });

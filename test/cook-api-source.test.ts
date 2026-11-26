@@ -8,12 +8,12 @@ import {apiSource} from '../src/cook/game/cookWorker';
 const hash = (n: number): string => n.toString(16).padStart(64, '0');
 const migration = (raw: string): unknown => ({raw, formatVersion: '0.1', migrations: [{raw, format: '0.1', hash: raw, chainId: 'identity', status: 'ok'}]});
 const catalogue = {shards: [
-  {slug: 'pinned', name: 'Pinned', live: {revision: 3, hash: hash(1)}, preview: {revision: 4, hash: hash(2)},
+  {slug: 'pinned', name: 'Pinned', live: {uploadNumber: 3, shardVersion: '1.2.3', hash: hash(1)}, preview: {uploadNumber: 4, hash: hash(2)},
     channels: {preview: migration(hash(2)), staging: migration(hash(3)), production: migration(hash(1))}},
   {slug: 'new-author', name: 'New', channels: {staging: migration(hash(4))}},
-  {slug: 'old-row', name: 'Old', live: {revision: 1, hash: hash(5)}},
+  {slug: 'old-row', name: 'Old', live: {revision: 1, version: '0.2.0', hash: hash(5)}},
   // api-server sends every channel's block and leaves `raw` out where the channel has no pointer.
-  {slug: 'live-only', name: 'Live only', live: {revision: 2, hash: hash(6)}, channels: {staging: {formatVersion: '0.1', migrations: []}, production: migration(hash(6))}},
+  {slug: 'live-only', name: 'Live only', live: {uploadNumber: 2, hash: hash(6)}, channels: {staging: {formatVersion: '0.1', migrations: []}, production: migration(hash(6))}},
 ]};
 const source = apiSource('https://api.example', (async () => Response.json(catalogue)) as unknown as typeof fetch);
 
@@ -22,8 +22,8 @@ describe('the cook reads every channel it cooks for', () => {
     expect(await source.heads('staging')).toEqual([{slug: 'pinned', hash: hash(3)}, {slug: 'new-author', hash: hash(4)}]);
   });
   it('keeps the old stages as they were', async () => {
-    expect(await source.heads('live')).toEqual([{slug: 'pinned', revision: 3, hash: hash(1)}, {slug: 'old-row', revision: 1, hash: hash(5)}, {slug: 'live-only', revision: 2, hash: hash(6)}]);
-    expect(await source.heads('preview')).toEqual([{slug: 'pinned', revision: 4, hash: hash(2)}]);
+    expect(await source.heads('live')).toEqual([{slug: 'pinned', uploadNumber: 3, shardVersion: '1.2.3', hash: hash(1)}, {slug: 'old-row', uploadNumber: 1, shardVersion: '0.2.0', hash: hash(5)}, {slug: 'live-only', uploadNumber: 2, hash: hash(6)}]);
+    expect(await source.heads('preview')).toEqual([{slug: 'pinned', uploadNumber: 4, hash: hash(2)}]);
   });
   it('refuses a staging pointer that is not a hash', async () => {
     const bad = apiSource('https://api.example', (async () => Response.json({shards: [{slug: 'x', channels: {staging: {raw: '../etc'}}}]})) as unknown as typeof fetch);
@@ -36,13 +36,13 @@ describe('the cook reads every channel it cooks for', () => {
 describe('the API copy the cook must match', () => {
   const copy = (raw: string, extra: object): unknown => ({raw, format: SHARDFILE_VERSION, hash: hash(90), chainId: 'c'.repeat(64), status: 'ok', ...extra});
   const listing = {shards: [
-    {slug: 'copied', live: {revision: 1, hash: hash(10)}, channels: {production: {raw: hash(10), migrations: [copy(hash(10), {format: '0.1.0.1'}), copy(hash(10), {})]}}},
+    {slug: 'copied', live: {uploadNumber: 1, hash: hash(10)}, channels: {production: {raw: hash(10), migrations: [copy(hash(10), {format: '0.1.0.1'}), copy(hash(10), {})]}}},
     {slug: 'refused', channels: {staging: {raw: hash(11), migrations: [copy(hash(11), {status: 'refused', hash: undefined})]}}},
     {slug: 'other', channels: {staging: {raw: hash(12), migrations: [copy(hash(13), {})]}}},
   ]};
   const api = apiSource('https://api.example', (async () => Response.json(listing)) as unknown as typeof fetch);
   it('attaches the ok copy at the engine format to its head, from any channel block', async () => {
-    expect(await api.heads('live')).toEqual([{slug: 'copied', revision: 1, hash: hash(10), expected: {chainId: 'c'.repeat(64), digest: hash(90)}}]);
+    expect(await api.heads('live')).toEqual([{slug: 'copied', uploadNumber: 1, hash: hash(10), expected: {chainId: 'c'.repeat(64), digest: hash(90)}}]);
   });
   it('attaches nothing for a refused copy or a copy of another original', async () => {
     expect(await api.heads('staging')).toEqual([{slug: 'refused', hash: hash(11)}, {slug: 'other', hash: hash(12)}]);

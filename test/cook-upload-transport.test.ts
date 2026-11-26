@@ -11,14 +11,14 @@ import {checkShardfile} from '../src/server/host/checkShardfile';
 import {emptyShardfile} from '../src/shared/host/author';
 
 const key = 'fixture-cook-signing-key-with-32-bytes', bytes = new TextEncoder().encode('private original');
-const job: PendingUpload = {uploadId: '11111111-1111-1111-1111-111111111111', hash: createHash('sha256').update(bytes).digest('hex'), slug: 'check-fixture', revision: 1, formatVersion: '2'};
+const job: PendingUpload = {uploadId: '11111111-1111-1111-1111-111111111111', hash: createHash('sha256').update(bytes).digest('hex'), slug: 'check-fixture', uploadNumber: 1, formatVersion: '2'};
 const directories: string[] = [];
 const directory = (): string => {const root = resolve('tmp/codex-wire'); mkdirSync(root, {recursive: true}); const path = mkdtempSync(`${root}/transport-`); directories.push(path); return path;};
 afterEach(() => {for (const path of directories.splice(0)) rmSync(path, {recursive: true, force: true});});
 const feed = async function* jobs(): AsyncIterable<PendingUpload> {yield job;};
 const api = (overrides: Partial<CookApi> = {}): CookApi => ({pending: feed, activations: async function* notices() {}, download: () => Promise.resolve(bytes), verdict: () => Promise.resolve(), acknowledge: () => Promise.resolve(), ...overrides});
 const successful = async (): Promise<CookRow> => {
-  const shard = emptyShardfile({slug: job.slug, name: 'Fixture', author: 'Test', seed: 1, revision: 1});
+  const shard = emptyShardfile({slug: job.slug, name: 'Fixture', author: 'Test', seed: 1, saveRevision: 1});
   const check = await checkShardfile(shard, new Map(), {validate: () => Promise.resolve({ticks: 240, lanes: 4, steps: 16, scripts: {p95Micros: 1, maxMicros: 2, samples: 180}, fuel: {p95: 1, max: 2, samples: 240}})});
   return {slug: job.slug, hash: job.hash, state: 'cooked', check};
 };

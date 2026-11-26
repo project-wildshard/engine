@@ -82,7 +82,7 @@ export function devServerBuildArgs({ id, out, built, dev }) {
  * socket's loopback port for that proxy. Staging mode serves the full snapshot; only a public world builds the server without
  * dev controls.
  * @param {{ dist: string, work: string, shard?: string, product?: string, port?: number, saves?: 'disk' | 'memory', gridRoot?: string,
- *   publicOrigin?: string, publicSocket?: string, socketPort?: number, staging?: readonly { slug: string, revision: number }[], log?: (line: string) => void }} options */
+ *   publicOrigin?: string, publicSocket?: string, socketPort?: number, staging?: readonly { slug: string, uploadNumber: number }[], log?: (line: string) => void }} options */
 export async function openDevWorld({ dist, work: requestedWork, shard = 'brasscap-mesa', product, port = DEV_PORT, saves = 'disk', gridRoot = ROOT, publicOrigin, publicSocket, socketPort = 0, staging, log = line => { console.log(line); } }) {
   if (!/^[a-z0-9_-]+$/u.test(shard)) throw new Error('A dev world shard must be a slug');
   const work = absolute(requestedWork); mkdirSync(work, { recursive: true });
@@ -117,7 +117,7 @@ export async function openDevWorld({ dist, work: requestedWork, shard = 'brassca
     if (read.missing.includes(shard)) throw new Error(`No shard source and no pinned product: ${shard}`);
     if (read.missing.length > 0) console.warn(`dev world: no local product for ${read.missing.join(', ')}; left off this grid (node src/scripts/pins.ts install)`);
     const books = /** @type {string[]} */ (read.books);
-    const shards = staging?.filter(row => !read.missing.includes(row.slug)).map(row => ({ slug: row.slug, revision: row.revision })) ?? [{ slug: shard, revision: 1 }];
+    const shards = staging?.filter(row => !read.missing.includes(row.slug)).map(row => ({ slug: row.slug, revision: row.uploadNumber })) ?? [{ slug: shard, revision: 1 }];
     const cells = staging === undefined ? shard : [shard, ...shards.map(row => row.slug).filter(slug => slug !== shard)].join(',');
     const secret = staging === undefined ? 'dev-world' : randomBytes(32).toString('hex');
     /** The server book and bundle for a client build. @param {string} id @param {string} built */

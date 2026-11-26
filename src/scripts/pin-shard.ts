@@ -1,16 +1,17 @@
 #!/usr/bin/env node
-// Meta SHARD-PUBLISH-ACTIONS SP6 (J369, J371): pin one shard revision a publish just committed, as the hand bumps did
+// Meta SHARD-PUBLISH-ACTIONS SP6 (J369, J371): pin one shard uploadNumber a publish just committed, as the hand bumps did
 // (engine fafee64e): its row in test/pins/shardfiles.json and in the pinned catalogue document, then the staging
 // snapshot by refresh. Only that slug's pin moves: a full `pins.ts refresh` would pull every other pin to its live head
 // and drop the staging revisions pinned by hand. Node built-ins only; .github/workflows/shard-pin.yml runs it.
 //
-//   node src/scripts/pin-shard.ts <slug> <revision> <hash> [staging|prod] [--first]
+//   node src/scripts/pin-shard.ts <slug> <uploadNumber> <hash> [staging|prod] [--first]
 //   node src/scripts/pin-shard.ts --drop <slug...>  remove pins after the reviewed catalogue removes them and no test
 //                                               names them (NB10, pin-test-names.ts)
 //
-// It refuses unless the API's channel document names exactly that revision and hash for the slug, and a slug engine
+// It refuses unless the API's channel document names exactly that uploadNumber and hash for the slug, and a slug engine
 // never pinned (a first pin is a reviewed `pins.ts refresh`, DEL9) unless `--first` asks for one: meta MOSSGATE-ZONE MZ26,
 // a staging-only shard (production `live: null`, so `pins.ts refresh` skips it) joins the preview pins under staging's name.
+import {catalogueUpload, type WireUploadIdentity} from '../shared/game/grid/uploadIdentity.ts';
 import { agentFetch as fetch } from './agent-requests.mjs';
 import {existsSync, readFileSync, writeFileSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
@@ -18,15 +19,15 @@ import {refreshStaging} from './pins-staging.ts';
 import {documentSlugs} from './pins-catalogue.ts';
 import {assertTestsDropped} from './pin-test-names.ts';
 
-interface Pin {slug: string; revision: number; hash: string; bytes: number}
+interface Pin {slug: string; uploadNumber: number; shardVersion?: string | undefined; hash: string; bytes: number}
 interface PinFile {api: string; shards: Pin[]}
-interface DocumentRow {slug: string; name?: string; revision: number; hash: string}
+interface DocumentRow {slug: string; name?: string; uploadNumber: number; shardVersion?: string | undefined; hash: string}
 interface PinnedDocument {shards: DocumentRow[]}
 
 const {WILDSHARD_API: API = 'https://api.wildshard.io'} = process.env;
 const PINS = 'test/pins/shardfiles.json', CATALOGUE = 'test/pins/catalogue.json', SAVES = 'test/pins/saves';
 const PIANO_MANIFEST = 'public/assets/music/piano/music.json';
-const HASH = /^[a-f0-9]{64}$/u, SLUG = /^[a-z0-9-]+$/u, REVISION = /^[1-9][0-9]*$/u;
+const HASH = /^[a-f0-9]{64}$/u, SLUG = /^[a-z0-9-]+$/u, UPLOAD_NUMBER = /^[1-9][0-9]*$/u;
 const json = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`;
 
 /** The pins and the pinned document with `slug` moved to `pin`; throws for a slug neither names, unless `first` names it,
@@ -34,14 +35,14 @@ const json = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`;
 export function movePin(pins: PinFile, document: PinnedDocument, pin: Pin, first?: {name: string}): {pins: PinFile; document: PinnedDocument} {
   const at = pins.shards.findIndex(row => row.slug === pin.slug), doc = document.shards.findIndex(row => row.slug === pin.slug);
   if (first !== undefined && at === -1 && doc === -1) {
-    return {pins: {...pins, shards: [...pins.shards, pin]}, document: {...document, shards: [...document.shards, {slug: pin.slug, name: first.name, revision: pin.revision, hash: pin.hash}]}};
+    return {pins: {...pins, shards: [...pins.shards, pin]}, document: {...document, shards: [...document.shards, {slug: pin.slug, name: first.name, uploadNumber: pin.uploadNumber, shardVersion: pin.shardVersion, hash: pin.hash}]}};
   }
   if (at === -1 || doc === -1) throw new Error(`${pin.slug} has no pin to move (${PINS} or ${CATALOGUE}): a first pin is a reviewed pins.ts refresh`);
   const held = pins.shards[at];
-  if (held !== undefined && held.revision > pin.revision) throw new Error(`${pin.slug}: engine pins revision ${held.revision}, newer than ${pin.revision}`);
+  if (held !== undefined && held.uploadNumber > pin.uploadNumber) throw new Error(`${pin.slug}: engine pins uploadNumber ${held.uploadNumber}, newer than ${pin.uploadNumber}`);
   return {
     pins: {...pins, shards: pins.shards.map((row, index) => index === at ? pin : row)},
-    document: {...document, shards: document.shards.map((row, index) => index === doc ? {...row, revision: pin.revision, hash: pin.hash} : row)},
+    document: {...document, shards: document.shards.map((row, index) => index === doc ? {...row, uploadNumber: pin.uploadNumber, shardVersion: pin.shardVersion, hash: pin.hash} : row)},
   };
 }
 
@@ -135,20 +136,20 @@ async function main(argv: readonly string[]): Promise<void> {
     return;
   }
   const first = argv.includes('--first');
-  const [slug = '', revisionText = '', hash = '', channel = 'staging'] = argv.filter(arg => arg !== '--first');
-  const revision = Number(revisionText);
-  if (!SLUG.test(slug) || !REVISION.test(revisionText) || !Number.isSafeInteger(revision) || revision < 1 || !HASH.test(hash) || !['staging', 'prod'].includes(channel)) {
-    throw new Error('usage: pin-shard.ts <slug> <revision> <sha256> [staging|prod] [--first]');
+  const [slug = '', uploadText = '', hash = '', channel = 'staging'] = argv.filter(arg => arg !== '--first');
+  const uploadNumber = Number(uploadText);
+  if (!SLUG.test(slug) || !UPLOAD_NUMBER.test(uploadText) || !Number.isSafeInteger(uploadNumber) || uploadNumber < 1 || !HASH.test(hash) || !['staging', 'prod'].includes(channel)) {
+    throw new Error('usage: pin-shard.ts <slug> <uploadNumber> <sha256> [staging|prod] [--first]');
   }
-  // A prod upload moves staging too (J301), so staging names the revision either way.
-  const [document, listing] = await Promise.all([getJson('/api/catalogue.json?channel=staging'), getJson('/api/shardfiles')]);
-  const row = (document as PinnedDocument).shards.find(shard => shard.slug === slug);
-  if (row?.revision !== revision || row.hash !== hash) {
-    throw new Error(`staging names ${slug} ${row === undefined ? 'nowhere' : `rev ${row.revision} ${row.hash.slice(0, 8)}`}, not rev ${revision} ${hash.slice(0, 8)}`);
+  // A prod upload moves staging too (J301), so staging names the uploadNumber either way.
+  const [document, listing] = await Promise.all([getJson('/api/catalogue.json?channel=staging&wire=upload'), getJson('/api/shardfiles')]);
+  const row = (document as {shards: (Omit<DocumentRow, 'uploadNumber'> & WireUploadIdentity)[]}).shards.map(catalogueUpload).find(shard => shard.slug === slug);
+  if (row?.uploadNumber !== uploadNumber || row.hash !== hash) {
+    throw new Error(`staging names ${slug} ${row === undefined ? 'nowhere' : `rev ${row.uploadNumber} ${row.hash.slice(0, 8)}`}, not rev ${uploadNumber} ${hash.slice(0, 8)}`);
   }
   const bytes = (listing as {shardfiles: {hash: string; bytes: number}[]}).shardfiles.find(file => file.hash === hash)?.bytes;
   if (bytes === undefined || bytes <= 0) throw new Error(`GET /api/shardfiles does not list ${hash.slice(0, 8)}`);
-  const moved = movePin(JSON.parse(readFileSync(PINS, 'utf8')) as PinFile, JSON.parse(readFileSync(CATALOGUE, 'utf8')) as PinnedDocument, {slug, revision, hash, bytes}, first ? {name: row.name ?? slug} : undefined);
+  const moved = movePin(JSON.parse(readFileSync(PINS, 'utf8')) as PinFile, JSON.parse(readFileSync(CATALOGUE, 'utf8')) as PinnedDocument, {slug, uploadNumber, shardVersion: row.shardVersion, hash, bytes}, first ? {name: row.name ?? slug} : undefined);
   writeFileSync(PINS, json(moved.pins));
   writeFileSync(CATALOGUE, json(moved.document));
   const save = `${SAVES}/${slug}.json`;
@@ -161,7 +162,7 @@ async function main(argv: readonly string[]): Promise<void> {
     console.log(`piano manifest follows the pin: ${piano.moved.join(', ')}`);
   }
   await refreshStaging(API);
-  console.log(`pinned ${slug} rev ${revision} ${hash.slice(0, 8)} (${bytes} bytes) from ${channel}${first ? ' (first pin)' : ''}`);
+  console.log(`pinned ${slug} rev ${uploadNumber} ${hash.slice(0, 8)} (${bytes} bytes) from ${channel}${first ? ' (first pin)' : ''}`);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) await main(process.argv.slice(2));

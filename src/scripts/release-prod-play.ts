@@ -7,7 +7,7 @@ import { createRequire } from 'node:module';
 import { dirname, join, resolve, sep } from 'node:path';
 import { prepareAssetDecoders } from '@wildshard/format/shardfileAssets';
 import { validateShardfileFolder } from '@wildshard/format/shardfileValidation';
-import { StandaloneCatalogueSchema } from '@wildshard/format/standaloneCatalogue';
+import { parseStandaloneCatalogue } from './standalone-catalogue.ts';
 import { readTar } from '@wildshard/format/tar';
 import * as v from 'valibot';
 import { apiSource } from '../cook/game/cookWorker.ts';
@@ -30,7 +30,7 @@ export const PRODUCTION_PLAY_TICKS = 600;
 
 interface Head {
   readonly slug: string;
-  readonly revision: number;
+  readonly uploadNumber: number;
   readonly hash: string;
 }
 
@@ -40,7 +40,7 @@ const GridPlan = v.strictObject({ cells: v.array(v.strictObject({
   instance: GridName,
   cell: v.tuple([coordinate, coordinate]),
   slug: GridName,
-  revision: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
+  uploadNumber: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
   hash: v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/u)),
 })) });
 type ProposedCell = v.InferOutput<typeof GridPlan>['cells'][number];
@@ -66,11 +66,11 @@ export async function replayProductionHeads(heads: readonly Head[], play: (head:
   const key = (head: Head): string => `${head.slug}/${head.hash}`;
   const candidates = new Map(heads.map(head => [key(head), head]));
   const indexed = new Set<string>();
-  for (const { slug, revision, hash } of proposed?.cells ?? []) {
-    const head = { slug, revision, hash };
+  for (const { slug, uploadNumber, hash } of proposed?.cells ?? []) {
+    const head = { slug, uploadNumber, hash };
     const id = key(head);
     const prior = candidates.get(id);
-    if (prior !== undefined && prior.revision !== revision) throw new Error(`Conflicting revisions for ${slug} in the grid plan`);
+    if (prior !== undefined && prior.uploadNumber !== uploadNumber) throw new Error(`Conflicting revisions for ${slug} in the grid plan`);
     if (prior === undefined) candidates.set(id, head);
     indexed.add(id);
   }
@@ -118,12 +118,12 @@ async function readCookIndex(build: string, head: Head): Promise<unknown> {
 }
 
 async function productionHeads(): Promise<readonly Head[]> {
-  const response = await agentFetch(`${API}/api/catalogue.json?channel=production`, {
+  const response = await agentFetch(`${API}/api/catalogue.json?channel=production&wire=upload`, {
     cache: 'no-store', signal: AbortSignal.timeout(30_000),
   });
   if (!response.ok) throw new Error(`Production catalogue answered HTTP ${response.status}`);
-  const document = v.parse(StandaloneCatalogueSchema, await response.json());
-  return document.shards.map(({ slug, revision, hash }) => ({ slug, revision, hash }))
+  const document = parseStandaloneCatalogue(await response.json());
+  return document.shards.map(({ slug, uploadNumber, hash }) => ({ slug, uploadNumber, hash }))
     .sort((a, b) => a.slug.localeCompare(b.slug));
 }
 
@@ -187,7 +187,7 @@ async function main(): Promise<void> {
     const verdict = { build, pass: unchanged && itemsUnchanged && planUnchanged && failures.length === 0,
       heads: outcomes, proposedCells: cells, unchanged, itemsUnchanged, planUnchanged };
     if (out !== undefined) await writeFile(out, `${JSON.stringify(verdict, null, 2)}\n`, { mode: 0o600 });
-    for (const row of failures) console.error(`${row.slug} r${row.revision}: ${row.reason}`);
+    for (const row of failures) console.error(`${row.slug} r${row.uploadNumber}: ${row.reason}`);
     if (!unchanged) console.error('Production heads changed during the play preflight');
     if (!itemsUnchanged) console.error('The platform item catalogue changed during the play preflight');
     if (!planUnchanged) console.error('The production grid plan changed during the play preflight');

@@ -38,7 +38,7 @@ function bytesModule(): string {
   const stagingHashes = process.env['WS_DEV_STAGING'] === '1' ? readStaging().shards.map(row => row.hash) : undefined;
   const stale = stalePinFolders('.', stagingHashes);
   if (stale.length > 0) {
-    const why = `out/ holds pinned products the pins no longer name (${stale.map(row => `${row.folder} revision ${String(row.revision)}`).join(', ')}): their public/ mounts would go into the boot stamps. Run \`pnpm pins\` in this tree, then gen:inputs again`;
+    const why = `out/ holds pinned products the pins no longer name (${stale.map(row => `${row.folder} revision ${String(row.uploadNumber)}`).join(', ')}): their public/ mounts would go into the boot stamps. Run \`pnpm pins\` in this tree, then gen:inputs again`;
     if (process.env['WS_STALE_PINS'] === 'refuse') throw new Error(why);
     console.warn(`gen:inputs: ${why}`);
   }

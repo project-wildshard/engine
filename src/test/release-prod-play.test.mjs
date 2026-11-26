@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'vitest';
 import { PRODUCTION_PLAY_TICKS, replayProductionHeads } from '../scripts/release-prod-play.ts';
 
-const old = { slug: 'old-cell', revision: 2, hash: 'a'.repeat(64) };
-const other = { slug: 'other-cell', revision: 1, hash: 'b'.repeat(64) };
-const brasscap = { slug: 'brasscap-mesa', revision: 17, hash: 'c'.repeat(64) };
+const old = { slug: 'old-cell', uploadNumber: 2, hash: 'a'.repeat(64) };
+const other = { slug: 'other-cell', uploadNumber: 1, hash: 'b'.repeat(64) };
+const brasscap = { slug: 'brasscap-mesa', uploadNumber: 17, hash: 'c'.repeat(64) };
 const build = 'd'.repeat(40);
 const cell = { ...brasscap, instance: 'blender-template', cell: [-1, -1] };
 
@@ -26,8 +26,8 @@ describe('production release play preflight', () => {
     ]);
   });
 
-  test('a changed head still plays alongside its advertised revision and needs an exact index', async () => {
-    const kept = { ...brasscap, revision: 16, hash: 'e'.repeat(64) };
+  test('a changed head still plays alongside its advertised uploadNumber and needs an exact index', async () => {
+    const kept = { ...brasscap, uploadNumber: 16, hash: 'e'.repeat(64) };
     const rows = await replayProductionHeads([kept], async () => PRODUCTION_PLAY_TICKS, {
       build, cells: [cell], readIndex: async head => cookIndex(head, 'f'.repeat(40)),
     });
@@ -37,7 +37,7 @@ describe('production release play preflight', () => {
     ]);
     const played = [];
     const accepted = await replayProductionHeads([kept], async head => {
-      played.push(head.revision);
+      played.push(head.uploadNumber);
       return PRODUCTION_PLAY_TICKS;
     }, { build, cells: [cell], readIndex: async head => cookIndex(head) });
     expect(played).toEqual([16, 17]);

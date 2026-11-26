@@ -56,7 +56,7 @@ export const KEY_EXEMPT=Object.freeze({
  'src/scripts/pin-test-names.ts':'drop check only (SHARD-COMPAT NB10): refuses a --drop while tests name the slug; no byte under out/',
 });
 
-/** @typedef {{slug:string,hash:string,revision:number,bytes:number}} Pin */
+/** @typedef {{slug:string,hash:string,uploadNumber:number,bytes:number}} Pin */
 /** @typedef {{folder:string,descriptor:string,mounts:string[]}} PinOwner */
 /** @typedef {{inputs:string,owners:Record<string,PinOwner>}} Incremental */
 /** @typedef {{version:number,key:string,products:Record<string,Record<string,string>>,mounts:Record<string,string>,incremental?:Incremental}} Manifest */
@@ -238,14 +238,14 @@ function pinHashes(root){
  * revision's, so the boot stamps gen:inputs writes from public/ would carry the old files (Far Reach rev 1's 21 rows,
  * re-added by lands from such worktrees, 2026-11-14). A tree with no `out/` or no pins file has none, and a format-dependency
  * product (installed from the frozen format package, named by no pin) is never stale.
- * @param {string} root @param {readonly string[]} [hashes] @returns {{folder:string,revision:unknown}[]}
+ * @param {string} root @param {readonly string[]} [hashes] @returns {{folder:string,uploadNumber:unknown}[]}
  */
 export function stalePinFolders(root,hashes){
  let want;
  try{want=new Set(hashes??pinHashes(root));}catch{return [];}
  let folders;
  try{folders=readdirSync(join(root,'out'),{withFileTypes:true}).filter(entry=>entry.isDirectory()).map(entry=>entry.name);}catch{return [];}
- /** @type {{folder:string,revision:unknown}[]} */const stale=[];
+ /** @type {{folder:string,uploadNumber:unknown}[]} */const stale=[];
  for(const folder of folders.sort()){
   /** @type {unknown} */let pin,source;
   try{({pin,source}=JSON.parse(readFileSync(join(root,'out',folder,'validation.json'),'utf8')));}catch{continue;}
@@ -253,11 +253,11 @@ export function stalePinFolders(root,hashes){
   // named by no pin on purpose, so it is current while its index is the installed format package's (TEMPLATE-E2E, 2026-11-16)
   // and stale once the dependency moves past it.
   if(typeof source==='object'&&source!==null&&'kind'in source&&source.kind==='format-dependency'){
-   if(!currentFormatFolder(root,source))stale.push({folder,revision:typeof pin==='object'&&pin!==null&&'revision'in pin?pin.revision:undefined});
+   if(!currentFormatFolder(root,source))stale.push({folder,uploadNumber:typeof pin==='object'&&pin!==null&&'uploadNumber'in pin?pin.uploadNumber:'revision'in pin?pin.revision:undefined});
    continue;
   }
   if(typeof pin!=='object'||pin===null||!('hash'in pin)||typeof pin.hash!=='string')continue;
-  if(!want.has(pin.hash))stale.push({folder,revision:'revision'in pin?pin.revision:undefined});
+  if(!want.has(pin.hash))stale.push({folder,uploadNumber:'uploadNumber'in pin?pin.uploadNumber:'revision'in pin?pin.revision:undefined});
  }
  return stale;
 }
@@ -265,7 +265,7 @@ export function stalePinFolders(root,hashes){
 /** A full `pnpm pins` removes every out/ product `stalePinFolders` names, so land's gen:inputs never refuses a tree the pins
  * just installed (opus-bugfix2, 2026-11-16: the Brasscap rename left a worktree's out/<old slug> behind until a hand
  * rm -rf). Only folders under out/ with a pin receipt; anything else in out/ stays. Their public/ mounts went with the ledger.
- * @param {string} root @param {readonly string[]} [hashes] @returns {{folder:string,revision:unknown}[]} the products removed */
+ * @param {string} root @param {readonly string[]} [hashes] @returns {{folder:string,uploadNumber:unknown}[]} the products removed */
 export function pruneStalePinProducts(root,hashes){
  const stale=stalePinFolders(root,hashes).filter(row=>folderName(row.folder));
  for(const {folder} of stale){
@@ -369,7 +369,7 @@ export async function reuseUnchangedPins(root,inputs,pins){
 function receiptMatches(root,folder,pin){
  try{
   const receipt=JSON.parse(readFileSync(join(root,'out',folder,'validation.json'),'utf8'));
-  return receipt.source===undefined&&receipt.pin?.hash===pin.hash&&receipt.pin?.revision===pin.revision;
+  return receipt.source===undefined&&receipt.pin?.hash===pin.hash&&(receipt.pin?.uploadNumber??receipt.pin?.revision)===pin.uploadNumber;
  }catch{return false;}
 }
 

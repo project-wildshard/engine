@@ -586,163 +586,163 @@
     {
       "slug": "brasscap-mesa",
       "name": "Brasscap Mesa",
-      "revision": 19,
+      "uploadNumber": 19,
       "hash": "4c7f53c597ed3a9dfdffbddf48785da52c25e2f9fd9487b7748769aabbc9f851"
     },
     {
       "slug": "driftwood-isle",
       "name": "Driftwood Isle",
-      "revision": 13,
+      "uploadNumber": 13,
       "hash": "2d4515d42e0598a72926d93e2a5751d6d70eab18ae055644c2fb10f732d0a41e"
     },
     {
       "slug": "far-reach",
       "name": "Sky Reach",
-      "revision": 9,
+      "uploadNumber": 9,
       "hash": "396a637f04e28b195ac1c4b36f95f7234b7700d7955d21cb663084f377c2043d"
     },
     {
       "slug": "nalati-grasslands",
       "name": "Nalati Grasslands",
-      "revision": 10,
+      "uploadNumber": 10,
       "hash": "b730599048b8a4a2797b3b2ad3a36d90c40870650a3002ca416a5fa09ad9b718"
     },
     {
       "slug": "nine-dragon-stack",
       "name": "Nine Dragon Stack",
-      "revision": 11,
+      "uploadNumber": 11,
       "hash": "a38ee0a18e59d2e7860a7a6e9320bf1aa3d089ce5b39566a4a23f7b6f7f6689c"
     },
     {
       "slug": "open-plot-alien-plain",
       "name": "Open Plot · Pastel Alien Plain",
-      "revision": 3,
+      "uploadNumber": 3,
       "hash": "dc9530e30ae211dc1319ea380b97c13ecd6b15d47697dde1ef7b8976542f0234"
     },
     {
       "slug": "open-plot-clockwork-canyon",
       "name": "Open Plot · Clockwork Canyon",
-      "revision": 3,
+      "uploadNumber": 3,
       "hash": "769fb3cf00fefe3990b2e04e51d067276454de4f7d24ba01f09a0f05180370fb"
     },
     {
       "slug": "open-plot-coral-drift",
       "name": "Open Plot · Coral Drift",
-      "revision": 4,
+      "uploadNumber": 4,
       "hash": "1eadc3d8eb30f92fc85bba8a32a23ec1bf1399102fb459d5feab017c1d51fc3b"
     },
     {
       "slug": "open-plot-desert-ruin",
       "name": "Open Plot · Desert Ruin",
-      "revision": 3,
+      "uploadNumber": 3,
       "hash": "1f5b42894c06f829edd374f698f33f809d151876e8ea9dddb3d4cfbb10ce1694"
     },
     {
       "slug": "open-plot-ember-forge",
       "name": "Open Plot · Ember Forge",
-      "revision": 3,
+      "uploadNumber": 3,
       "hash": "cc8578855df849f9fec4708e1cb374935d6314a328a1cc0bae44154f657d5ebd"
     },
     {
       "slug": "open-plot-fossil-badlands",
       "name": "Open Plot · Fossil Badlands",
-      "revision": 3,
+      "uploadNumber": 3,
       "hash": "6bb64209a6c0961926b6fa23ccd76671453b26280d42617e8eaddfaac9d28c0c"
     },
     {
       "slug": "open-plot-frostline-peaks",
       "name": "Open Plot · Frostline Peaks",
-      "revision": 3,
+      "uploadNumber": 3,
       "hash": "d7f8d41f00ca6e79f726823745926d64a3ee9841a3040775212a7a1a1b68137d"
     },
     {
       "slug": "open-plot-jungle-ziggurat",
       "name": "Open Plot · Jungle Ziggurat",
-      "revision": 3,
+      "uploadNumber": 3,
       "hash": "aba4da75774ad3a6ac8e81c5dbc0eeb8fb0ea1def1869258659b761cc3f2d256"
     },
     {
       "slug": "open-plot-lantern-bayou",
       "name": "Open Plot · Lantern Bayou",
-      "revision": 3,
+      "uploadNumber": 3,
       "hash": "a760942ca1260572c8b468f27a4dd00b9b503dd798a480e1c68f5265d5eb5582"
     },
     {
       "slug": "open-plot-mosslight-ruins",
       "name": "Open Plot · Mosslight Ruins",
-      "revision": 3,
+      "uploadNumber": 3,
       "hash": "7ae59eddb0e95917f786c02339e83fd4471ef4a19760667228612a731bcd9480"
     },
     {
       "slug": "open-plot-night-market",
       "name": "Open Plot · Night Market",
-      "revision": 3,
+      "uploadNumber": 3,
       "hash": "51162fa40b817beeeadac2b891732159ed4badce0daa875ab04e5312f48c8e6a"
     },
     {
       "slug": "open-plot-patchwork-fairground",
       "name": "Open Plot · Patchwork Fairground",
-      "revision": 3,
+      "uploadNumber": 3,
       "hash": "293e70f037ee399eba22f8fba8aaf3f2a896e63b87e1d435faddb995dae69f6c"
     },
     {
       "slug": "open-plot-saltwind-lighthouse",
       "name": "Open Plot · Saltwind Lighthouse",
-      "revision": 3,
+      "uploadNumber": 3,
       "hash": "f038088e7ccd7f9347c9b24a3e2f9e7c0965bce5bd3290fa37d92eb67721345c"
     },
     {
       "slug": "open-plot-sky-harbor",
       "name": "Open Plot · Sky Harbor",
-      "revision": 3,
+      "uploadNumber": 3,
       "hash": "58faeb5e2fa3d371f9db871af3b99b2b27e3eb83dcca99a54e4cebe6b61561af"
     },
     {
       "slug": "open-plot-sky-race",
       "name": "Open Plot · Floating Island Race",
-      "revision": 3,
+      "uploadNumber": 3,
       "hash": "ddaf0adcd003dbb871c28b34ed9b620fcc7a4384f43ed011d6d44dee5b9a4cce"
     },
     {
       "slug": "open-plot-starfall-observatory",
       "name": "Open Plot · Starfall Observatory",
-      "revision": 3,
+      "uploadNumber": 3,
       "hash": "99b19a1eeaa6234a2f588428f925ccb13053780c2c993d884825ae862246cff8"
     },
     {
       "slug": "open-plot-thin-ice",
       "name": "Open Plot · Thin Ice",
-      "revision": 4,
+      "uploadNumber": 4,
       "hash": "dcf56eddafd42b777d0fbdecca1439cfc0263dadbe1c74fc4bd56f84705d6744"
     },
     {
       "slug": "pine-hollow",
       "name": "Pine Hollow",
-      "revision": 18,
+      "uploadNumber": 18,
       "hash": "98518c8fde2b3e9f9b4aa1034acd2a736261b5bd7040148507fe6e56b40bf6bc"
     },
     {
       "slug": "sunscar-dunes",
       "name": "Signal Dunes",
-      "revision": 8,
+      "uploadNumber": 8,
       "hash": "08d0da0e061fb02e0b3ec6a1d68314dde66ab80e7fd8f9292d619d2f92a4f239"
     },
     {
       "slug": "mossgate",
       "name": "Mossgate Hollow",
-      "revision": 25,
+      "uploadNumber": 25,
       "hash": "f0e3a7601391e6f0709db806f37b7c6ea052f0508a74b22741e5679c1a6dc02d"
     },
     {
       "slug": "mirror-salt",
       "name": "Mirror Salt",
-      "revision": 7,
+      "uploadNumber": 7,
       "hash": "8729462ab98c723a355c11d0ce1520bf75b1c65ea889188f597b4dab751df3c3"
     },
     {
       "slug": "glowfen",
       "name": "Glowfen",
-      "revision": 8,
+      "uploadNumber": 8,
       "hash": "d0343bc7c50446381464c84a0c5803fb2ce228e5867038bb70eeaf0f6cc2da3e"
     }
   ],
