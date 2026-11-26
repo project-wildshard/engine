@@ -3,7 +3,10 @@
 // URL-shaped `chunk` comes back in the tree an engine page, tool or doc is made from:
 //   (a) a query pair: `chunk=` right after `?`, `&`, a quote, a backtick or a parenthesis;
 //   (b) a params call: `.get`, `.set`, `.has`, `.delete` or `.append` of the string `'chunk'` (a `searchParams`, a
-//       `URLSearchParams` or any params object a page reads its address with).
+//       `URLSearchParams` or any params object a page reads its address with);
+//   (c) a params object: a `chunk` key in the object literal handed to `new URLSearchParams({…})` or
+//       `Object.entries({…})` (MAIN RED 45762609780: nine-load.mjs set its address from one, so (a) and (b) read zero
+//       while the Nine load opened `?chunk=` CP22 had deleted; model-spin.mjs and zone-entry-tour.mjs did the same).
 // The music sting (`music.sting('chunk')`), Rollup's `type === 'chunk'` and `--chunk=` flags match neither, by construction.
 // project/ (journals) and budgets/calibration-reports/ (recorded runs) are history and stay unread.
 // The baseline (src/scripts/chunk-param-guard.baseline.json) holds today's files and their counts while M3 and CP22 remove
@@ -30,6 +33,7 @@ export function guardKey(path){return path.replace(/^src\/scripts\//u,'scripts/'
 const TEXT=/\.(?:[cm]?[jt]sx?|mts|json|html|md|sh|py|ya?ml|txt|css)$/u;
 const PAIR=/[?&'"`(]chunk=(?![=>])/gu; // never `(chunk===` or `(chunk=>`, a variable named chunk
 const CALL=/\.(?:get|set|has|delete|append)\(\s*['"`]chunk['"`]/gu;
+const PARAMS=/(?:URLSearchParams|Object\.entries)\(\s*\{[^}]*?\bchunk\s*:/gu;
 const ONE_SHARD=['src/client/app/entry.ts','src/client/game/grid/oneWayIn.ts','src/client/game/grid/pageEntry.ts'];
 const MODE_BRANCH=/[!=]==\s*'(?:grid|shard|shardfile)'/gu;
 
@@ -38,7 +42,7 @@ export const OLD_LINK='chunk-param-guard: old link';
 
 /** How many URL-shaped `chunk` reads and writes a text carries (a marked line is not counted). @param {string} text */
 export function chunkParamCount(text){
-  return text.split('\n').filter(line=>!line.includes(OLD_LINK)).reduce((sum,line)=>sum+(line.match(PAIR)?.length??0)+(line.match(CALL)?.length??0),0);
+  return text.split('\n').filter(line=>!line.includes(OLD_LINK)).reduce((sum,line)=>sum+(line.match(PAIR)?.length??0)+(line.match(CALL)?.length??0)+(line.match(PARAMS)?.length??0),0);
 }
 
 /** Every file in scope that carries one, with its count. @param {{ paths: string[], read: (path: string) => string }} input */

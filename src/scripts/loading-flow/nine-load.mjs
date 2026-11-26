@@ -7,6 +7,7 @@ import {bootMemoryMarks,bootMemoryVerdict,liveHeapBytes,retainedGeometryBytes} f
 import {readBaselines,readCaps} from '../budgets/files.mjs';
 import {reportLedger,zoneContentKey} from '../memory/ledgerVerdict.mjs';
 import {pinnedContentKeys} from '../shard-size-gate.mjs';
+import {enterZone} from '../zone-entry.mjs';
 
 // Readiness is bounded by progress, not one flat number (engine red 44847945386, 2026-11-20). The old 235 s came from
 // six hosted *total* loads (98-166 s, setup and the memory reads included); readiness itself was never logged. On
@@ -26,8 +27,10 @@ export function readNineState() {
   const failure=document.querySelector('.ws-load-error');
   const message=failure?.querySelector('p:nth-of-type(2)')?.textContent?.trim();
   const error=failure===null?null:message!==undefined&&message!==''?message:'Terminal load failure screen opened';
-  const world=Reflect.get(window,'__wildshard')?.world;
-  const ready=world?.game.level.id==='nine-dragon-stack'&&world.game.frameCount>0&&world.hud.entered&&!world.hud.paused&&world.game.frameGate()&&!document.querySelector('.ws-load');
+  const harness=Reflect.get(window,'__wildshard'),world=harness?.world;
+  // The one-cell world is a grid page: it plays `platform.grid`, and the cell it stands in is the grid's `inside`.
+  const zone=harness?.shard?.grid?.state?.().inside??world?.game.level.id;
+  const ready=zone==='nine-dragon-stack'&&world.game.frameCount>0&&world.hud.entered&&!world.hud.paused&&world.game.frameGate()&&!document.querySelector('.ws-load');
   const timing=Reflect.get(globalThis,'__bootTiming'),read=timing===undefined?undefined:Reflect.get(timing,'read');
   const data=typeof read==='function'?read.call(timing):timing,entries=data===undefined||data===null?[]:Reflect.get(data,'entries');
   const rows=Array.isArray(entries)?entries:[];
@@ -80,9 +83,8 @@ export async function assertNineLoad(browser,base,out,/** @type {Parameters<type
     const profile=await startStallProfile(page);
     if(profile===null)throw new Error('Nine load ratchet requires a Chromium CPU profile');
     try {
-      const url=new URL(base);
-      for(const [key,value] of Object.entries({chunk:'nine-dragon-stack',skipintro:'1',tier:'phone',touch:'1',mute:'1',nolock:'1',sw:'0'}))url.searchParams.set(key,value);
-      await page.goto(url.href,{waitUntil:'domcontentloaded',timeout:30_000});
+      // J522 (CP22 deleted the chunk param): a measure of one zone enters it alone, as a one-cell world, through the tap's path
+      await enterZone(page,{zone:'nine-dragon-stack',base,flags:{skipintro:'1',tier:'phone',touch:'1',mute:'1',nolock:'1',sw:'0'},alone:true,waitUntil:'domcontentloaded',timeout:30_000});
       // A busy page may not answer a read in time; that read is null, never progress.
       const readNine=()=>Promise.race([page.evaluate(readNineState).catch(()=>null),
         new Promise(resolve=>{setTimeout(()=>{resolve(null);},NINE_READ_MS);})]);

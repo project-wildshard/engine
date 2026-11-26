@@ -10,6 +10,9 @@ describe('chunk-param guard', () => {
     expect(chunkParamCount("new URLSearchParams(location.search).get('chunk')")).toBe(1);
     expect(chunkParamCount("search.has(\"chunk\") && page.goto(base + '&chunk=' + slug)")).toBe(2);
     expect(chunkParamCount("open(`${origin}/(chunk=a)`)")).toBe(1);
+    // MAIN RED 45762609780: a params object built the Nine load's address, and (a) and (b) read zero
+    expect(chunkParamCount("for(const [key,value] of Object.entries({chunk:'nine-dragon-stack',mute:'1'}))url.searchParams.set(key,value);")).toBe(1);
+    expect(chunkParamCount("url.search = new URLSearchParams({mute:'1', chunk:source.slug}).toString();")).toBe(1);
   });
 
   it('passes the music sting, Rollup\'s chunk type and a --chunk= flag', () => {
@@ -17,6 +20,8 @@ describe('chunk-param guard', () => {
     expect(chunkParamCount("if (output.type === 'chunk') emit(output)")).toBe(0);
     expect(chunkParamCount('node bench.mjs --chunk=4')).toBe(0);
     expect(chunkParamCount('const chunkSize = 4; chunks.push(chunk)')).toBe(0);
+    // a record or a bundle naming its chunk is no address
+    expect(chunkParamCount("const run={chunk:'brasscap-mesa',ready:true}; build({chunk: 'export const a = 1'})")).toBe(0);
     // CP22: a variable named chunk compared or taken as an arrow's argument is not the param
     expect(chunkParamCount("if(chunk===undefined)throw e; rows.map(chunk=>chunk.bytes)")).toBe(0);
   });

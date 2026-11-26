@@ -27,7 +27,10 @@ test.each([false,true])('Nine readiness failure retains its cause and timeline (
   const profile={send:()=>Promise.resolve(),detach:()=>{detached=true;return Promise.resolve();}};
   const profilingContext={browser:()=>({browserType:()=>({name:()=>'chromium'})}),newCDPSession:()=>Promise.resolve(profile)};
   // The page's own read runs here against happy-dom's document; every other evaluate returns the boot timeline.
-  const page={context:()=>profilingContext,on:()=>undefined,goto:()=>Promise.resolve(),
+  // J522: the load enters Nine alone (a one-cell world routed into `/`), and its address names no zone
+  const opened:string[]=[],routed:string[]=[];
+  const page={context:()=>profilingContext,on:()=>undefined,goto:(url:string)=>{opened.push(url);return Promise.resolve();},
+    route:(url:string)=>{routed.push(url);return Promise.resolve();},unroute:()=>Promise.resolve(),
     evaluate:(read:()=>unknown)=>Promise.resolve(read===readNineState?read():timeline)};
   const context={addInitScript:()=>Promise.resolve(),newPage:()=>Promise.resolve(page),
     close:()=>{closed=true;return Promise.resolve();}};
@@ -40,6 +43,8 @@ test.each([false,true])('Nine readiness failure retains its cause and timeline (
     // a stall names where the boot stood, not null (run 44847945386's receipt had no timeline at all)
     if(!terminal)expect(receipt.last).toEqual({error:null,ready:false,frames:0,done:0,open:[]});
     expect(closed&&detached).toBe(true);
+    expect(opened).toEqual(['http://127.0.0.1:1234/?skipintro=1&tier=phone&touch=1&mute=1&nolock=1&sw=0']);
+    expect(routed).toEqual(opened);
   }finally{document.body.replaceChildren();rmSync(out,{recursive:true,force:true});}
 });
 

@@ -34,6 +34,7 @@
 // browsers on this Mac).
 import { execFileSync } from 'node:child_process';
 import { debugSettings } from './debug-settings.mjs';
+import { enterZone, zoneHome } from './zone-entry.mjs';
 import { browserBakeBytes } from './bake-output.mjs';
 import { stopSpinRecording, uploadRecordedClip } from './model-spin-recording.mjs';
 import { mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -83,8 +84,8 @@ export function injectQuery(url) { return url; }
 export class ErrorOverlay extends HTMLElement {}
 `;
 
-const url = new URL(BASE);
-for (const [k, v] of Object.entries({ chunk: SHARD, tier: 'phone', touch: '1', mute: '1', nolock: '1', sw: '0', explore: 'model' })) url.searchParams.set(k, v);
+// J522 (CP22 deleted the chunk param): the shard opens alone, as a one-cell world, and the address names no zone
+const FLAGS = { tier: 'phone', touch: '1', mute: '1', nolock: '1', sw: '0', explore: 'model' };
 
 const { chromium } = await import("./browser-playwright.mjs");
 const scratch = resolvePath(import.meta.dirname, '../../tmp'); mkdirSync(scratch, { recursive: true });
@@ -102,8 +103,8 @@ try {
 
   // ── boot straight into the Model Explorer's catalog ──
   const t0 = Date.now();
-  console.log(`model-spin: ${url.href}`);
-  await page.goto(url.href, { waitUntil: 'domcontentloaded' });
+  console.log(`model-spin: ${SHARD} alone at ${zoneHome(new URL(BASE).origin, FLAGS)}`);
+  await enterZone(page, { zone: SHARD, base: BASE, flags: FLAGS, alone: true, waitUntil: 'domcontentloaded' });
   const opened = await page.waitForFunction(() => {
     if (document.querySelector('.ws-x-empty-models.show') !== null) return 'empty';
     const shown = document.querySelector('.ws-x.show[data-mode="model"] .ws-x-models.show[data-view="catalog"]');

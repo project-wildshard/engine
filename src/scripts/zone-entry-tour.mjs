@@ -8,6 +8,7 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { acceptPhoneMemoryWarning, deployFrameProblem, PHONE } from './journey-proof.mjs';
 import { saveFixture } from './debug-settings.mjs';
+import { enterZone } from './zone-entry.mjs';
 import { guardStagingSockets } from './staging-proof-lines.mjs';
 import { TOUR_FEATURED as featured } from './zone-entry-featured.mjs';
 
@@ -724,9 +725,8 @@ async function requireSmokeBuild(build, base) {
 /** Seat a normal guest at the source cell of an otherwise independent crossing.
  * @param {Page} page @param {Cell} source @param {string} build @param {string} name @param {string} base */
 async function bootSmokeSource(page, source, build, name, base) {
-  const url = new URL('/', base);
-  url.search = new URLSearchParams({chunk:source.slug ?? source.instance, mute:'1', nolock:'1', skipintro:'1', fps:'60'}).toString();
-  await page.goto(url.href, {waitUntil:'domcontentloaded', timeout:45_000});
+  // J522 (CP22 deleted the chunk param): a guest seats at the source cell the way a player does, by the tap into its zone
+  await enterZone(page, {zone:source.slug ?? source.instance, base, flags:{mute:'1', nolock:'1', skipintro:'1', fps:'60'}, waitUntil:'domcontentloaded', timeout:45_000});
   const nameBox = page.locator('#ws-name-box input');
   const nameSubmit = page.locator('#ws-name-box button[type=submit]');
   const stop = Date.now()+90_000;
