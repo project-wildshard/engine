@@ -38,13 +38,13 @@ await test('actual private policy loads; unsafe mode, oversize and symlink refus
  }finally{rmSync(directory,{recursive:true,force:true});}
 });
 
-// QA 11-25 row 103: the MacBook's policy named engine/scripts/ after the lean move and every admitted browser refused.
+// QA 11-25 row 103: the MacBook's policy named engine/scripts/ after the lean move and every admitted browser refused. // script-paths: the pre-lean path is this fixture
 /** @param {string} module @param {readonly string[]} present */
 function movedContext(module,present){
  return {...context,read:()=>Promise.resolve({bytes:JSON.stringify({version:1,module}),uid:501,mode:0o100600,regular:true}),exists:(/** @type {string} */name)=>present.includes(name)};
 }
 await test('a policy naming the pre-lean scripts/ folder follows the move and names the line to write',async()=>{
- const old='/repos/sharddev/node_modules/engine/scripts/policy.mjs',moved='/repos/sharddev/node_modules/engine/src/scripts/policy.mjs';
+ const old='/repos/sharddev/node_modules/engine/scripts/policy.mjs',moved='/repos/sharddev/node_modules/engine/src/scripts/policy.mjs'; // script-paths: the pre-lean path is this fixture
  const warnings=/** @type {string[]} */([]),loads=/** @type {string[]} */([]);
  assert.equal(await installMachineBrowserAdmission({},{...movedContext(old,[moved]),warn:message=>{warnings.push(message);},load:url=>{loads.push(url);return Promise.resolve({install:()=>Promise.resolve()});}}),true);
  assert.deepEqual(loads,[`file://${moved}`]);
@@ -52,7 +52,7 @@ await test('a policy naming the pre-lean scripts/ folder follows the move and na
 });
 await test('a provider path that exists nowhere refuses, naming the policy file and the lean path',async()=>{
  let loaded=false;
- await assert.rejects(installMachineBrowserAdmission({},{...movedContext('/repos/engine/scripts/policy.mjs',[]),load:()=>{loaded=true;return Promise.resolve();}}),(/** @type {Error} */error)=>error.message.includes('/config/browser-admission.json')&&error.message.includes('/repos/engine/src/scripts/policy.mjs')&&error.message.includes('src/scripts/browser-machine-policy.mjs'));
+ await assert.rejects(installMachineBrowserAdmission({},{...movedContext('/repos/engine/scripts/policy.mjs',[]),load:()=>{loaded=true;return Promise.resolve();}}),(/** @type {Error} */error)=>error.message.includes('/config/browser-admission.json')&&error.message.includes('/repos/engine/src/scripts/policy.mjs')&&error.message.includes('src/scripts/browser-machine-policy.mjs')); // script-paths: the pre-lean path is this fixture
  assert.equal(loaded,false);
  await assert.rejects(installMachineBrowserAdmission({},movedContext('/gone/provider.mjs',[])),/\/config\/browser-admission\.json names \/gone\/provider\.mjs, which does not exist;/);
 });
