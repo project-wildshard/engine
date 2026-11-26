@@ -74,7 +74,7 @@ export async function openQaRig({ root, build, out, tourSeed }) {
     writeFileSync(keyFile, JSON.stringify({ private: pair.privateKey.export({ type: 'pkcs8', format: 'pem' }), public: key }), { mode: 0o600, flag: 'wx' });
     // Both the app and server are built using this source checkout's tools.
     process.env.WS_RIG_PORTS ??= '19476';
-    const { RELEASE_PORT, WORLD_PORT, openRig } = await import(pathToFileURL(join(checkout, 'scripts', 'online-rig.mjs')).href);
+    const { RELEASE_PORT, WORLD_PORT, openRig } = await import(pathToFileURL(join(checkout, 'src', 'scripts', 'online-rig.mjs')).href);
     const tour = await tourFixture(checkout, tourSeed);
     const catalogueFile = join(work, 'fixture-catalogue.json');
     {

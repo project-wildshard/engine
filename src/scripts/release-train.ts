@@ -9,7 +9,7 @@ import { dirname, join, resolve as absolute } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
-import { attributionGap, fullCommitArgs, gateInputsMoved, localAttemptDir, nextAdmission, releaseCiAdmission, provesNpmNext, provesReleaseReuse, provesTrainCi, retryRead, trainSha as sha, trainTag as tagPattern, watchTrainRun,
+import { attributionGap, cutTree, fullCommitArgs, gateInputsMoved, localAttemptDir, nextAdmission, releaseCiAdmission, provesNpmNext, provesReleaseReuse, provesTrainCi, retryRead, trainSha as sha, trainTag as tagPattern, watchTrainRun,
   type Alias, type Leg, type Run } from './release-train-proof.mjs';
 import { CHANNELS, localQaGap, RELEASE_PUBLIC_KEY, type QaVerdict } from './page-release/flow.mjs';
 import { pidLock } from './.kit/pid-lock.mjs';
@@ -203,12 +203,20 @@ async function main(args: string[]) {
   try {
     scratch = openReleaseRun(root, 'train');
     const out = scratch.work, saved = join(dirname(scratch.proof), `train-${tag}-${source.headSha.slice(0, 8)}`);
+    const legTree = async (at: string, name: string) => {
+      const leg = cutTree(root, at, join(out, name));
+      if (!existsSync(join(leg, 'node_modules/.pnpm/lock.yaml'))) {
+        await runLogged(leg, join(out, `${name}-install.log`), 'pnpm', ['install', '--frozen-lockfile', '--config.ci=false']);
+      }
+      return leg;
+    };
     evidence = saved;
     mkdirSync(saved, { recursive: true, mode: 0o700 });
     const localDir = localAttemptDir(saved, dir => existsSync(join(dir, 'verdict.json'))
       && localQaGap(read(join(dir, 'verdict.json')) as QaVerdict | undefined, source.headSha, tag) !== undefined);
     const local = join(localDir, 'verdict.json');
-    if (!existsSync(local)) await runLogged(root, join(out, 'local.log'), 'bash', [
+    // QA 11-25 row 88: local QA runs from the train's own clone at the cut, never the canonical checkout.
+    if (!existsSync(local)) await runLogged(await legTree(source.headSha, 'cut-tree'), join(out, 'local.log'), 'bash', [
       'src/scripts/browser-lane.sh', '--max', '20', process.execPath, 'src/scripts/staging-qa.mjs',
       '--local', '--release', tag, '--build', source.headSha, '--out', localDir,
     ], { ...process.env, BROWSER: 'none' });
@@ -310,18 +318,7 @@ async function main(args: string[]) {
     const liveTag = `v${stagingPage?.clientVersion ?? ''}`;
     if (tagPattern.test(liveTag) && newer(liveTag, tag)) throw new Error(`Staging already serves newer ${liveTag}`);
     receipt(lane, `NOTE ${tag} starting staging.`);
-    const stageTree = join(out, 'stage-tree');
-    if (!existsSync(stageTree)) {
-      await runLogged(root, join(out, 'staging-install.log'), 'git', ['clone', '--quiet', '--shared', '--no-checkout', root, stageTree]);
-      git(['remote', 'set-url', 'origin', git(['remote', 'get-url', 'origin'])], stageTree);
-      git(['checkout', '--quiet', '--detach', build], stageTree);
-    }
-    if (git(['rev-parse', 'HEAD'], stageTree) !== build || git(['status', '--porcelain'], stageTree) !== '') {
-      throw new Error('Staging requires the clean exact release clone');
-    }
-    if (!existsSync(join(stageTree, 'node_modules/.pnpm/lock.yaml'))) {
-      await runLogged(stageTree, join(out, 'staging-install.log'), 'pnpm', ['install', '--frozen-lockfile', '--config.ci=false']);
-    }
+    const stageTree = await legTree(build, 'stage-tree');
     const attemptPath = join(saved, 'staging-attempt.json');
     const attempt = (read(attemptPath) as { attempt: number } | undefined)?.attempt ?? 0;
     if (!Number.isSafeInteger(attempt) || attempt < 0) throw new Error('The staging attempt number is invalid');

@@ -1,5 +1,8 @@
+import { execFileSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { describe, expect, test } from 'vitest';
-import { attributionGap, fullCommitArgs, gateInputsMoved, localAttemptDir, nextAdmission, provesNpmNext, releaseCiAdmission, provesReleaseReuse, provesTrainCi, retryRead, watchTrainRun } from '../src/scripts/release-train-proof.mjs';
+import { attributionGap, cutTree, fullCommitArgs, gateInputsMoved, localAttemptDir, nextAdmission, provesNpmNext, releaseCiAdmission, provesReleaseReuse, provesTrainCi, retryRead, watchTrainRun } from '../src/scripts/release-train-proof.mjs';
 import { createTempRepo } from '../src/test/helpers/git';
 
 const build = 'a'.repeat(40);
@@ -183,4 +186,29 @@ test('a held local QA verdict stays as evidence and the rerun takes the next loc
   const held = new Set(['/saved/local', '/saved/local-1']);
   expect(localAttemptDir('/saved', dir => held.has(dir))).toBe('/saved/local-2');
   expect(localAttemptDir('/saved', () => false)).toBe('/saved/local');
+});
+
+// QA 11-25 row 88: the lean move renamed the canonical checkout's scripts while a train could be running.
+test('a train leg runs the cut from its own clone while the canonical checkout moves', () => {
+  const repo = createTempRepo();
+  try {
+    repo.git(['remote', 'add', 'origin', 'https://github.com/project-wildshard/engine.git']);
+    const cut = repo.commit({ 'scripts/leg.sh': 'echo cut\n' }, 'cut');
+    const dir = cutTree(repo.dir, cut, join(dirname(repo.dir), 'cut-tree'));
+    // Mid-run, the canonical checkout pulls a layout move and another lane edits it.
+    repo.git(['mv', 'scripts', 'src']);
+    repo.commit({ 'src/leg.sh': 'echo moved\n' }, 'move');
+    writeFileSync(join(repo.dir, 'src/leg.sh'), 'echo dirty\n');
+    expect(execFileSync('bash', ['scripts/leg.sh'], { cwd: cutTree(repo.dir, cut, dir), encoding: 'utf8' })).toBe('cut\n');
+    expect(repo.git(['remote', 'get-url', 'origin'], dir)).toBe('https://github.com/project-wildshard/engine.git');
+    writeFileSync(join(dir, 'scripts/leg.sh'), 'echo edited\n');
+    expect(() => cutTree(repo.dir, cut, dir)).toThrow(/clean clone/u);
+  } finally {
+    repo.cleanup();
+  }
+  // Only git, gh and the repo-kit (which reads the engine only from its release worktree) run in the canonical checkout.
+  const train = readFileSync(join(import.meta.dirname, '../src/scripts/release-train.ts'), 'utf8');
+  const fromRoot = [...train.matchAll(/runLogged\(root, (?:join\([^)]*\)|\w+), ([^,]+),/gu)].map(match => match[1]);
+  expect(fromRoot.length).toBeGreaterThan(0);
+  expect(fromRoot.filter(file => !["'gh'", 'kit'].includes(file ?? ''))).toEqual([]);
 });

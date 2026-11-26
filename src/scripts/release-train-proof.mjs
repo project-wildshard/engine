@@ -1,4 +1,6 @@
 // FS28: staging npm admission uses only exact CI and alias evidence.
+import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { provesCode } from './ci-proof-jobs.mjs';
 import { releaseOnlyParent } from './release-gate.mjs';
 
@@ -124,4 +126,22 @@ export function releaseCiAdmission(build, ci) {
  * a passing stop that a second prepare clears. @param {string} log @returns {boolean} */
 export function gateInputsMoved(log) {
   return /Full proof inputs unavailable; rerun the complete gate|Installed inputs changed during the gate/u.test(log);
+}
+
+/** QA 11-25 row 88: every leg the train spawns runs from its own clone at the cut, never the canonical checkout, so a
+ * pull, a layout move or another lane's edit there mid-run cannot change the scripts a release runs. Opens, or reopens,
+ * the clean `--shared` clone of `root` at `sha` in `dir`, pushing to the canonical checkout's origin.
+ * @param {string} root @param {string} sha @param {string} dir @returns {string} */
+export function cutTree(root, sha, dir) {
+  const git = (/** @type {string[]} */ args, cwd = root) =>
+    execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  if (!existsSync(dir)) {
+    git(['clone', '--quiet', '--shared', '--no-checkout', root, dir]);
+    git(['remote', 'set-url', 'origin', git(['remote', 'get-url', 'origin'])], dir);
+    git(['checkout', '--quiet', '--detach', sha], dir);
+  }
+  if (git(['rev-parse', 'HEAD'], dir) !== sha || git(['status', '--porcelain'], dir) !== '') {
+    throw new Error(`The train runs its legs only from the clean clone at ${sha.slice(0, 10)}`);
+  }
+  return dir;
 }
