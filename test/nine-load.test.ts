@@ -5,7 +5,7 @@ import {mkdtempSync,readFileSync,rmSync} from 'node:fs';
 import {resolve,join} from 'node:path';
 import type {Browser} from 'playwright';
 import {expect,test} from 'vitest';
-import {assertNineLoad,NINE_READY_CAP_MS,NINE_STALL_MS,readNineState,waitNineReady} from '../src/scripts/loading-flow/nine-load.mjs';
+import {assertNineLoad,NINE_READY_CAP_MS,NINE_SETTLE_CAP_MS,NINE_SETTLE_MS,NINE_STALL_MS,readNineState,waitNineReady,waitNineSettled} from '../src/scripts/loading-flow/nine-load.mjs';
 
 /** A clock that only moves when the wait sleeps. */
 function fakeClock() {
@@ -74,4 +74,20 @@ test('engine red 44847945386: a slow boot that keeps moving passes 235 s; a stal
   clock=fakeClock();
   await expect(waitNineReady(()=>Promise.resolve({...state(1),error:'Tile fence stalled'}),clock)).rejects.toThrow('Nine boot failed: Tile fence stalled');
   expect(clock.now()).toBe(0);
+});
+
+test('QA 11-25 row 115: the boot memory read waits for the after-control build to settle, bounded', async()=>{
+  // Metal's after-control build: CPU geometry climbs and falls for about 6 s, then holds; the read comes 3 s into the hold
+  let clock=fakeClock();
+  const ramp=[21,24,28,33,42,37,29,29,26,26,20,15,9,8,7,6.4];
+  const climbing=()=>Promise.resolve(ramp[Math.min(Math.floor(clock.now()/500),ramp.length-1)]??null);
+  await expect(waitNineSettled(climbing,clock)).resolves.toEqual({settled:true,waitedMs:(ramp.length-1)*500+NINE_SETTLE_MS,retained:6.4});
+  // already still (hosted SwiftShader before its slow build): one window
+  clock=fakeClock();
+  await expect(waitNineSettled(()=>Promise.resolve(6.8),clock)).resolves.toEqual({settled:true,waitedMs:NINE_SETTLE_MS,retained:6.8});
+  // a page that never holds still, or never answers, is read at the cap and says so
+  clock=fakeClock();
+  await expect(waitNineSettled(()=>Promise.resolve(clock.now()),clock)).resolves.toMatchObject({settled:false,waitedMs:NINE_SETTLE_CAP_MS});
+  clock=fakeClock();
+  await expect(waitNineSettled(()=>Promise.resolve(null),clock)).resolves.toEqual({settled:false,waitedMs:NINE_SETTLE_CAP_MS,retained:null});
 });

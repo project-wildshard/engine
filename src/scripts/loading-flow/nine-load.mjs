@@ -67,6 +67,33 @@ export async function waitNineReady(read,options={}) {
   }
 }
 
+// QA 11-25 row 115: nine-load read Nine's boot memory at its first readiness poll after control, while the home's
+// after-control build ran: on Metal the boot is ready in about 4 s and that build then runs about 6 s (CPU geometry climbs
+// to 47 MB and settles near 6), so one build read 9.8 MB and 237 MB on one run and 23.6 MB and 313 MB on the next. The read
+// waits until the scene's CPU geometry has held still for NINE_SETTLE_MS, at most NINE_SETTLE_CAP_MS (hosted SwiftShader
+// settles in its first window; the cap keeps the 10 min job inside its readiness cap plus non-boot work).
+export const NINE_SETTLE_MS=3_000,NINE_SETTLE_CAP_MS=45_000;
+const NINE_SETTLE_POLL_MS=500;
+
+/** Wait until `read` (the scene's retained CPU geometry; null when the page did not answer) gives one value for `settleMs`,
+ * or `capMs` passes. A null read is never still.
+ * @param {()=>Promise<number|null>} read
+ * @param {{now?:()=>number,sleep?:(ms:number)=>Promise<void>,settleMs?:number,capMs?:number,pollMs?:number}} [options]
+ * @returns {Promise<{settled:boolean,waitedMs:number,retained:number|null}>} */
+export async function waitNineSettled(read,options={}) {
+  const {now=Date.now,sleep=ms=>new Promise(resolve=>{setTimeout(resolve,ms);}),settleMs=NINE_SETTLE_MS,capMs=NINE_SETTLE_CAP_MS,pollMs=NINE_SETTLE_POLL_MS}=options;
+  const start=now();
+  /** @type {number|null} */ let last=null;
+  let since=start;
+  for(;;){
+    const value=await read(),at=now();
+    if(value===null||value!==last){last=value;since=at;}
+    else if(at-since>=settleMs)return {settled:true,waitedMs:at-start,retained:value};
+    if(at-start>=capMs)return {settled:false,waitedMs:at-start,retained:value};
+    await sleep(pollMs);
+  }
+}
+
 /** NB6's actual standalone props boot, independent of screenshot and street
  * work. A fresh phone, real readiness, and the stock CPU-profile stall gate.
  * @param {import('playwright').Browser} browser @param {string} base @param {string} out */
@@ -97,6 +124,11 @@ export async function assertNineLoad(browser,base,out,/** @type {Parameters<type
       faults.push(...read.faults);
       if(!read.stalls.some(row=>row.stage==='props'))faults.push('Nine load has no completed props stage');
       const state=await page.evaluate(()=>{const world=window.__wildshard.requireWorld();return {shard:world.game.level.id,frames:world.game.frameCount,entered:world.hud.entered};});
+      // QA 11-25 row 115: the boot's memory is read once its after-control build has settled, not mid-way through it
+      const readRetained=()=>Promise.race([page.evaluate(retainedGeometryBytes).catch(()=>null),
+        new Promise(resolve=>{setTimeout(()=>{resolve(null);},NINE_READ_MS);})]);
+      const settle=await waitNineSettled(/** @type {()=>Promise<number|null>} */ (readRetained));
+      console.log(`nine-load memory read ${settle.settled?'settled':'not settled'} ${Math.round(settle.waitedMs/1000)} s after readiness`);
       // mini QA 2026-11-17 row 19: the boot's memory cuts hold (boot-memory-ratchet.mjs)
       const heap=await page.context().newCDPSession(page);
       let memory;
@@ -109,7 +141,7 @@ export async function assertNineLoad(browser,base,out,/** @type {Parameters<type
       faults.push(...memory.faults);
       // BUDGET-CAPS BC11: the two boot budgets in one table and budget-measures.json; the budgets workflow judges them
       reportLedger({rows:memory.rows,mode:'nine-boot',directory:out,commit:process.env.GITHUB_SHA,summaryFile:process.env.GITHUB_STEP_SUMMARY});
-      const receipt={...state,elapsedMs:Date.now()-started,readinessMs,stagesMs,stalls:read.stalls,memory,faults};
+      const receipt={...state,elapsedMs:Date.now()-started,readinessMs,stagesMs,stalls:read.stalls,settle,memory,faults};
       writeFileSync(join(out,'load.json'),`${JSON.stringify(receipt,null,2)}\n`);
       console.log(JSON.stringify(receipt));
       if(faults.length>0)throw new Error(faults.join('; '));
