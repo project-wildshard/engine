@@ -12,7 +12,7 @@ import { wirePage } from '../src/client/game/shardfile/wirePage';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { GAMEPLAY_SLICE } from './fixtures/gameplaySlice';
 
-// TEMPLATE-E2E TC-E5c: Mossgate's one-shard page (the retired Template's `?chunk=`, no client plan) built no collider for its lift, so a
+// TEMPLATE-E2E TC-E5c: Mossgate's one-shard page (the retired Template's zone-alone address, no client plan) built no collider for its lift, so a
 // player stood under it as it rose; a grid cell had one (TC-E5b). The page's movers now stand in its physics, posed off the wire.
 const LIFT = 'template.lift';
 afterEach(() => { wirePage.movers.clear(); });

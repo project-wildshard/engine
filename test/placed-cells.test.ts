@@ -1,7 +1,7 @@
 // @vitest-environment node
 // SHARD-AUTHORING SA33 to SA35, the page half: a released page learns the cells the API placed after its build from its channel's signed
 // placement file (SA33a), checked under the API's placement key as the box (`readPlacementFile`) and SA35's preview bake check it. A
-// verified cell can get a Zone Select card and `?chunk=` enters the grid there, ring 3 included; a bad signature, a 404, a slow or an
+// verified cell can get a Zone Select card and its tap enters the grid there, ring 3 included; a bad signature, a 404, a slow or an
 // unreadable file keep the build's 24 cells.
 // oxlint-disable-next-line import/no-nodejs-modules -- It signs as the API does.
 import { generateKeyPairSync, sign, type KeyObject } from 'node:crypto';
@@ -154,7 +154,7 @@ test('a slug neither this build nor the API\'s catalogue cards stays out, and an
   expect(cards()).toEqual(['driftwood-isle']);
 });
 
-test('SA46: a placed slug the build has no card for is carded from its catalogue entry, and `?chunk=` enters its cell', async () => {
+test('SA46: a placed slug the build has no card for is carded from its catalogue entry, and its tap enters its cell', async () => {
   let init: RequestInit | undefined;
   const fetch = routes({ [ENTRY_AT]: asked => { init = asked; return json(ENTRY); } });
   const read = await learnPlacedCells(URL_AT, { keep: device, fetch, publicKey: api.hex, api: API, content: cooked });
@@ -171,7 +171,7 @@ test('SA46: a placed slug the build has no card for is carded from its catalogue
   expect(cell).toMatchObject({ instance: 'new-author-shard', cell: [1, 3] });
 });
 
-test('HERO-GATE HG4: a placed slug whose upload carried no hero keeps its cell and `?chunk=`, its card Developer only', async () => {
+test('HERO-GATE HG4: a placed slug whose upload carried no hero keeps its cell and its entry, its card Developer only', async () => {
   const { card: _card, ...heroless } = STAND_IN;
   const fetch = routes({ [ENTRY_AT]: () => json(ENTRY) });
   const read = await learnPlacedCells(URL_AT, { keep: device, fetch, publicKey: api.hex, api: API, content: () => Promise.resolve(heroless) });

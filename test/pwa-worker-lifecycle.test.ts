@@ -325,7 +325,7 @@ test('refused native routes cannot publish an installed generation', async () =>
 test('navigation fallback serves the exact document without storage when the network cannot answer', async () => {
   const f = fixture(() => Promise.reject(new TypeError('offline'))), open = vi.spyOn(f.caches, 'open').mockRejectedValue(new DOMException('denied', 'SecurityError'));
   const worker = f.load('A', []);
-  for (const path of ['/', '/index.html', '/?chunk=fixture']) {
+  for (const path of ['/', '/index.html', '/?mute=1']) {
     const response = await worker.dispatch('fetch', {request: new Request(url(path))});
     expect(response?.status).toBe(200); expect(response?.headers.get('content-type')).toBe('text/html;charset=utf-8');
     expect(response?.headers.get('cache-control')).toBe('no-store'); expect(await response?.text()).toBe(document);
@@ -354,7 +354,7 @@ test('STALESHELL: a worker that does not hold its code never serves its stale do
   // a title-only device: A's shell is installed, its generation never precached
   expect(await (await f.open('ws-builds-v1')).keys()).toHaveLength(0);
   asked.length = 0;
-  for (const path of ['/', '/slug/blender-template', '/slug/blender-template?chunk=x#here']) {
+  for (const path of ['/', '/slug/blender-template', '/slug/blender-template?mute=1#here']) {
     const answer = await old.dispatch('fetch', { request: nav(path) });
     expect(await answer?.text(), path).toBe('<!doctype html><html><body>network page B</body></html>');
   }

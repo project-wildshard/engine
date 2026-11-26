@@ -96,7 +96,7 @@ test('SR12: Settings ▸ Reload now from a world comes back in the same shard wh
   expect(arrivals, 'the next document takes the zone from the tab (QA row 16)').toEqual(['fixture']);
 });
 
-test('SR12: a grid page (no ?chunk=) reloads on its bare address and resumes from its planned-reload record', async () => {
+test('SR12: a grid page reloads on its bare address and resumes from its planned-reload record', async () => {
   const at = page(), session = held(), reasons: string[] = [];
   const location = { ...at.location, href: 'https://example.test/' };
   const reload = slice('src/client/engine/ui/ReloadPrompt.ts', 'export function reloadWithPicks', '', 'reloadWithPicks', { ...marks, ...cover, location, settingsReloadUrl: (href: string) => href,

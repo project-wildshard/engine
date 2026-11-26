@@ -1,4 +1,4 @@
-// CHUNK-PARAM-REMOVAL CP12 (J522): tools enter a zone with the title's own tap bytes and a bare `/`, never `?chunk=`.
+// CHUNK-PARAM-REMOVAL CP12 (J522): tools enter a zone with the title's own tap bytes and a bare `/`, never a zone in the query.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { runInNewContext } from 'node:vm';

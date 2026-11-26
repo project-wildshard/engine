@@ -76,7 +76,7 @@ test('ZS11: a fresh upload the build has no row for shows first in NEW in its co
   tap(view.root.querySelector('.ws-menu-play'));
   await frames();
   expect(onEnter.mock.calls.map(([card]) => card.slug)).toEqual([SLUG]);
-  // the page it travels to (`?chunk=new-author-shard`) enters the grid at the cell the placement file gave it
+  // the page it travels to (a bare `/`, the tap naming the zone) enters the grid at the cell the placement file gave it
   expect(oneWayIn({ online: true, hosted: true, slug: SLUG, kept: false }, new GridAssembly(player))).toMatchObject({ instance: SLUG, cell: [1, 3] });
 });
 
