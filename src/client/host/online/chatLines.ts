@@ -33,7 +33,11 @@ export function chatDock(bandHeight: number): number { return Math.round(Math.mi
  *  Enter closes it. It is not a modal: the game runs on, and a tap outside reaches the game as well as closing the chat.
  *  MOBILE-KEYBOARD MK5 (Jake, 2026-11-12: "fix the top of it"): with no keyboard up (after Done, or before it opens) the open
  *  chat on a phone sizes to its lines. Its bottom edge stays where the tall panel's was and its old height is only a ceiling,
- *  so a few lines never sit under an empty dark top. */
+ *  so a few lines never sit under an empty dark top.
+ *  QA 11-25 row 22 (Jake, 2026-11-26 grill: hide the voice tip while the TALK prompt shows, then bring it back; nothing else on
+ *  the HUD moves): on a phone the voice tip stood over the USE band (TALK · <name>, TouchControls.ts). While the band shows the
+ *  tip is not drawn; its own state (voiceUi.ts) runs on, so it comes back when the band goes only if it is still due, and a tip
+ *  closed or timed out meanwhile stays gone. */
 const CSS = `
 #ws-chat{--ws-chat-bar:calc(max(15vh,104px) + max(env(safe-area-inset-bottom,0px),var(--ws-home,0px)) * .5);--ws-chat-gap:46px;--ws-chat-lift:132px;position:fixed;left:8px;top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + var(--ws-chat-lift));max-height:calc(100vh - var(--ws-chat-lift) - 120px);z-index:900;width:min(56vw,260px);display:flex;flex-direction:column;justify-content:flex-end;gap:4px;font:500 13px/1.3 system-ui,sans-serif;color:#fff;pointer-events:none}
 #ws-chat>[data-head]{display:none}
@@ -73,6 +77,7 @@ const CSS = `
 #ws-chat[data-touch]:not([data-open]) #ws-voice{order:1;width:36px;height:36px}
 #ws-chat[data-touch]:not([data-open]) #ws-chat-icon{order:2;display:grid}
 #ws-chat[data-touch]:not([data-open])>#ws-voice-tip{position:absolute;left:44px;bottom:42px;width:max-content;max-width:min(200px,calc(55vw - 52px))}
+:root:has(.ws-touch:not(.ws-touch-drive-seated) .ws-touch-use.show) #ws-chat>#ws-voice-tip{display:none}
 #ws-chat-icon{flex:none;position:relative;width:36px;height:36px;padding:0;place-items:center;border-radius:50%;border:1.5px solid rgba(143,227,255,.5);background:rgba(9,22,36,.86);color:#9fb3c8;pointer-events:auto;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 #ws-chat-icon svg{width:19px;height:19px}
 #ws-chat-icon>[data-badge]{position:absolute;right:-5px;top:-5px;min-width:17px;height:17px;padding:0 4px;box-sizing:border-box;border-radius:9px;background:#ffc56b;color:#1c1100;font:800 10px/17px system-ui,sans-serif;text-align:center}

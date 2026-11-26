@@ -13,7 +13,7 @@ export const LOCAL_FILE_SECONDS=20;
 /** Vitest files that drive a real browser. Playwright e2e is already hosted-only. */
 export const BROWSER_TESTS=Object.freeze(/** @type {string[]} */(['test/chromium-memory-browser.test.ts','test/headless-combat.test.ts','test/memory-calibration-page.test.ts','test/javelin-flight.test.ts',
  'test/projectile-law.test.ts','test/staging-smoke-recovery.test.ts','src/test/agent-browser-marker.test.mjs','src/test/browser-prod-guard.test.mjs','src/test/.kit/chrome-keychain.test.mjs','src/test/parity/browser-escape.test.mjs',
- 'test/touch-holds-webkit.test.ts']));
+ 'test/touch-holds-webkit.test.ts','test/voice-tip-talk-phone.test.ts']));
 /** Wall-clock proofs that hold the whole CPU budget (vitest-ci-files.ts). */
 export const TIMING_TESTS=Object.freeze(/** @type {string[]} */([...CPU_EXCLUSIVE_TESTS]));
 /** The repo's declared native (Rust/Python/C child) integration files. */
