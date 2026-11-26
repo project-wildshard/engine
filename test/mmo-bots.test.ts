@@ -236,6 +236,8 @@ test('release-proof riders leave the release observer its two sockets', () => {
 // CHUNK-PARAM CP5 (J522): main run 45731753083 went red when seating tests still named their cell in the socket address,
 // which the door no longer reads; the bot refuses such an address before it dials, so the cell rides the goto word only
 test('a bot never names its cell in the socket address', () => {
-  for (const url of ['ws://127.0.0.1:9/?chunk=nalati-grasslands', 'ws://127.0.0.1:9/?x=1&chunk=a'])
+  for (const query of [{ chunk: 'nalati-grasslands' }, { x: '1', chunk: 'a' }]) {
+    const url = `ws://127.0.0.1:9/?${new URLSearchParams(query).toString()}`;
     expect(() => new RoomBot(url, 'bench', 'device:guard')).toThrow(/no cell in the socket address/u);
+  }
 });
