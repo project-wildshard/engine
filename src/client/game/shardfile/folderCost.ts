@@ -314,15 +314,20 @@ export function jsonResidentBytes(input: unknown): number {
   if (bytes === undefined) throw new Error('Product residency needs bounded plain JSON');
   return bytes;
 }
+/** CHUNK-PARAM-REMOVAL CP25 (J522): `wildshard dev`'s and `wildshard prepare`'s page owns its author's uncooked candidate,
+ * which no build verdict prices, and enters it as its one grid cell; that page alone walks a product's residency and post
+ * cost as Node does. Every player build folds this to false, so the walk stays a Node-only cost there. */
+const OWNS_CANDIDATE=(typeof __DEVSERVER__==='boolean'&&__DEVSERVER__)||(typeof __PREPARATION_ONLY__==='boolean'&&__PREPARATION_ONLY__);
+const walks=():boolean=>(import.meta.env?.SSR??true)||OWNS_CANDIDATE;
 /** Reuse publication's graph cost; only Node/external sources need to validate graph bytes here. */
 export function folderPostCost(source:Shardfile,bytes:(hash:string)=>Uint8Array|undefined):PostStackCost{
   const descriptor=outputDescriptor(source);
   if(descriptor?.built===true){
     const cost=builtShardfilePostCost(descriptor.index.build.sourceHash);
-    if(cost===undefined)throw new Error('Build must publish post cost');
-    return cost;
+    if(cost!==undefined)return cost;
+    if(!OWNS_CANDIDATE)throw new Error('Build must publish post cost');
   }
-  if(!(import.meta.env?.SSR??true))throw new Error('Client product needs its build-owned post cost');
+  if(!walks())throw new Error('Client product needs its build-owned post cost');
   return postStackCost(source,bytes).cost;
 }
 /** The wire a product claim holds: every file's and common's compressed bytes. The grid's transport release
@@ -336,8 +341,9 @@ function shardfileWireBytes(source: Shardfile): number {
 /** Conservative transport/source heap claim: two parsed-source copies, owned asset buffers and map/object overhead. */
 export function folderResidentBytes(source: Shardfile): number {
   const emitted=outputDescriptor(source);
-  if(emitted?.built===true){if(emitted.residentBytes===undefined)throw new Error('Build must publish source residency');return Math.max(emitted.residentBytes,shardfileWireBytes(source));}
-  if(!(import.meta.env?.SSR??true))throw new Error('Client product needs its build-owned residency');
+  if(emitted?.built===true&&emitted.residentBytes!==undefined)return Math.max(emitted.residentBytes,shardfileWireBytes(source));
+  if(emitted?.built===true&&!OWNS_CANDIDATE)throw new Error('Build must publish source residency');
+  if(!walks())throw new Error('Client product needs its build-owned residency');
   const accounting = { heapBytes: 0 };
   preflightShardfile(source, accounting);
   // File/common aliases are copied into separate owned buffers by admitFolder, so count each actual Map entry.
@@ -351,8 +357,9 @@ export function folderResidentBytes(source: Shardfile): number {
  *  whole source in one drawn frame of a drive, 23-34 ms at phone 4x). The source must not change between steps. */
 export function* folderResidentBytesSteps(source: Shardfile, every = 4096): Generator<void, number> {
   const emitted=outputDescriptor(source);
-  if(emitted?.built===true){if(emitted.residentBytes===undefined)throw new Error('Build must publish source residency');return Math.max(emitted.residentBytes,shardfileWireBytes(source));}
-  if(!(import.meta.env?.SSR??true))throw new Error('Client product needs its build-owned residency');
+  if(emitted?.built===true&&emitted.residentBytes!==undefined)return Math.max(emitted.residentBytes,shardfileWireBytes(source));
+  if(emitted?.built===true&&!OWNS_CANDIDATE)throw new Error('Build must publish source residency');
+  if(!walks())throw new Error('Client product needs its build-owned residency');
   const accounting = { heapBytes: 0 };
   yield* preflightShardfileSteps(source, every, accounting);
   const wire = shardfileWireBytes(source);

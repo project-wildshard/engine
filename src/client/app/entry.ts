@@ -179,12 +179,10 @@ async function enterPage(): Promise<unknown> {
   // SA36: a `/slug/<slug>` link opens that one shard's page; its PLAY leaves for `/` with the tap (CP6), so a world never boots here.
   // SA37: on every host, a world build too: PLAY's page enters the world's grid at the shard's cell (GO7 below)
   const slugged = exploreChannel() ? null : slugOfPath(location.pathname);
-  // CP10 (J522): a page that carries a one-cell world (a tool's zone alone) boots that world at its only cell on a bare `/`, with no
-  // tap: the grid path players take (a grid intent at the cell), never the one-shard page. A page with its own inline shard
-  // (`wildshard dev`, `wildshard prepare`) keeps booting it on `/` as before: the grid admits only a product whose build owns its
-  // residency verdict (folderCost.ts), which an author's uncooked candidate has none of (CHUNK-PARAM-REMOVAL CP25)
-  inlineCell = requested === null && slugged === null && !exploreChannel() && document.getElementById('ws-shardfile') === null
-    ? oneCellWorld(catalogue) : null;
+  // CP10 (J522): a page that carries a one-cell world (`wildshard dev`, `wildshard prepare`, a tool's zone alone) boots that world at
+  // its only cell on a bare `/`, with no tap: the grid path players take (a grid intent at the cell), never the one-shard page.
+  // An inline author shard runs in that cell (CP25: its descriptor, its placement and its residency, clientSource and folderCost)
+  inlineCell = requested === null && slugged === null && !exploreChannel() ? oneCellWorld(catalogue) : null;
   const plainTitle = requested === null && slugged === null && inlineCell === null && document.getElementById('ws-shardfile') === null
     && bootRoute(search, { line: previousBootLine(), level: previousBootLevel() }).titleOnly;
   // The live menu's code can arrive while styles and the previous-end query settle.

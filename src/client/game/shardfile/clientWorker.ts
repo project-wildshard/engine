@@ -8,6 +8,7 @@ import type { DevBox, DevGround } from '@wildshard/engine/game/devColliders';
 import type { LiveGridWire } from '../grid/liveSession';
 import { chosenArrival, chosenCell, gotoHosted, pageGoto } from '../../../shared/game/grid/pageMode';
 import { GridAssembly } from '../../../shared/game/grid/assembly';
+import { oneCellWorld } from '../../../shared/game/grid/catalogueSlot';
 import { findSpecies, speciesDef } from '@wildshard/engine/entities/species/registry';
 import type { SystemSpec } from '@wildshard/engine/app/systems';
 import type { Player } from '@wildshard/engine/player/Player';
@@ -593,8 +594,10 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   // OFFLINE OF2 (J298): a build with a world sends every page online; the world's word never picks the server. A grid page whose world
   // is known to host one cell (a word in time, or the device's kept answer; no word takes the grid, J300) re-enters as that cell's
   // one-shard online page, never the solo grid. Shard select's goto already asked, so its grid page doesn't ask again.
+  // CHUNK-PARAM-REMOVAL CP25 (J522): a one-cell page (`wildshard dev`) is that one cell's world already, so its world hosting one
+  // cell is the page's own shape, never a reason to leave for a one-shard page
   const bootedCell = ports.grid?.booted, reshard = ports.grid?.reshard;
-  if (world !== undefined && bootedCell !== undefined && reshard !== undefined && !gotoHosted() && !await bootTask('server:grid-hosted', () => worldHosted(world))) {
+  if (world !== undefined && bootedCell !== undefined && reshard !== undefined && oneCellWorld() === null && !gotoHosted() && !await bootTask('server:grid-hosted', () => worldHosted(world))) {
     // a page the player left while it asked (back to the title) goes nowhere: the title keeps the document (review MUST)
     if (scope.disposed) throw new Error('The page left before it joined the world');
     reshard(bootedCell);

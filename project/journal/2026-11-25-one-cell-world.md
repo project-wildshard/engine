@@ -18,3 +18,10 @@
   grid admits a cell only by a descriptor whose build owns its residency verdict (folderCost.ts), which an uncooked
   candidate never has: the verdict is build-owned, never a network sidecar. So a page with its own `ws-shardfile` keeps its
   one-shard boot on `/` (no `chunk` either way); the grid path for builder dev is CHUNK-PARAM-REMOVAL CP25.
+- CP25 (opus-chunk2): builder dev now runs on the grid path too. Five walls, each a small fix: a grid cell places its
+  slug (`cataloguePlaced`, as `catalogueInstance` already did), so the inline shard saves and claims under the cell's
+  instance; the inline shard names its descriptor on a one-cell grid page (the product root dev and prepare serve); a
+  dev or preparation-only page prices its own uncooked candidate's residency and post cost by Node's walk (player builds
+  fold that to false); a data home is claimed at its regional charge before the session, so the grid's handoff matches;
+  and a one-cell page never re-enters as a one-shard page because its world hosts one cell. Proof: sharddev's dev and
+  watch e2e green against this devserver client with the page at `/` on `platform.grid`, installed-author 21 of 21.

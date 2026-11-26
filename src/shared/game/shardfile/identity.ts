@@ -12,9 +12,12 @@ export function assertShardSlug(slug: string): void {
  * instance, so this answers undefined; any other product's saves are keyed by its exact (origin, slug) pair, which
  * paths and revisions do not change.
  */
-/** A slug the catalogue places saves under its placement's instance. */
+/** A slug the catalogue places saves under its placement's instance. A grid cell places its slug too: builder dev's one-cell
+ * world (CHUNK-PARAM-REMOVAL CP11, J522) names the author's shard only as its cell, so the inline shard saves and claims its
+ * home under that cell's instance, the one the grid entered. Every channel cell is also a placement, so players see no change. */
 export function cataloguePlaced(slug: string): boolean {
-  return catalogueDocument().placements.some(row => bareSlug(row.slug) === bareSlug(slug));
+  const catalogue = catalogueDocument(), bare = bareSlug(slug);
+  return catalogue.placements.some(row => bareSlug(row.slug) === bare) || catalogue.grid.cells.some(row => bareSlug(row.slug) === bare);
 }
 export async function admittedShardInstance(base: string, slug: string, hash: (bytes: Uint8Array) => Promise<string>): Promise<string | undefined> {
   assertShardSlug(slug);

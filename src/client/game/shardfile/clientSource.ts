@@ -19,6 +19,8 @@ import { TIER, type Tier } from '@wildshard/engine/core/tier';
 import type { GridRecoveryRecord } from '../../../shared/game/grid/recovery';
 import { bootPageMode, pageGridRecovery } from '../grid/pageEntry';
 import { currentPageMode } from '../../../shared/game/grid/pageMode';
+import { oneCellWorld } from '../../../shared/game/grid/catalogueSlot';
+import { regionalDataCellBytes } from '../grid/runtimeCost';
 import { catalogueInstance } from '../../../shared/game/grid/instances';
 import { game } from '../shard/registry';
 import { installShards, shards } from '../shard/list';
@@ -118,6 +120,7 @@ function clientSource(admitted: AdmittedFolder, options: FolderOptions, bindings
     ...(bindings.allocator === undefined && bindings.residency === undefined && options.memory !== undefined ? { allocator: new ResidencyAllocator({ memory: options.memory, playing: pagePlayingBytes() }) } : {}),
     // OF10a5: admission names the save instance of a product the catalogue does not place (its origin and slug)
     ...(admitted.instance === undefined ? {} : { instance: admitted.instance }) };
+  admitGridDataHome(source, ownedBindings);
   const residency = clientResidency(source, ownedBindings);
   const assets = new ClientAssets(source, admitted.assets, options);
   const manifest = sourceManifest(source, admitted.assets, bindings.imageOwner);
@@ -126,6 +129,7 @@ function clientSource(admitted: AdmittedFolder, options: FolderOptions, bindings
     // Traversal belongs to the platform, independently of authored item rows or Developer mode.
     loadout: { weapons: [], tools: ['tool.hoverboard'], start: ['tool.hoverboard'] },
     ...(manifest.navigation === undefined ? {} : { navigation: manifest.navigation }),
+    ...inlineCellDescriptor(source.identity.slug),
     // A product with no terrain is a structure world, an empty one included: a slab needs rock art only a runtime shard's manifest has.
     ground: { structures: true, paths: 'plugin', terrain: clientGround(source, assets.retained), water: shardfileWater(source.water) },
     species: source.rows.species.map((row) => row.kind), uses: ['spawns', 'quests', 'bosses', 'elites', 'swim', 'hover', 'explore', 'practice'],
@@ -141,6 +145,25 @@ function clientSource(admitted: AdmittedFolder, options: FolderOptions, bindings
   };
   provideManifestAdmission(result, admitted, options, assets);
   return result;
+}
+
+/** CHUNK-PARAM-REMOVAL CP25 (J522): a data shard that is a grid page's own home is admitted at its region's charge, as
+ * session.ts admits an owned data home, so the live grid's initial handoff takes that exact claim. Builder dev's inline
+ * candidate (`wildshard dev` enters it as its one cell) reaches here before the session; a claimed home is left alone. */
+function admitGridDataHome(source: Shardfile, bindings: Pick<ShardfileClientBindings, 'instance' | 'residency'>): void {
+  const home = pageGridInstance(), owner = bindings.residency;
+  if (owner === undefined || home === null || source.runtime !== null || hasDeclaredClientPage(source)) return;
+  if (![home].includes(bindings.instance) || owner.allocator.has(`sim:${home}`)) return;
+  owner.admitHome(home, regionalDataCellBytes(source.identity.slug, source, undefined));
+}
+
+/** CHUNK-PARAM-REMOVAL CP11 (J522): `wildshard dev`'s one-cell world enters the author's inline shard as its grid cell, and the
+ * grid admits a cell by its descriptor (GO7, `gridShardfileFolder`): the page's own origin serves the candidate at its product
+ * root, as an inline runtime's discovery names it. Any other page keeps the inline shard pointerless, as before. */
+export function inlineCellDescriptor(slug: string): { shardfile?: string } {
+  const folder = slug.replace(/^_/u, ''), cell = oneCellWorld();
+  return currentPageMode() === 'grid' && cell !== null && [cell.slug].includes(folder) && /^[a-z0-9][a-z0-9-]*$/u.test(folder)
+    ? { shardfile: `/shardfiles/${folder}/shard.json` } : {};
 }
 
 /** Select a fully admitted external product before the ordinary session starts; built-in discovery remains installed.
