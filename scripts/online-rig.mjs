@@ -42,8 +42,7 @@ export async function enterPage(browser, device, to, name) {
   page.on('pageerror', error => { errors.push(error.message.slice(0, 240)); });
   page.on('console', line => { if (line.type() === 'error') errors.push(line.text().slice(0, 240)); });
   await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
-  if (typeof to === 'string') await page.goto(to, { waitUntil: 'load' });
-  else await enterZone(page, { flags: PLAY_FLAGS, ...to });
+  await (typeof to === 'string' ? page.goto(to, { waitUntil: 'load' }) : enterZone(page, { flags: PLAY_FLAGS, ...to }));
   await page.locator('#ws-name-box input').waitFor({ timeout: 150_000 });
   await page.locator('#ws-name-box input').fill(name);
   await page.locator('#ws-name-box button[type=submit]').click();
