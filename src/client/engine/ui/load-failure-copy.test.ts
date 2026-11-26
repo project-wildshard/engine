@@ -42,7 +42,7 @@ it('moves Copy diagnostics onto the fatal screen beside Reload and copies the ca
 // STAGING-BUGBASH SB53: offline mid load, a lazy module's fetch failed and this screen stayed after the network came back.
 it('SB53: a load failure shown offline reloads this page once the network returns', () => {
   const reload = vi.fn<() => void>();
-  vi.stubGlobal('location', { href: 'https://boot.test/?chunk=driftwood-isle', origin: 'https://boot.test', pathname: '/', search: '?chunk=driftwood-isle', reload });
+  vi.stubGlobal('location', { href: 'https://boot.test/', origin: 'https://boot.test', pathname: '/', search: '', reload });
   vi.stubGlobal('requestAnimationFrame', (run: FrameRequestCallback) => { run(0); return 0; });
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
   showLoadFailure({ ...failure, stage: 'level.play', message: 'Failed to fetch dynamically imported module: https://boot.test/b/c/late.js' });
@@ -53,7 +53,7 @@ it('SB53: a load failure shown offline reloads this page once the network return
 
 it('SB53: a load failure shown online waits for the player', async () => {
   const reload = vi.fn<() => void>();
-  vi.stubGlobal('location', { href: 'https://boot.test/?chunk=driftwood-isle', origin: 'https://boot.test', pathname: '/', search: '?chunk=driftwood-isle', reload });
+  vi.stubGlobal('location', { href: 'https://boot.test/', origin: 'https://boot.test', pathname: '/', search: '', reload });
   showLoadFailure(failure);
   window.dispatchEvent(new Event('online'));
   await new Promise(resolve => { setTimeout(resolve, 50); });
@@ -62,7 +62,7 @@ it('SB53: a load failure shown online waits for the player', async () => {
 
 it('SB53: only the screen on the page reloads when the network returns', async () => {
   const reload = vi.fn<() => void>();
-  vi.stubGlobal('location', { href: 'https://boot.test/?chunk=driftwood-isle', origin: 'https://boot.test', pathname: '/', search: '?chunk=driftwood-isle', reload });
+  vi.stubGlobal('location', { href: 'https://boot.test/', origin: 'https://boot.test', pathname: '/', search: '', reload });
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
   // a second failure replaces the first screen: one reload, not one per screen ever shown
   showLoadFailure(failure);

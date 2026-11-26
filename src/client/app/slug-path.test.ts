@@ -19,6 +19,6 @@ test('Brasscap Mesa is brasscap-mesa: its retired slug blender-template reads as
   expect(retiredSlugs()).toEqual([['blender-template', 'brasscap-mesa']]);
   expect([currentSlug('blender-template'), currentSlug('brasscap-mesa'), currentSlug('driftwood-isle')]).toEqual(['brasscap-mesa', 'brasscap-mesa', 'driftwood-isle']);
   expect(slugPathOf('driftwood-isle')).toBe('/slug/driftwood-isle');
-  // Ring 1's catalogue lists blender-template, the format's own Template 2: its ?chunk= link stays itself
+  // Ring 1's catalogue lists blender-template, the format's own Template 2: an old link to it stays itself
   expect(currentSlug('blender-template', slug => slug === 'blender-template')).toBe('blender-template');
 });

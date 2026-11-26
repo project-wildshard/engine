@@ -36,7 +36,7 @@ it('a mid-play cell load keeps its own exits: no menu row', () => {
 
 it('Exit to title replaces the page with a fresh title, once', async () => {
   const replace = vi.fn();
-  vi.stubGlobal('location', { href: 'https://play.wildshard.io/?chunk=driftwood-isle&sw=0', replace });
+  vi.stubGlobal('location', { href: 'https://play.wildshard.io/?skipintro=1&sw=0', replace });
   const exit = card().root.querySelector<HTMLButtonElement>('[data-load-menu="exit"]');
   exit?.click();
   await vi.waitFor(() => { expect(replace).toHaveBeenCalledTimes(1); });
@@ -47,7 +47,7 @@ it('Exit to title replaces the page with a fresh title, once', async () => {
   expect(replace).toHaveBeenCalledTimes(1);
 });
 
-it('Exit keeps the host and drops the shard', () => {
-  expect(exitTitleUrl('https://preview.wildshard.io/?chunk=nine-dragon-stack')).toBe('https://preview.wildshard.io/');
-  expect(exitTitleUrl('http://127.0.0.1:4406/?chunk=driftwood-isle&sw=0&mute=1')).toBe('http://127.0.0.1:4406/?sw=0');
+it('Exit keeps the host and drops every param but the worker opt-out', () => {
+  expect(exitTitleUrl('https://preview.wildshard.io/?skipintro=1')).toBe('https://preview.wildshard.io/');
+  expect(exitTitleUrl('http://127.0.0.1:4406/?tour=1&sw=0&mute=1')).toBe('http://127.0.0.1:4406/?sw=0');
 });

@@ -32,10 +32,12 @@ describe('START: the first document\'s painter', () => {
   async function startRow(steps: number, rows: { url: string; decodedBodySize: number; responseStatus?: number | null }[]): Promise<{ fact: string; pct: string; bar: string; step: string | undefined }> {
     const html = readFileSync('index.html', 'utf8').replace('<script data-loading-clock>',
       `<script type="application/json" id="boot-module-files">${JSON.stringify({ common: codeFiles })}</script><script data-loading-clock>`);
-    const window = new Window({ url: 'https://launch.test/?chunk=brasscap-mesa&tier=phone', width: 402, height: 874, settings: {
+    const window = new Window({ url: 'https://launch.test/?tier=phone', width: 402, height: 874, settings: {
       enableJavaScriptEvaluation: true, disableJavaScriptFileLoading: true, disableCSSFileLoading: true,
       enableImageFileLoading: false, handleDisabledFileLoadingAsSuccess: true } });
     windows.push(window);
+    // CP13 (J522): a world page is a bare `/` with the Zone Select tap in the tab (titleArrival.ts)
+    window.sessionStorage.setItem('wildshard.save.v2@2.session', JSON.stringify({ keys: { titleArrival: { v: 1, data: { slug: 'brasscap-mesa', mode: 'enter', at: Date.now() } } } }));
     window.document.write(html);
     const timing = Reflect.get(window, '__bootTiming') as { entries: object[]; resources: object[] };
     for (const operation of startOperations.slice(0, steps)) timing.entries.push({ operation, end: 1, result: 'complete' });

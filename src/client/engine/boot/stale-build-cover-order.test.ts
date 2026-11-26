@@ -11,7 +11,7 @@ test('RL8: a stale-build reload puts the RELOADING cover up even when the cover 
   vi.stubGlobal('__BUILD_ID__', '40e08ff-old');
   const coverAtReload: boolean[] = [];
   const reload = vi.fn(() => { coverAtReload.push(document.getElementById('ws-reloading') !== null); });
-  vi.stubGlobal('location', Object.assign(new URL('https://example.com/?chunk=driftwood-isle'), { reload, replace: vi.fn() }));
+  vi.stubGlobal('location', Object.assign(new URL('https://example.com/'), { reload, replace: vi.fn() }));
   vi.stubGlobal('fetch', () => Promise.resolve(Object.defineProperty(Response.json({ build: 'd91507e-live' }), 'url', { value: '' })));
   const { reloadIfStaleBuild } = await import('./browserChunkRecovery');
   await expect(reloadIfStaleBuild()).resolves.toBe(true);
@@ -25,7 +25,7 @@ test('FM5b4/R3: a player\'s reload past the worker (too-old Update, the new-buil
   vi.stubGlobal('__BUILD_ID__', '40e08ff-old');
   const coverAtReload: boolean[] = [];
   const reload = vi.fn(() => { coverAtReload.push(document.getElementById('ws-reloading') !== null); });
-  vi.stubGlobal('location', Object.assign(new URL('https://example.com/?chunk=driftwood-isle'), { reload, replace: vi.fn() }));
+  vi.stubGlobal('location', Object.assign(new URL('https://example.com/'), { reload, replace: vi.fn() }));
   const { reloadPastWorker } = await import('./browserChunkRecovery');
   await reloadPastWorker();
   await vi.waitFor(() => { expect(reload).toHaveBeenCalledOnce(); }, { timeout: 5000 });

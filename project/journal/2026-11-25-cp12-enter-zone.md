@@ -23,3 +23,8 @@ inside it with 1 cell in 12 s and 6 s; no request carries chunk.
 CP16 starts on the local proofs: `enterZone` takes the run's flags (`zoneHome` refuses a `chunk`), online-rig's
 `enterPage` takes `{ zone, base }`, and the rig proofs, failmode-proof's play pages and reload-title-proof tap in. The
 scripts that drive staging or prod wait for a CP1 build there: switched now, they would break that train's own QA.
+
+CP13 closes now that M1 is in: the last ten `src/` tests take a bare address, or a bare `/` with the tap in the tab where
+they need a world page (title-first-paint's `firstDocument` takes a zone, loading-row-ratio writes Brasscap's tap). One
+DL21 case read "an arrival for another shard"; with the tap naming the page's zone there is no such arrival, so it now
+proves a tap past its minute leaves the page the title. The guard's baseline prunes the ten files.

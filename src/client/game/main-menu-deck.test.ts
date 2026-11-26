@@ -349,7 +349,7 @@ test('ZS10: Developer\'s ALL (J469) is a list of every zone, served order first,
 
 // QA 11-23-b row 26 (J453, J498): staging v0.1.76 placed the hidden test shards Pastel Plain and Ink-Cel Valley on the grid, and
 // Popular and New listed them. However a door or a kept list serves them, no player tab names a hidden or test shard; ALL does.
-test('row 26: with no door answer (preview, a `?chunk=` boot) a hidden shard\'s card stays on Featured, so ENTER enters it', () => {
+test('row 26: with no door answer (preview, a harness boot) a hidden shard\'s card stays on Featured, so ENTER enters it', () => {
   // main ci 45298253323 (boundaries): cook-to-play boots hidden Brasscap Mesa by its route; with its card filtered off Featured,
   // ENTER entered Signal Dunes and the page navigated away under the gameplay wait.
   const hiddenCard = { ...card('g-seven', 'G-SEVEN'), badge: 'Developer only' as const };

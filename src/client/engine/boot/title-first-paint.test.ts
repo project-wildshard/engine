@@ -18,7 +18,9 @@ afterEach(async () => {
   for (const window of windows.splice(0)) await window.happyDOM.close();
   document.body.innerHTML = '';
 });
-function firstDocument(search: string, frames?: Frames, developer = false, handoffMs = 0): Window {
+/** CHUNK-PARAM-REMOVAL CP13 (J522): a world page is a bare `/` with the tap in the tab; `zone` writes a fresh one
+ *  (`handoffMs` back-dates it, and alone writes Driftwood's "Home" arrival). */
+function firstDocument(search: string, frames?: Frames, developer = false, handoffMs = 0, zone?: string): Window {
   const window = new Window({ url: `https://launch.test/${search}`, width: 402, height: 874, settings: {
     enableJavaScriptEvaluation: true, disableJavaScriptFileLoading: true, disableCSSFileLoading: true,
     enableImageFileLoading: false, handleDisabledFileLoadingAsSuccess: true,
@@ -30,8 +32,8 @@ function firstDocument(search: string, frames?: Frames, developer = false, hando
     window.requestAnimationFrame = callback => { frames.callbacks.push(callback); return nativeFrame(() => undefined); };
   }
   windows.push(window);
-  if (handoffMs > 0) window.sessionStorage.setItem(`wildshard.save.v2@${saveEpoch}.session`, JSON.stringify({keys: {titleArrival: {data: JSON.stringify({
-    slug: 'driftwood-isle', name: 'Home', mode: 'enter', at: window.performance.timeOrigin + (frames?.now ?? 0) - handoffMs,
+  if (handoffMs > 0 || zone !== undefined) window.sessionStorage.setItem(`wildshard.save.v2@${saveEpoch}.session`, JSON.stringify({keys: {titleArrival: {data: JSON.stringify({
+    slug: zone ?? 'driftwood-isle', name: 'Home', mode: 'enter', at: window.performance.timeOrigin + (frames?.now ?? 0) - handoffMs,
   })}}}));
   window.document.write(html);
   // Happy DOM does not retain the head's lexical homeParams across script tags;
@@ -41,7 +43,7 @@ function firstDocument(search: string, frames?: Frames, developer = false, hando
 }
 
 test('a split document cannot expose a loading card before its real arrival metadata is applied', () => {
-  const window = new Window({ url: 'https://launch.test/?chunk=driftwood-isle', settings: {
+  const window = new Window({ url: 'https://launch.test/', settings: {
     enableJavaScriptEvaluation: true, disableJavaScriptFileLoading: true, disableCSSFileLoading: true,
     enableImageFileLoading: false, handleDisabledFileLoadingAsSuccess: true,
   } });
@@ -106,11 +108,11 @@ test('environment flags alone (the phone harness, ?v=) launch the same title and
     expect(window.document.documentElement.classList.contains('title-first')).toBe(true);
     expect(window.document.querySelector('link[as="image"]')?.getAttribute('href')).toMatch(/^\/assets\/title\/main-crossroads-square-first-[a-f0-9]{16}\.jpg$/u);
   }
-  expect(firstDocument('?tier=phone&chunk=driftwood-isle').document.documentElement.classList.contains('title-first')).toBe(false);
+  expect(firstDocument('?tier=phone', undefined, false, 0, 'driftwood-isle').document.documentElement.classList.contains('title-first')).toBe(false);
 });
 
 test('BUGBASH-LOOP (J385): a selected shard paints its full-screen loading card, never the title shell or a thin bar', () => {
-  const window = firstDocument('?chunk=driftwood-isle'), panel = window.document.querySelector('[data-title-shell]');
+  const window = firstDocument('', undefined, false, 0, 'driftwood-isle'), panel = window.document.querySelector('[data-title-shell]');
   if (panel === null) throw new Error('Missing title shell');
   const doc = window.document.documentElement;
   expect(doc.classList.contains('title-first')).toBe(false);
@@ -157,11 +159,11 @@ test('RL3: a page whose entry graph never arrived reloads once at 12 s; a runnin
 
 test('SB53: a page offline before its entry graph ran reloads when the network returns, its one retry spent or not', () => {
   const page = (offline: boolean): { window: Window; reload: ReturnType<typeof vi.fn<() => void>> } => {
-    const window = new Window({ url: 'https://launch.test/?chunk=driftwood-isle', settings: { enableJavaScriptEvaluation: true, disableJavaScriptFileLoading: true,
+    const window = new Window({ url: 'https://launch.test/', settings: { enableJavaScriptEvaluation: true, disableJavaScriptFileLoading: true,
       disableCSSFileLoading: true, enableImageFileLoading: false, handleDisabledFileLoadingAsSuccess: true } });
     windows.push(window);
     Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => !offline });
-    window.sessionStorage.setItem('wildshard.save.v2@2.session', JSON.stringify({ keys: { 'boot.selfReload': { v: 1, data: '1' } } }));
+    window.sessionStorage.setItem('wildshard.save.v2@2.session', JSON.stringify({ keys: { 'boot.selfReload': { v: 1, data: '1' }, titleArrival: { v: 1, data: { slug: 'driftwood-isle', mode: 'enter', at: Date.now() } } } }));
     const reload = vi.fn<() => void>();
     vi.spyOn(window.location, 'reload').mockImplementation(() => { reload(); });
     window.document.write(html);
@@ -249,7 +251,7 @@ test('BUGBASH-LOOP (J385): the title always hides the play HUD (#hud.intro) and 
 const startedOf = (window: Window): string | undefined => { const card = window.document.querySelector('.ws-load'); return card instanceof window.HTMLElement ? card.dataset['clockStartedAt'] : undefined; };
 test('DL21: a world page\'s first-paint card runs its clock from the title tap before any module, until Loading adopts it', async () => {
   // The title tapped 1.5 s before this document started (the fixture's stored arrival); no module script runs here.
-  const frames: Frames = { now: 0, callbacks: [] }, window = firstDocument('?chunk=driftwood-isle', frames, false, 1500);
+  const frames: Frames = { now: 0, callbacks: [] }, window = firstDocument('', frames, false, 1500);
   const card = window.document.querySelector('.ws-load[data-shell]'), clock = (): string => card?.querySelector('[data-el="clock"]')?.textContent ?? '';
   expect(startedOf(window)).toBe('-1500');
   expect(card?.querySelector('[data-el="slug"]')?.textContent).toBe('Home');
@@ -270,10 +272,13 @@ test('CHUNK-PARAM CP2: a bare / the tap navigated runs its card\'s clock and nam
   expect(window.document.querySelector('[data-el="slug"]')?.textContent).toBe('Home');
 });
 
-test('DL21: the title page and an arrival for another shard leave the card\'s clock alone', () => {
+// CP13 (J522): the tap names the page's zone, so an arrival can no longer be for another shard than the page's; a tap past
+// its minute is no arrival at all, and the page stays the title.
+test('DL21: the title page and a tap over a minute old leave the card\'s clock alone', () => {
   expect(startedOf(firstDocument(''))).toBeUndefined();
-  const other = firstDocument('?chunk=pine-hollow', { now: 0, callbacks: [] }, false, 1500);
-  expect(startedOf(other)).toBe('0'); expect(other.document.querySelector('[data-el="slug"]')?.textContent).toBe('');
+  const stale = firstDocument('', { now: 0, callbacks: [] }, false, 61_000);
+  expect(startedOf(stale)).toBeUndefined();
+  expect(stale.document.documentElement.classList.contains('title-first')).toBe(true);
 });
 
 // QA 11-13 (Jake, preview at 09:58: "Whenever I see this frozen screen I'm like, is it broken? ... show the version at top
@@ -334,7 +339,7 @@ test('QA 11-13: the static bar moves from the boot record: files, then the entry
 });
 
 test('QA 11-13: a page the entry turns into the title later (a player reload, an unlisted shard) gets the moving bar too', async () => {
-  const frames: Frames = { now: 0, callbacks: [] }, window = firstDocument('?chunk=driftwood-isle', frames);
+  const frames: Frames = { now: 0, callbacks: [] }, window = firstDocument('', frames, false, 0, 'driftwood-isle');
   const text = (): string => window.document.querySelector('[data-launch-step]')?.textContent ?? '';
   const settle = (): Promise<void> => new Promise(resolve => { setTimeout(resolve, 150); });
   frames.now = 400; await settle();

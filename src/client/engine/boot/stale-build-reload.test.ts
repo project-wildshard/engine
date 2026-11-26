@@ -13,7 +13,7 @@ type Files = (url: string, init: RequestInit) => Promise<Response>;
 function oldBuildPage(live: string): { reload: () => void; files: Files & { mock: { calls: unknown[] } } } {
   vi.stubGlobal('__BUILD_ID__', '40e08ff-old');
   const reload = vi.fn<() => void>();
-  vi.stubGlobal('location', Object.assign(new URL('https://example.com/?chunk=driftwood-isle'), { reload, replace: vi.fn() }));
+  vi.stubGlobal('location', Object.assign(new URL('https://example.com/'), { reload, replace: vi.fn() }));
   // a same-origin answer reports url '' as a browser's does (happy-dom leaves it undefined)
   const answer = (response: Response): Response => Object.defineProperty(response, 'url', { value: '' });
   vi.stubGlobal('fetch', (url: URL | string) => Promise.resolve(answer(String(url).includes('/version.json') ? Response.json({ build: live }) : new Response('Not found', { status: 404 }))));

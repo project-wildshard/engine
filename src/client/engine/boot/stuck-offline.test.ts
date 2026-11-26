@@ -10,7 +10,7 @@ afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); vi.unst
 
 test('SB53: a boot that fails offline waits for the network before its one reload', async () => {
   const reload = vi.fn<() => void>();
-  vi.stubGlobal('location', { href: 'https://boot.test/?chunk=driftwood-isle', origin: 'https://boot.test', pathname: '/', search: '?chunk=driftwood-isle', reload });
+  vi.stubGlobal('location', { href: 'https://boot.test/', origin: 'https://boot.test', pathname: '/', search: '', reload });
   vi.stubGlobal('fetch', () => Promise.reject(new TypeError('Failed to fetch')));
   const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
   guardBoot(Promise.reject(new TypeError('Failed to fetch dynamically imported module')));
@@ -28,7 +28,7 @@ test('SB53: a boot that fails offline waits for the network before its one reloa
 // QA 11-24 row 25: offline on a first visit (no service worker control yet), the start's chunks fail and the card stood at
 // START 84 % with its clock running and no word; the wait now says why on the card, and its line goes when the network is back.
 test('a boot that fails offline says so on the loading card until the network is back', async () => {
-  vi.stubGlobal('location', { href: 'https://boot.test/?chunk=driftwood-isle', origin: 'https://boot.test', pathname: '/', search: '?chunk=driftwood-isle', reload: vi.fn<() => void>() });
+  vi.stubGlobal('location', { href: 'https://boot.test/', origin: 'https://boot.test', pathname: '/', search: '', reload: vi.fn<() => void>() });
   vi.stubGlobal('fetch', () => Promise.reject(new TypeError('Failed to fetch')));
   const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
   const card = document.createElement('div'); card.className = 'ws-load'; document.body.append(card);
@@ -45,7 +45,7 @@ test('a boot that fails offline says so on the loading card until the network is
 // boot's recovery reloaded it onto the title, and the card was gone a tenth of a second after it showed.
 test('a boot that left through the funnel is not recovered: no reload, no retry spent', async () => {
   const reload = vi.fn<() => void>();
-  vi.stubGlobal('location', { href: 'https://boot.test/?chunk=brasscap-mesa', origin: 'https://boot.test', pathname: '/', search: '?chunk=brasscap-mesa', reload });
+  vi.stubGlobal('location', { href: 'https://boot.test/', origin: 'https://boot.test', pathname: '/', search: '', reload });
   vi.stubGlobal('fetch', () => Promise.reject(new TypeError('Failed to fetch')));
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
   guardBoot(Promise.reject(new LeavingPlayError('brasscap-mesa: the world runs a newer revision than this page has; waiting for it')));

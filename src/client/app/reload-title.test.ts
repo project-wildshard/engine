@@ -72,7 +72,7 @@ test("index.html's 12 s self-reload of a hung fresh open (its claim, just before
   window.dispatchEvent(new Event('pagehide')); // the player left Nalati for a deep link, whose boot hung
   vi.advanceTimersByTime(12_000);
   t.session.set('boot.selfReload', String(Date.now() - 20));
-  const end = t.page('reload', { href: 'http://localhost:3000/?chunk=pine-hollow' }).life.lastEnd();
+  const end = t.page('reload', { href: 'http://localhost:3000/' }).life.lastEnd();
   expect(end.player).toBeUndefined();
   expect(toTitle(end)).toBe(false);
 });
