@@ -13,7 +13,7 @@ import type { ExploreSpec } from '@wildshard/engine/level/data';
 import type { LevelSpec, EngineMechanism, TierOverrides, BootSpec, LoadoutSpec } from '@wildshard/engine/level/spec';
 import type { RosterEntry } from '@wildshard/engine/models/live';
 import type { SwimArms } from '@wildshard/engine/player/Hands';
-import type { LookReplaceContext, LookStrategy } from '@wildshard/engine/render/look';
+import type { EngineChainKind, LookReplaceContext, LookStrategy } from '@wildshard/engine/render/look';
 import type { Renderer } from '@wildshard/engine/render/renderer';
 import type { HudBand } from '@wildshard/engine/ui/hudSlots';
 import type { MinimapPalette } from '@wildshard/engine/ui/Minimap';
@@ -590,6 +590,11 @@ export interface ShardManifest {
    * ever sees the bound loader (progress/shard-platform/product-in-look-o272/).
    */
   render?: (product: ShardFolder) => Promise<LookStrategy>;
+  /**
+   * The engine chain `render`'s look runs on, where the manifest knows it without loading the look (a product's own data
+   * look: 'clean'). The grid frame reads it from the catalogue (meta QA 11-25 row 110); absent: known once the look loads.
+   */
+  lookChain?: EngineChainKind;
   /**
    * A built fragment's limits (the landscape shards have the terrain's edge walls instead): below `floor` or outside the
    * box, on foot or on the board, the player is put back on the last floor they stood on inside them (a registry floor;

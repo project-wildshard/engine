@@ -123,7 +123,8 @@ function clientSource(admitted: AdmittedFolder, options: FolderOptions, bindings
   admitGridDataHome(source, ownedBindings);
   const residency = clientResidency(source, ownedBindings);
   const assets = new ClientAssets(source, admitted.assets, options);
-  const manifest = sourceManifest(source, admitted.assets, bindings.imageOwner);
+  // the data look's chain is said again below, where this source's own render replaces it
+  const { lookChain: _dataChain, ...manifest } = sourceManifest(source, admitted.assets, bindings.imageOwner);
   const clientBindings = { ...ownedBindings, allocator: residency.allocator }, post = declaredPost(source);
   const result: ShardManifest = { ...manifest, ...(source.presentation === undefined ? { biome: 'Authored world', blurb: source.identity.name } : {}),
     // Traversal belongs to the platform, independently of authored item rows or Developer mode.
@@ -137,6 +138,8 @@ function clientSource(admitted: AdmittedFolder, options: FolderOptions, bindings
     creatures: { lowPoly: true, waitForModels: false, furRim: false, tintRange: 0, oneMaterial: true },
     // QA 11-24 row 59: a declared post look (Nine's rain, ink lines and live light) runs as a discovery page runs it
     // over the data look, which keeps the zone's sky, light and ground (a post look alone fell back to an HDRI the page lacks)
+    // QA 11-25 row 110: the data look runs the clean chain; a declared post look or a painted world says its own once loaded
+    ...(post === null && sections !== undefined && !sections.has('look/painted') ? { lookChain: 'clean' as const } : {}),
     render: product => {
       const data = product.has('look/painted') ? folderPaintedLook(product) : Promise.resolve(source.look.keys.length === 0 ? emptyLook(source.look.dayOverride) : shardfileLook(source.look, assets.retained));
       return post === null ? data : withDeclaredPost(data, declaredPostLook(post, product));

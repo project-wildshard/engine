@@ -28,7 +28,10 @@
  * - **A cinematic region's shafts, fringe and grain** (SF63 follow-up): the shell runs the clean chain, so the three
  *   effects only the cinematic chain has are compiled into its colour pass at install, neutral (`regionCinematic.ts`); a
  *   carried region on the cinematic chain turns them on by its weight, its clock drives the shafts, and the march's target
- *   is allocated only while it carries them.
+ *   is allocated only while it carries them. They and the carried god rays are placed only in a world where a cell can
+ *   carry them on this tier (QA 11-25 row 110, the catalogue's `carriage`; not known: placed): a one-cell world of a
+ *   clean-chain zone with its god rays off compiles none of their programs, and a live chain that carries them after all
+ *   places them as its region loads (one prepared recompile, never at the crossing).
  * - **A region's own composite** (SF63 / G158, `ExtendLook.cell`): a resident region whose look declares its post composite
  *   puts its display after the shell's tone mapping (like a 'replace' chain's display transform) and its side passes before
  *   the colour pass; they run only while it carries the frame, and its weight fades its display in and the tone mapping out.
@@ -48,7 +51,7 @@ import { CAMERA_FOV } from '@wildshard/engine/core/config';
 import type { LookCellPost } from '@wildshard/engine/render/look';
 import { RoadSky, type RoadSkyPage } from './roadSky';
 import { FAR_RING, GRID_HAZE } from '../../../shared/game/grid/farProxy';
-import { bindFrameLook, type FrameLookContribution, type FramePost, type FrameSkyLayer, type RegionChain, type RegionPost } from './frameLook';
+import { bindFrameLook, chainCarriage, type CellCarriage, type FrameLookContribution, type FramePost, type FrameSkyLayer, type RegionChain, type RegionPost } from './frameLook';
 import { NEUTRAL_GRADE, dominantOwner, edgeDistance, frameFog, frameGrade, frameOwners, type FrameCell, type FullGrade, type RegionGrade, type RegionWeights } from './frameModel';
 import { ROAD_SKY } from '@wildshard/format/roadLight';
 
@@ -353,6 +356,8 @@ export class GridFrame {
   private readonly half: number;
   private readonly band: number | undefined;
   private readonly feet: () => { readonly x: number; readonly z: number };
+  /** QA 11-25 row 110: what each cell of the world can carry, from the catalogue (absent: not known) */
+  private readonly carriage: (() => readonly CellCarriage[]) | undefined;
   private readonly hazes = new Map<string, readonly [number, number, number]>();
   private readonly grades = new Map<string, RegionGrade>();
   /** live regions' contributions (instance → its look), and the airs the owners bring this frame */
@@ -379,6 +384,9 @@ export class GridFrame {
   private cine: FrameCinematic | null = null;
   /** G321 part 5: the chain's god rays are the carried ones (`FrameCinematic.rays`), at 0 on the page */
   private carriedRays = false;
+  /** QA 11-25 row 110: where the cinematic effects go once a live chain carries them (set while none is placed) */
+  private cineSlot: { readonly composer: EffectComposer; readonly pass: EffectPass; readonly effects: Effect[]; readonly post: FramePostEffects } | null = null;
+  private unplaceCine: (() => void) | null = null;
   /** SF63: the shell's colour pass and its effect list (set at install), where a resident region's display transform goes */
   private colour: { readonly composer: EffectComposer; readonly pass: EffectPass; readonly effects: Effect[]; readonly tone: Effect } | null = null;
   /** SF63 / G158: each resident region's own composite side passes (`ExtendLook.cell`), before the colour pass */
@@ -411,9 +419,12 @@ export class GridFrame {
   private readonly written = new Color(Number.NaN, Number.NaN, Number.NaN);
   private readonly eye = new Vector3();
 
-  constructor(options: { host: GridFrameHost; scope: Scope; cells: readonly FrameCell[]; home: FrameCell; homeIsFrame?: boolean; half: number; band?: number; feet: () => { readonly x: number; readonly z: number } }) {
+  constructor(options: { host: GridFrameHost; scope: Scope; cells: readonly FrameCell[]; home: FrameCell; homeIsFrame?: boolean; half: number; band?: number; feet: () => { readonly x: number; readonly z: number };
+    /** QA 11-25 row 110: what each cell of the world can carry on this tier, read at install (absent: not known) */
+    carriage?: () => readonly CellCarriage[] }) {
     const { host, scope, home } = options;
     this.host = host; this.cells = options.cells; this.homeInstance = options.homeIsFrame === false ? null : home.instance; this.half = options.half; this.band = options.band; this.feet = options.feet;
+    this.carriage = options.carriage;
     this.weights = { cells: new Map([[home.instance, 1]]), highway: 0 };
     // the scene fog is the owner's air while the scene draws (the backdrop has written its own by then)
     const prev = host.scene.onBeforeRender.bind(host.scene);
@@ -468,6 +479,8 @@ export class GridFrame {
     // and one as it unloads; crossing its edge only moves opacities)
     const make = look.chain?.post?.display;
     if (make !== undefined) { const display = make(); display.blendMode.opacity.value = 0; this.displays.set(instance, display); this.placeDisplay(display, true); }
+    // QA 11-25 row 110: a chain that carries what the catalogue said no cell would gets it now, as it loads
+    if (this.cineSlot !== null && this.needsCinematic(this.cineSlot.post, [chainCarriage(look.chain)])) this.placeLate();
     return () => {
       if (this.live.get(instance) !== look) return;
       this.live.delete(instance); this.lenses.delete(instance);
@@ -601,11 +614,10 @@ export class GridFrame {
         this.chainFade = carried; this.chainPost = post;
         const at = Math.max(...own.map((effect) => effects.indexOf(effect))) + 1;
         effects.splice(at, 0, this.lookEffect, this.lutEffect);
-        // SF63 follow-up: a cinematic region's shafts, fringe and grain, neutral until one carries them
-        const unplace = this.placeCinematic(composer, pass, effects);
-        // G321 part 5: a shell whose chain leaves its god rays out carries a region's in the rays placed with them
-        const carriedRays = (post.rays ?? null) === null ? this.cine?.rays ?? null : null;
-        if (carriedRays !== null && effects.includes(carriedRays)) { this.chainPost = { ...post, rays: carriedRays }; this.carriedRays = true; }
+        // SF63 follow-up: a cinematic region's shafts, fringe and grain, neutral until one carries them; QA 11-25 row 110:
+        // only in a world where a cell can carry them (or the catalogue cannot say), else once a live chain does
+        if (this.needsCinematic(post, this.worldCarriage())) this.placeNow(composer, pass, effects, post);
+        else this.cineSlot = { composer, pass, effects, post };
         // SF63: a 'replace' region's display transform takes over the tone mapping by its weight: the tone mapping blends
         // (NORMAL at opacity 1 draws exactly what SRC drew) and the regions resident before the install are placed now
         const tone = post.tone, toneBlend = tone?.blendMode.blendFunction;
@@ -621,7 +633,7 @@ export class GridFrame {
           if (tone !== undefined && toneBlend !== undefined) { tone.blendMode.blendFunction = toneBlend; tone.blendMode.opacity.value = 1; }
           for (const passes of this.cellPasses.values()) for (const p of passes) composer.removePass(p);
           this.colour = null;
-          unplace();
+          this.unplaceCine?.(); this.unplaceCine = null; this.cineSlot = null;
         };
       } else {
         const fade = opacityFade(home);
@@ -633,6 +645,40 @@ export class GridFrame {
       pass.recompile();
       return;
     }
+  }
+
+  /**
+   * QA 11-25 row 110: what the world's cells can carry, the catalogue's word for each and the live chains' own (absent
+   * catalogue: one cell not known, so everything is placed as before).
+   */
+  private worldCarriage(): CellCarriage[] {
+    const live = [...this.live.values()].map((look) => chainCarriage(look.chain));
+    return this.carriage === undefined ? [{ cinematic: null, rays: null }, ...live] : [...this.carriage(), ...live];
+  }
+
+  /** whether any of `cells` can carry the cinematic effects, or god rays where the page's own chain has none (null: may) */
+  private needsCinematic(post: FramePostEffects, cells: readonly CellCarriage[]): boolean {
+    if (this.host.cinematic === undefined) return false;
+    const pageRays = (post.rays ?? null) !== null;
+    return cells.some((cell) => cell.cinematic !== false || (!pageRays && cell.rays !== false));
+  }
+
+  /** the cinematic effects and the carried god rays into the colour pass (the caller recompiles) */
+  private placeNow(composer: EffectComposer, pass: EffectPass, effects: Effect[], post: FramePostEffects): void {
+    this.unplaceCine = this.placeCinematic(composer, pass, effects);
+    // G321 part 5: a shell whose chain leaves its god rays out carries a region's in the rays placed with them
+    const carriedRays = (post.rays ?? null) === null ? this.cine?.rays ?? null : null;
+    if (carriedRays !== null && effects.includes(carriedRays)) { this.chainPost = { ...post, rays: carriedRays }; this.carriedRays = true; }
+  }
+
+  /** QA 11-25 row 110: placed after the install, as a region that carries them loads: one prepared recompile */
+  private placeLate(): void {
+    const slot = this.cineSlot;
+    if (slot === null) return;
+    this.cineSlot = null;
+    this.placeNow(slot.composer, slot.pass, slot.effects, slot.post);
+    this.rebypass();
+    void this.prepareDisplay(slot.pass);
   }
 
   /**

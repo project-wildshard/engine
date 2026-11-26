@@ -213,3 +213,26 @@ export function lookChainKind(look: { readonly mode?: 'extend' | 'replace'; read
   if (look === null) return 'cinematic';
   return look.mode === 'replace' ? undefined : look.chain ?? 'cinematic';
 }
+
+/**
+ * QA 11-25 row 110: what a cell can carry into the shell's colour pass on this tier. `cinematic`: the cinematic chain's
+ * shafts, fringe and grain (`regionCinematic.ts`); `rays`: god rays, which a page whose own chain leaves them out carries
+ * for it (G321 part 5). null: not known.
+ */
+export interface CellCarriage { readonly cinematic: boolean | null; readonly rays: boolean | null }
+
+/**
+ * What a catalogue cell can carry, from its manifest alone. A shard with no look binding runs its product's own data look,
+ * which is on the clean chain (`emptyLook`, `shardfileLook`), so it never carries the cinematic effects, and its god rays
+ * only where its tier knob leaves them on; so does a binding that says it runs that chain (`lookChain`). A look binding (toon, painted, keyed sky, post graph) is code the catalogue
+ * cannot read: not known. A cell whose live chain disagrees still gets them as it loads (`GridFrame.contribute`).
+ */
+export function catalogueCarriage(manifest: { readonly render?: unknown; readonly lookChain?: EngineChainKind | undefined; readonly tiers?: Partial<Record<string, { readonly godRays?: boolean | undefined } | undefined>> | undefined } | undefined, tier: string): CellCarriage {
+  if (manifest === undefined || (manifest.render !== undefined && manifest.lookChain !== 'clean')) return { cinematic: null, rays: null };
+  return { cinematic: false, rays: manifest.tiers?.[tier]?.godRays !== false };
+}
+
+/** What a live region's chain carries: the shafts, fringe and grain on the cinematic chain, god rays when it draws any. */
+export function chainCarriage(chain: RegionChain | undefined): { readonly cinematic: boolean; readonly rays: boolean } {
+  return { cinematic: chain?.post?.volumetric !== undefined, rays: (chain?.post?.rays ?? 0) > 0 };
+}

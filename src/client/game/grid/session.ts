@@ -77,6 +77,7 @@ import { bakedNearFiles, NearPlaceholders, type NearPlaceholderState } from './n
 import { PHONE_NEAR_CELLS, admitsCellTiles, farDrawnAt, farNearReachOn, placeholderBlocksTiles } from './nearPlaceholderPlan';
 import { TIER } from '@wildshard/engine/core/tier';
 import { GridFrame, type GridFrameHost, type GridFrameState } from './frame';
+import { catalogueCarriage } from './frameLook';
 import { installHazeBand } from './hazeBand';
 import { LiveGridSession, type LiveGridPage, type LiveGridSessionState } from './liveSession';
 import { gridShardfileEdges, gridShardfileFarBytes, gridShardfileFolder, readGridShardfileFar, readGridShardfileNear } from './folders';
@@ -702,7 +703,9 @@ export class GridSession {
     // road look owns the road, blended over 16 m at the cell edge; a host with no camera / composer builds none
     const frameHost = host.frame;
     this.frame = frameHost !== undefined ? new GridFrame({ host: frameHost, scope: host.scope, home, homeIsFrame: false, half: CHUNK_HALF, feet: () => this.world(),
-      cells: this.assembly.cells.map((cell) => ({ instance: cell.instance, origin: { x: cell.origin.x, z: cell.origin.z } })) }) : null;
+      cells: this.assembly.cells.map((cell) => ({ instance: cell.instance, origin: { x: cell.origin.x, z: cell.origin.z } })),
+      // QA 11-25 row 110: the cinematic effects and carried god rays only where a cell of this world can carry them
+      carriage: () => this.assembly.cells.map((cell) => catalogueCarriage(findShard(cell.slug), TIER)) }) : null;
     const frame = this.frame;
     this.constructorTiming?.('frame');
     // SF17b look: the boulevard over the deck's road band (G80 / G81 / G93) and the VR void past the outer road (G89)
