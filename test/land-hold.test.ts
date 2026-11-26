@@ -50,6 +50,33 @@ describe('the engine land HOLD (QA 11-25 row 37)', () => {
     expect(holdRefusal({ lane: 'opus-fe13', env: {}, bodies: '', receipts: '' })).toBeNull();
   });
 
+  // Row 98: on 11-26 05:23 UTC opus-lean91's land stopped on this note about a hold, read as a hold naming no lander.
+  const NOTE_ABOUT_HOLD = '05:19 UTC opus-fr13 NOTE HOLD-engine coordinator opus-lean91: two small engine commits wait on the HOLD: QA-11-25-93 (pins mend a stale out/ product; v0.1.94\'s path) and my part of RED 45757742821 (layer-hunt-senses: the felt blow follows a telegraphed fight only). Neither touches a lean-move path. Default in 10 minutes unless told otherwise: land them with ALLOW_LAND_DURING_HOLD=1 named in the bodies, as two separate pushes';
+
+  test('row 98: only `NOTE HOLD engine: ...; lander <lane>` holds; a NOTE whose topic names a hold does not', () => {
+    for (const note of [
+      NOTE_ABOUT_HOLD,
+      '03:44 UTC opus-fr13 NOTE HOLD-scoped red 45746379191: fixing forward alone',
+      '21:43 UTC opus-rel86 NOTE HOLD v0.1.92 staging opus-nalati: staging can\'t sign on engine 279b5ed0d',
+      '05:30 UTC opus-x NOTE engine: waiting on the HOLD engine: lander opus-y to lift',
+    ]) {
+      expect(openHold(log(GREEN, note)), note).toBeNull();
+      expect(holdRefusal({ lane: 'opus-lean91', env: {}, bodies: 'fix: red', receipts: log(GREEN, note) })).toBeNull();
+    }
+    // The note does not hide a real hold before it: the real one still binds, and its lander still lands.
+    const held = log(GREEN, HOLD, NOTE_ABOUT_HOLD);
+    expect(openHold(held)?.line).toBe(HOLD);
+    expect(holdRefusal({ lane: 'opus-b', env: {}, bodies: '', receipts: held })).toBeNull();
+    // A real hold that names no lander refuses everyone and quotes the receipt line.
+    const bare = '05:20 UTC saga-builder NOTE HOLD engine: MAIN RED 45757742821 (the lean move), fix being named';
+    const refusal = holdRefusal({ lane: 'opus-lean91', env: {}, bodies: '', receipts: log(GREEN, bare) });
+    expect(refusal).toContain('nobody lands: the hold names no `; lander <lane>`');
+    expect(refusal).toContain(bare);
+    // A lift is `NOTE LIFT engine:`; a NOTE that lifts some other hold leaves the engine hold open.
+    expect(openHold(log(HOLD, '21:11 UTC opus-rel86 NOTE LIFT v0.1.92 staging go-live HOLD (21:11) was transient'))?.line).toBe(HOLD);
+    expect(openHold(log(HOLD, '05:40 UTC opus-x NOTE row 9: I land once the HOLD lifted'))?.line).toBe(HOLD);
+  });
+
   test('ALLOW_LAND_DURING_HOLD=1 passes only when a commit body names it (J381)', () => {
     const receipts = log(HOLD);
     const named = 'fix: urgent\n\nALLOW_LAND_DURING_HOLD=1 (J381): the red is this fix';

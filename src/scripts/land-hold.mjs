@@ -8,6 +8,11 @@
 // `NOTE HOLD all lanes:` and `NOTE HOLD again:` (landers from `only <lane> lands` or `<lane> fixes forward first`),
 // lifted by a NOTE saying `HOLD lifted`. A release lane's `<lane> HOLD v0.1.89 train` holds a release, not lands.
 // The override is ALLOW_LAND_DURING_HOLD=1, named in an outgoing commit's body (J381).
+// Meta QA 11-25 row 98: only that shape is a hold: `NOTE HOLD <topic>:` with the topic exactly `engine` (or the 11-25
+// `engine lands`, `all lanes`, `again`). On 11-26 05:23 UTC a land stopped on `NOTE HOLD-engine coordinator
+// opus-lean91: two small engine commits wait on the HOLD`, a note to the coordinator about a hold, read as a hold
+// naming no lander, so nobody could land. A NOTE whose topic merely names a hold (`HOLD-engine`, `HOLD-scoped red`,
+// `HOLD v0.1.92 staging`) binds nothing; a lift is `NOTE LIFT engine:` (or the 11-25 `engine land HOLD lifted`).
 // Meta QA 11-25 row 67 (J505, no freezes): a hold binds only pushes that touch the red's files. The red's files are the
 // paths named in the hold line and in main-watch's `MAIN RED` and `NOTE RED` lines since the last lift or green. A push
 // none of whose files is one of them (or, for a named source file that is not a test, sits in its directory) goes, with
@@ -19,8 +24,8 @@ import { join, resolve } from 'node:path';
 
 const TAIL_BYTES = 1 << 20;
 const LANE = '[a-z][a-z0-9_-]*';
-const HOLD = /^\S+ (?:UTC|Cancún) \S+ NOTE HOLD\b(.*)$/u;
-const LIFT = /^\S+ (?:UTC|Cancún) \S+ NOTE (?:LIFT engine\b|.*\bHOLD lifted\b)/u;
+const HOLD = /^\S+ (?:UTC|Cancún) \S+ NOTE HOLD (?:engine|engine lands|all lanes|again):(.*)$/u;
+const LIFT = /^\S+ (?:UTC|Cancún) \S+ NOTE (?:LIFT engine:|.*\bengine land HOLD lifted\b)/u;
 const GREEN = /^\S+ (?:UTC|Cancún) main-watch main green\b/u;
 const OVERRIDE = 'ALLOW_LAND_DURING_HOLD';
 const RED = /^\S+ (?:UTC|Cancún) main-watch (?:MAIN RED|NOTE RED)\b/u;
@@ -53,8 +58,8 @@ export function openHold(receipts) {
     if (LIFT.test(line) || GREEN.test(line)) break;
     if (RED.test(line)) { reds.push(line); continue; }
     const match = HOLD.exec(line);
-    // A hold for lands names engine or all lanes; `HOLD again` repeats the last one.
-    if (hold === null && match !== null && /^ (?:engine|all|again)\b|\bengine\b/u.test(match[1])) hold = { line, landers: landers(match[1]) };
+    // A hold for lands names engine or all lanes as its topic; `HOLD again` repeats the last one.
+    if (hold === null && match !== null) hold = { line, landers: landers(match[1]) };
   }
   if (hold === null) return null;
   // `all lanes` holds (rooms down, not a red) bind every push.
@@ -100,7 +105,8 @@ export function holdRefusal({ lane, env = process.env, bodies, receipts = readRe
   }
   const override = env[OVERRIDE] === '1';
   if (override && bodies.includes(OVERRIDE)) return null;
-  const who = hold.landers.length > 0 ? `only ${hold.landers.join(', ')} land(s)` : 'nobody lands';
+  const who = hold.landers.length > 0 ? `only ${hold.landers.join(', ')} land(s)`
+    : 'nobody lands: the hold names no `; lander <lane>`';
   const lifts = '`NOTE LIFT engine: <why>` or `main-watch main green`';
   const how = override ? `${OVERRIDE}=1 is set but no outgoing commit body names it (J381): say why there.`
     : `Override (J381): ${OVERRIDE}=1 and name it in the commit body.`;
