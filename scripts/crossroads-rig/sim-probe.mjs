@@ -6,7 +6,7 @@
 // It runs itself inside scripts/sim-lane.sh run (one booted Simulator machine-wide; shut down after). Per target: Safari
 // terminated and relaunched on /version.json, Web Inspector attached (ios_webkit_debug_proxy, as scripts/nine-sim-memory.mjs),
 // the kernel sampler started (scripts/sim-mem-phases.py, 100 ms, the game tab's WebContent physical footprint + the
-// WebKit GPU process), then the page: a shard loads `?chunk=<slug>&skipintro=1&nolock=1&mute=1` (entered as the start
+// WebKit GPU process), then the page: a shard loads `/?skipintro=1&nolock=1&mute=1` after its tap (entered as the start
 // title's ENTER WORLD stores it), settles, measures; the rig (stage.sh) follows window.__rig.phase.
 // Writes <out>/<label>.{native,inspector}.jsonl and <out>/summary.json (the medians per phase, decimal MB).
 // A REGRESSION / RELATIVE CHECK, NOT PHONE EVIDENCE: the Simulator runs on the Mac's memory and GPU (ios-simulator skill).
@@ -112,7 +112,8 @@ async function oneRun(udid, run, opts) {
       await evaluate(`${saveFixtureCode({ scope: 'session', key: 'titleArrival', data: arrival })};${saveFixtureCode({ scope: 'device', key: 'titleArrival.once', data: arrival })};1`);
       setPhase('loading');
       const loadStart = Date.now();
-      await evaluate(`location.href = ${JSON.stringify(`${base}?chunk=${run.slug}&skipintro=1&nolock=1&mute=1`)}; 1`);
+      // CHUNK-PARAM CP17 (J522): the tap above names the zone; the address never does
+      await evaluate(`location.href = ${JSON.stringify(`${base}?skipintro=1&nolock=1&mute=1`)}; 1`);
       await sleep(2000);
       for (;;) {
         const v = JSON.parse(await evaluate('JSON.stringify({ world: Boolean(window.__wildshard?.world), loading: Boolean(document.querySelector(".ws-load")), err: document.querySelector("#wserr .msg")?.textContent ?? null })', 'null'));

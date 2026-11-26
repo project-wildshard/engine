@@ -21,7 +21,9 @@ export function ledgerByKind(snapshot:{allocations?:readonly {domain:string;kind
 export function stats(values:readonly number[]):{n:number;median:number;min:number;max:number;spreadPct:number};
 export interface DumpProcess {pid:number;role:string;footprint:number;alloc:Record<string,number>}
 export function dumpsInOrder(events:readonly unknown[]):{id:string;processes:DumpProcess[]}[];
-export function bootURL(url:string,chunk:string):string;
+export const BOOT_FLAGS:string;
+export function bootURL(url:string):string;
+export function bootZone(page:unknown,url:string,chunk:string):Promise<void>;
 export type Boot = 'online'|'standalone';
 export interface WorldStamp {release:string;key:string}
 export function isServerWorker(url:string):boolean;

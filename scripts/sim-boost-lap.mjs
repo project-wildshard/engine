@@ -12,6 +12,7 @@
 // --base is a served preview of --rev (scripts/serve-build.sh --rev): Safari's inspector cannot inject a script before
 // navigation, so the harness pins and the control-frame snapshot go in a copy of the served entry HTML (frame-floor's
 // method), dl17-sim.html; compiled JS and assets stay byte-identical. Exit 0 = 0 pops, 1 = pops, 2 = no reading.
+import { initScript } from './zone-entry.mjs';
 import { agentUrl } from './agent-marker.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -96,7 +97,8 @@ try {
     window.__dl17Reset = 'done';
   })().catch(error => { window.__dl17Reset = String(error); }); 1`);
   if (!await until("window.__dl17Reset !== null", 30000) || await page.evaluate('window.__dl17Reset') !== 'done') throw new Error('The Safari reset did not finish');
-  const query = new URLSearchParams({ chunk: flow, tier: 'phone', skipintro: '1', nolock: '1', mute: '1' });
+  // CHUNK-PARAM CP17 (J522): the tap names the zone, written just before the navigation; the address never does
+  const query = new URLSearchParams({ tier: 'phone', skipintro: '1', nolock: '1', mute: '1' });
   const opened = Date.now();
   if (memory) {
     phase('loading');
@@ -104,7 +106,7 @@ try {
     let printed = ''; sampler.stdout.on('data', data => { printed += String(data); }); sampler.on('exit', () => { report.memoryRaw = printed; });
     await sleep(1000);
   }
-  await page.evaluate(`setTimeout(() => location.replace('/dl17-sim.html?${query}'), 50); 1`);
+  await page.evaluate(`${initScript(flow)} setTimeout(() => location.replace('/dl17-sim.html?${query}'), 50); 1`);
   await sleep(800);
   await connect(`${base}/dl17-sim.html`);
   if (!await until('window.__dl17AtControl !== undefined', 300000)) throw new Error('No control within 300 s');

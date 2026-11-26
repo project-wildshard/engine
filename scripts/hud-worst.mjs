@@ -33,6 +33,7 @@
 // row 15). A required surface missing or a page error fails too; a rotate-gated case is GATE, not PASS. Every other
 // overlap between HUD elements is listed, not failed: the union draws pieces no one shard draws at once.
 // Headless only (J148, Jake 2026-11-10); Chromium launches with the keychain flags. Our own build on localhost only.
+import { enterZone } from './zone-entry.mjs';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -225,7 +226,13 @@ const rotateGate = page => page.evaluate(() => { const gate = document.querySele
  * gate is up instead: there is no HUD to lay out under it.
  * @param {import('playwright').Page} page @param {boolean} dev @returns {Promise<boolean>} */
 async function enter(page, dev) {
-  await page.goto(pageUrl(dev ? '/?mute=1&nolock=1&sw=0' : `/?chunk=${chunk}&mute=1&nolock=1&sw=0${staging ? '&skipintro=1' : ''}`), { waitUntil: 'load', timeout: 120_000 });
+  if (dev) await page.goto(pageUrl('/?mute=1&nolock=1&sw=0'), { waitUntil: 'load', timeout: 120_000 });
+  else {
+    // CHUNK-PARAM CP17 (J522): the zone as players see it, entered by the tap; on staging every address carries the marker
+    if (staging) await page.goto(pageUrl('/version.json'), { waitUntil: 'commit' });
+    const flags = new URL(pageUrl(`/?mute=1&nolock=1&sw=0${staging ? '&skipintro=1' : ''}`)).searchParams.toString();
+    await enterZone(page, { zone: chunk, base, flags, waitUntil: 'load', timeout: 120_000 });
+  }
   await page.waitForTimeout(2000);
   if (await rotateGate(page)) return false;
   // the staging page opens on its title: it asks a name first (the local build's nameAsked fixture skips that)

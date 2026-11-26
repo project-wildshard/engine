@@ -17,6 +17,7 @@ import { spawn, execSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve as resolvePath, basename, join } from 'node:path';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
+import { enterZone, zoneHome } from './zone-entry.mjs';
 
 process.env.PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS ??= '1';
 const { chromium } = await import("./browser-playwright.mjs");
@@ -46,9 +47,10 @@ const HELP = `bench-load — headless load-performance ruler
   --no-build             reuse dist/ as is
   --port=4175            vite preview port
   --viewport=1280x720    page size (DPR 1)
-  --query=tier=phone     extra URL params appended to the page URL (e.g. tier=phone&skipintro=1)
+  --query=tier=phone     extra URL params appended to the page URL (e.g. tier=phone&skipintro=1); never a zone
+  --zone=<slug>          bench that zone alone, a one-cell world of it entered as zone-entry.mjs does (no zone in the URL)
   --gpu=metal            metal = the host GPU through ANGLE (same stack as iOS Safari); swiftshader = software GL
-  --ci                   check bench.budget.json (the rows of the benched shard: chunk= in --query, else Driftwood Isle);
+  --ci                   check bench.budget.json (the rows of the benched shard: --zone, else Driftwood Isle);
                          exit code = number of rows over budget
   --compare a.json b.json   print a before/after table of two result files and exit
   --help
@@ -70,8 +72,10 @@ const PORT = Number(flag('port', '4175'));
 const [VW, VH] = flag('viewport', '1280x720').split('x').map(Number);
 const GPU = flag('gpu', 'metal');
 const QUERY = flag('query', ''); // extra URL params, e.g. --query=tier=phone&skipintro=1
-// the shard benched (`chunk=` in --query; the default boot is Driftwood Isle): budget rows name theirs (`shard`, default Driftwood)
-const SHARD = new URLSearchParams(QUERY).get('chunk') ?? 'driftwood-isle';
+// the shard benched (--zone; the default boot is Driftwood Isle): budget rows name theirs (`shard`, default Driftwood).
+// CHUNK-PARAM CP17 (J522): a zone is never named in the URL; zoneHome refuses a --query that tries.
+const ZONE = flag('zone', '');
+const SHARD = ZONE === '' ? 'driftwood-isle' : ZONE;
 const CI = has('ci');
 let URL_BASE = flag('url', '');
 
@@ -247,7 +251,9 @@ async function runOnce(ctx, cond, cache, label) {
   await page.addInitScript(INIT_SCRIPT);
   let status = 'ok';
   try {
-    await page.goto(`${URL_BASE}/?nolock=1&bench=1${QUERY ? `&${QUERY}` : ''}`, { waitUntil: 'commit', timeout: TIMEOUT_MS });
+    const flags = `nolock=1&bench=1${QUERY ? `&${QUERY}` : ''}`;
+    await (ZONE === '' ? page.goto(zoneHome(URL_BASE, flags), { waitUntil: 'commit', timeout: TIMEOUT_MS })
+      : enterZone(page, { zone: ZONE, base: URL_BASE, flags, alone: true, waitUntil: 'commit', timeout: TIMEOUT_MS }));
     await page.waitForFunction(() => window.__bench_play > 0, null, { timeout: TIMEOUT_MS, polling: 100 });
     await page.waitForTimeout(1500); // let the first frames land so renderer.info / long tasks settle
   } catch (e) {

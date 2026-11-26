@@ -31,6 +31,7 @@
  * Owns one clean --head preview and one muted browser-lane capture, then stops both.
  * Entry and calibrated pose follow progress/shard-platform/look28/capture.mjs.
  */
+import { enterZone } from './zone-entry.mjs';
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -197,7 +198,9 @@ async function capture(base) {
         page.setDefaultTimeout(240000);
         page.on('pageerror', error => { errors.push(error.message); });
         page.on('console', message => { if (message.type() === 'error' && message.text().includes('[faults]')) errors.push(message.text()); });
-        await page.goto(mode === 'grid' ? base : `${base}?chunk=${mode}&mute=1&skipintro=1&nolock=1&sw=0`, { waitUntil: 'domcontentloaded' });
+        // CHUNK-PARAM CP17 (J522): a zone's hero is the zone as players see it, entered by the tap
+        await (mode === 'grid' ? page.goto(base, { waitUntil: 'domcontentloaded' })
+          : enterZone(page, { zone: mode, base, flags: 'mute=1&skipintro=1&nolock=1&sw=0', waitUntil: 'domcontentloaded' }));
         if (mode === 'grid') await page.locator('.ws-main-grid').click();
         await page.waitForFunction(() => Boolean(document.querySelector('#wserr .msg')?.textContent)
           || (!document.querySelector('.ws-load') && Boolean(window.__wildshard?.world?.game)));

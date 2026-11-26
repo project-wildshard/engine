@@ -16,3 +16,10 @@
 - CP18: the drain-inbox, look-loop and mockup-to-model skills, `docs/look-loop.md` and `docs/trailer.md` now describe
   entering a zone by its tap (`zone-entry.mjs --init` or `enterZone`), and `cameras.json` gets a `zone` field. The
   look-loop skill changed the same way in repo-kit, and engine's `AGENTS.md` has the one-line rule.
+- CP17: every measuring tool now enters its zone with `alone: true`, and the tools that show the game enter by the tap
+  with the zone's neighbours. The Inspector and Simulator scripts write the tap and drop the chunk from `location.href`.
+  The look loop's `cameras.json` gets a `zone` field.
+  Pine Hollow's ledger on the one-cell world reads 244 MB at control, against 224 MB with `?chunk=`: textures are
+  9 MB higher and buffers 7 MB lower. Its peak is 312 MB against 343 MB. Both sit under the budget line.
+  The census times out at control both before and after this change, so that is an older problem. The Simulator and
+  iPhone paths are unproven, because no agent may boot the Simulator.

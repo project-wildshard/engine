@@ -35,7 +35,7 @@
 // shell loop can take one pair per command, each inside the measure lock, with the order still flipping. `--online --arm2=<query>`
 // pairs the online boot with itself under a probe's URL switch (STR12's `trisprobe=half`): same build, same world. `--arm2-pin=<slot>=<json>`
 // does the same under a device slot (STR16's `debug.vertexPack=false`), since the game reads no URL switch. ratchet.mjs and phone-fit.mjs refuse runs that mix boots, as they do instruments.
-// The online page enters a `?chunk=` shard only where its build's catalogue gives the shard a grid cell (OF3): a shard off the
+// The online page enters a zone only where its build's catalogue gives the shard a grid cell (OF3): a shard off the
 // grid (Thin Ice and Desert Ruin, J305) lands on the title, so `--online` refuses it at once. `--place=<slug,...> --out=<file>`
 // writes the pinned catalogue with those shards on ring 3's first free cells (J314's order, from (0,3), where staging puts
 // Thin Ice); build the client with `WILDSHARD_CATALOGUE=<file>` and measure that build online (MEMORY-STRUCTURE STR8).
@@ -66,6 +66,7 @@ import { bootTimelineEntries } from '../loading-flow/stalls.mjs';
 import { listProcesses, readFootprints, startSampler, webkitProcesses } from './footprint.mjs';
 import { IPHONE_13_MODEL, ledgerSplit, loadPhoneModel, phoneFromWebKit, phonePeakFromWebKit, rangeText, zoneOverRuns } from './phoneModel.mjs';
 import { allocationSites, CULLER, symbolizer, walkPeak, walkRoute } from './walk.mjs';
+import { enterZone, zoneHome } from '../zone-entry.mjs';
 
 export const PROTOCOL = 'memory-run/1';
 /** The inspector modes (see the header). @type {readonly ['minimal', 'full']} */
@@ -203,11 +204,22 @@ export function dumpsInOrder(events, depth = 3) {
   return [...byId.keys()].sort((a, b) => Number.parseInt(a, 16) - Number.parseInt(b, 16)).map((id) => ({ id, processes: [...(byId.get(id)?.values() ?? [])] }));
 }
 
-/** @param {string} url @param {string} chunk */
-export function bootURL(url, chunk) {
-  const page = new URL(url);
-  for (const [key, value] of Object.entries({ ...(chunk === '' ? {} : { chunk }), mute: '1', skipintro: '1', nolock: '1', sw: '0' })) page.searchParams.set(key, value);
-  return page.href;
+/** A run's own flags: they name no zone (CHUNK-PARAM-REMOVAL CP17, J522). */
+export const BOOT_FLAGS = 'mute=1&skipintro=1&nolock=1&sw=0';
+/** A run's query: the served URL's own (an arm's probe switch) with BOOT_FLAGS over it. @param {string} url */
+function bootFlags(url) {
+  const query = new URL(url).searchParams;
+  for (const [key, value] of new URLSearchParams(BOOT_FLAGS)) query.set(key, value);
+  return query.toString();
+}
+/** The address a run opens: the build's `/` with the run's flags, never a zone. @param {string} url */
+export function bootURL(url) { return zoneHome(new URL(url).origin, bootFlags(url)); }
+/** Boot `chunk` as a measured zone (Q1 (a)): a one-cell world of it (zone-entry's `alone`), so its numbers stay comparable
+ *  with the zone-alone readings; an empty chunk opens the page's own inline shard (`wildshard prepare`).
+ *  @param {any} page @param {string} url @param {string} chunk */
+export async function bootZone(page, url, chunk) {
+  if (chunk === '') { await page.goto(bootURL(url), { waitUntil: 'commit' }); return; }
+  await enterZone(page, { zone: chunk, base: url, flags: bootFlags(url), alone: true, waitUntil: 'commit' });
 }
 
 /** Init script: every `new Worker` URL the page makes, in `window.__workersMade` (mini-pinemem6). */
@@ -411,7 +423,7 @@ export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_
     /** @type {StepRow[]} */ let steps = [], trace = [];
     const started = Date.now();
     try {
-      await page.goto(bootURL(url, chunk), { waitUntil: 'commit' });
+      await bootZone(page, url, chunk);
       // QA 11-23-b row 25: the game document sends COOP and /version.json does not, so WebKit swaps the page into a new
       // WebContent at this navigation, and its new inspector session has the Network domain on again (every run read
       // `minimal-lost`). Turn the new session down at commit, before the boot's fetches; `kept` below checks this one.
@@ -575,8 +587,8 @@ export function settleControl(checkpoints, settled) {
 }
 
 /** Read the page's checkpoint ledger without requesting browser process dumps during boot.
- * @param {import('playwright').Page} page @param {string} url @param {number} timeoutMs */
-async function chromiumLedger(page, url, timeoutMs) {
+ * @param {import('playwright').Page} page @param {() => Promise<void>} open @param {number} timeoutMs */
+async function chromiumLedger(page, open, timeoutMs) {
   // Low resizes the cleared shadow maps during the next draw after this event. On SwiftShader the loading
   // card can be gone long before that draw; reading earlier counts the full boot shadow targets at control.
   await page.addInitScript(() => {
@@ -588,7 +600,7 @@ async function chromiumLedger(page, url, timeoutMs) {
   });
   let failure = null;
   try {
-    await page.goto(url, { waitUntil: 'commit' });
+    await open();
     failure = await untilControl(page, timeoutMs, true);
   } catch (error) {
     if (!(error instanceof Error) || error.name !== 'TimeoutError') throw error;
@@ -632,7 +644,7 @@ export async function chromiumWalk({ url, chunk, world, seconds, timeoutMs = 240
     const page = await context.newPage(); page.setDefaultTimeout(timeoutMs);
     /** @type {string[]} */ const errors = [];
     page.on('pageerror', (error) => { errors.push(error.message); });
-    await page.goto(bootURL(url, chunk), { waitUntil: 'commit' });
+    await bootZone(page, url, chunk);
     const named = world === null ? null : answerName(page);
     let failure;
     try { failure = await untilControl(page, timeoutMs); } finally { await named?.stop(); }
@@ -684,7 +696,7 @@ export async function chromiumMicroscope({ url, chunk, timeoutMs = 240_000, dept
       });
     });
     const page = await context.newPage(); page.setDefaultTimeout(timeoutMs);
-    if (!captureDumps) return await chromiumLedger(page, bootURL(url, chunk), timeoutMs);
+    if (!captureDumps) return await chromiumLedger(page, () => bootZone(page, url, chunk), timeoutMs);
     const tracing = await owned.browser.newBrowserCDPSession();
     /** @type {any[]} */ const events = [];
     tracing.on('Tracing.dataCollected', (event) => { events.push(...event.value); });
@@ -710,7 +722,7 @@ export async function chromiumMicroscope({ url, chunk, timeoutMs = 240_000, dept
     let failure = null, gpuDetail = null;
     /** @type {StepRow | undefined} */ let liveControl;
     try {
-      await page.goto(bootURL(url, chunk), { waitUntil: 'commit' });
+      await bootZone(page, url, chunk);
       failure = await untilControl(page, timeoutMs);
       await sleep(1500);
       // One detailed dump per step runs behind a slow host's boot (hosted SwiftShader, 44255220814: ember-forge and jungle-ziggurat

@@ -44,7 +44,7 @@ export function readNavigationPanel(input: unknown): PanelRow | null {
   return {at, clock, download, downloadFact, header, wait, step, activeLabel, documentToken, navigation, ...(content === undefined ? {} : {content})};
 }
 export interface ControlWitness {
-  at: number; documentToken: string; timeOrigin: number; initialURL: string; url: string; initialChunk: string | null;
+  at: number; documentToken: string; timeOrigin: number; initialURL: string; url: string; initialZone: string | null;
   expectedShard: string | null; shard: string | null; titleFirst: boolean; entered: boolean; paused: boolean | null;
   clockPaused: boolean | null; frameGate: boolean; frames: number | null; appState: string | null;
   gridHome: {instance: string | null; slug: string | null; current: string | null; inside: string | null; ready: boolean; entered: boolean} | null;

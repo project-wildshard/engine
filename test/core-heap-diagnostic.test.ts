@@ -6,13 +6,13 @@ import { expect, test } from 'vitest';
 import { captureCoreHeap, coreHeapProtocol, coreHeapRequested } from '../scripts/core-heap-diagnostic.mjs';
 import { coreMemorySummary } from '../scripts/shard-phone-memory.mjs';
 
-const target = 'brasscap-mesa', href = 'http://127.0.0.1:4400/?sw=0&chunk=brasscap-mesa';
+const target = 'brasscap-mesa', href = 'http://127.0.0.1:4400/?sw=0';
 const samples = [10, 60, 120].map(second => ({phase: `${second}s`, rendererBytes: 100, gpuBytes: 1}));
 const raw = JSON.stringify({ version: 3, nodes: [1, 100, 0, 0, 2, 200, 1, 0, 3, 40, 0, 0], nodeClassNames: ['Object', 'ArrayBuffer'] });
 function fixture() {
   const calls: string[] = [], writes = new Map<string, string>();
   const driver = {
-    evaluate: (_expression: string): Promise<unknown> => { calls.push('fence'); return Promise.resolve({href, ready: true}); },
+    evaluate: (_expression: string): Promise<unknown> => { calls.push('fence'); return Promise.resolve({href, zone: target, ready: true}); },
     send: (method: string): Promise<unknown> => { calls.push(method); return Promise.resolve({snapshotData: raw}); },
   };
   const write = (path: string, text: string): void => { calls.push('write'); writes.set(path, text); };
@@ -77,7 +77,7 @@ test('malformed heaps keep raw evidence and an unknown summary', async () => {
 test('initial and mid-snapshot navigation refuse without attributing another page', async () => {
   for (const changedAt of [1, 2]) {
     const f = fixture(); let reads = 0;
-    f.driver.evaluate = () => { f.calls.push('fence'); reads++; return Promise.resolve({href: reads === changedAt ? `${href}&changed=1` : href, ready: changedAt !== 1}); };
+    f.driver.evaluate = () => { f.calls.push('fence'); reads++; return Promise.resolve({href: reads === changedAt ? `${href}&changed=1` : href, zone: target, ready: changedAt !== 1}); };
     const result = await captureCoreHeap(f.driver, target, 'tmp/owned-core-heap', samples, f.write);
     expect(result.errors).toHaveLength(1); expect(result.snapshot?.summary ?? null).toBeNull();
     expect(f.calls.includes('Heap.snapshot')).toBe(changedAt === 2);

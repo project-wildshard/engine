@@ -20,7 +20,9 @@ const anchor = v.looseObject({
 });
 const file = v.pipe(v.looseObject({
   about: v.optional(v.string()),
-  /** the build's query for both contexts, e.g. `chunk=<slug>&mute=1&skipintro=1&nolock=1&sw=0` */
+  /** the zone the anchors stand in: views.mjs enters it as a player does (zone-entry's tap, its neighbours round it) */
+  zone: v.optional(v.pipe(v.string(), v.regex(/^[a-z0-9][a-z0-9_-]*$/u, 'a zone is its slug'))),
+  /** the build's query for both contexts, e.g. `mute=1&skipintro=1&nolock=1&sw=0`; never a zone (J522: `zone` names it) */
   query: v.optional(v.string(), ''),
   /** pause > Settings > Debug picks set before the load (time, weather, ...): the world freeze, never a URL switch */
   settings: v.optional(v.record(v.string(), v.union([v.string(), v.number(), v.boolean()])), {}),

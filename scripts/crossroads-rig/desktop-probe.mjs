@@ -6,13 +6,14 @@
 //     --shard=brasscap-mesa --shard=driftwood-isle … [--rig=<query>=<label> …] [--blank] [--settle=15] [--out=<file.json>]
 //   --setting=k=v seeds and verifies the same global Settings pick as sim-memory.mjs (the textures are a harness pin since G386).
 //
-// A shard target loads `/?chunk=<slug>&skipintro=1&nolock=1&mute=1&touch=1&tier=phone`, waits for the world (no loading
+// A shard target boots alone (zone-entry's one-cell world, Q1 (a)) at `/?skipintro=1&nolock=1&mute=1&touch=1&tier=phone`, waits for the world (no loading
 // screen), settles --settle s, then samples 10 s. A rig target opens /crossroads-rig/index.html?<query> (stage.sh) and
 // follows window.__rig.phase. --blank measures the browser on /version.json (what is not the page's).
 // Meters, decimal MB: the renderer and GPU processes' physical footprint (kernel proc_pid_rusage, as load-mem-probe.mjs),
 // as the settled median (after one forced GC, so garbage the page already dropped is not counted) and the whole-run high (interval max), V8 heap used + ArrayBuffer backing (CDP Runtime.getHeapUsage),
 // the labelled GL bytes (scripts/parity/glbytes.mjs: textures, renderbuffers, buffers), three's renderer.info. Desktop is not the phone:
 // Chromium keeps GPU memory in its GPU process and may shadow-copy uploads; see docs/design/mmo/research/e435/sf22a-memory.md.
+import { enterZone } from '../zone-entry.mjs';
 import { spawn } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { GL_INIT } from '../parity/glbytes.mjs';
@@ -84,7 +85,7 @@ async function probe(target) {
     if (target.kind === 'blank') {
       await sleep(5000); mark('measure'); await sleep(10_000);
     } else if (target.kind === 'shard') {
-      await page.goto(`${BASE}/?chunk=${target.slug}&skipintro=1&nolock=1&mute=1&touch=1&tier=phone`, { waitUntil: 'commit', timeout: 180_000 });
+      await enterZone(page, { zone: target.slug, base: BASE, flags: 'skipintro=1&nolock=1&mute=1&touch=1&tier=phone', alone: true, waitUntil: 'commit', timeout: 180_000 });
       await page.waitForFunction(() => Boolean(window.__wildshard?.world) && !document.querySelector('.ws-load'), null, { timeout: 300_000, polling: 250 });
       const witness = await page.evaluate(() => ({ build: window.__wildshard?.boot?.build,
         settings: JSON.parse(localStorage.getItem('wildshard.save.v2@2.global') ?? '{}').keys?.settings?.data ?? {},

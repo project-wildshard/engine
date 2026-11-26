@@ -239,7 +239,7 @@ async function runCoreMemory(mode, index, target) {
         if (!await until(`(() => { const b=document.querySelector('.ws-menu-play');return !!b && !b.disabled && b.getClientRects().length>0; })()`, 30000)) throw new Error('Missing compiled core template entry');
         await gesture(`setTimeout(() => document.querySelector('.ws-menu-play').click(), 0);true`);
         await sleep(800); await connect(`${BASE}/`);
-        if (!await until(`(() => {const w=window.__wildshard?.world;const failure=document.querySelector('#wserr .msg')?.textContent;return !!failure || (new URL(location.href).searchParams.get('chunk')===${JSON.stringify(target)} && !!w?.hud.entered && !w.hud.paused && w.game.frameGate() && !document.querySelector('.ws-load'));})()`, 240000)) throw new Error('Compiled core template never reached controls');
+        if (!await until(`(() => {const w=window.__wildshard?.world;const failure=document.querySelector('#wserr .msg')?.textContent;return !!failure || (w?.game.level.id===${JSON.stringify(target)} && !!w?.hud.entered && !w.hud.paused && w.game.frameGate() && !document.querySelector('.ws-load'));})()`, 240000)) throw new Error('Compiled core template never reached controls');
         const failure=await page.evaluate(`document.querySelector('#wserr .msg')?.textContent ?? null`);
         if (failure) throw new Error(`Compiled core template failed: ${failure}`);
       }
@@ -384,7 +384,7 @@ async function run(mode, index, target) {
           break;
         }
         if (shard !== undefined) {
-          const current = JSON.parse(await page.evaluate(`JSON.stringify({ href: location.href, origin: performance.timeOrigin, documentToken: window.__simEntry?.documentToken ?? null, at: performance.now(),
+          const current = JSON.parse(await page.evaluate(`JSON.stringify({ href: location.href, zone: window.__wildshard?.world?.game.level.id ?? null, origin: performance.timeOrigin, documentToken: window.__simEntry?.documentToken ?? null, at: performance.now(),
             ready: (${COMPILED_READY}),
             ...(${compiledPollDetails.toString()})(${compiled === null}, window.__loadingAccuracy ?? null,
               () => performance.getEntriesByType('measure').map(row => ({ name: row.name, start: row.startTime, ms: row.duration }))) })`));
@@ -416,7 +416,7 @@ async function run(mode, index, target) {
     if (compiledFault !== null) throw new Error(`${label}: ${compiledFault}`);
     if (compiled === null || !compiledReady) throw new Error(`${label}: compiled entry never reached controls`);
     const document = compiledDocumentEvidence(compiled, sample);
-    requireCompiledEntry(compiled.href, shard, compiled.accuracy);
+    requireCompiledEntry(compiled.zone ?? null, shard, compiled.accuracy);
     const observedUrls = [...new Set(compiled.accuracy.resources.map(row => row.name).filter(name => {
       try { return new URL(name).origin === new URL(compiled.href).origin; } catch { return false; }
     }))];

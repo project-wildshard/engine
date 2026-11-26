@@ -15,6 +15,7 @@
 // row 1 FP front / left / right, row 2 FP back / TOP / DIAG front, row 3 DIAG left / right / back; each cell is labelled
 // with the frame's draw calls and triangles. Shoot a served build (engine scripts/serve-build.sh, or
 // scripts/preview-server.mjs on a built dist), never a dev server. One headless Chromium, muted, closed in a finally.
+import { enterZone, zoneHome } from '../zone-entry.mjs';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve as resolvePath, join } from 'node:path';
 import { chromium, devices } from "../browser-playwright.mjs";
@@ -110,9 +111,11 @@ try {
       const page = await ctx.newPage();
       const errors = [];
       page.on('pageerror', e => errors.push(e.message.slice(0, 200)));
-      const url = `${BASE}/?${[DEF.query, g.query, EXTRA].filter(Boolean).join('&')}`;
+      // CHUNK-PARAM CP17 (J522, Q1 (a)): the look loop shows the zone as players see it, so it enters by the tap with its
+      // neighbours; zoneHome refuses a query that still names the zone (move it to cameras.json's `zone`)
+      const query = [DEF.query, g.query, EXTRA].filter(Boolean).join('&'), url = zoneHome(new URL(BASE).origin, query);
       const t0 = Date.now();
-      await page.goto(url, { waitUntil: 'load' });
+      await (DEF.zone === undefined ? page.goto(url, { waitUntil: 'load' }) : enterZone(page, { zone: DEF.zone, base: BASE, flags: query, waitUntil: 'load' }));
       try {
         await page.waitForFunction(() => Boolean(window.__wildshard?.world?.hud?.entered && !document.querySelector('.ws-load') && window.__wildshard.world.game.frameGate()), undefined, { timeout: TIMEOUT, polling: 1000 });
       } catch (error) {

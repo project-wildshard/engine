@@ -6,6 +6,7 @@
 // It boots the built product at iPhone portrait size in Chromium and WebKit, records every change of the
 // card's bars with the LS1 counters that moved with it, screenshots the card loading and ready, and reports
 // each stretch of over 2 s where the bar took less than 1 %, by the stage that held it.
+import { enterZone } from './zone-entry.mjs'
 import { agentFetch as fetch } from './agent-requests.mjs';
 import {
   mkdirSync,
@@ -204,10 +205,14 @@ try {
             await page.locator('.ws-main-grid').click()
             await loaded
           } else
-            await page.goto(
-              `${preview.url}/?chunk=${encodeURIComponent(shard)}&tier=phone&mute=1&nolock=1&sw=0`,
-              { waitUntil: 'commit', timeout: 30000 },
-            )
+            // CHUNK-PARAM CP17 (J522): the card a player sees after a tap, so the zone is entered by the tap
+            await enterZone(page, {
+              zone: shard,
+              base: preview.url,
+              flags: 'tier=phone&mute=1&nolock=1&sw=0',
+              waitUntil: 'commit',
+              timeout: 30000,
+            })
           await page.waitForFunction(
             () => document.querySelector('.ws-load:not([data-shell])') !== null,
             null,

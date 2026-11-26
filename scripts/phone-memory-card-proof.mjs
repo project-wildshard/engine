@@ -2,7 +2,7 @@
 // scripts/browser-lane.sh node scripts/phone-memory-card-proof.mjs <preview-url> <screenshot.png>
 import assert from 'node:assert/strict';
 import { chromium } from './browser-playwright.mjs';
-import { bootPageURL } from './boot-memory-peak.mjs';
+import { bootPage } from './boot-memory-peak.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { debugSettings, saveFixture } from './debug-settings.mjs';
 
@@ -54,7 +54,7 @@ try {
       await page.addInitScript(() => {
         document.addEventListener('ws:control-ready', () => { document.documentElement.dataset.memoryProofControl = 'true'; });
       });
-      await page.goto(bootPageURL(origin, slug), { waitUntil: 'domcontentloaded' });
+      await bootPage(page, origin, slug);
       const card = page.getByRole('dialog', { name: 'This world may crash this phone' });
       const error = page.locator('#wserr');
       const control = page.locator('html[data-memory-proof-control=true]');

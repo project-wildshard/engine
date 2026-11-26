@@ -149,9 +149,10 @@ export function recoveredGridControls(sample) {
 }
 
 /** Exact compiled route fence; the similarly named legacy route is not evidence. */
-export function requireCompiledEntry(href, shard, accuracy) {
+export function requireCompiledEntry(zone, shard, accuracy) {
   loadingShardName(shard);
-  if (new URL(href).searchParams.get('chunk') !== shard || accuracy?.final?.path !== 'shardfile') throw new Error('Expected exact compiled shard entry');
+  // CHUNK-PARAM CP17 (J522): the running world's zone, never the address's
+  if (zone !== shard || accuracy?.final?.path !== 'shardfile') throw new Error('Expected exact compiled shard entry');
   if (!Number.isFinite(accuracy.readyAt) || !(accuracy.readyAt > 0) || accuracy.errors.length > 0) throw new Error('Compiled entry did not finish cleanly');
 }
 

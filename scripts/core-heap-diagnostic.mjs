@@ -17,11 +17,12 @@ export function coreHeapRequested(args) {
   return true;
 }
 
-const fenceExpression = `(() => {const w=window.__wildshard?.world;return {href:location.href,
+// CHUNK-PARAM CP17 (J522): the zone is the running world's, never the address's
+const fenceExpression = `(() => {const w=window.__wildshard?.world;return {href:location.href,zone:w?.game.level.id??null,
   ready:!!w?.hud.entered&&!w.hud.paused&&w.game.frameGate()&&!document.querySelector('.ws-load')};})()`;
 function fence(value, target) {
   if (value === null || typeof value !== 'object' || value.ready !== true || typeof value.href !== 'string'
-    || new URL(value.href).searchParams.get('chunk') !== target) throw new Error('Heap diagnostic left its compiled Template');
+    || value.zone !== target) throw new Error('Heap diagnostic left its compiled Template');
   return value.href;
 }
 /** Raw snapshot and class estimates are diagnostic; Heap.snapshot may collect. */

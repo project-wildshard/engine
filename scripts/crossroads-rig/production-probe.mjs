@@ -2,6 +2,7 @@
 // Owns a pinned production preview and a dedicated Simulator lane. The browser posts over real HTTP to the pinned
 // production API handler; only its private Blob backend is an in-memory fixture. This is delivery/behavior evidence,
 // never a physical iPhone memory reading. node scripts/crossroads-rig/production-probe.mjs [--rev=HEAD] [--out=<json>]
+import { initScript } from '../zone-entry.mjs';
 import { agentUrl } from '../agent-marker.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
@@ -74,9 +75,11 @@ async function safari() {
     const versionUrl = agentUrl(`${base}version.json`);
     sim(['openurl', udid, versionUrl]); await connect(versionUrl);
     await evaluate(`(()=>{${saveFixtureCode({ scope: 'device', key: 'devMode', data: true })}; return true;})()`, versionUrl);
-    connection.close(); connection = undefined;
-    const game = agentUrl(`${base}?chunk=brasscap-mesa&mute=1&skipintro=1&sw=0`);
-    sim(['openurl', udid, game]); await connect(game);
+    // CHUNK-PARAM CP17 (J522): the tap goes into this tab and the page navigates itself, as a title tap does; a fresh
+    // `openurl` would land on the title like a typed address
+    const game = agentUrl(`${base}?mute=1&skipintro=1&sw=0`);
+    await evaluate(`(()=>{${initScript('brasscap-mesa')} setTimeout(() => { location.href = ${JSON.stringify(game)}; }, 50); return true;})()`, versionUrl);
+    connection.close(); connection = undefined; await sleep(1000); await connect(game);
     const start = Date.now();
     while (!(await evaluate('Boolean(document.querySelector(".ws-touch-pause") && !document.querySelector(".ws-load"))'))) {
       if (Date.now() - start > 90000) throw new Error('Brasscap boot timed out'); await sleep(250);

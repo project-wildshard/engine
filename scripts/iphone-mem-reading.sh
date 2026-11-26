@@ -31,10 +31,10 @@ page() { curl -fsS "http://127.0.0.1:$PORT/json/list" | python3 -c 'import json,
 WS=$(page); [ -n "$WS" ] || { echo "no Safari tab on the game's origin: open $BASE/version.json on the phone"; exit 1; }
 STAMP=$(date +%Y%m%d-%H%M)
 echo "== 1. pine→nalati (href) · $WS"
-node scripts/webkit-mem-reading.mjs --ws="$WS" --tag="phone-href-$STAMP" --from="$BASE/?chunk=pine-hollow" --url="$BASE/?chunk=nalati-grasslands" --nav=href --no-explore
+node scripts/webkit-mem-reading.mjs --ws="$WS" --tag="phone-href-$STAMP" --from-zone=pine-hollow --url="$BASE/" --zone=nalati-grasslands --nav=href --no-explore
 WS=$(page)
 echo "== 2. pine→nalati (replace, the game's switch)"
-node scripts/webkit-mem-reading.mjs --ws="$WS" --tag="phone-replace-$STAMP" --from="$BASE/?chunk=pine-hollow" --url="$BASE/?chunk=nalati-grasslands" --nav=replace --no-explore
+node scripts/webkit-mem-reading.mjs --ws="$WS" --tag="phone-replace-$STAMP" --from-zone=pine-hollow --url="$BASE/" --zone=nalati-grasslands --nav=replace --no-explore
 WS=$(page)
 echo "== 3. nalati: Explorer + world + fps ($FPS s)"
-node scripts/webkit-mem-reading.mjs --ws="$WS" --tag="phone-fps-$STAMP" --url="$BASE/?chunk=nalati-grasslands" --fps="$FPS"
+node scripts/webkit-mem-reading.mjs --ws="$WS" --tag="phone-fps-$STAMP" --url="$BASE/" --zone=nalati-grasslands --fps="$FPS"

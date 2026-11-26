@@ -117,18 +117,19 @@ test('native grid control requires the intended birth document, uncovered HUD an
     document.documentElement.classList.remove('title-first'); cover.style.display = 'none';
     tick(330); expect(capture().control).toBeNull();
     Reflect.deleteProperty(window, '__phoneLoading'); frames.length = 0;
-    documentURL.search = '?chunk=fixture'; instrument('grid');
-    // The real grid removes chunk in this same document after boot.
-    documentURL.search = ''; document.dispatchEvent(new Event('ws:control-ready'));
+    // CHUNK-PARAM CP17 (J522): the tap names the zone in the tab, and the app spends it in this same document after boot
+    sessionStorage.setItem('wildshard.save.v2@2.session', JSON.stringify({keys: {titleArrival: {v: 1, data: {slug: 'fixture', mode: 'enter', at: 1}}}}));
+    instrument('grid');
+    sessionStorage.removeItem('wildshard.save.v2@2.session'); document.dispatchEvent(new Event('ws:control-ready'));
     ready = false; tick(440); tick(550); expect(capture().control).toBeNull();
     ready = true; inside = 'other'; tick(660); expect(capture().control).toBeNull();
     inside = 'home'; tick(770); expect(capture().control).toBeNull(); tick(880);
     const accepted = capture(), token = accepted.controlWitness?.documentToken ?? null;
-    expect(accepted.lastWitness?.initialURL).toContain('?chunk=fixture');
+    expect(accepted.lastWitness?.initialURL).not.toMatch(/chunk/u);
     expect(accepted.lastWitness?.expectedShard).toBe('fixture');
     expect(accepted.lastWitness?.blockers).toEqual([]);
     expect(accepted.control).toBeTypeOf('number');
-    expect(accepted.controlWitness).toMatchObject({shard: 'platform.grid', initialChunk: 'fixture', valid: true,
+    expect(accepted.controlWitness).toMatchObject({shard: 'platform.grid', initialZone: 'fixture', valid: true,
       gridHome: {slug: 'fixture', current: 'home', inside: 'home', ready: true, entered: true}});
     expect(grid.state).toHaveBeenCalledTimes(2); // Once per document, never per frame.
     expect(controlQualification(accepted, token)).toBeNull();

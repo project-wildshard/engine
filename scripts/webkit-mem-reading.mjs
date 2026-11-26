@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { initScript, zoneHome } from './zone-entry.mjs';
 import { agentUrl } from './agent-marker.mjs';
 import { saveFixtureCode } from './debug-settings.mjs';
 // webkit-mem-reading.mjs — the iPhone memory reading of E263 as one command (NALATI-FINISH B8 / P4, E302): Safari Web
@@ -17,12 +18,14 @@ import { saveFixtureCode } from './debug-settings.mjs';
 //     (the socket: `lsof -U | grep webinspectord_sim` → the one owned by that simulator's launchd_sim)
 // Both are raw WebKit protocol; the proxy's pages multiplex through Target.* (handled here), the bridge's do not.
 //
-//   --url=<game url>     what to load (default: production Nalati, ?chunk=nalati-grasslands). Explorer is entered with
+//   --url=<game url>     the page to load (default: production's `/`); it names no zone (J522)
+//   --zone=<slug>        the zone it enters (default nalati-grasslands): its title tap goes into the tab first, as
+//                        zone-entry.mjs writes it, so the tab must be on the game's origin (not with --blank-first). Explorer is entered with
 //                        the title's EXPLORE WORLD button, then left (its ✕) for ENTER WORLD (`--no-explore` skips
 //                        Explorer; with --fps it still enters the world)
 //   --blank-first        navigate the tab to about:blank and wait 3 s before the load (the E263 runs came from another
 //                        shard in the same tab; a blank start is the cleaner reading)
-//   --from=<game url>    load this shard first (to its playable state + settle), then switch to --url the way the game's
+//   --from-zone=<slug>   load this zone first (tapped in, to its playable state + settle), then switch to --url the way the game's
 //                        shard switch does (src/game/travel/switch.ts: a navigation in the same tab) — the E263 flow
 //   --nav=href|replace   how that navigation is made (default: what the game's switch does, href)
 //   --setting=k=v        save a pause ▸ Settings value (v2 global/settings) in the tab before the load, e.g. --setting=weather=rain
@@ -38,16 +41,20 @@ const ROOT = resolvePath(new URL('..', import.meta.url).pathname);
 const argv = process.argv.slice(2);
 const flag = (name, d) => { const a = argv.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : d; };
 const WS = flag('ws', 'ws://127.0.0.1:9231/devtools/page/1');
-const URL_GAME = agentUrl(flag('url', 'https://play.wildshard.io/?chunk=nalati-grasslands'));
+const GAME_PAGE = new URL(flag('url', 'https://play.wildshard.io/'));
+const URL_GAME = agentUrl(zoneHome(GAME_PAGE.origin, GAME_PAGE.search)); // CHUNK-PARAM CP17 (J522): zoneHome refuses a zone in it
+const ZONE = flag('zone', 'nalati-grasslands');
 const TAG = flag('tag', `reading-${new Date().toISOString().slice(0, 16).replaceAll(/[:T]/g, '')}`);
 const FPS_S = Number(flag('fps', '0'));
 const SETTLE = Number(flag('settle', '8')) * 1000;
 const EXPLORE = !argv.includes('--no-explore');
 const BLANK = argv.includes('--blank-first');
-const FROM = flag('from', '');
+const FROM_ZONE = flag('from-zone', '');
+const FROM = FROM_ZONE === '' ? '' : URL_GAME;
 const NAV = flag('nav', 'href');
 const SETTINGS = argv.filter((a) => a.startsWith('--setting=')).map((a) => a.slice(10).split('='));
 const OUT = resolvePath(ROOT, flag('out', 'progress/b8'));
+if (BLANK && ZONE !== '') throw new Error('--blank-first leaves the game origin, so no tap can go into the tab: pass --zone= (empty) with it');
 mkdirSync(OUT, { recursive: true });
 const out = createWriteStream(resolvePath(OUT, `${TAG}.jsonl`));
 const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
@@ -101,14 +108,14 @@ try {
   if (BLANK) { phase = 'blank'; await tryEval('location.href = "about:blank"'); await sleep(3000); }
   if (FROM) {
     phase = 'from';
-    await tryEval(`location.href = ${JSON.stringify(FROM)}`);
+    await tryEval(`${initScript(FROM_ZONE)} location.href = ${JSON.stringify(FROM)}`);
     await sleep(1500);
     for (let i = 0; i < 480; i++) { if ((await tryEval('Boolean(window.__wildshard?.world) && !document.querySelector(".ws-load")')) === true) break; await sleep(500); }
     await sleep(SETTLE);
   }
   phase = 'loading';
   const loadStart = Date.now();
-  await tryEval(NAV === 'replace' ? `location.replace(${JSON.stringify(URL_GAME)})` : `location.href = ${JSON.stringify(URL_GAME)}`);
+  await tryEval(`${ZONE === '' ? '' : initScript(ZONE)} ${NAV === 'replace' ? `location.replace(${JSON.stringify(URL_GAME)})` : `location.href = ${JSON.stringify(URL_GAME)}`}`);
   await sleep(1500);
   // the load ends when the world exists and the loading screen is gone (a long task blocks the answer: keep asking)
   const steps = []; let last = '';

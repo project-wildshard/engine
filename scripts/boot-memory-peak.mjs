@@ -13,12 +13,13 @@
 //   node scripts/boot-memory-peak.mjs --url=<served client> --chunk=<slug> [--out=<file.json>] [--every=250]
 //        [--settle=5] [--timeout=240] [--factor=<chromium to phone>] [--budget-bytes=1500000000] [--entry=url|select]
 //
-// --entry=select walks in as a player does (title, SHARD SELECT, the shard's card, ENTER WORLD) instead of `?chunk=`:
+// --entry=select walks in as a player does (title, SHARD SELECT, the shard's card, ENTER WORLD) instead of the measured one-cell world (zone-entry's alone, J522):
 // a released page (staging) takes that way in.
 //
 // --budget-bytes exits 1 when the central phone estimate exceeds MEMORY_AMBER (1.5 GB).
 // --factor explicitly replays the old renderer-only estimate for historical clients.
 // Shard CI runs this through `wildshard memory`; engine CI uses `scripts/nine-ring1.mjs memory`.
+import { enterZone, zoneHome } from './zone-entry.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve as resolvePath } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -160,12 +161,20 @@ export function bootMemoryLine(slug, verdict) {
     + ` JS heap peak ${mb(verdict.heapPeakBytes)}; ${verdict.samples} dumps`;
 }
 
-/** The boot page for a served client: the shard straight in, muted, no intro, no service worker. @param {string} url @param {string} chunk */
-export function bootPageURL(url, chunk) {
-  const page = new URL(url);
-  // An empty chunk: the page carries its one shard inline (`wildshard prepare`'s preview), so no `?chunk=`.
-  for (const [key, value] of Object.entries({ ...(chunk === '' ? {} : { chunk }), mute: '1', skipintro: '1', nolock: '1', sw: '0' })) page.searchParams.set(key, value);
-  return page.href;
+/** The boot page's address for a served client: `/`, muted, no intro, no service worker, the URL's own query kept; never
+ *  a zone (CHUNK-PARAM-REMOVAL CP17, J522). @param {string} url */
+export function bootPageURL(url) {
+  const query = new URL(url).searchParams;
+  for (const [key, value] of Object.entries({ mute: '1', skipintro: '1', nolock: '1', sw: '0' })) query.set(key, value);
+  return zoneHome(new URL(url).origin, query.toString());
+}
+/** Boot `chunk` straight in, as a measured zone (Q1 (a)): a one-cell world of it, entered by zone-entry's alone. An empty
+ *  chunk: the page carries its one shard inline (`wildshard prepare`'s preview), so it enters nothing.
+ *  @param {import('playwright').Page} page @param {string} url @param {string} chunk */
+export async function bootPage(page, url, chunk) {
+  const home = new URL(bootPageURL(url));
+  await (chunk === '' ? page.goto(home.href, { waitUntil: 'domcontentloaded' })
+    : enterZone(page, { zone: chunk, base: home.origin, flags: home.searchParams.toString(), alone: true, waitUntil: 'domcontentloaded' }));
 }
 
 /** Install inside each document so a delayed Chromium process dump cannot stall the loading ledger.
@@ -279,7 +288,7 @@ export async function measureBootMemory({ url, chunk, everyMs = 250, settleMs = 
         await page.locator('.ws-menu-play').click();
         await page.waitForFunction(() => Boolean(document.querySelector('#wserr .msg')?.textContent) || window.__wildshard?.shard?.grid?.state?.().live?.live?.gameplayReady === true, undefined, { polling: 250 });
       } else {
-        await page.goto(bootPageURL(url, chunk), { waitUntil: 'domcontentloaded' });
+        await bootPage(page, url, chunk);
         await page.waitForFunction(() => Boolean(document.querySelector('#wserr .msg')?.textContent) || (!document.querySelector('.ws-load') && Boolean(window.__wildshard?.world?.game)));
       }
       failure = await page.evaluate(async () => {

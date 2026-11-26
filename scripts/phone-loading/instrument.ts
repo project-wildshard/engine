@@ -5,10 +5,19 @@ export function instrument(flow: string): void {
   const key = 'phone-loading.tap';
   const expectedKey = 'phone-loading.expected-shard';
   const tap = Number(sessionStorage.getItem(key));
-  const initialURL = location.href, initialChunk = new URL(initialURL).searchParams.get('chunk');
+  // CHUNK-PARAM CP17 (J522): the entry document is the one a tap sent here, and the tap names its zone (the tab's
+  // titleArrival record, read before the app spends it); the address names none
+  const tapZone = (): string | null => {
+    try {
+      const keys: unknown = Reflect.get(JSON.parse(sessionStorage.getItem('wildshard.save.v2@2.session') ?? 'null') ?? {}, 'keys');
+      const slug: unknown = Reflect.get(Reflect.get(Reflect.get(keys ?? {}, 'titleArrival') ?? {}, 'data') ?? {}, 'slug');
+      return typeof slug === 'string' ? slug : null;
+    } catch { return null; }
+  };
+  const initialURL = location.href, initialZone = tapZone();
   const documentToken = crypto.randomUUID();
-  const expectedShard = flow.startsWith('select:') ? flow.slice(7) : initialChunk ?? sessionStorage.getItem(expectedKey);
-  if (tap > 0 && initialChunk !== null) sessionStorage.setItem(expectedKey, expectedShard ?? initialChunk);
+  const expectedShard = flow.startsWith('select:') ? flow.slice(7) : initialZone ?? sessionStorage.getItem(expectedKey);
+  if (tap > 0 && initialZone !== null) sessionStorage.setItem(expectedKey, expectedShard ?? initialZone);
   const data: Capture = {tap: tap > 0 ? tap : null, control: null, rows: [], measures: [], longTasks: [], frameGaps: [], errors: [], errorDetails: [], panels: [], rowCoverage: 'visible-only'};
   Reflect.set(window, '__phoneLoading', data);
   let gridHome: {world: unknown; instance: string | null; slug: string | null} | undefined;
@@ -62,7 +71,7 @@ export function instrument(flow: string): void {
     const canvasVisible = canvas instanceof HTMLCanvasElement && canvas.width > 0 && canvas.height > 0 && shown(canvas);
     const blockers: string[] = [];
     if (data.tap === null) blockers.push('No real entry tap');
-    if (expectedShard === null || initialChunk !== expectedShard) blockers.push('Not the intended entry document');
+    if (expectedShard === null || initialZone !== expectedShard) blockers.push('Not the intended entry document');
     if (titleFirst) blockers.push('Renderer-free title-first document');
     const enteredShard = flow === 'grid' ? home?.slug ?? null : shard;
     if (enteredShard !== expectedShard) blockers.push(`Entered shard ${enteredShard ?? 'missing'} differs from ${expectedShard ?? 'unknown target'}`);
@@ -73,7 +82,7 @@ export function instrument(flow: string): void {
     if (!canvasVisible) blockers.push('Native game canvas is not visible');
     if (covers.length > 0) blockers.push(`Visible cover: ${covers.join(', ')}`);
     const witness: ControlWitness = {at: epoch(), documentToken, timeOrigin: performance.timeOrigin, initialURL, url: location.href,
-      initialChunk, expectedShard, shard, titleFirst, entered, paused: typeof paused === 'boolean' ? paused : null,
+      initialZone, expectedShard, shard, titleFirst, entered, paused: typeof paused === 'boolean' ? paused : null,
       clockPaused: typeof clockPaused === 'boolean' ? clockPaused : null, frameGate, frames: typeof frameValue === 'number' ? frameValue : null,
       appState: typeof state === 'string' ? state : null, gridHome: home, hudVisible, canvasVisible, covers, blockers, valid: blockers.length === 0};
     data.lastWitness = witness;

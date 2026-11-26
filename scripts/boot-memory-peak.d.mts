@@ -1,3 +1,4 @@
+import type { Page } from 'playwright';
 import type { PhoneModel } from './memory/phoneModel.mjs';
 
 export const MEMORY_LINE_BYTES: number;
@@ -23,7 +24,8 @@ export function alignProcessDumps(samples: readonly BootSample[], dumps: Map<str
 export const TRACE_BUFFER_KB: number;
 export function bootMemoryVerdict(samples: readonly BootSample[], dumps: Map<string, BootProcessTotals>, options?: { factor?: number; budgetBytes?: number }): BootMemoryVerdict;
 export function bootMemoryLine(slug: string, verdict: BootMemoryVerdict): string;
-export function bootPageURL(url: string, chunk: string): string;
+export function bootPageURL(url: string): string;
+export function bootPage(page: Page, url: string, chunk: string): Promise<void>;
 export function installBootMemoryProbe(everyMs: number): void;
 export function measureBootMemory(options: { url: string; chunk: string; everyMs?: number; settleMs?: number; timeoutMs?: number; entry?: 'url' | 'select' }): Promise<{
   chunk: string; url: string; entry: 'url' | 'select'; protocol: 'chromium-phone-boot/1'; ready: boolean; failure: string | null; errors: string[];

@@ -135,9 +135,9 @@ test('MG1: a run no dump measured refuses rather than passing', () => {
   expect(() => bootMemoryVerdict([], new Map(), { factor: 0 })).toThrow('Invalid memory verdict');
 });
 
-test('MG1: the boot page enters the shard straight in, muted, with no service worker', () => {
-  const page = new URL(bootPageURL('http://127.0.0.1:4401/?x=1', 'nine-dragon-stack'));
-  expect(Object.fromEntries(page.searchParams)).toEqual({ x: '1', chunk: 'nine-dragon-stack', mute: '1', skipintro: '1', nolock: '1', sw: '0' });
+test('MG1: the boot page is muted, with no service worker, and names no zone (J522: bootPage enters it)', () => {
+  const page = new URL(bootPageURL('http://127.0.0.1:4401/?x=1'));
+  expect([page.pathname, Object.fromEntries(page.searchParams)]).toEqual(['/', { x: '1', mute: '1', skipintro: '1', nolock: '1', sw: '0' }]);
 });
 
 test('QA 11-25 row 40: the trace holds a slow boot\'s every dump', () => {

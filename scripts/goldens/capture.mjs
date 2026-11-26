@@ -17,6 +17,7 @@
 // later, and the server drops it on a pose: `board` asks, then waits for the answer, so a press never lands after the pose
 // and turns the board back on. ON_FOOT: a board that shows in the frame. It stows Sky's fan and fills its hover decks, and
 // its goldens have neither, so a player hovering there for its streaming steps off for the shot.
+import {enterZone} from '../zone-entry.mjs';
 import {chromium,webkit,devices} from "../browser-playwright.mjs";
 import {existsSync,readFileSync,statSync,writeFileSync,mkdirSync} from 'node:fs';
 import {readFile} from 'node:fs/promises';
@@ -130,9 +131,10 @@ try{for(const slug of slugs){
   const version=await(await page.request.get(new URL('/version.json',base).href)).json();
   const actual=goldenPreviewIdentity(version,arg('sha',''));
   if(actual.build!==source.build)throw Error(`Preview changed from ${source.build} to ${actual.build}`);row.build=actual.build;
-  // --direct (S12c): enter by the shard's own URL (`?chunk=<slug>`), as scripts/tier-textures-proof.mjs does. Since J300's Shard select
-  // enters the grid at a shard's cell (a42f92b6), the title's card no longer reaches a grid-hosted shard's one-shard page.
-  await page.goto(DIRECT?`${base.replace(/\/$/u,'')}/?chunk=${slug}&skipintro&mute=1&nolock=1`:base,{waitUntil:'load'});
+  // --direct (S12c): the shard alone. CHUNK-PARAM CP17 (J522, Q1 (a)): a per-zone golden is a measurement, so it boots a
+  // one-cell world of the zone (zone-entry's alone), never naming it in the URL; without --direct the title's own page.
+  if(DIRECT)await enterZone(page,{zone:slug,base,flags:'skipintro=&mute=1&nolock=1',alone:true,waitUntil:'load'});
+  else await page.goto(base,{waitUntil:'load'});
   if (slug==='nine-dragon-stack'&&nativeBinding!==null) {
     // The per-document DOM-ready hook also covers SHARD SELECT's fresh-page
     // navigation. The title's explicit handshake precedes every menu action.

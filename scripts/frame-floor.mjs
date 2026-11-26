@@ -24,6 +24,7 @@
 // Results: --output-dir=<scratch dir> (default progress/frame-floor)/<measured-short-sha>-<run-id>.json.
 // --desktop-dpr=<1..3>: the desktop surface's device scale factor (default 2) on its 1440x900 viewport.
 import { agentUrl } from './agent-marker.mjs';
+import { enterZone, initScript, oneCellPage } from './zone-entry.mjs';
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { join, resolve as resolvePath } from 'node:path';
@@ -230,7 +231,12 @@ const fixture = (tier) => [
   ...(publicGrid ? [publicGridIntentCode({instance:'driftwood-isle',slug:'driftwood-isle'})] : []),
 ].join(';');
 const fixtureCheck = `(${assertFrameFloorFixture.toString()})(${JSON.stringify({ ...settings, tier: 'phone' })},${developer === 'on'},${JSON.stringify(deviceSaves)})`;
-const query = (shard) => (shard === 'grid' && !publicGrid ? '?mute=1&nolock=1&sw=0' : `?chunk=${encodeURIComponent(shard === 'grid' ? 'driftwood-isle' : shard)}&mute=1&skipintro=1&nolock=1&sw=0`); // the public pre-release probe seeds only the existing intent
+// CHUNK-PARAM CP17 (J522): no zone in any address. A named shard boots alone (Q1 (a)), a one-cell world of it; the grid
+// row opens the title, or (the public pre-release probe, which seeds only the existing intent) taps into Driftwood's cell.
+const FLOOR_FLAGS = 'mute=1&skipintro=1&nolock=1&sw=0';
+const query = (shard) => (shard === 'grid' && !publicGrid ? '?mute=1&nolock=1&sw=0' : `?${FLOOR_FLAGS}`);
+/** The Safari helper page a shard boots from: the grid's, or the shard's own one-cell copy. @param {string} shard */
+const safariHelper = (shard) => (shard === 'grid' ? 'frame-floor-safari.html' : `frame-floor-safari-${shard}.html`);
 const errorText = (e) => e instanceof Error ? e.message : String(e);
 
 // Jake's SF0 clarification (2026-10-04): allow vsync quantization, retain the original strict verdict.
@@ -1035,12 +1041,13 @@ async function worker() {
           }
           page.on('pageerror', (e) => errors.push(e.message.slice(0, 240)));
           page.on('console', (message) => { if (message.type() === 'error' && message.text().includes('[faults]')) errors.push(message.text().slice(0, 1000)); });
-          await page.goto(`${base}${query(shard)}`, { waitUntil: 'domcontentloaded' });
+          await (shard === 'grid' && !publicGrid ? page.goto(`${base}${query(shard)}`, { waitUntil: 'domcontentloaded' })
+            : enterZone(page, { zone: shard === 'grid' ? 'driftwood-isle' : shard, base, flags: FLOOR_FLAGS, alone: shard !== 'grid', waitUntil: 'domcontentloaded' }));
         },
         beginMeasurement: async () => { await cpuPhase?.measure(); },
         cpuPhase: () => cpuPhase?.reading() ?? null,
         tapGrid: () => page.evaluate(FLOOR_GRID_TAP),
-        evaluate: evaluator((expr) => page.evaluate(expr), observe), errors: () => Promise.resolve(errors), progress: () => lastRoute, followed: () => page.waitForURL((u) => !u.search.includes('mute=1') || u.search.includes('chunk='), { timeout: 60000 }).catch(() => undefined),
+        evaluate: evaluator((expr) => page.evaluate(expr), observe), errors: () => Promise.resolve(errors), progress: () => lastRoute, followed: () => page.waitForURL((u) => !u.search.includes('mute=1'), { timeout: 60000 }).catch(() => undefined),
         unload: async () => { try {await throttle?.detach();} finally {throttle = null; await page?.close();} },
         profile: cpuProfileDir === '' ? null : {
           start: async () => { profiler = await page.context().newCDPSession(page); await profiler.send('Performance.enable'); await profiler.send('Profiler.enable'); await profiler.send('Profiler.setSamplingInterval', { interval: 250 }); await profiler.send('Profiler.start'); return page.evaluate('performance.now()'); },
@@ -1109,10 +1116,12 @@ async function worker() {
           }
           // Reconnect after navigation: an inspector evaluation envelope can disappear in a WebContent process swap.
           // The helper sets live pose pins before the clean build's modules boot.
-          const gameUrl = agentUrl(`${base}frame-floor-safari.html${query(shard)}`);
+          const gameUrl = agentUrl(`${base}${safariHelper(shard)}${query(shard)}`);
+          // the public grid row taps into Driftwood's cell: the tap goes into the tab before the navigation, as a title tap does
+          const navigate = shard === 'grid' && publicGrid ? `(() => { ${initScript('driftwood-isle')} return ${frameFloorGameNavigationCode(gameUrl)}; })()` : frameFloorGameNavigationCode(gameUrl);
           // Intentional preparation navigation has no measurement envelope to
           // preserve. Read its acknowledgement directly before reconnecting.
-          if (!wasmMemoryProbe && await inspector.raw(frameFloorGameNavigationCode(gameUrl)) !== true)
+          if (!wasmMemoryProbe && await inspector.raw(navigate) !== true)
             throw new Error('Safari preparation did not acknowledge game navigation');
           inspector.close(); inspector = undefined;
           if (wasmMemoryProbe) xcrun(['openurl', udid, gameUrl]);
@@ -1219,7 +1228,10 @@ async function main() {
       const registry = readFileSync(join(process.env.HOME, '.dev-servers', new URL(base).port), 'utf8').trim().split(' ');
       const dist = join(registry[2], 'dist'), html = readFileSync(join(dist, 'index.html'), 'utf8');
       const helper = join(dist, 'frame-floor-safari.html');
-      writeFileSync(helper, html.replace('<head>', `<head><script>(${traceFrameFloorFixtureWrites.toString()})();${ablationSelected ? BUFFER_PRESSURE_SCRIPT : ''}${NATIVE_PRESSURE}${WASM_CONSTRUCTORS}${fixture('phone')};window.__wildshardHarness=${HARNESS_PINS};${ERROR_SCRIPT}${CONSOLE_SCRIPT}${GL_TIME_SCRIPT}${TASK_CLOCK}${travelGl}</script>`));
+      const helperHtml = html.replace('<head>', `<head><script>(${traceFrameFloorFixtureWrites.toString()})();${ablationSelected ? BUFFER_PRESSURE_SCRIPT : ''}${NATIVE_PRESSURE}${WASM_CONSTRUCTORS}${fixture('phone')};window.__wildshardHarness=${HARNESS_PINS};${ERROR_SCRIPT}${CONSOLE_SCRIPT}${GL_TIME_SCRIPT}${TASK_CLOCK}${travelGl}</script>`);
+      writeFileSync(helper, helperHtml);
+      // CHUNK-PARAM CP17 (J522, Q1 (a)): a named shard boots alone from its own helper copy, a one-cell world of it
+      for (const shard of shards) if (shard !== 'grid') writeFileSync(join(dist, safariHelper(shard)), oneCellPage(helperHtml, shard));
       writeFileSync(join(dist, 'frame-floor-bootstrap.html'), frameFloorBootstrapHtml(fixture('phone'), fixtureCheck));
     }
     for (const s of surface === 'both' ? ['desktop', 'sim'] : [surface]) {

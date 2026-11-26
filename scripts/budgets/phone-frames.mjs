@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { devices } from '../browser-playwright.mjs';
 import { developerSettings, harnessPins, NAME_ASKED, saveFixture } from '../debug-settings.mjs';
 import { bootURL } from '../memory/measure.mjs';
+import { enterZone } from '../zone-entry.mjs';
 import { browserPool } from '../parity/pool.mjs';
 import { serve } from '../parity/serve.mjs';
 import { pinnedContentKeys } from '../shard-size-gate.mjs';
@@ -121,14 +122,15 @@ export async function readPhoneFrames(browser, base, slug, graphics = 'low') {
     /** @type {string[]} */
     const faults = [];
     page.on('pageerror', error => faults.push(error.message));
-    const url = new URL(bootURL(base, slug));
+    const url = new URL(bootURL(base));
     url.searchParams.set('tier', 'phone');
     url.searchParams.set('touch', '1');
     await page.route(target => target.origin === url.origin && target.pathname === url.pathname, async route => {
       const response = await route.fetch();
       await route.fulfill({ response, body: measuringCatalogue(await response.text(), slug) });
     });
-    await page.goto(url.href, { waitUntil: 'domcontentloaded', timeout: READY_MS });
+    // CHUNK-PARAM CP17 (J522): enter the zone's cell by the title's tap and a bare `/`, as a player does
+    await enterZone(page, { zone: slug, base: url.origin, flags: url.searchParams.toString(), waitUntil: 'domcontentloaded', timeout: READY_MS });
     const ready = await page.waitForFunction(zone => {
       const error = document.querySelector('.ws-load-error, #wserr');
       if (error !== null) return error.textContent?.trim() || 'Load error';

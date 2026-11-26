@@ -21,6 +21,7 @@ import { saveFixture } from './debug-settings.mjs';
 import { chromiumProcessPeaks, chromiumAllocatorBytes } from './grid-ready-memory.mjs';
 import { loadingCardIndex } from './loading-benchmark/catalogue.mjs';
 import { pageMemoryAttributionExpression } from './memory-report-snapshot.mjs';
+import { enterZone } from './zone-entry.mjs';
 
 /** G682: fixed 2026-10-24 hello-world 120s Simulator WebContent+GPU floor.
  * Same native reader: 87,397,464 + 15,927,456 bytes; no forced GC or app scripts.
@@ -428,11 +429,13 @@ try {
         const enter = page.locator('.ws-menu-play');
         if (requireCompiled && (!await enter.isVisible() || await enter.isDisabled())) throw new Error(`Missing compiled floor entry: ${shard}`);
         await enter.click();
-        await page.waitForURL(url => url.searchParams.get('chunk') === shard);
+        // CHUNK-PARAM CP1 (J522): the tap leaves for a bare `/`; the new page is the zone's once its world runs it
+        await page.waitForFunction(zone => window.__wildshard?.world?.game.level.id === zone, shard);
       }
     }
   } else {
-  await page.goto(`${base}?chunk=${shard}&mute=1&skipintro=1&nolock=1&sw=0`, { waitUntil: 'domcontentloaded' });
+  // CHUNK-PARAM CP17 (J522, Q1 (a)): a measured zone boots alone, as a one-cell world, never named in the address
+  await enterZone(page, { zone: shard, base, flags: 'mute=1&skipintro=1&nolock=1&sw=0', alone: true, waitUntil: 'domcontentloaded' });
   }
   if (!title) {
   await page.waitForFunction(() => Boolean(document.querySelector('#wserr .msg')?.textContent) || (!document.querySelector('.ws-load') && Boolean(window.__wildshard?.world?.game)));

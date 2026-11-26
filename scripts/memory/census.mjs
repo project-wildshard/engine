@@ -13,7 +13,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve as resolvePath } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { PHONE_VIEW, bootURL, dumpsInOrder, phoneContext, untilControl } from './measure.mjs';
+import { PHONE_VIEW, bootZone, dumpsInOrder, phoneContext, untilControl } from './measure.mjs';
 
 const BIG = 65536, MB = 1e6;
 
@@ -153,7 +153,7 @@ async function main(argv) {
     // each worker gets the census as soon as Playwright sees it: before its module script has been fetched, so in practice
     // before its first allocation (a worker that allocates first is marked `late` by its own `made` count being 0)
     page.on('worker', (worker) => { workers.push(worker); worker.evaluate(init).catch(() => undefined); });
-    const failure = await (async () => { await page.goto(bootURL(args.url, args.chunk), { waitUntil: 'commit' }); return untilControl(page, 240_000); })();
+    const failure = await (async () => { await bootZone(page, args.url, args.chunk); return untilControl(page, 240_000); })();
     if (failure) throw new Error(`boot failed: ${failure}`);
     const cdp = await context.newCDPSession(page);
     for (let i = 0; i < 2; i++) { await cdp.send('HeapProfiler.collectGarbage'); await sleep(1000); }

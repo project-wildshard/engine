@@ -223,7 +223,8 @@ async function oneRun(udid, run, opts) {
     await evaluate(`${saveFixtureCode({ scope: 'session', key: 'titleArrival', data: arrival })};${saveFixtureCode({ scope: 'device', key: 'titleArrival.once', data: arrival })};${saveFixtureCode({ scope: 'global', key: 'settings', data: settings, merge: true })};${saveFixtureCode({ scope: 'device', key: 'devMode', data: true })};${deviceCode};1`); // developer mode: EXPLORE WORLD is developer-only (E386)
     setPhase('loading');
     const loadStart = Date.now();
-    await evaluate(`location.href = ${JSON.stringify(`${run.base}?chunk=${run.shard}&mute=1`)}; 1`, 1);
+    // CHUNK-PARAM CP17 (J522): the tap above names the zone; the address never does
+    await evaluate(`location.href = ${JSON.stringify(`${run.base}?mute=1`)}; 1`, 1);
     await sleep(2000);
     for (let last = '';;) {
       const v = JSON.parse(await evaluate('JSON.stringify({ step: document.querySelector(".ws-load")?.getAttribute("data-step") ?? null, world: Boolean(window.__wildshard?.world), loading: Boolean(document.querySelector(".ws-load")), err: document.querySelector("#wserr .msg")?.textContent ?? null })', 'null'));

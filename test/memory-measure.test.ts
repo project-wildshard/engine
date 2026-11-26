@@ -28,8 +28,9 @@ test('ledger by kind, stats and the boot URL',()=>{
   expect(ledgerByKind({allocations:[{domain:'gpu',kind:'texture',bytes:2},{domain:'gpu',kind:'texture',bytes:3},{domain:'ram',kind:'wasm',bytes:7}]})).toEqual({gpu:{texture:5},ram:{wasm:7}});
   expect(ledgerByKind(null)).toBeNull();
   expect(stats([100,103,101,99,102])).toEqual({n:5,median:101,min:99,max:103,spreadPct:4});
-  const url=new URL(bootURL('http://127.0.0.1:4400/','brasscap-mesa'));
-  expect(Object.fromEntries(url.searchParams)).toEqual({chunk:'brasscap-mesa',mute:'1',skipintro:'1',nolock:'1',sw:'0'});
+  // CHUNK-PARAM CP17 (J522): the run's address names no zone (bootZone enters it); an arm's own switch rides along
+  const url=new URL(bootURL('http://127.0.0.1:4400/?trisprobe=half'));
+  expect([url.pathname,Object.fromEntries(url.searchParams)]).toEqual(['/',{trisprobe:'half',mute:'1',skipintro:'1',nolock:'1',sw:'0'}]);
   expect(PROTOCOL).toBe('memory-run/1');
 });
 

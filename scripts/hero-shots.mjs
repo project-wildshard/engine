@@ -25,6 +25,7 @@
 //   → <dir>/<id>.jpg (1206×2440, the phone's own pixels) + <id>-menu.jpg (the same hero under the real title deck)
 //   scripts/browser-lane.sh --max 10 node scripts/hero-shots.mjs --shard=<slug> --url=… --overlay=<a.jpg,b.jpg> --out=<dir>
 //   → only the -menu.jpg checks, for heroes already shot (or the shipped one).
+import { enterZone } from './zone-entry.mjs';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -116,9 +117,10 @@ try {
       await ctx.addInitScript(() => { window.__wildshardHarness = { seed: 0x2545f491, capture: null, lane: 'local', sha: '', browser: 'chromium', errors: [], saves: { read: [], written: [] }, audioRequests: [], gpuBytes: () => ({ textures: 0, renderbuffers: 0, buffers: 0, total: 0 }) }; });
       const page = await ctx.newPage();
       page.on('pageerror', (e) => errors.push(e.message.slice(0, 200)));
-      const url = `${URL_BASE}/?chunk=${SLUG}&tier=desktop&mute=1&nolock=1&sw=0&perf=0&skipintro=1${q ? `&${q}` : ''}`;
-      console.log('load', url);
-      await page.goto(url, { waitUntil: 'domcontentloaded' });
+      // CHUNK-PARAM CP17 (J522): a hero shot shows the zone as players see it, its neighbours round it, entered by the tap
+      const flags = `tier=desktop&mute=1&nolock=1&sw=0&perf=0&skipintro=1${q ? `&${q}` : ''}`;
+      console.log('load', SLUG, flags);
+      await enterZone(page, { zone: SLUG, base: URL_BASE, flags, waitUntil: 'domcontentloaded' });
       await page.waitForFunction(() => Boolean(window.__wildshard?.world?.player && window.__wildshard?.world?.game) && document.querySelector('.ws-load') === null,
         undefined, { timeout: 480000, polling: 1000 });
       await page.evaluate(() => {
