@@ -28,7 +28,7 @@ const rig = await openRig({ dist, nextDist, work, keyFile, pgBin, pgData, shard:
 const launched = await (engine === 'webkit' ? webkit : chromium).launch({ headless: true, args: engine === 'webkit' ? [] : [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
 const { defaultBrowserType: _engine, ...phone } = devices['iPhone 16 Pro'];
 /** @param {string} name */
-const enter = async name => { const entered = await enterPage(launched, phone, `${rig.base}/?chunk=${SHARD}&mute=1&nolock=1&skipintro=1`, name); await intoWorld(entered.page); return entered; };
+const enter = async name => { const entered = await enterPage(launched, phone, { zone: SHARD, base: rig.base }, name); await intoWorld(entered.page); return entered; };
 /** @param {import('playwright').Page} page */
 const others = page => page.evaluate(() => window.__onlinePlayers?.() ?? []);
 /** @param {import('playwright').Page} page @param {(rows: readonly { name: string, gait: string, board: boolean, x: number, z: number, modelled: boolean, held: number }[]) => boolean} seen @param {string} step */
@@ -112,7 +112,7 @@ try {
   }
   if (seats !== '') {
     // J178: a full world turns the next page away, and lets it in when a seat frees: a held seat lasts J114's 30 s, and the page tries each 30 s.
-    const ann = await enterPage(launched, phone, `${rig.base}/?chunk=${SHARD}&mute=1&nolock=1&skipintro=1`, 'Ann');
+    const ann = await enterPage(launched, phone, { zone: SHARD, base: rig.base }, 'Ann');
     await ann.page.locator('[data-failmode="full"]').waitFor({ timeout: 90_000 });
     note('the third page is told World is full', true);
     await ann.page.waitForTimeout(1500);

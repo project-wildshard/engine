@@ -17,7 +17,8 @@ import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 // The rig's ports come from WS_RIG_PORTS when online-rig.mjs loads: this proof's own block, clear of other lanes' rigs.
 process.env.WS_RIG_PORTS ??= '19576';
-const { RELEASE_PORT, enterPage, intoWorld, openRig } = await import('./online-rig.mjs');
+const { PLAY_FLAGS, RELEASE_PORT, enterPage, intoWorld, openRig } = await import('./online-rig.mjs');
+const { enterZone } = await import('./zone-entry.mjs');
 const ROOT = absolute(import.meta.dirname, '..');
 const workArg = process.argv.slice(2).find(value => !value.startsWith('--')) ?? '';
 if (workArg === '') throw new Error('usage: seat-hold-proof.mjs <work dir> [--short]');
@@ -71,7 +72,7 @@ async function openWorld() {
   } finally { rmSync(keyFile, { force: true }); }
 }
 
-const rig = await openWorld(), url = (/** @type {string} */ slug) => `${rig.base}/?chunk=${slug}&mute=1&nolock=1&skipintro=1`;
+const rig = await openWorld(), url = (/** @type {string} */ slug) => ({ zone: slug, base: rig.base });
 const browser = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
 /** @type {typeof devices[string] & { screen?: { width: number, height: number } }} */
 const { defaultBrowserType: _engine, ...phone } = devices['iPhone 16 Pro'];
@@ -91,7 +92,7 @@ try {
 
   // A fresh title pick of Driftwood inside the Dunes hold: the one-shard page dials its own shard (NB2).
   hand.errors.length = 0;
-  await hand.page.goto(url(DRIFTWOOD), { waitUntil: 'load' });
+  await enterZone(hand.page, { ...url(DRIFTWOOD), flags: PLAY_FLAGS });
   await intoWorld(hand.page);
   const moved = await whereIs(hand.page);
   note('the fresh Driftwood pick plays Driftwood', moved.level.includes('driftwood'), moved);
@@ -108,7 +109,7 @@ try {
   note(`the desktop still sees the held body at ${String(HELD_AT / 1000)} s`, await sees(desk.page, 'Hand'), { seconds: (Date.now() - gone) / 1000 });
   const back = await hand.context.newPage();
   back.on('pageerror', error => { hand.errors.push(error.message.slice(0, 240)); });
-  await back.goto(url(DRIFTWOOD), { waitUntil: 'load' });
+  await enterZone(back, { ...url(DRIFTWOOD), flags: PLAY_FLAGS });
   await intoWorld(back);
   const returned = await whereIs(back);
   note('back inside the hold, the phone lands where it left', returned.level.includes('driftwood') && Math.hypot(returned.x - left.x, returned.z - left.z) < 1.5,

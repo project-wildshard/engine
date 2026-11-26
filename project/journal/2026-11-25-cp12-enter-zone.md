@@ -19,3 +19,7 @@ a string, the entry refuses it and the page shows the title (the first browser r
 writes no tap and puts the zone's cell at (0, 0), as CP10's one-cell world boots with none. Local proof on a preview of
 799a6edd9: with neighbours, desktop and WebKit iPhone 13 are inside pine-hollow with 22 cells in 11 s and 8 s; alone,
 inside it with 1 cell in 12 s and 6 s; no request carries chunk.
+
+CP16 starts on the local proofs: `enterZone` takes the run's flags (`zoneHome` refuses a `chunk`), online-rig's
+`enterPage` takes `{ zone, base }`, and the rig proofs, failmode-proof's play pages and reload-title-proof tap in. The
+scripts that drive staging or prod wait for a CP1 build there: switched now, they would break that train's own QA.

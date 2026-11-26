@@ -96,7 +96,7 @@ const reversals = (gaps, floor) => {
 const round = (/** @type {number} */ n) => Math.round(n * 1000) / 1000;
 
 const rig = await openRig({ dist, work, keyFile, pgBin: 'memory:', pgData: '', shard: 'driftwood-isle' });
-const url = `${rig.base}/?chunk=driftwood-isle&mute=1&nolock=1&skipintro=1`;
+const url = { zone: 'driftwood-isle', base: rig.base };
 const browser = await webkit.launch({ headless: true });
 const { defaultBrowserType: _engine, ...iphone } = devices['iPhone 16 Pro'], phone = { ...iphone, viewport: { width: 402, height: 874 } }; // the iPhone 17 Pro's points
 /** @type {Record<string, unknown>} */

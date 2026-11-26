@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { runInNewContext } from 'node:vm';
 import { test } from 'vitest';
-import { SAVE_PREFIX, initScript, oneCellCatalogue, oneCellPage, tapDocument } from '../../scripts/zone-entry.mjs';
+import { SAVE_PREFIX, initScript, oneCellCatalogue, oneCellPage, tapDocument, zoneHome } from '../../scripts/zone-entry.mjs';
 import { tapRecord, tapSessionDocument } from '../../src/client/engine/boot/tapRecord.ts';
 import { WILDSHARD_IDENTITY } from '../../src/client/game/identity.ts';
 
@@ -57,4 +57,11 @@ test('alone cuts the inline catalogue to the zone\'s one cell, at the origin as 
   assert.deepEqual(JSON.parse(inline).grid.cells.map(row => row.slug), ['driftwood-isle']);
   assert.doesNotMatch(inline, /</u, 'a < in the catalogue never closes the inline script');
   assert.throws(() => oneCellPage('<html></html>', 'pine-hollow'), /inlines no ws-catalogue/u);
+});
+
+test('the address enterZone opens carries the run\'s flags and never a zone (CP16)', () => {
+  assert.equal(zoneHome('http://127.0.0.1:4401'), 'http://127.0.0.1:4401/');
+  assert.equal(zoneHome('http://127.0.0.1:4401', 'mute=1&nolock=1&skipintro=1'), 'http://127.0.0.1:4401/?mute=1&nolock=1&skipintro=1');
+  assert.equal(zoneHome('https://staging.wildshard.io', { sw: '0' }), 'https://staging.wildshard.io/?sw=0');
+  assert.throws(() => zoneHome('http://127.0.0.1:4401', 'chunk=pine-hollow&mute=1'), /no zone in the address/u);
 });

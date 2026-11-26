@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // QA-FEEDBACK 2026-11-12 row 35 (Jake, 20:04: "I expected reload to go back to main menu"): a headless proof on a built app.
-//   1. a fresh open of a shard URL opens the shard (its loading card, not the title);
+//   1. a tap into a shard (enterZone: the tap in the tab, a bare /) opens the shard (its loading card, not the title);
 //   2. the player's own reload (page.reload(), the browser's reload button) lands on the title with no drop modal and no
 //      title-drop report;
 //   3. the engine's chunk recovery (a stale `main` chunk, a newer /version.json) reloads by itself and resumes the shard.
@@ -11,6 +11,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { chromium } from "./browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
+import { enterZone } from './zone-entry.mjs';
 
 /** @param {string} name */
 const option = name => process.argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -45,8 +46,8 @@ try {
   // 1 + 2: a fresh open loads the shard; the player's reload goes to the title, quietly
   {
     const { context, page, consoleLines, reports } = await tab();
-    await page.goto(`${base}/?chunk=${shard}&sw=0`);
-    check(await loadingShard(page), `a fresh open of /?chunk=${shard} shows its loading card`);
+    await enterZone(page, { zone: shard, base, flags: 'sw=0' });
+    check(await loadingShard(page), `a fresh tap into ${shard} shows its loading card`);
     await sleep(1500);
     await page.screenshot({ path: join(out, '1-fresh-open-loading.png') });
     await page.reload();
@@ -69,7 +70,7 @@ try {
     let documents = 0, versions = 0;
     page.on('domcontentloaded', () => { documents++; });
     await page.route(/\/version\.json(?:\?.*)?$/u, route => { versions++; void route.fulfill({ contentType: 'application/json', body: JSON.stringify({ build: 'proof-newer-build', saveEpoch: 2 }) }); });
-    await page.goto(`${base}/?chunk=${shard}&sw=0`);
+    await enterZone(page, { zone: shard, base, flags: 'sw=0' });
     check(await loadingShard(page), `the shard is loading before the stale chunk fails`);
     const chunk = await page.evaluate(() => {
       const url = performance.getEntriesByType('resource').map(entry => entry.name).find(name => /\/b\/[\w.-]+\/[^/]+-[\w-]{8}\.js$/u.test(new URL(name).pathname)) ?? '';
@@ -85,7 +86,7 @@ try {
     check(await loadingShard(page), `the recovery reload resumes ${shard} (its loading card, not the title)`);
     await sleep(1500);
     check(!await onTitle(page) && await page.locator('#wsdrop').count() === 0, 'no title and no drop modal after the recovery reload');
-    check(new URL(page.url()).searchParams.get('chunk') === shard, `the address still names ${shard} (${page.url()})`);
+    check(!new URL(page.url()).searchParams.has('chunk'), `the address names no zone, the tab does (J522; ${page.url()})`);
     const said = consoleLines.filter(line => line.includes('[lastEnd]'));
     check(said.some(line => line.includes('the previous page: stale deployment code')), `lastEnd names the engine reload (${said.join(' | ')})`);
     await page.screenshot({ path: join(out, '3-chunk-recovery-resumes.png') });

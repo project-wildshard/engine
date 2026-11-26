@@ -102,7 +102,7 @@ const forgetHint = () => {
   }
 };
 
-const rig = await openWorld(), url = (/** @type {string} */ slug) => `${rig.base}/?chunk=${slug}&mute=1&nolock=1&skipintro=1`;
+const rig = await openWorld(), url = (/** @type {string} */ slug) => ({ zone: slug, base: rig.base });
 const browser = await webkit.launch({ headless: true });
 const out = join(work, 'proof');
 mkdirSync(out, { recursive: true });

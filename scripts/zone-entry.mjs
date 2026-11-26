@@ -58,15 +58,25 @@ export function oneCellPage(html, zone) {
   return html.replace(INLINE, () => `<script type="application/json" id="ws-catalogue">${text}</script>`);
 }
 
-/** Enter `zone` like a player: the tap in the tab, then `/`. `base` is the build's origin (default: the page's own).
+/** The address enterZone opens: `/` with only the run's flags (`mute=1&skipintro=1` and the like), never a zone.
+ *  @param {string} origin @param {string | Record<string, string>} [flags] */
+export function zoneHome(origin, flags = '') {
+  const query = new URLSearchParams(flags);
+  if (query.has('chunk')) throw new Error('zone-entry: no zone in the address (J522); enterZone names it in the tap');
+  const search = query.toString();
+  return `${origin}/${search === '' ? '' : `?${search}`}`;
+}
+
+/** Enter `zone` like a player: the tap in the tab, then `/`. `base` is the build's origin (default: the page's own);
+ *  `flags` are the run's own params (`mute=1&nolock=1&skipintro=1`), which name no zone.
  *  @param {import('playwright').Page} page
- *  @param {{ zone: string; base?: string; mode?: 'enter' | 'explore' | 'arena'; name?: string; alone?: boolean; prefix?: string;
- *    waitUntil?: 'load' | 'domcontentloaded' | 'commit' }} options */
-export async function enterZone(page, { zone, base, mode = 'enter', name, alone = false, prefix = SAVE_PREFIX, waitUntil = 'load' }) {
+ *  @param {{ zone: string; base?: string; flags?: string | Record<string, string>; mode?: 'enter' | 'explore' | 'arena'; name?: string;
+ *    alone?: boolean; prefix?: string; waitUntil?: 'load' | 'domcontentloaded' | 'commit'; timeout?: number }} options */
+export async function enterZone(page, { zone, base, flags, mode = 'enter', name, alone = false, prefix = SAVE_PREFIX, waitUntil = 'load', timeout }) {
   checked(zone, mode);
   const origin = new URL(base ?? page.url()).origin;
   if (origin === 'null') throw new Error('zone-entry: give a base URL, the page is on no origin yet');
-  const home = `${origin}/`;
+  const home = zoneHome(origin, flags);
   // The tab's storage belongs to the origin: stand on it (a small static file, never a page that boots) to write the tap.
   // A one-cell page boots its cell with no tap (CP10); a tap there would ask the grid path for a world it doesn't hold.
   if (!alone) {
@@ -79,7 +89,7 @@ export async function enterZone(page, { zone, base, mode = 'enter', name, alone 
       await route.fulfill({ response, body: oneCellPage(await response.text(), zone) });
     });
   }
-  await page.goto(home, { waitUntil });
+  await page.goto(home, { waitUntil, ...(timeout === undefined ? {} : { timeout }) });
   if (alone) await page.unroute(home);
   return page;
 }

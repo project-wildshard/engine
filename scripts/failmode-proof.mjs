@@ -42,6 +42,7 @@ import { BOOT_SCREEN_MS, bootScreenWait, qualifyResult } from './failmode-result
 import { nextFailmodeDeploy } from './failmode-deploy-fixture.mjs';
 import { claimFixture, fixtureKey, fixtureRequestOrigins } from './online-rig-owned.mjs';
 import { rawLeak, selectCases, verdict } from './failmode-cases.mjs';
+import { enterZone } from './zone-entry.mjs';
 
 process.env.WS_RIG_PORTS ??= '18856';
 const rigPort = Number(process.env.WS_RIG_PORTS);
@@ -179,7 +180,9 @@ try {
   const socketDials = /** @type {Map<string, number>} */ (new Map());
   const guardFaults = /** @type {string[]} */ ([]);
   let pageFaults = /** @type {string[]} */ ([]);
-  const URL_PLAY = `${PAGE_ORIGIN}/?chunk=${SHARD}&mute=1&nolock=1&skipintro=1`;
+  /** CHUNK-PARAM-REMOVAL CP16 (J522): a play page enters by the tap, as a Zone Select pick does; the address names no zone.
+   *  @param {import('playwright').Page} page */
+  const play = page => enterZone(page, { zone: SHARD, base: PAGE_ORIGIN, flags: 'mute=1&nolock=1&skipintro=1' });
   /** A fresh device: its own context, Developer on, its errors and visibility changes kept.
    *  `observe`: the off-fixture guard watches instead of routing. Playwright's routing disables the HTTP cache, and Chromium then hands
    *  a service worker every read as `cache: 'no-store'`, which sw.js rightly sends to the network: a warmed page could never launch
@@ -409,7 +412,7 @@ try {
         const link = await mailedLink(page, email);
         await page.goto(link);
         await page.locator('#ws-signin[data-signed-in="true"]').waitFor({ state: 'visible', timeout: 30_000 });
-        await page.goto(URL_PLAY); await intoWorld(entered);
+        await play(page); await intoWorld(entered);
         return entered;
       };
       /** The session ends at the API (its own 401 from now), then one drop of the world socket; the card must come. */
@@ -521,7 +524,7 @@ try {
     socketDown: async item => {
       const entered = await fresh(); const { page } = entered;
       try {
-        await page.goto(URL_PLAY); await intoWorld(entered);
+        await play(page); await intoWorld(entered);
         const before = await control(), started = Date.now();
         /** @type {Record<string, { first: object, hold: object | null, holdMs: number, wait: number, button?: string, reloads?: boolean }>} */
         const plans = {
@@ -574,12 +577,12 @@ try {
       if (seats !== '2') return { outcome: 'harness-fail', reason: 'the line case needs --seats=2' };
       const opened = /** @type {Entered[]} */ ([]);
       try {
-        const sit = async () => { const entered = await fresh(); opened.push(entered); await entered.page.goto(URL_PLAY); await intoWorld(entered); return entered; };
+        const sit = async () => { const entered = await fresh(); opened.push(entered); await play(entered.page); await intoWorld(entered); return entered; };
         const first = await sit(); await sit();
         // a page that waits in line: its Name, then the full card
         const wait = async () => {
           const entered = await fresh(); opened.push(entered); const { page } = entered, started = Date.now();
-          await page.goto(URL_PLAY);
+          await play(page);
           const named = await page.locator('#ws-name-box input').waitFor({ state: 'visible', timeout: 60_000 }).then(() => true, () => false);
           if (named) { await page.locator('#ws-name-box input').fill(`fm${String(Date.now() % 100_000)}`); await page.locator('#ws-name-box button[type=submit]').click(); }
           return { entered, seen: await screen(page, item.screen, 60_000, started) };
@@ -611,7 +614,7 @@ try {
     heldChat: async item => {
       const entered = await fresh(); const { page } = entered;
       try {
-        await page.goto(URL_PLAY); await intoWorld(entered);
+        await play(page); await intoWorld(entered);
         const before = await control();
         await arm('reset', [{ route: 'socket', kind: 'drop-after', afterMs: 0 }]);
         for (let tries = 0; tries < 40 && await matchedSince(before, 'socket') === 0; tries++) await sleep(100);
@@ -643,7 +646,7 @@ try {
       const plan = plans[item.id];
       if (plan === undefined) throw new Error(`heldTap has no plan for ${item.id}`);
       try {
-        await page.goto(URL_PLAY); await intoWorld(entered);
+        await play(page); await intoWorld(entered);
         const before = await control();
         const name = item.id.replace('/', '-');
         await arm(name, [plan.first]);
@@ -668,9 +671,9 @@ try {
     replaced: async item => {
       const entered = await fresh(); const { page, context } = entered;
       try {
-        await page.goto(URL_PLAY); await intoWorld(entered);
+        await play(page); await intoWorld(entered);
         const second = await context.newPage(), started = Date.now();
-        await second.goto(URL_PLAY);
+        await play(second);
         const seen = await screen(page, item.screen, 120_000, started), shot = seen === null ? undefined : await shoot(page, item.id, 'card');
         const result = await judged(seen, item, page);
         await second.close();
@@ -692,7 +695,7 @@ try {
         await button.click({ timeout: 10_000 });
       };
       try {
-        await page.goto(URL_PLAY); await intoWorld(entered);
+        await play(page); await intoWorld(entered);
         const before = await control(), started = Date.now();
         await arm(item.id, [{ route: 'version', kind: 'status', code: 503 }]);
         await check();
@@ -715,7 +718,7 @@ try {
       /** @param {number | undefined} untilMs */
       const rule = untilMs => ({ route: 'socket', kind: 'close', code: 4001, reason: JSON.stringify({ v: 1, code: 'banned', ...untilMs === undefined ? {} : { untilMs } }) });
       try {
-        await page.goto(URL_PLAY); await intoWorld(entered);
+        await play(page); await intoWorld(entered);
         const before = await control(), started = Date.now(), untilMs = Date.now() + 26 * 3_600_000;
         await arm(item.id, [rule(untilMs)]);
         const seen = await screen(page, item.screen, 15_000, started), shot = seen === null ? undefined : await shoot(page, item.id, 'until');
@@ -733,7 +736,7 @@ try {
         await press(page, item.screen, 'Title screen').catch(() => undefined);
         const toTitle = await titled;
         if (!toTitle) return { outcome: 'ui-fail', reason: 'Title screen did not leave for the title', seen, shot };
-        const again = Date.now(); await page.goto(URL_PLAY);
+        const again = Date.now(); await play(page);
         const open = await screen(page, item.screen, 60_000, again), openShot = open === null ? undefined : await shoot(page, item.id, 'no-end');
         const openResult = await judged(open, item, page);
         if (openResult.outcome !== 'pass') return { ...openResult, shot };
@@ -749,7 +752,7 @@ try {
     titleHold: async item => {
       const entered = await fresh(); const { page } = entered;
       try {
-        await page.goto(URL_PLAY); await intoWorld(entered);
+        await play(page); await intoWorld(entered);
         const before = await control(), named = item.id.replace('/', '-');
         await arm(named, [{ route: 'socket', kind: 'close', code: 4005, reason: 'restart' }]);
         for (let tries = 0; tries < 40 && await matchedSince(before, 'socket') === 0; tries++) await sleep(100);
@@ -790,7 +793,7 @@ try {
       };
       const gone = (/** @type {string} */ id, /** @type {number} */ timeout) => page.locator(`[data-failmode~="${id}"]`).first().waitFor({ state: 'detached', timeout }).then(() => true, () => false);
       try {
-        await page.goto(URL_PLAY); await intoWorld(entered);
+        await play(page); await intoWorld(entered);
         const base = await writes(), until = Date.now() + 90_000;
         while (await writes() === base) { if (Date.now() > until) return { outcome: 'harness-fail', reason: 'no save landed in 90 s after the seat' }; await sleep(1000); }
         await sleep(500);
@@ -853,7 +856,7 @@ try {
     unmatched: async () => {
       const entered = await fresh(); const { page } = entered;
       try {
-        await page.goto(URL_PLAY); await intoWorld(entered);
+        await play(page); await intoWorld(entered);
         const before = await control(); await arm('unmatched', [{ route: 'doctor', kind: 'status', code: 503 }]);
         await sleep(5000);
         const matches = await matchedSince(before, 'doctor');
@@ -864,7 +867,7 @@ try {
     doctorHttp: async item => {
       const entered = await fresh(); const { page } = entered;
       try {
-        await page.goto(URL_PLAY); await intoWorld(entered);
+        await play(page); await intoWorld(entered);
         const before = await control(), here = page.url(), started = Date.now();
         await arm(item.id, [{ route: 'doctor', kind: 'status', code: 503 }]);
         await page.evaluate(() => { document.dispatchEvent(new CustomEvent('ws:doctor', { detail: 'link' })); });
@@ -894,7 +897,7 @@ try {
       const entered = await fresh(); const { page } = entered;
       try {
         const started = Date.now();
-        await page.goto(URL_PLAY);
+        await play(page);
         // the Name box asks before the page dials (MP2.4): answer it as a player would, then the dial goes out
         for (const until = Date.now() + 60_000; Date.now() < until; await sleep(250)) {
           if (await page.locator('#ws-name-box input').isVisible().catch(() => false)) {
@@ -956,7 +959,7 @@ try {
         await entered.context.route(iceUrl, route => { iceAsks.count++; void route.fulfill({ status: 200, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' }, body: '{"iceServers":[]}' }); });
         if (desktop) await saveFixture(entered.context, { scope: 'device', key: 'voiceSettings', data: { input: '', volume: 1, mode: 'hold' } });
         if (engine === 'chromium') await entered.context.grantPermissions(['microphone'], { origin: PAGE_ORIGIN }).catch(() => undefined);
-        await entered.page.goto(URL_PLAY); await intoWorld(entered);
+        await play(entered.page); await intoWorld(entered);
         return entered;
       };
       const opened = /** @type {Entered[]} */ ([]);
@@ -1027,7 +1030,7 @@ try {
     offlinePlay: async item => {
       const entered = await fresh(); const { page, context } = entered;
       try {
-        await page.goto(URL_PLAY); await intoWorld(entered);
+        await play(page); await intoWorld(entered);
         const started = Date.now(); await context.setOffline(true);
         const loopbackCut = await cutLoopback(true), injection = { setOffline: true, ...loopbackCut ? { loopbackCut } : {} };
         const seen = await screen(page, item.screen, 8000, started), shot = seen === null ? undefined : await shoot(page, item.id, 'card');
@@ -1041,11 +1044,11 @@ try {
     offlineLaunch: async item => {
       const entered = await fresh(undefined, { observe: true }); const { page, context } = entered;
       try {
-        await page.goto(URL_PLAY); await intoWorld(entered);
+        await play(page); await intoWorld(entered);
         // a first visit's worker takes control from the next load (no clients.claim on a world page): a second online visit is the warm one.
         // Visits open the play address: the page drops its query once it starts, so a reload would land on the title
         const controlling = () => page.waitForFunction(() => navigator.serviceWorker?.controller !== null && navigator.serviceWorker?.controller !== undefined, undefined, { timeout: 20_000 }).then(() => true, () => false);
-        if (!await controlling()) { await page.waitForFunction(async () => (await navigator.serviceWorker?.getRegistration())?.active !== undefined, undefined, { timeout: 60_000 }).catch(() => undefined); await page.goto(URL_PLAY); await intoWorld(entered); }
+        if (!await controlling()) { await page.waitForFunction(async () => (await navigator.serviceWorker?.getRegistration())?.active !== undefined, undefined, { timeout: 60_000 }).catch(() => undefined); await play(page); await intoWorld(entered); }
         const controlled = await controlling();
         if (!controlled) return { outcome: 'unsupported', reason: `${engine}: no controlling service worker after the warm visit, so nothing can launch offline` };
         // the worker precaches its build's code after control (DL1): wait until the page's caches stop growing, not a fixed 3 s
@@ -1057,7 +1060,7 @@ try {
         }
         await context.setOffline(true);
         const loopbackCut = await cutLoopback(false), injection = { warmed: true, setOffline: true, guard: 'observe-only (routing would disable the HTTP cache)', ...loopbackCut ? { loopbackCut } : {} };
-        const started = Date.now(); await page.goto(URL_PLAY).catch(() => undefined);
+        const started = Date.now(); await play(page).catch(() => undefined);
         await intoWorld(entered, 60_000).catch(() => undefined);
         const seen = await screen(page, item.screen, 15_000, started), shot = seen === null ? await shoot(page, item.id, 'missing') : await shoot(page, item.id, 'card');
         await context.setOffline(false); if (loopbackCut) await heal();
@@ -1075,7 +1078,7 @@ try {
       if (engine !== 'chromium') return { outcome: 'unsupported', reason: 'WebKit has no lifecycle freeze; a native-Safari Ring 2 proof is owed' };
       const entered = await fresh(); const { page, context } = entered;
       try {
-        await page.goto(URL_PLAY); await intoWorld(entered);
+        await play(page); await intoWorld(entered);
         const cdp = await context.newCDPSession(page), quiet = item.id === 'sleep-wake', awayMs = item.id === 'background-short' ? 4000 : 35_000;
         /** @type {Record<string, unknown> | undefined} */
         let healthyControl;
@@ -1129,7 +1132,7 @@ try {
     linkQuality: async item => {
       const entered = await fresh(); const { page } = entered;
       try {
-        await page.goto(URL_PLAY); await intoWorld(entered);
+        await play(page); await intoWorld(entered);
         const before = await control(), started = Date.now();
         // Mode 22 (opus-of18): the proxy keeps a socket's frames in order, so per-frame jitter on a 60 Hz stream queues every frame behind
         // the slowest and the pong RTT sits flat near the jitter's top (seen: no screen under ±200 ms). An unstable link is one whose
@@ -1165,7 +1168,7 @@ try {
       const entered = await fresh(); const { page } = entered;
       try {
         const before = await control(); await arm(item.id, [rule]);
-        const started = Date.now(); await page.goto(URL_PLAY);
+        const started = Date.now(); await play(page);
         // the Name box comes before the read on a page with no seat yet
         // QA 2026-11-19 row 8: the page reads the file again when it dials, after the world loads (past 30 s on SwiftShader)
         const waited = await bootScreenWait({ inWorld: async () => await frames(page) > 0, screen: async () => {
@@ -1199,7 +1202,7 @@ try {
       const entered = await fresh(); const { page } = entered, route = item.id === 'book-5xx' ? 'book' : 'packs';
       try {
         const before = await control(); await arm(item.id, [rule]);
-        const started = Date.now(); await page.goto(URL_PLAY);
+        const started = Date.now(); await play(page);
         const seen = await (async () => { const until = Date.now() + (item.id === 'download-failed' ? 120_000 : 40_000); while (Date.now() < until) { if (await page.locator('#ws-name-box input').isVisible().catch(() => false)) { await page.locator('#ws-name-box input').fill('fmload'); await page.locator('#ws-name-box button[type=submit]').click(); } const found = await screen(page, item.screen, 500, started); if (found !== null) return found; } return null; })();
         const shot = await shoot(page, item.id, seen === null ? 'missing' : 'line');
         const injection = { matches: await matchedSince(before, route) };
@@ -1265,7 +1268,7 @@ try {
       });
       const { page } = entered;
       try {
-        await page.goto(URL_PLAY); await intoWorld(entered);
+        await play(page); await intoWorld(entered);
         const started = Date.now();
         await Promise.all([page.waitForURL(/\/doctor\//u, { timeout: 20_000 }), page.evaluate(() => { document.dispatchEvent(new CustomEvent('ws:doctor', { detail: 'link' })); })]);
         const seen = await screen(page, item.screen, 45_000, started), shot = await shoot(page, item.id, seen === null ? 'missing' : 'doctor');
@@ -1297,7 +1300,7 @@ try {
       if (rig.nextBuild === '') return { outcome: 'blocked-dependency', reason: NEEDS_NEXT };
       const entered = await fresh(); const { page } = entered;
       try {
-        await page.goto(URL_PLAY); await intoWorld(entered);
+        await play(page); await intoWorld(entered);
         let seen = /** @type {Seen | null} */ (null), shot = '', playing = false;
         const started = Date.now();
         onNext = true;
@@ -1325,7 +1328,7 @@ try {
       const entered = await fresh(); const { page } = entered;
       try {
         // as 9b: a device that has played, and heard the world restart, goes back to the title (a fresh one's ENTER opens Zone select)
-        await page.goto(URL_PLAY); await intoWorld(entered);
+        await play(page); await intoWorld(entered);
         const before = await control();
         await arm('deploy-blocked-restart', [{ route: 'socket', kind: 'close', code: 4005, reason: 'restart' }]);
         for (let tries = 0; tries < 40 && await matchedSince(before, 'socket') === 0; tries++) await sleep(100);
@@ -1365,7 +1368,7 @@ try {
           const reads = /** @type {number[]} */ ([]), entered = await fresh(); const { page } = entered;
           page.on('response', response => { if (new URL(response.url()).pathname === '/code-retention.json') reads.push(response.status()); });
           try {
-            await page.goto(URL_PLAY); await intoWorld(entered); await checkForUpdate(page); await sleep(3000);
+            await play(page); await intoWorld(entered); await checkForUpdate(page); await sleep(3000);
             const up = (await visibleIds(page)).filter(ids => /\btoo-old/u.test(ids));
             if (up.length > 0) return { outcome: 'ui-fail', reason: 'a legacy page (no retention file) showed too-old', notes: await onScreen(page) };
             if (!reads.includes(404)) return { outcome: 'harness-fail', reason: `the page never read the missing retention file (${reads.join(',')})` };
@@ -1377,7 +1380,7 @@ try {
         {
           const entered = await fresh(); const { page } = entered;
           try {
-            const started = Date.now(); await page.goto(URL_PLAY);
+            const started = Date.now(); await play(page);
             // a fresh device is asked its Name first (MP2.4, before the online start); the page comes after it
             const named = await page.locator('#ws-name-box input').waitFor({ state: 'visible', timeout: 60_000 }).then(() => true, () => false);
             if (named) { await page.locator('#ws-name-box input').fill(`fm${String(Date.now() % 100_000)}`); await page.locator('#ws-name-box button[type=submit]').click(); }
@@ -1406,7 +1409,7 @@ try {
         // a document load, not a same-document history step (the game's own replaceState also fires framenavigated)
         page.on('domcontentloaded', () => { navigations++; });
         try {
-          await page.goto(URL_PLAY); await intoWorld(entered);
+          await play(page); await intoWorld(entered);
           const retireAt = Date.now() + 25_000, settled = navigations;
           rig.pageView(next); rig.retain({ keptBuilds: [next], retireAt });
           const started = Date.now();
@@ -1460,7 +1463,7 @@ try {
       rig.publish(2, rig.build, 'staging');
       const entered = await fresh(); const { page } = entered;
       try {
-        await page.goto(URL_PLAY); await intoWorld(entered);
+        await play(page); await intoWorld(entered);
         const seen = await screen(page, item.screen, 10_000), shot = await shoot(page, item.id, seen === null ? 'missing' : 'notice');
         const result = await judged(seen, item, page);
         return { ...result, shot, injection: { channel: 'staging', loopback: true }, ...result.outcome === 'pass' ? { recovery: 'stays for the session' } : {} };

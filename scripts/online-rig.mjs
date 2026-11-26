@@ -12,6 +12,7 @@ import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
 import { rigOptions } from './online-rig-options.mjs';
 import { claimFixture, fixtureKey, freeFixturePorts, ownedPostgres, ownedEphemeralPostgres, confirmPostgres } from './online-rig-owned.mjs';
 import { signRetention } from './code-retention.mjs';
+import { enterZone } from './zone-entry.mjs';
 
 const ROOT = absolute(import.meta.dirname, '..');
 /** The rig's four loopback ports, from 18796 (a lane beside another rig names its own: WS_RIG_PORTS=18856; its dist is stamped
@@ -29,13 +30,20 @@ const sleep = ms => new Promise(resolve => { setTimeout(resolve, ms); });
 /** @param {string[]} args @param {string} what */
 const run = (args, what) => { const done = spawnSync(process.execPath, args, { cwd: ROOT, stdio: ['ignore', 'pipe', 'inherit'], encoding: 'utf8' }); if (done.status !== 0) throw new Error(`${what} stopped: ${String(done.status)}`); return done.stdout; };
 
-/** A Playwright page from a bare context to a seat. @param {import('playwright').Browser} browser @param {Record<string, unknown>} device @param {string} url @param {string} name */
-export async function enterPage(browser, device, url, name) {
+/** The run flags a rig's play page carries; the zone goes in the tap (CP16, J522). */
+export const PLAY_FLAGS = 'mute=1&nolock=1&skipintro=1';
+
+/** A Playwright page from a bare context to a seat. `to` is a zone to enter by its tap (`enterZone`, with `PLAY_FLAGS` unless
+ *  it names its own), or a page address that names none (the title, a sign-in link).
+ *  @param {import('playwright').Browser} browser @param {Record<string, unknown>} device
+ *  @param {string | { zone: string, base: string, flags?: string }} to @param {string} name */
+export async function enterPage(browser, device, to, name) {
   const context = await browser.newContext(device), page = await context.newPage(), errors = /** @type {string[]} */ ([]);
   page.on('pageerror', error => { errors.push(error.message.slice(0, 240)); });
   page.on('console', line => { if (line.type() === 'error') errors.push(line.text().slice(0, 240)); });
   await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
-  await page.goto(url, { waitUntil: 'load' });
+  if (typeof to === 'string') await page.goto(to, { waitUntil: 'load' });
+  else await enterZone(page, { flags: PLAY_FLAGS, ...to });
   await page.locator('#ws-name-box input').waitFor({ timeout: 150_000 });
   await page.locator('#ws-name-box input').fill(name);
   await page.locator('#ws-name-box button[type=submit]').click();

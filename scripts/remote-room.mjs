@@ -28,7 +28,7 @@ export function recorder() {
 /** One room on a shard (Driftwood unless named), headless Chromium at 402×874 on the GPU, and a way to bring a page into it.
  *  @param {{ dist: string, work: string, keyFile: string, shard?: string }} options */
 export async function openRoom({ dist, work, keyFile, shard = 'driftwood-isle' }) {
-  const rig = await openRig({ dist, work, keyFile, pgBin: 'memory:', pgData: '', shard }), url = `${rig.base}/?chunk=${shard}&mute=1&nolock=1&skipintro=1`;
+  const rig = await openRig({ dist, work, keyFile, pgBin: 'memory:', pgData: '', shard }), url = { zone: shard, base: rig.base };
   const launched = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] }).catch(async (/** @type {unknown} */ error) => { await rig.close(); throw error; });
   const { defaultBrowserType: _engine, ...phone } = devices['iPhone 16 Pro']; // 402×874
   const pages = /** @type {Entered[]} */ ([]);
