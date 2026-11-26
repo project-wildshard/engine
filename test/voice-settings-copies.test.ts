@@ -51,3 +51,17 @@ test('a page whose every copy is memory only still reads and writes for the visi
   voiceSettings.write({ mode: 'hold' });
   expect(voiceSettings.read().mode).toBe('hold');
 });
+
+test('QA 11-25 row 137: the talk key comes from the bindings the game lends, so the online copy carries no app', async () => {
+  delete page[HUB];
+  vi.resetModules();
+  const online = await import('../src/client/engine/ui/voiceSettings');
+  expect(online.voiceTalkKeys(), 'before the game loads: the default').toEqual(['KeyB']);
+  vi.resetModules();
+  const game = await import('../src/client/engine/ui/voiceSettings');
+  let talk: readonly string[] = ['KeyV'];
+  game.lendVoiceTalkKeys(() => [{ action: 'use', codes: ['KeyE'] }, { action: game.VOICE_TALK, codes: talk }]);
+  expect(online.voiceTalkKeys(), 'the online copy reads the game\'s rebind').toEqual(['KeyV']);
+  talk = [];
+  expect(online.voiceTalkKeys(), 'a cleared talk key opens nothing').toEqual([]);
+});

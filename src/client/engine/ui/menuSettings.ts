@@ -16,8 +16,11 @@ import { foldCard } from './cards';
 import { buildDebugMenu, type DebugMenu } from './DebugMenu';
 import { buildSettingsTabs, touchRows, type SettingsGroup, type SettingsTabsView } from './settingsTabs';
 import type { GraphicsControl } from './graphicsControls';
-import { voiceSettingsRows } from './voiceSettings';
+import { lendVoiceTalkKeys, voiceSettingsRows } from './voiceSettings';
 import { nameSettingRows } from './namePrompt';
+
+// The talk key the online shell's voice card reads comes from the game's own bindings (voiceSettings.ts lendVoiceTalkKeys)
+lendVoiceTalkKeys(() => app.input.bindings.entries());
 
 export interface SettingsCtx { weapons: ReadonlySet<string>; melee: boolean; tracers: boolean; huntersEye: boolean; chunk: LevelSpec }
 /** a gated row's test: what you hold (no row reads the shard, so the title can ask it too) */

@@ -13,6 +13,7 @@ import { writeIsolationRule } from "./app-build/isolation.mjs";
 import { bakeGridSeams, writeGridSeams } from "./app-build/gridSeams.mjs";
 import { checkNoTopLevelAwait } from "./app-build/noTopLevelAwait.mjs";
 import { checkImportMaps } from "./app-build/importMap.mjs";
+import { checkOneThree } from "./app-build/oneThree.mjs";
 import { nameChunksByFinalBytes } from "./app-build/finalChunkNames.mjs";
 import { writeTitleAssets } from "./title-assets.mjs";
 import {
@@ -245,6 +246,8 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
   // J217 (LD6b): chunks name each other through each document's import map; with every document and bundle written,
   // refuse a document without its map, or a request that resolves nowhere
   checkImportMaps(outDir);
+  // QA 11-25 row 137: the page bundle and the online shell it imports hold one three.js between them
+  checkOneThree(outDir, buildId);
   // PZ12 (J274): an isolated channel's page origin sends COOP and COEP on every path; the worker reads the same rule
   if (writeIsolationRule(outDir, process.env.WS_CHANNEL)) console.log(`cross-origin isolated: ${process.env.WS_CHANNEL}`);
   // the service worker over the bundle as written (was vite/pwa-plugin.ts): sw.js and its content-named core

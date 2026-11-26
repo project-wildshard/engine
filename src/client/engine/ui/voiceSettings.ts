@@ -5,7 +5,6 @@ import type { Scope } from '../../../shared/engine/app/scope';
 import { engineString } from '../../../shared/engine/strings';
 import { listenTap } from '../input/dom';
 import { keycap } from '../input/keycap';
-import { app } from '../app/runtime';
 import type { Action } from '../input/InputService';
 
 // VOICE-POLISH V10 (meta docs/plans/VOICE-POLISH-PLAN.md): Settings ▸ Sound ▸ Voice. Which microphone voice opens, how loud the
@@ -49,11 +48,15 @@ const hub = ((): Hub => {
 // what its storage persists; a memory-only copy steps aside for the next, and stays the last resort while no other answers.
 hub.readers.add(() => { if (!saveEnvironment().persistent() && hub.readers.size > 1) throw new Error('memory-only saves'); return slot.read(); });
 hub.writers.add(now => { if (!saveEnvironment().persistent() && hub.writers.size > 1) throw new Error('memory-only saves'); slot.write(now); });
-hub.keys.add(() => {
-  // An action bound here answers, even with no key: a cleared talk key opens nothing (Codex review).
-  for (const { action, codes } of app.input.bindings.entries()) if (action === VOICE_TALK) return codes;
-  return null;
-});
+/** The game lends its key bindings (menuSettings.ts, beside the app); this module stays out of the app's graph, so the
+ *  online shell's bundle carries no second app and no second three.js (QA 11-25 row 137). An action bound there answers, even
+ *  with no key: a cleared talk key opens nothing (Codex review). */
+export function lendVoiceTalkKeys(bindings: () => Iterable<{ readonly action: Action; readonly codes: readonly string[] }>): void {
+  hub.keys.add(() => {
+    for (const { action, codes } of bindings()) if (action === VOICE_TALK) return codes;
+    return null;
+  });
+}
 
 /** This device's voice settings; a page with no storage keeps them for the visit. */
 export const voiceSettings = {
