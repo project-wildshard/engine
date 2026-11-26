@@ -208,13 +208,57 @@ const lentParams: { setParam: (id: string, name: string, value: GraphLiteral) =>
 /** Push a channel group's graph params (`graphParamRoots(...)`) into the lent looks. */
 export function pushLentParams(params: { readonly push: (looks: typeof lentParams) => void }): void { params.push(lentParams); }
 
-const uniformLends: { readonly id: string; readonly uniforms: Readonly<Record<string, IUniform>>; readonly scope: Scope }[] = [];
+interface UniformLend { readonly id: string; readonly uniforms: Readonly<Record<string, IUniform>>; readonly scope: Scope }
+const uniformLends: UniformLend[] = [];
+/** The borrowers waiting on each lent set (`whileUniformsLent`), told of every new loan. */
+const loanWatchers = new Set<{ readonly id: string; readonly lent: (lend: UniformLend) => void }>();
 /** Lend a live uniform set (one `{ value }` object per name, the same objects its programs read) as `id` until `scope` ends. */
 export function lendUniforms(scope: Scope, id: string, uniforms: Readonly<Record<string, IUniform>>): void {
   if (scope.disposed) throw new Error('Uniform loan needs a live scope');
   const lend = { id, uniforms, scope };
   uniformLends.push(lend);
   scope.onDispose(() => { const at = uniformLends.indexOf(lend); if (at !== -1) uniformLends.splice(at, 1); });
+  for (const watcher of loanWatchers) if (watcher.id === id) watcher.lent(lend);
+}
+
+/**
+ * QA 11-25 row 133: run `borrow` once per loan of the uniform set `id`, with a scope that ends when that loan ends or
+ * `scope` does, at once when one is lent now. A borrower that composes with the set (`lentUniforms`) waits for its lender
+ * this way: on the grid a data cell's post look is laid when its region is resident, and its world lends the set only
+ * when the feet enter (the plan's world scenes). A newer loan ends the last one's scope first; when a loan ends, the
+ * newest loan still open (if any) is borrowed again.
+ */
+export function whileUniformsLent(id: string, scope: Scope, borrow: (loan: Scope) => void): void {
+  if (scope.disposed || scope.disposing) return;
+  let current: { readonly lend: UniformLend; readonly loan: Scope } | null = null;
+  const open = (lend: UniformLend): void => {
+    if (scope.disposed || scope.disposing || lend.scope.disposed || lend.scope.disposing) return;
+    const last = current; current = null; last?.loan.dispose();
+    const loan = scope.child(`lent-uniforms:${id}`), held = { lend, loan };
+    current = held;
+    const forget = lend.scope.captureScope(loan);
+    loan.onDispose(() => {
+      forget();
+      if (current !== held) return;
+      current = null;
+      // the lender left first: the newest loan still open, if any, is borrowed again
+      if (lend.scope.disposed || lend.scope.disposing) queueMicrotask(() => { if (current === null) { const next = newestLend(id); if (next !== undefined) open(next); } });
+    });
+    borrow(loan);
+  };
+  const watcher = { id, lent: open };
+  loanWatchers.add(watcher);
+  scope.onDispose(() => { loanWatchers.delete(watcher); });
+  const now = newestLend(id);
+  if (now !== undefined) open(now);
+}
+/** The newest open loan of `id`. */
+function newestLend(id: string): UniformLend | undefined {
+  for (let i = uniformLends.length - 1; i >= 0; i--) {
+    const lend = uniformLends[i];
+    if (lend?.id === id && !lend.scope.disposed && !lend.scope.disposing) return lend;
+  }
+  return undefined;
 }
 /** The newest lent uniform set `id` within the caller's owner, else the newest; throws when none is lent. */
 export function lentUniforms(id: string): Readonly<Record<string, IUniform>> {
@@ -228,3 +272,13 @@ export function lentUniforms(id: string): Readonly<Record<string, IUniform>> {
   if (newest === null) throw new Error(`No lent uniforms ${id}: the world lends them before its look composes`);
   return newest;
 }
+
+/** The lent uniform set each built look composes with (a post-graph look's `live` row), by look. */
+const borrowers = new WeakMap<object, string>();
+/** Note that `look` composes with the lent uniform set `id`; returns the look. */
+export function borrowsUniforms<Look extends object>(look: Look, id: string | undefined): Look {
+  if (id !== undefined) borrowers.set(look, id);
+  return look;
+}
+/** The lent uniform set `look` composes with, if any (QA 11-25 row 133: its layer waits for the loan). */
+export function borrowedUniforms(look: object): string | undefined { return borrowers.get(look); }

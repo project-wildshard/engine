@@ -19,6 +19,7 @@ import { findShard } from '../shard/registry';
 import { toLevelSpec } from '../shard/spec';
 import { declaredLevel, withoutHorizon } from '../shardfile/declaredLook';
 import { declaredPost, declaredPostLook } from '../shardfile/declaredRender';
+import { borrowedUniforms, whileUniformsLent } from '../shardfile/lentLooks';
 import { frameLookOf, lookChainKind, regionChain, regionGrade, replacedKnobs, wholeChainKnobs, type FrameLookContribution, type FrameLookPort } from './frameLook';
 import type { RegionalRuntimePage } from './regionalRuntime';
 
@@ -47,7 +48,8 @@ export interface CellPostHost {
   readonly addSystem: (system: { readonly id: string; readonly phase: 'update'; readonly run: (dt: number, t: number) => void }, scope: Scope) => void;
 }
 
-/** Lay a data cell's declared post look on the grid frame: 'off' when it declares none or the page has no grid frame. */
+/** Lay a data cell's declared post look on the grid frame: 'off' when it declares none or the page has no grid frame; a
+ *  look that composes with a lent uniform set is laid once its world lends it (`layCellPostWhenLent`). */
 export async function hangCellDataPost(request: CellDataPostRequest): Promise<'on' | 'off'> {
   const { page, scope, root } = request, post = declaredPost(request.source), manifest = findShard(request.slug);
   if (post === null || page === null || manifest === undefined || root === undefined) return 'off';
@@ -62,8 +64,36 @@ export async function hangCellDataPost(request: CellDataPostRequest): Promise<'o
     ? regionChain(level, () => null, undefined, { ao }, wholeChainKnobs(ao))
     : regionChain(level, () => null, lookChainKind(look), { ao, godRays: level.tiers?.[TIER]?.godRays }, replacedKnobs(look, TIER)) });
   const app = page.context.app;
-  return layCellPost(look, frameLook, { instance: request.instance, root, scope },
-    { port, camera: game.camera, renderer: game.renderer, sky: page.world.sky, addSystem: (system, owner) => { app.addSystem(system, owner); } });
+  const host: CellPostHost = { port, camera: game.camera, renderer: game.renderer, sky: page.world.sky, addSystem: (system, owner) => { app.addSystem(system, owner); } };
+  return layCellPostWhenLent(look, () => declaredPostLook(post, request.folder()), (built, owner) => layCellPost(built, frameLook, { instance: request.instance, root, scope: owner }, host), scope,
+    cause => { console.warn(`[region post] ${request.instance}`, cause); });
+}
+
+/**
+ * QA 11-25 row 133: a post look that composes with a lent uniform set (Nine's `nine-shared`, `borrowedUniforms`) is laid
+ * once its world lends it. On its own page the world phase lends the set before the post composes; on the grid the cell's
+ * region (and this post) is resident before the feet enter, and its world lends the set only then (the plan's world
+ * scenes), so composing at once threw `No lent uniforms nine-shared`. The look is laid on each loan, for as long as that
+ * loan and the cell last, and built again (`make`) for a later loan. A look that borrows nothing is laid at once.
+ */
+export function layCellPostWhenLent(look: LookStrategy, make: () => Promise<LookStrategy>,
+  lay: (look: LookStrategy, owner: Scope) => Promise<'on' | 'off'>, scope: Scope, warn: (error: unknown) => void): Promise<'on' | 'off'> {
+  const id = borrowedUniforms(look);
+  if (id === undefined) return lay(look, scope);
+  if (scope.disposed) { look.dispose?.(); return Promise.resolve('off'); }
+  let spare: LookStrategy | null = look;
+  scope.onDispose(() => { spare?.dispose?.(); spare = null; });
+  whileUniformsLent(id, scope, loan => {
+    const ready = spare; spare = null;
+    void (async (): Promise<void> => {
+      try {
+        const built = ready ?? await make();
+        if (loan.disposed) { built.dispose?.(); return; }
+        await lay(built, loan);
+      } catch (cause) { if (!loan.disposed) warn(cause); }
+    })();
+  });
+  return Promise.resolve('on');
 }
 
 /**

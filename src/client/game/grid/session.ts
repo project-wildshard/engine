@@ -81,6 +81,7 @@ import { catalogueCarriage } from './frameLook';
 import { installHazeBand } from './hazeBand';
 import { LiveGridSession, type LiveGridPage, type LiveGridSessionState } from './liveSession';
 import { gridShardfileEdges, gridShardfileFarBytes, gridShardfileFolder, readGridShardfileFar, readGridShardfileNear } from './folders';
+import { bakedFarServed, farSource } from './farSource';
 import { ApproachInputsDeferredError } from './folderInputs';
 import { GridViewAdmissions } from './viewAdmissions';
 import { loadShardfileFar, loadShardfileNear } from './shardfileFar';
@@ -270,14 +271,18 @@ function neighbourTiles(scope: Scope, prepare: (tile: PreparedRingTile) => Promi
   return { instances, ports: clientRingPorts(instances, { scope, decoder, prepare, retired, ...(frame === undefined ? {} : { frame }) }) };
 }
 
+/** Whether the page's inventory lists a baked far for `slug` (the build baked one; its server may still not serve it). */
+const bakedFarListed = (slug: string): boolean => publicBytes()[`/assets/baked/${slug}/far.json`] !== undefined;
 /** The far proxy and its row, fetched from the shard's baked folder (`public/assets/baked/<slug>/far.*`). */
 async function loadFar(slug: string): Promise<{ prepared: FarPrepared; bytes: number }> {
   // Pure authored projects have no repo bake: their proxy comes from their product's sections and far files (O26: read
   // hash-verified on their own, not after admitting the whole product), instead of a nonexistent far.json
   // a slug the build baked no far for (an upload with no mesh collision) reads its product's far row whatever its world
-  const shardfile = await readGridShardfileFar(slug, publicBytes()[`/assets/baked/${slug}/far.json`] === undefined);
-  if (shardfile !== null) return loadShardfileFar(shardfile.rows, shardfile.read);
-  const response = await fetch(versionedUrl(`/assets/baked/${slug}/far.json`));
+  // QA 11-25 row 133: decided by what the page's server serves, not only by its inventory (`farSource.ts`)
+  const source = await farSource(slug, bakedFarListed(slug), { product: anyWorld => readGridShardfileFar(slug, anyWorld),
+    baked: () => fetch(versionedUrl(`/assets/baked/${slug}/far.json`)) });
+  if (source.kind === 'product') return loadShardfileFar(source.far.rows, source.far.read);
+  const { response } = source;
   if (!response.ok) throw new Error(`far.json ${slug}: ${String(response.status)}`);
   const row: unknown = await response.json();
   const look = farLook(row), bytes = farBytes(row), impostorRow = farImpostorRow(row);
@@ -1308,7 +1313,7 @@ export class GridSession {
    *  once, one cell at a time behind the ring's own work, so the worker keeps them; nothing is decoded or held. */
   private async keepFarFiles(slug: string): Promise<void> {
     if (this.host.scope.disposed) return;
-    const far = await readGridShardfileFar(slug, publicBytes()[`/assets/baked/${slug}/far.json`] === undefined);
+    const far = await readGridShardfileFar(slug, !bakedFarServed(slug, bakedFarListed(slug)));
     for (const ref of far?.rows.far?.files ?? []) { if (this.host.scope.disposed) return; await far?.read(ref); }
   }
   private keepRoadSet(): void {

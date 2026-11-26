@@ -30,7 +30,7 @@ import { PaintedWorldSchema, type PostGraphEffect, type PostGraphLookRow, type P
 import type { ScaledPostRow } from '@wildshard/format/scaledPost';
 import { uniformsFrom, type UniformMap } from '../plugin/shaderFamily';
 import { ScaledPostPass, precompileScaledPost, prepareScaledPost } from './scaledPost';
-import { hasLentLook, lendUniforms, lentUniforms, setLentParam, setLentTexture } from '../shardfile/lentLooks';
+import { borrowsUniforms, hasLentLook, lendUniforms, lentUniforms, setLentParam, setLentTexture } from '../shardfile/lentLooks';
 import { paintedAir } from './paintedLook';
 import { PaintedPanorama, PainterKeyLight, paintedGroundPainter, type PainterSkyLook } from './painterlyLook';
 import { GrassPresentation, GrassPresentationProfile } from './grassPresentation';
@@ -241,7 +241,7 @@ export async function postGraphLook(product: { readonly slug: string; readonly s
   },live);
   const look = buildPostGraphLook(product.slug, row);
   // a painterly level's painted world (fog, ground, grass, sky) beside its graphs
-  return painted === undefined ? look : { ...look, ...paintedWorld(product.slug, painted,files,tier).look };
+  return painted === undefined ? look : borrowsUniforms({ ...look, ...paintedWorld(product.slug, painted,files,tier).look }, row.live);
 }
 
 /** A level's post-graph look from its admitted row (`slug` names its LUT): an engine-chain look, or with `scene` its own. */
@@ -272,7 +272,9 @@ export function postGraphLookOf(slug: string, input: unknown): LookStrategy {
   return buildPostGraphLook(slug, parsePostGraphDocument(input));
 }
 
-function buildPostGraphLook(slug: string, row: PostGraphLookRow): LookStrategy {
+/** QA 11-25 row 133: a look whose composite reads a lent uniform set (`live`) says so, so a grid cell lays it once lent. */
+function buildPostGraphLook(slug: string, row: PostGraphLookRow): LookStrategy { return borrowsUniforms(postGraphStrategy(slug, row), row.live); }
+function postGraphStrategy(slug: string, row: PostGraphLookRow): LookStrategy {
   const lut: UniformMap = row.lut === undefined ? {} : { [row.lut.texture]: { value: neutralLut() }, [row.lut.amount]: { value: 0 } };
   if (row.lut !== undefined) {
     const { url, texture, amount } = row.lut;
