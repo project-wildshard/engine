@@ -87,4 +87,6 @@ export const CHANNELS: { staging: WorldChannelConfig; production: WorldChannelCo
 export class RefusedError extends Error { constructor(message: string) }
 export function runPhase(phase: Phase, deps: Deps): Promise<{ refusals: string[] }>;
 export function buildEnv(channel: ChannelConfig, deps: Deps): Record<string, string>;
+/** PV13: whether a channel waits on a signed release file of its own (every channel but preview). */
+export function ownGate(channel: ChannelConfig): boolean;
 export function readGate(channel: ChannelConfig, deps: Deps): Promise<{ serial?: number; problem?: string }>;

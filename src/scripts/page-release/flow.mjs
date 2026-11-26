@@ -8,7 +8,7 @@
 //            the producer's signed serial to name this build and the channel's /health to show that build and serial.
 //   go-live  the alias move, LAST: refused without a fresh signed-release and /health match.
 //
-// Preview (the solo build of green main, J274) signs preview.json in the release bucket (PZ6 D2).
+// Preview (the solo build of green main, J274) signs no release file and writes nothing to R2 (fix-preview PV13).
 // Its document has no world stamp or release URL: the offline page still runs its server in a worker.
 //
 // The flow owns order and gates; the host (hosts/workers.mjs, page-release.mjs --host) owns how a
@@ -302,18 +302,21 @@ export async function runPhase(phase, deps) {
     }
     for (const line of deps.host.describe('deployedDigests', deployed)) plan(line);
     if (!dry) await checkDeployed(deps, deployed, refuse);
-    if (channel.channel === 'preview') {
-      plan(`sign ${channel.release} after the page and its content are uploaded (no socket or server bundle)`);
-      if (!dry) deps.run('node', ['--import', './src/scripts/bake-loader.mjs', 'src/scripts/page-release/preview.mjs', `--build=${deps.build}`], {});
-    } else if (!channel.solo) {
+    // Fix-preview PV13 (Jake, 2026-11-26: "preview deploy github action should not write to R2"): preview signs no
+    // releases/preview.json and reads no gate of its own; it follows staging (QA 11-26 row 9).
+    if (!channel.solo) {
       plan(`verify the server book and parts on ${PACKS_ORIGIN} answer with CORS ${channel.origin}`);
       if (!dry) await deps.packs.verify({root: deps.root, build: deps.build, cors: channel.origin});
     }
-    plan(`wait for ${channel.release} to sign ${deps.build}${channel.solo ? ' (solo deployment gate)' : ` and ${channel.health} to match its serial`}`);
-    const gate = await waitForGate(channel, deps, refuse);
+    /** @type {{serial?: number, problem?: string}} */
+    let gate = {};
+    if (ownGate(channel)) {
+      plan(`wait for ${channel.release} to sign ${deps.build}${channel.solo ? ' (solo deployment gate)' : ` and ${channel.health} to match its serial`}`);
+      gate = await waitForGate(channel, deps, refuse);
+    } else plan(`no signed gate: ${channel.channel} writes and reads no release file of its own (PV13)`);
     if (dry) return {refusals};
     deps.state.write('check', {build: deps.build, channel: channel.channel, deployment, serial: gate.serial});
-    deps.log(`PASS ${channel.channel} check ${deployment.id}: deployed bytes equal, serial ${gate.serial} signed${channel.solo ? ', solo deployment gate' : ', packs public and healthy'}; alias not moved`);
+    deps.log(`PASS ${channel.channel} check ${deployment.id}: deployed bytes equal, ${ownGate(channel) ? `serial ${gate.serial} signed${channel.solo ? ', solo deployment gate' : ', packs public and healthy'}` : 'no gate of its own'}; alias not moved`);
     return {refusals};
   }
 
@@ -333,7 +336,7 @@ export async function runPhase(phase, deps) {
   if (!dry) await checkDeployed(deps, deployed, refuse);
   /** @type {{serial?: number, problem?: string}} */
   let gate = {};
-  {
+  if (ownGate(channel)) {
     plan(`re-read ${channel.release}${channel.solo ? '' : ` and ${channel.health}`}: must name ${deps.build} and one serial`);
     gate = await readGate(channel, deps);
     if (gate.problem !== undefined) refuse(gate.problem);
@@ -600,6 +603,10 @@ async function readSignedGate(channel, deps) {
   if (String(release.socket).replace(/\/$/u, '') !== channel.socket) return {problem: `${channel.release} socket ${release.socket} is not ${channel.socket}`};
   return {serial: release.serial};
 }
+
+/** PV13: preview signs and reads no release file of its own; every other channel waits on its signed gate.
+ * @param {ChannelConfig} channel */
+export const ownGate = channel => channel.channel !== 'preview';
 
 /** @param {ChannelConfig} channel @param {Deps} deps */
 export async function readGate(channel, deps) {

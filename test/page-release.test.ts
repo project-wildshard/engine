@@ -437,8 +437,10 @@ test('--print-env: the three channels build alike but for named keys (PAGE-SIZE 
   expect(borrowed.stdout).toContain(`WILDSHARD_CATALOGUE=${resolve('x.json')}`);
 });
 
-test('preview signs a deployment gate while its page stays solo and the alias moves last', async () => {
-  const {deps, calls, lines} = rig('preview');
+test('PV13: preview signs no release file, reads no gate of its own, stays solo and moves the alias last', async () => {
+  const {deps, calls, lines, live} = rig('preview');
+  // a stale or forged releases/preview.json no longer matters: preview never reads it
+  live.release = undefined;
   const seen: Record<string, string>[] = [];
   const run = deps.run;
   deps.run = (file, args, env) => { seen.push(env); run(file, args, env); };
@@ -446,32 +448,18 @@ test('preview signs a deployment gate while its page stays solo and the alias mo
   expect(fetched(calls)).toEqual([
     'prepare', 'run pnpm build:game', 'run node src/scripts/app-build/splitOutput.mjs dist --join', 'package', 'state build',
     'upload', 'state upload',
-    'deployedDigests', `run node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/preview.mjs --build=${build}`, 'state check',
+    'deployedDigests', 'state check',
     'deployedDigests', 'goLive', 'state go-live',
   ]);
-  // The deploy reads the signed file; no rooms or health reads.
-  expect(calls.filter(call => call.startsWith('fetch ')).every(call => call.startsWith(`fetch ${CHANNELS.preview.origin}/`) || call === `fetch ${CHANNELS.preview.release}`)).toBe(true);
+  // Fix-preview PV13 (Jake, 2026-11-26: "preview deploy github action should not write to R2"): no sign step, no read of
+  // the signed file, no rooms or health reads; only the preview origin itself.
+  expect(calls.some(call => call.includes('page-release/preview.mjs'))).toBe(false);
+  expect(calls.filter(call => call.startsWith('fetch ')).every(call => call.startsWith(`fetch ${CHANNELS.preview.origin}/`))).toBe(true);
   expect(seen[0]?.['WILDSHARD_RELEASE_URL']).toBeUndefined();
   expect(seen[0]?.['WS_CHANNEL']).toBe('preview');
   expect(seen[0]?.['WS_PREVIOUS_DEPLOY_ORIGIN']).toBe('https://preview.wildshard.io');
   expect(seen[0]?.['VITE_API_ORIGIN']).toBe('https://api.wildshard.io');
-  expect(lines.some(line => line.includes('solo deployment gate'))).toBe(true);
-});
-
-test('preview refuses a missing, forged, stale or online release before its alias moves', async () => {
-  for (const release of [undefined, {body: '{}', signature: '00'}, signed('preview', 8, 'b'.repeat(40)), signed('staging', 8)]) {
-    const {deps, live, calls} = rig('preview');
-    await through(deps, 'upload');
-    live.release = release;
-    await expect(runPhase('check', deps)).rejects.toThrow(RefusedError);
-    expect(calls).not.toContain('goLive');
-  }
-  const {deps, live, calls} = rig('preview');
-  await through(deps, 'check');
-  const body = JSON.stringify({channel: 'preview', serial: 9, engineBuild: build, saveEpoch: 1, socket: 'wss://rooms.example'});
-  live.release = {body, signature: sign(null, Buffer.from(body), privateKey).toString('hex')};
-  await expect(runPhase('go-live', deps)).rejects.toThrow(/must be solo/);
-  expect(calls).not.toContain('goLive');
+  expect(lines.some(line => line.includes('no gate of its own'))).toBe(true);
 });
 
 test('SA35: preview bakes the grid it borrowed from staging; staging and production refuse a borrowed catalogue', async () => {

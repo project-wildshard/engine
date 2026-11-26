@@ -155,17 +155,12 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          # PZ6 D2: deployment-only signature; the solo page carries no release URL.
+          # FM7: the build signs code-retention.json; the solo page carries no release URL.
           E7_RELEASE_SIGNING_KEY: ${{ secrets.E7_RELEASE_SIGNING_KEY }}
           E7_RELEASE_PUBLIC_KEY: ${{ vars.E7_RELEASE_PUBLIC_KEY }}
-          # PAGE-SIZE PZ6: preview reads its content from packs.wildshard.io. --content stamps the content set's base into the
-          # page, keeps the split (the Worker serves only dist/) and publishes dist-content/ first; a new set copies unchanged
-          # files from the last one on R2 (server side) and puts the rest through S3 with these bucket-scoped keys.
-          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-          R2_PACKS_ACCESS_KEY_ID: ${{ secrets.R2_PACKS_ACCESS_KEY_ID }}
-          R2_PACKS_SECRET_ACCESS_KEY: ${{ secrets.R2_PACKS_SECRET_ACCESS_KEY }}
-          R2_RELEASES_ACCESS_KEY_ID: ${{ secrets.R2_RELEASES_ACCESS_KEY_ID }}
-          R2_RELEASES_SECRET_ACCESS_KEY: ${{ secrets.R2_RELEASES_SECRET_ACCESS_KEY }}
+        # Fix-preview PV13 (Jake, 2026-11-26: "preview deploy github action should not write to R2"): no --content and no
+        # R2 keys. The page deploys to the preview Worker's static assets and signs no releases/preview.json; preview follows
+        # staging. test/preview-workflow.test.ts pins it.
         run: |
           grid=(); [ -f tmp/preview-grid/catalogue.json ] && grid=(--catalogue=tmp/preview-grid/catalogue.json)
-          node src/scripts/page-release.mjs preview build,upload,check,go-live --host=workers --content "${grid[@]}"
+          node src/scripts/page-release.mjs preview build,upload,check,go-live --host=workers "${grid[@]}"
