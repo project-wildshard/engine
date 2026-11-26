@@ -13,6 +13,14 @@ it into main while other lanes continue landing.
 `src/scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.96 (2026-11-26)
+
+- The game reads the newest shard format, so zones published with the latest SDK open as built.
+- Travelling between zones keeps the address bare, and the menu's back button returns to the main menu after a trip.
+- Fights in grid zones and the practice room work again, and Sky Reach's distant views load.
+- An upgraded weapon keeps its slot, and ammo finds the weapon it belongs to.
+- A slow early server no longer holds up the first picture on lower-power devices.
+
 ## v0.1.92 (2026-11-25)
 
 - Pine Hollow, Driftwood Isle, Glowfen and Nine Dragon Stack open on their newest builds, with no extra reload on the way in.
