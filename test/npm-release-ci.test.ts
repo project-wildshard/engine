@@ -14,11 +14,11 @@ const build = 'a'.repeat(40);
 const { version } = JSON.parse(readFileSync('package.json', 'utf8')) as { version: string };
 test('the release tag installs without package build lifecycle hooks', () => {
   const { scripts } = JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> };
-  // repo-kit D33 makes `prepare` a contract script (it replaced pnpm:devPreinstall). It may only point a Git checkout
-  // at .githooks; anything that builds is still refused.
-  const hooksOnly = 'git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git config core.hooksPath .githooks || true';
-  expect(['prepare', 'prepublish', 'prepack', 'publish']
-    .filter(name => scripts[name] && !(name === 'prepare' && scripts[name] === hooksOnly))).toEqual([]);
+  // repo-kit's release prepare refuses any of these in a published package (release-consumer-hooks.mjs): v0.1.73's boot
+  // stamps (8cc2477f9) and v0.1.94's hooks-only `prepare` from the lean move both held a cut. The hooks are set by
+  // pnpm:devPreinstall (5c67a873f), which runs only in this repo, so a push that brings `prepare` back fails here.
+  expect(['prepare', 'prepublish', 'prepack', 'publish'].filter(name => scripts[name])).toEqual([]);
+  expect(scripts['pnpm:devPreinstall']).toContain('git config core.hooksPath .githooks');
 });
 
 const run = 44867215030;
