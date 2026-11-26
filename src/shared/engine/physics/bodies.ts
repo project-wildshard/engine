@@ -82,6 +82,9 @@ const GRAVITY = 9.81;
 /** the per-tier cap on awake dynamic bodies (PHYSICS.md §Budgets) */
 export const BODY_CAP = { phone: 40, desktop: 150 } as const;
 
+/** The most player poses one native body-slot pool takes a step: a shard's 32-player cap. A caller over it passes a subset. */
+export const BODY_SLOT_CONTACT_PLAYERS = 32;
+
 export class Body {
   /** the pose at the previous and at the latest fixed step (render interpolates between them) */
   readonly prev = { x: 0, y: 0, z: 0 };
@@ -547,10 +550,10 @@ export class RowBodySlots<T extends { readonly entityId: string } = never> {
     });
     const changed = this.changed; this.changed = false; return drew || changed;
   }
-  /** Advance native slots once against the actual host player poses. */
+  /** Advance native slots once against the actual host player poses (at most BODY_SLOT_CONTACT_PLAYERS). */
   updateTargets(dt: number, alpha: number, players: readonly Readonly<Vec3>[]): boolean {
     // The defining shard host admits at most 32 players. Validate before any slot advances.
-    if (players.length > 32) throw new Error('Invalid native body-slot player poses');
+    if (players.length > BODY_SLOT_CONTACT_PLAYERS) throw new Error('Invalid native body-slot player poses');
     for (const player of players) {
       if (![player?.x, player?.y, player?.z].every(Number.isFinite)) throw new Error('Invalid native body-slot player poses');
     }

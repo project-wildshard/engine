@@ -5,7 +5,7 @@ import {Vector3,Euler,Quaternion} from 'three';
 import type {AnimalSim} from '@wildshard/engine/entities/AnimalSim';
 import type {SimHost} from '@wildshard/engine/sim';
 import type {Rng} from '@wildshard/format/seededRng';
-import {Bodies,RowBodySlots} from '@wildshard/engine/physics/bodies';
+import {Bodies,BODY_SLOT_CONTACT_PLAYERS,RowBodySlots} from '@wildshard/engine/physics/bodies';
 import {publishScriptBody} from '@wildshard/engine/sim/shardRows';
 import {volleyRow} from '../../../shared/game/shardfile/wirePrompts';
 
@@ -47,7 +47,12 @@ export function installPerchBodyPools(host:SimHost,input:readonly CreaturePerchB
   const Saved=strictObject({version:literal(1),contract:literal(contract),pools:tuple(savedPool)});
   host.onStep(PERCH_POOLS_STEP,dt=>{
     service.post(dt);poses.length=0;
-    for(const player of host.players.values())if(player.health.alive&&!host.parked.has(player.id))poses.push(player.position);
+    // QA 11-24 row 24: staging at 40 seats put 33 players in one cell, and the pool's 32-pose cap threw and took the
+    // world down (server.crashed 2026-11-26 01:20 UTC). Past the cap, the first 32 live players are this step's targets.
+    for(const player of host.players.values()){
+      if(poses.length>=BODY_SLOT_CONTACT_PLAYERS)break;
+      if(player.health.alive&&!host.parked.has(player.id))poses.push(player.position);
+    }
     for(const [index,pool] of pools.entries()){
       pool.updateTargets(dt,1,poses);
       const row=catalogue[index],strike=row===undefined?undefined:strikes.get(row.projectile.strike);

@@ -131,6 +131,18 @@ test('one catalogue shares its bounded round-robin slots; another owns its own a
   }
 })
 
+test('a cell over the 32-player cap steps its perch pools instead of crashing the world (QA 11-24 row 24)', async () => {
+  const f = await fixture()
+  try {
+    for (let n = 0; n < 40; n++) f.host.addPlayer(`fixture.crowd.${String(n)}`, { x: 8 + n * 0.1, y: 0, z: 7 })
+    expect(f.host.players.size).toBeGreaterThan(32)
+    f.pools.throw('fixture.perch', new Vector3(0, 4, 7), new Vector3(10, 4, 7), f.actor, f.rng)
+    expect(() => { for (let tick = 0; tick < 30; tick++) f.host.step() }).not.toThrow()
+  } finally {
+    f.host.dispose()
+  }
+})
+
 test('native restore reattaches the original handles without spawn, entropy or publication and replays exactly', async () => {
   const f = await fixture()
   let again: ReturnType<typeof createSimHost> | undefined
