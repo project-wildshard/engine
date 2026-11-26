@@ -3,6 +3,9 @@ import type { EffectPass } from 'postprocessing';
 import type { N8AOPostPass } from 'n8ao';
 import { patchShader, PATCH_ORDER } from './shaderPatches';
 
+/** The colour pass's last write: the presented world frame is opaque (QA 11-25 row 141). */
+export const OPAQUE_FRAME = 'gl_FragColor.a=1.0;';
+
 /** Dependency shader contracts, kept in one place for real-material tests. */
 export function displayColourFragment(source: string, stage: 'surface' | 'post' | 'ao'): string {
   if (stage === 'surface') {
@@ -17,8 +20,12 @@ export function displayColourFragment(source: string, stage: 'surface' | 'post' 
   }
   const input = 'vec4 color0=texture2D(inputBuffer,UV);', output = 'gl_FragColor=color0;';
   if (!source.includes(input) || !source.includes(output)) throw new Error('Display colour post contract changed');
+  // QA 11-25 row 141: the colour pass presents the world frame opaque. Nine's ink graph carried its scene's alpha (near 0
+  // over most of its lit world) to the canvas; the premultiplied canvas still showed the colour, plus the page's near-black
+  // background, so the world watch read it transparent and opened RELOAD. Alpha 1 restores the intended frame: no colour
+  // moves, only the background that bled through goes.
   return source.replace(input, `${input}vec4 displayColourSource=color0;`)
-    .replace(output, `${output}if(displayColourSource.a<0.0)gl_FragColor=vec4(displayColourSource.rgb,1.0);`);
+    .replace(output, `${output}if(displayColourSource.a<0.0)gl_FragColor=vec4(displayColourSource.rgb,1.0);${OPAQUE_FRAME}`);
 }
 
 /** Mark an opaque native material without allocating a mask, target or pass. */

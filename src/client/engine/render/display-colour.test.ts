@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { EffectPass, HueSaturationEffect } from 'postprocessing';
 import { N8AOPostPass } from 'n8ao';
 import { MeshBasicMaterial, PerspectiveCamera, Scene, ShaderLib, ShaderMaterial } from 'three';
-import { displayColourFragment, markDisplayColour, protectDisplayColour, protectDisplayColourAo } from './displayColour';
+import { displayColourFragment, markDisplayColour, OPAQUE_FRAME, protectDisplayColour, protectDisplayColourAo } from './displayColour';
 
 test('the real merged post shader restores source colour after grading without another texture sample', () => {
   const pass = new EffectPass(new PerspectiveCamera(), new HueSaturationEffect({ saturation: 0.9 }));
@@ -37,4 +37,21 @@ test('AO keeps marked source pixels and reattaches the patch after real quality 
   ao.configuration.halfRes = !ao.configuration.halfRes;
   expect(current()).not.toBe(first); expect(current().customProgramCacheKey()).toContain('display-colour-ao');
   ao.dispose();
+});
+
+// QA 11-25 row 141: Nine's ink graph carried its scene's alpha (near 0 over its lit world) to the canvas, so the world watch
+// read the frame transparent and opened RELOAD. The colour pass's last write to the fragment sets alpha 1, so no world frame
+// it presents has alpha under 1: a later write to gl_FragColor (or none) fails here.
+test('the colour pass presents an opaque world frame, whatever alpha its input carries', () => {
+  const pass = new EffectPass(new PerspectiveCamera(), new HueSaturationEffect({ saturation: 0.9 }));
+  pass.recompile(); protectDisplayColour(pass);
+  const material = pass.fullscreenMaterial;
+  if (!(material instanceof ShaderMaterial)) throw new Error('Missing effect material');
+  const patched = displayColourFragment(material.fragmentShader, 'post'), main = patched.slice(patched.indexOf('void main()'));
+  const opaque = main.lastIndexOf(OPAQUE_FRAME);
+  expect(opaque).toBeGreaterThan(main.indexOf('gl_FragColor=color0;'));
+  expect(opaque).toBeGreaterThan(main.indexOf('if(displayColourSource.a<0.0)'));
+  // nothing after it writes the fragment's alpha or the whole fragment
+  expect(/gl_FragColor(?:\.a|\.[rgb]*a[rgb]*)?\s*=(?!=)/u.test(main.slice(opaque + OPAQUE_FRAME.length).replaceAll(/gl_FragColor\s*=\s*(?:linearToOutputTexel|sRGBTransferOETF)\(\s*gl_FragColor\s*\)/gu, ''))).toBe(false);
+  pass.dispose();
 });
