@@ -50,7 +50,7 @@ case "${1:-}" in
       read -r pid exp out cwd name < "$f"
       if [ "${SERVE_SHARED_STOP:-}" != 1 ] && { [ "$tgt" = "$(basename "$f")" ] || [ "$tgt" = all-mine ]; }; then
         all_mine=0; [ "$tgt" = all-mine ] && all_mine=1
-        SERVE_STOP_OBSERVED_PID="$pid" SERVE_STOP_OBSERVED_OUT="$out" python3 "$REPO/scripts/serve-shared-preview.py" release "$REG" "$(basename "$f")" "$CALLER" "$all_mine" bash "$0" stop "$(basename "$f")"
+        SERVE_STOP_OBSERVED_PID="$pid" SERVE_STOP_OBSERVED_OUT="$out" python3 "$REPO/src/scripts/serve-shared-preview.py" release "$REG" "$(basename "$f")" "$CALLER" "$all_mine" bash "$0" stop "$(basename "$f")"
         shared_result=$?
         [ "$shared_result" = 0 ] && continue
         exit "$shared_result"
@@ -101,10 +101,10 @@ EPHEMERAL=0
 if [ $HEAD_ONLY -eq 1 ]; then
   REV="${SERVE_PINNED_SHA:-${SERVE_SHARED_SHA:-$(git -C "$REPO" rev-parse --verify "$REV^{commit}")}}" || exit 1
   if [ -z "${SERVE_IN_MIRROR:-}" ]; then
-    node "$REPO/scripts/build-mirror.mjs" authorize "$REV" >/dev/null || exit 2
+    node "$REPO/src/scripts/build-mirror.mjs" authorize "$REV" >/dev/null || exit 2
   fi
   if [ -z "${SERVE_SHARED_SHA:-}" ] && [ "$EPHEMERAL" -eq 0 ]; then
-    exec python3 "$REPO/scripts/serve-shared-preview.py" run "$REG" "$REV" "$MODE" "$CALLER" bash "$0" "${ARGS[@]}"
+    exec python3 "$REPO/src/scripts/serve-shared-preview.py" run "$REG" "$REV" "$MODE" "$CALLER" bash "$0" "${ARGS[@]}"
   fi
   # G620: the first pinned build contains every product, so every later lane's
   # --shard subset shares it. Working-tree builds retain their explicit filter.
@@ -163,12 +163,12 @@ elif [ "$EPHEMERAL" -eq 1 ]; then
 else
   PORT_CHANNEL="$(mktemp -d "$REG/.port-lease-XXXXXX")" || exit 1
   mkfifo "$PORT_CHANNEL/commands" "$PORT_CHANNEL/replies" || exit 1
-  python3 "$REPO/scripts/serve-port-lease.py" hold "$REG" "$PORT_CHANNEL" "$$" &
+  python3 "$REPO/src/scripts/serve-port-lease.py" hold "$REG" "$PORT_CHANNEL" "$$" &
   PORT_LEASE_OWNER=$!
 fi
 close_port_lease() {
   if [ -n "${PORT_LEASE_OWNER:-}" ]; then
-    python3 "$REPO/scripts/serve-port-lease.py" request "$PORT_CHANNEL" close >/dev/null 2>&1 || kill "$PORT_LEASE_OWNER" 2>/dev/null
+    python3 "$REPO/src/scripts/serve-port-lease.py" request "$PORT_CHANNEL" close >/dev/null 2>&1 || kill "$PORT_LEASE_OWNER" 2>/dev/null
     wait "$PORT_LEASE_OWNER" 2>/dev/null || true
     PORT_LEASE_OWNER=""
   fi
@@ -185,7 +185,7 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 port_lease() {
   local reply
-  reply="$(python3 "$REPO/scripts/serve-port-lease.py" request "$PORT_CHANNEL" take "$1")" || return 2
+  reply="$(python3 "$REPO/src/scripts/serve-port-lease.py" request "$PORT_CHANNEL" take "$1")" || return 2
   case "$reply" in ok) return 0;; busy) return 1;; *) return 2;; esac
 }
 reserve_port() { # caller holds the registry lock; the OS lease stays held after unlock
@@ -271,7 +271,7 @@ fi
 if [ $HEAD_ONLY -eq 1 ] && [ -z "${SERVE_IN_MIRROR:-}" ]; then
   SERVE_IN_MIRROR=1 SERVE_PINNED_SHA="$REV" SERVE_RESERVED_PORT="$PORT" SERVE_RESERVED_STAMP="$stamp" \
     SERVE_RESERVED_CHANNEL="$PORT_CHANNEL" SERVE_RESERVED_KEY="$RESERVATION_KEY" SERVE_RESERVATION_PID="$$" \
-    node "$REPO/scripts/build-mirror.mjs" run "$REV" -- bash "$REPO/scripts/serve-build.sh" "${ARGS[@]}"
+    node "$REPO/src/scripts/build-mirror.mjs" run "$REV" -- bash "$REPO/src/scripts/serve-build.sh" "${ARGS[@]}"
   exit $?
 fi
 
@@ -301,7 +301,7 @@ GEN_ARGS="--proof"; SHARDFILE_ARGS="--reuse"
 # includes products itself. Keep full previews from compiling them twice.
 [ $FULL -eq 1 ] && { GEN_ARGS="--inputs-only"; SHARDFILE_ARGS=""; }
 [ -n "$SHARDS" ] && SHARDFILE_ARGS="$SHARDFILE_ARGS --shard=$SHARDS"
-( cd "$SRC" && python3 "$REPO/scripts/heavy-lane.py" build -- bash -c \
+( cd "$SRC" && python3 "$REPO/src/scripts/heavy-lane.py" build -- bash -c \
   'step() { local s=$SECONDS; "$@" || return; echo "serve-build step $1 $2: $((SECONDS - s))s"; }
    app="pnpm exec vite build"; [ -f src/scripts/build-app.mjs ] && app="node src/scripts/build-app.mjs"   # a --rev tree may predate it
    if [ -f scripts/build-shardfiles.mjs ]; then
@@ -338,7 +338,7 @@ link_tree "$SRC/public" "$OUT"
 
 # The host's plain preview server (D24: was `vite preview` with vite/preview.ts) serves any tree's already-built bytes
 # with that tree's _headers, so older pinned trees need nothing of their own.
-PREVIEW_SERVER="$REPO/scripts/preview-server.mjs"
+PREVIEW_SERVER="$REPO/src/scripts/preview-server.mjs"
 cd "$SRC" || exit 1
 # A tool runner retires its process group when the calling command exits. nohup ignores HUP, but stays in that
 # group: the preview died and the lane reaper correctly deleted its registered export. Give it its own session.

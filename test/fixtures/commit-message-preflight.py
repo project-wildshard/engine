@@ -25,7 +25,7 @@ with tempfile.TemporaryDirectory(dir=source / 'tmp', prefix='commit-message-') a
     (root / 'peer.txt').write_text('base\n')
     git('add', '--', 'own.txt', 'peer.txt')
     git('commit', '-qm', 'base')
-    (root / 'scripts').mkdir()
+    (root / 'src/scripts/.kit').mkdir(parents=True)
     shutil.copy2(wrapper, root / 'src/scripts/.kit/commit.sh')
     (root / '.githooks').mkdir()
     shutil.copy2(source / '.githooks/check-commit-message.mjs', root / '.githooks/check-commit-message.mjs')
@@ -70,7 +70,8 @@ sys.exit(23 if os.environ.get('FIXTURE_RED') else 0)
     assert passed.returncode == 0 and git('show', 'HEAD:own.txt') == 'change', passed
     assert git('show', 'HEAD:peer.txt') == 'base' and git('show', ':peer.txt') == 'peer stage'
     (root / 'own.txt').write_text('human\n')
-    human, _ = run('test(cf1): human commit', {'SKIP_ATTRIB': '1'})
+    # A human commit names its hatch too (J381, meta QA 11-25 row 51).
+    human, _ = run('test(cf1): human commit\n\nSKIP_ATTRIB=1: Jake commits by hand with no agent trailer', {'SKIP_ATTRIB': '1'})
     assert human.returncode == 0 and git('show', 'HEAD:own.txt') == 'human', human
     print(json.dumps({'mode': 'after', 'invalidMessageMs': elapsed, 'checksExecuted': False,
                       'indexPreserved': True, 'validHookRedRefuses': True, 'humanUnchanged': True}))

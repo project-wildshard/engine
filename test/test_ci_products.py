@@ -11,7 +11,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-spec = importlib.util.spec_from_file_location('ci_products', Path(__file__).resolve().parents[1] / 'scripts' / 'ci-folders.py')
+spec = importlib.util.spec_from_file_location('ci_products', Path(__file__).resolve().parents[1] / 'src' / 'scripts' / 'ci-folders.py')
 products = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(products)
 
@@ -44,7 +44,7 @@ class PreparedFolders(unittest.TestCase):
         cls.asset = (cls.shard / 'assets' / 'hash').as_posix()
         cls.policy = (cls.shard / '.wildshard' / 'build-policy.json').as_posix()
         (cls.root / '.gitignore').write_text(f'{source}/*.generated.ts\npublic/generated.bin\nout/\nnode_modules/\nlint/*.generated.json\n')
-        (cls.root / 'scripts').mkdir()
+        (cls.root / 'src/scripts').mkdir(parents=True)
         cls.catalogue = {'producers': {'fixture': [cls.asset, 'public/generated.bin', cls.table]}}
         (cls.root / 'src/scripts/source-generation-outputs.json').write_text(json.dumps(cls.catalogue))
         subprocess.run(['git', '-C', str(cls.root), 'add', '.gitignore'], check=True)
@@ -416,7 +416,7 @@ class PreparedFolders(unittest.TestCase):
     def run_prepared_checks(self, read_product=False):
         repo = Path(__file__).resolve().parents[1]
         for name in ['ci-checks.mjs', 'ci-folders.py']:
-            (self.root / 'scripts' / name).write_bytes((repo / 'scripts' / name).read_bytes())
+            (self.root / 'src/scripts' / name).write_bytes((repo / 'src/scripts' / name).read_bytes())
         (self.root / 'package.json').write_text(json.dumps({'type': 'module', 'scripts': {
             'test:checks': 'pnpm gen && node check.mjs'}}))
         (self.root / 'check.mjs').write_text("""

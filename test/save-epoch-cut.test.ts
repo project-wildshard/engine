@@ -89,7 +89,7 @@ function files(dir: string, extensions: readonly string[]): string[] {
   });
 }
 test('page code, the page shell and the proof scripts name only the current epoch', () => {
-  const stale = [...files('src', ['.ts', '.js', '.mjs']), ...files('scripts', ['.ts', '.js', '.mjs']), 'index.html']
+  const stale = [...files('src', ['.ts', '.js', '.mjs']), 'index.html']
     .filter(path => path !== join('src', 'client', 'game', 'identity.ts'))
     .flatMap(path => [...readFileSync(path, 'utf8').matchAll(/save\.v2@(\d+)\.|wildshard-saves@(\d+)/gu)]
       // force-update-proof.mjs plants a database from far in the future on purpose.

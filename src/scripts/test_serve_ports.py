@@ -93,15 +93,15 @@ class PreviewTests(unittest.TestCase):
         self.port_locks = []
         self.addCleanup(self.release_ports)
         self.addCleanup(self.stop_previews)
-        (self.root / 'scripts').mkdir()
+        (self.root / 'src/scripts').mkdir(parents=True)
         (self.root / 'public').mkdir()
         source = Path(os.environ.get('X15_TEST_SCRIPT', ROOT / 'src/scripts/serve-build.sh'))
         shutil.copyfile(source, self.root / 'src/scripts/serve-build.sh')
         shutil.copyfile(HELPER, self.root / 'src/scripts/serve-port-lease.py')
         shutil.copyfile(os.environ.get('X15_TEST_SHARED', ROOT / 'src/scripts/serve-shared-preview.py'), self.root / 'src/scripts/serve-shared-preview.py')
         for name in ('preview-server.mjs', 'preview-encoded-cache.mjs', 'preview-telemetry.mjs', 'app-build/isolation.mjs'):
-            (self.root / 'scripts' / name).parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(ROOT / 'scripts' / name, self.root / 'scripts' / name)
+            (self.root / 'src/scripts' / name).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(ROOT / 'src/scripts' / name, self.root / 'src/scripts' / name)
         subprocess.run(['git', 'init', '-q', str(self.root)], check=True)
         (self.root / 'source').write_text('pinned fixture')
         subprocess.run(['git', '-C', str(self.root), 'add', 'source'], check=True)
@@ -548,7 +548,7 @@ class SharedReleaseTests(unittest.TestCase):
         self.assertTrue(output.exists())
 
     def test_official_reader_release_keeps_its_parent_preview(self):
-        command = "import {compiledPreviewEnvironment} from './scripts/loading-benchmark/sim-shard.mjs'; process.stdout.write(compiledPreviewEnvironment({SERVE_OWNER:'lane-a'},123).SERVE_OWNER);"
+        command = "import {compiledPreviewEnvironment} from './src/scripts/loading-benchmark/sim-shard.mjs'; process.stdout.write(compiledPreviewEnvironment({SERVE_OWNER:'lane-a'},123).SERVE_OWNER);"
         borrower = subprocess.check_output(['node', '--input-type=module', '-e', command], cwd=ROOT, text=True)
         self.assertNotEqual(borrower, 'lane-a')
         self.shared()

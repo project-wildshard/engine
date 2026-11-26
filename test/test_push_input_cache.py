@@ -9,7 +9,7 @@ import time
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-TOOL_ROOT = Path(os.environ.get("WS_PUSH_TOOL_ROOT", ROOT / "scripts"))
+TOOL_ROOT = Path(os.environ.get("WS_PUSH_TOOL_ROOT", ROOT / "src" / "scripts"))
 CACHE = runpy.run_path(str(TOOL_ROOT / "push_input_cache.py"))
 
 
@@ -62,7 +62,7 @@ class PushInputCache(unittest.TestCase):
         digest = hashlib.sha256(output).hexdigest()
         saved = {'schema': 'generation-phase/1', 'root': str(generated), 'identity': '0' * 64,
                  'inputs': {'src/base.ts': hashlib.sha256(source.encode()).hexdigest()},
-                 'trees': {'src': ['src/base.ts']}, 'outputs': {'src/value.generated.json': digest}}
+                 'trees': {'src': ['src/base.ts', 'src/scripts/push-inputs.mjs']}, 'outputs': {'src/value.generated.json': digest}}
         body_name = 'public/assets/nalati/baked/bodies.bin'
         body = b'original raw species source'
         body_digest = hashlib.sha256(body).hexdigest()

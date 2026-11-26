@@ -10,7 +10,7 @@ import { expect, test } from 'vitest';
  * stops with it. Nothing here reads a body after its reader, so a reader is cancelled or read to its end and then dropped.
  */
 test('no stream reader releases its lock', () => {
-  const rows = execFileSync('git', ['grep', '-n', String.raw`\.releaseLock()`, '--', 'src', ':!src/server/host/dist', ':!*.test.ts'], { encoding: 'utf8' }).split('\n').filter(row => row !== '');
+  const rows = execFileSync('git', ['grep', '-n', String.raw`\.releaseLock()`, '--', 'src', ':!src/server/host/dist', ':!src/scripts', ':!src/test', ':!*.test.ts'], { encoding: 'utf8' }).split('\n').filter(row => row !== '');
   // FreeCam's is its own pointer lock; gridAssetBytes hands a custom stream's BYOB reader back so the default reader can take it.
   expect(rows.filter(row => !row.startsWith('src/client/engine/explore/FreeCam.ts:') && !row.includes('else candidate.releaseLock()'))).toEqual([]);
 });
