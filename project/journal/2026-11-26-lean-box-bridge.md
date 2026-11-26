@@ -2,7 +2,7 @@
 
 > Written by: Claude (opus-rel86)
 
-> State: landed 2026-11-26; remove the bridge once the box's harden stamp names a lean commit.
+> State: done 2026-11-26. The box hardened from v0.1.96's lean tag (stamp 48084eb2) and the bridge is removed.
 
 v0.1.95's staging cook move rolled back at 09:08 UTC (meta QA 11-25 row 88). The box's
 root-owned copies predate the lean move:
@@ -30,3 +30,9 @@ The fix:
 The cost: while `scripts/vps/harden.sh` is tracked, the kit's script-paths moved check no longer
 treats this repo as lean for `scripts/`. repo-kit's guard should exempt the named bridge; once
 the box stamp is lean the bridge goes and the check is whole again.
+
+v0.1.96's staging cook move ran the bridge: release-cook applied harden from
+`server-staging-48084eb2…` (VH5 no longer holds it), the cook came up on the lean tag
+with its unit as rebuild.sh writes, and `/var/lib/wildshard-harden-applied` names
+48084eb2. Staging and production share the box, so `scripts/vps/harden.sh` is
+deleted and the test now holds `scripts/` empty; the path and apply guards stay.
