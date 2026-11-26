@@ -33,7 +33,7 @@ export function installCrashFlag(game: Game, params: URLSearchParams): void {
     // J501's two in-play exits: the flag leaves the address first, so the page they lead to never forces them again
     case 'revision': case 'seat': game.levelScope.timeout(AFTER_S * 1000, () => {
       const url = new URL(location.href); url.searchParams.delete('crash'); history.replaceState(history.state, '', url);
-      const zone = params.get('chunk') ?? game.level.id; // CP4 (J522): the running zone, named by no address
+      const zone = game.level.id; // CP4, CP22 (J522): the running zone, named by no address
       if (mode === 'revision') reloadPlay({ code: 'REV-RELOAD', zone, revision: 'forced0rev000', retry: true, why: `Forced (?crash=revision): the world runs a newer version of ${zone || 'this zone'} than this page had, so the page reloaded to switch to it, and didn't make it back in.` });
       else endPlay({ code: 'SEAT-NOPAGE', zone, room: 'forced-cell', why: 'Forced (?crash=seat): the world server seated you in forced-cell, a place this build can\'t open, so the game went back to the title.' }, new URL(location.pathname, location.origin));
     }); break;

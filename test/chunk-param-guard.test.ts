@@ -17,6 +17,12 @@ describe('chunk-param guard', () => {
     expect(chunkParamCount("if (output.type === 'chunk') emit(output)")).toBe(0);
     expect(chunkParamCount('node bench.mjs --chunk=4')).toBe(0);
     expect(chunkParamCount('const chunkSize = 4; chunks.push(chunk)')).toBe(0);
+    // CP22: a variable named chunk compared or taken as an arrow's argument is not the param
+    expect(chunkParamCount("if(chunk===undefined)throw e; rows.map(chunk=>chunk.bytes)")).toBe(0);
+  });
+
+  it('skips a line marked as an old-link proof, and only that line', () => {
+    expect(chunkParamCount("expect(at('/?chunk=x')).toBe('/'); // chunk-param-guard: old link\nlocation.href = '/?chunk=y'")).toBe(1);
   });
 
   it('reads only its scope, never project/ or the calibration reports', () => {
@@ -24,6 +30,7 @@ describe('chunk-param guard', () => {
       'src/a.ts': "params.get('chunk')", 'scripts/b.mjs': '?chunk=x&chunk=y', 'docs/c.md': 'open /?chunk=pine-hollow',
       'project/journal/d.md': '/?chunk=old', 'budgets/calibration-reports/e.json': '"/?chunk=old"', 'lint/f.json': '"?chunk="',
       'src/g.png': '?chunk=binary', 'index.html': "homeParams.has('chunk')",
+      'test/parity/baselines/m5/h.json': '"/?chunk=old"', 'test/fixtures/phone-loading-a6701db71.json': '"/?chunk=old"',
     };
     expect(chunkParamOffenders({ paths: Object.keys(files), read: path => files[path] ?? '' }))
       .toEqual({ 'docs/c.md': 1, 'index.html': 1, 'scripts/b.mjs': 2, 'src/a.ts': 1 });

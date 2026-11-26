@@ -8,7 +8,8 @@
 // project/ (journals) and budgets/calibration-reports/ (recorded runs) are history and stay unread.
 // The baseline (src/scripts/chunk-param-guard.baseline.json) holds today's files and their counts while M3 and CP22 remove
 // them. It may only shrink: a new file, or a listed file with more than its count, fails; a smaller count passes and asks
-// for `--prune`, which writes the lower counts. CP22 takes it to zero.
+// for `--prune`, which writes the lower counts. CP22 took it to zero: what is left is a test or a refusal proving an old
+// link is ignored, each line marked `chunk-param-guard: old link`.
 // It also prints the one-shard page's mode branches left in entry.ts, oneWayIn.ts and pageEntry.ts (the plan's Q2).
 import {execFileSync} from 'node:child_process';
 import {existsSync,readFileSync,writeFileSync} from 'node:fs';
@@ -19,19 +20,25 @@ import {join} from 'node:path';
 const ROOT=execFileSync('git',['rev-parse','--show-toplevel'],{cwd:import.meta.dirname,encoding:'utf8'}).trim();
 const BASELINE_FILE=join(import.meta.dirname,'chunk-param-guard.baseline.json');
 const SCOPE=['src','index.html','public','scripts','test','.agents','docs'];
-const SKIP=['project/','budgets/calibration-reports/'];
-const SELF=new Set(['scripts/chunk-param-guard.mjs','scripts/chunk-param-guard.d.mts','scripts/chunk-param-guard.baseline.json','test/chunk-param-guard.test.ts','src/test/chunk-param-guard.test.ts']);
+// test/parity/baselines/ and the phone-loading fixture are recorded runs, history like the calibration reports.
+const SKIP=['project/','budgets/calibration-reports/','test/parity/baselines/','test/fixtures/phone-loading-a6701db71.json'];
+const SELF=new Set(['scripts/chunk-param-guard.mjs','scripts/chunk-param-guard.d.mts','scripts/chunk-param-guard.baseline.json','test/chunk-param-guard.test.ts','src/test/chunk-param-guard.test.ts',
+  // CP22's proof that an old link is ignored carries one on purpose
+  'src/e2e/t1/old-link.ts']);
 /** A path's baseline key: `src/scripts/x` is `scripts/x` (the lean layout's move). @param {string} path */
 export function guardKey(path){return path.replace(/^src\/scripts\//u,'scripts/');}
 const TEXT=/\.(?:[cm]?[jt]sx?|mts|json|html|md|sh|py|ya?ml|txt|css)$/u;
-const PAIR=/[?&'"`(]chunk=/gu;
+const PAIR=/[?&'"`(]chunk=(?![=>])/gu; // never `(chunk===` or `(chunk=>`, a variable named chunk
 const CALL=/\.(?:get|set|has|delete|append)\(\s*['"`]chunk['"`]/gu;
 const ONE_SHARD=['src/client/app/entry.ts','src/client/game/grid/oneWayIn.ts','src/client/game/grid/pageEntry.ts'];
 const MODE_BRANCH=/[!=]==\s*'(?:grid|shard|shardfile)'/gu;
 
-/** How many URL-shaped `chunk` reads and writes a text carries. @param {string} text */
+/** CP22: a line that proves an old link is ignored or refused carries the param on purpose, and says so with this mark. */
+export const OLD_LINK='chunk-param-guard: old link';
+
+/** How many URL-shaped `chunk` reads and writes a text carries (a marked line is not counted). @param {string} text */
 export function chunkParamCount(text){
-  return (text.match(PAIR)?.length??0)+(text.match(CALL)?.length??0);
+  return text.split('\n').filter(line=>!line.includes(OLD_LINK)).reduce((sum,line)=>sum+(line.match(PAIR)?.length??0)+(line.match(CALL)?.length??0),0);
 }
 
 /** Every file in scope that carries one, with its count. @param {{ paths: string[], read: (path: string) => string }} input */

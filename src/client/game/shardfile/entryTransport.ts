@@ -53,9 +53,9 @@ export function startEntryDownload(slug: string, flow: 'client' | 'grid' = 'clie
   } catch { /* Read-ahead never blocks a player navigation. */ }
 }
 
-/** CHUNK-PARAM CP2 (J522): the zone this document enters, from the tap it took; an address's `?chunk=` until CP22. */
+/** CHUNK-PARAM CP2, CP22 (J522): the zone this document enters, from the tap it took; no address names one. */
 function entryZone(): string | null {
-  return pendingTitleArrival()?.slug ?? new URL(location.href).searchParams.get('chunk');
+  return pendingTitleArrival()?.slug ?? null;
 }
 
 /** Read-only presentation facts, never entry authority. The fresh document

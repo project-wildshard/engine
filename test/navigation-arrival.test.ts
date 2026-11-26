@@ -83,51 +83,42 @@ test('a different destination refuses and consumes both entry copies', () => {
 
 
 test.each([
-  ['', true],
-  ['v=build', true],
-  ['tier=phone&touch=1&mute=1&nolock=1&sw=0', true],
-  ['tier=phone&touch=1&mute=1&nolock=1&sw=0&v=build', true],
-  // TEMPLATE-E2E TR-4: T1's seat (`mute=1&nolock=1&sw=0&fps=30`) is the title: a frame cap selects no level, so its first Play is a tap
-  // like the one after Exit to Title (which drops the flags), and both enter the same world and save.
-  ['mute=1&nolock=1&sw=0&fps=30', true],
-  ['chunk=driftwood-isle&tier=phone&mute=1', false],
-  ['chunk=brasscap-mesa&touch=1&sw=0', false],
-  ['explore=hub&mute=1', false],
-])('environment flags on %s preserve the selected title route %s', (query, titleOnly) => {
-  expect(bootRoute(new URLSearchParams(query), { line: '', level: '' })).toEqual({ rescue: false, titleOnly });
+  [null, true],
+  ['driftwood-isle', false],
+  ['brasscap-mesa', false],
+])('CP22 (J522): a load handed zone %s boots a world only with that zone (titleOnly %s); no address picks a level', (zone, titleOnly) => {
+  expect(bootRoute(zone, { line: '', level: '' })).toEqual({ rescue: false, titleOnly });
 });
 
 test('interrupted explicit level entry still returns to the title', () => {
-  expect(bootRoute(new URLSearchParams('chunk=driftwood-isle&tier=phone'), { line: 'interrupted', level: 'driftwood-isle' }))
-    .toEqual({ rescue: true, titleOnly: true });
+  expect(bootRoute('driftwood-isle', { line: 'interrupted', level: 'driftwood-isle' })).toEqual({ rescue: true, titleOnly: true });
 });
 
 test('CP4: the WebKit rescue compares the zone this load boots (the tap the boot adopted), not the address', () => {
-  const booting = new URLSearchParams('mute=1'); booting.set('chunk', 'pine-hollow'); // entry.ts adoptTap on a bare address
-  expect(bootRoute(booting, { line: 'interrupted', level: 'pine-hollow' })).toEqual({ rescue: true, titleOnly: true });
-  expect(bootRoute(booting, { line: 'interrupted', level: 'glowfen' }).rescue, 'another zone than the one that died').toBe(false);
+  expect(bootRoute('pine-hollow', { line: 'interrupted', level: 'pine-hollow' })).toEqual({ rescue: true, titleOnly: true });
+  expect(bootRoute('pine-hollow', { line: 'interrupted', level: 'glowfen' }).rescue, 'another zone than the one that died').toBe(false);
+  expect(bootRoute(null, { line: 'interrupted', level: 'glowfen' }), 'no zone: the title, no rescue').toEqual({ rescue: false, titleOnly: true });
 });
 
-test('explicit RELOAD returns to title even with a selected shard URL', () => {
-  expect(bootRoute(new URLSearchParams('chunk=driftwood-isle'), { line: '', level: '', reload: true }))
-    .toEqual({ rescue: true, titleOnly: true });
+test('explicit RELOAD returns to title even with a zone in hand', () => {
+  expect(bootRoute('driftwood-isle', { line: '', level: '', reload: true })).toEqual({ rescue: true, titleOnly: true });
 });
 
 test('an online build enters a level only from a tap (QA row 16)', () => {
   const at = (query: string): URLSearchParams => new URLSearchParams(query);
-  expect(onlineTitleFirst(at('chunk=driftwood-isle'), true, false), 'a reopened tab or bookmark lands on the title').toBe(true);
-  expect(onlineTitleFirst(at('chunk=driftwood-isle'), true, true), 'a title tap or grid intent enters').toBe(false);
-  expect(onlineTitleFirst(at('chunk=driftwood-isle&skipintro=1'), true, false), 'a harness that skips the title enters').toBe(false);
-  expect(onlineTitleFirst(at('chunk=driftwood-isle&tour=1'), true, false)).toBe(false);
+  expect(onlineTitleFirst(at(''), 'driftwood-isle', true, false), 'a zone with no tap lands on the title').toBe(true);
+  expect(onlineTitleFirst(at(''), 'driftwood-isle', true, true), 'a title tap or grid intent enters').toBe(false);
+  expect(onlineTitleFirst(at('skipintro=1'), 'driftwood-isle', true, false), 'a harness that skips the title enters').toBe(false);
+  expect(onlineTitleFirst(at('tour=1'), 'driftwood-isle', true, false)).toBe(false);
   // QA-FEEDBACK-2026-11-13 rows 6 and 13 (WILDSHARD-GAME-8H): the engine's own reload (GPU recovery, RELOAD HERE, the reload
   // prompt) carries ?glreload and returns to the world, not the title; play.ts strips it once read, so a reopened tab has none
-  expect(onlineTitleFirst(at('chunk=driftwood-isle&glreload=1&at=1,2,3,0,0'), true, false), 'GPU recovery returns to the world').toBe(false);
-  expect(onlineTitleFirst(at('glreload=1'), true, false), 'a grid page recovery reload too').toBe(false);
-  expect(onlineTitleFirst(at('chunk=driftwood-isle'), false, false), 'the solo build keeps its deep links').toBe(false);
-  expect(onlineTitleFirst(at(''), true, false), 'the plain title is the title already').toBe(false);
-  expect(onlineTitleFirst(at('utm_source=bookmark'), true, false), 'a setting that boots the default level is no tap either').toBe(true);
-  expect(onlineTitleFirst(at('explore=hub'), true, false)).toBe(true);
-  expect(onlineTitleFirst(at('mute=1&v=2'), true, false), 'harness settings alone are the title already').toBe(false);
+  expect(onlineTitleFirst(at('glreload=1&at=1,2,3,0,0'), 'driftwood-isle', true, false), 'GPU recovery returns to the world').toBe(false);
+  expect(onlineTitleFirst(at('glreload=1'), null, true, false), 'a grid page recovery reload too').toBe(false);
+  expect(onlineTitleFirst(at(''), 'driftwood-isle', false, false), 'the solo build enters the zone it was handed').toBe(false);
+  expect(onlineTitleFirst(at(''), null, true, false), 'the plain title is the title already').toBe(false);
+  // CP22 (J522): an old link's zone is ignored: the boot never hands it on, so the load is the plain title
+  expect(onlineTitleFirst(at('chunk=driftwood-isle'), null, true, false), 'an old link is the plain title').toBe(false); // chunk-param-guard: old link
+  expect(onlineTitleFirst(at('utm_source=bookmark'), null, true, false), 'a setting selects no level').toBe(false);
 });
 
 test('a page reloading itself hands the tap to its own tab only (QA row 16)', () => {
@@ -142,8 +133,8 @@ test('a page reloading itself hands the tap to its own tab only (QA row 16)', ()
 });
 
 test('Explore opens a selected zone in the hub by default and retains an explicit view', () => {
-  expect(Object.fromEntries(exploreBootParams(new URLSearchParams('chunk=driftwood-isle')))).toEqual({ chunk: 'driftwood-isle', explore: 'hub' });
-  const link = new URLSearchParams('chunk=mossgate&explore=model&model=oak&tier=phone');
+  expect(Object.fromEntries(exploreBootParams(new URLSearchParams('')))).toEqual({ explore: 'hub' });
+  const link = new URLSearchParams('explore=model&model=oak&tier=phone');
   expect(exploreBootParams(link).toString()).toBe(link.toString());
 });
 
@@ -152,9 +143,9 @@ test('the Explore path chooses the shard and retains the view coordinates and mo
   expect(slug).toBe('driftwood-isle');
   expect(exploreSlugOfPath('/blender-template')).toBe('brasscap-mesa');
   for (const path of ['/', '/b/c', '/version.json', '/%2f']) expect(exploreSlugOfPath(path)).toBeNull();
-  const query = new URLSearchParams('explore=world&cam=16,32,64,0.5,0.1&model=tree&chunk=wrong');
-  expect(Object.fromEntries(exploreBootParams(query, slug ?? undefined))).toEqual({
-    explore: 'world', cam: '16,32,64,0.5,0.1', model: 'tree', chunk: 'driftwood-isle',
+  const query = new URLSearchParams('explore=world&cam=16,32,64,0.5,0.1&model=tree');
+  expect(Object.fromEntries(exploreBootParams(query)), 'the path names the zone (entry.ts), the query only the view').toEqual({
+    explore: 'world', cam: '16,32,64,0.5,0.1', model: 'tree',
   });
 });
 
@@ -188,7 +179,7 @@ test("the tap's device copy is taken only by the document the tap navigated, nev
 test('travel leaves for a bare / with the harness flags it keeps, never naming the zone', () => {
   const at = (href: string, mode: 'enter' | 'explore' = 'enter'): string => { const url = travelAddress({ mode }, href); return `${url.pathname}${url.search}`; };
   expect(at('https://play.example/')).toBe('/');
-  expect(at('https://play.example/?chunk=pine-hollow&mute=1&nolock=1&skipintro=1&at=1,2,3,0,0&glreload=1&v=9')).toBe('/?mute=1&nolock=1');
+  expect(at('https://play.example/?chunk=pine-hollow&mute=1&nolock=1&skipintro=1&at=1,2,3,0,0&glreload=1&v=9')).toBe('/?mute=1&nolock=1'); // chunk-param-guard: old link
   expect(at('https://play.example/slug/pine-hollow?sw=0'), 'a /slug/ page leaves for /').toBe('/?sw=0');
   expect(at('https://play.example/?tier=phone', 'explore')).toBe('/?tier=phone&explore=hub');
 });

@@ -249,7 +249,9 @@
       // device copy (iOS's WebContent swap) only on a same-origin navigation. The entry reads the same record (titleArrival.ts `ours`).
       // STAGING-BUGBASH SB44: the engine's own update reload of a world page (lastEnd's young `stale deployment code` / `stale
       // build` / `new build panel` / `offline load failure`, not a `reload` that means the title) hands that page's taken tap on.
-      if (!homeParams.has('chunk') && location.pathname === '/' && document.getElementById('ws-shardfile') === null) try {
+      // CHUNK-PARAM CP22 (J522): no address names a zone (an old link's is ignored, bootRoute.ts); the tap this document took does
+      let homeZone = '';
+      if (location.pathname === '/' && document.getElementById('ws-shardfile') === null) try {
         const name = scope => 'wildshard.save.v2@2.' + scope, own = performance.timeOrigin, now = Date.now();
         const read = (store, scope, key) => { const blob = JSON.parse(store.getItem(name(scope)) || '{}'), item = blob.keys?.[key]?.data; return { blob, tap: typeof item === 'string' ? JSON.parse(item) : item }; };
         const fresh = tap => tap && typeof tap.at === 'number' && /^[a-z0-9_-]+$/u.test(tap.slug) && ['enter', 'explore', 'arena'].includes(tap.mode)
@@ -263,14 +265,15 @@
           if (!fresh(tap) || (tap.taken !== undefined && tap.taken !== own && !handed)) continue;
           tap.taken = own; const item = blob.keys[key]; item.data = typeof item.data === 'string' ? JSON.stringify(tap) : tap;
           store.setItem(name(scope), JSON.stringify(blob));
-          homeParams.set('chunk', tap.slug);
+          homeZone = tap.slug;
           break;
         }
       } catch { /* storage blocked: the title, as before */ }
-      if (!globalThis.__WS_EXPLORE__ && homeParams.size === 0) document.documentElement.classList.add('title-first');
-      // BUGBASH-LOOP (J385): the launch shell and live menu belong to the title only. A world page (`?chunk=`, a tap's
-      // navigation) paints its own full-screen loading card from the first bytes, never the bare title over it.
-      if (homeParams.size === 0 && document.getElementById('ws-shardfile') === null) document.documentElement.classList.add('boot-menu');
+      // CP22: only a zone this document was handed boots a world (bootRoute.ts); anything else is the title
+      if (!globalThis.__WS_EXPLORE__ && homeZone === '') document.documentElement.classList.add('title-first');
+      // BUGBASH-LOOP (J385): the launch shell and live menu belong to the title only. A world page (a tap's navigation) paints
+      // its own full-screen loading card from the first bytes, never the bare title over it.
+      if (homeZone === '' && document.getElementById('ws-shardfile') === null) document.documentElement.classList.add('boot-menu');
       if (document.documentElement.classList.contains('title-first')) {
         const hero = document.createElement('link');
         hero.rel = 'preload'; hero.as = 'image'; hero.setAttribute('fetchpriority', 'low');
@@ -689,14 +692,14 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
       let oneCellZone = '';
       try {
         const cells = JSON.parse(document.getElementById('ws-catalogue')?.textContent || 'null')?.grid?.cells;
-        if (!globalThis.__WS_EXPLORE__ && location.pathname === '/' && !homeParams.has('chunk') && Array.isArray(cells) && cells.length === 1) {
+        if (!globalThis.__WS_EXPLORE__ && location.pathname === '/' && homeZone === '' && Array.isArray(cells) && cells.length === 1) {
           oneCellZone = String(cells[0]?.slug || '');
           document.documentElement.classList.remove('title-first', 'boot-menu');
         }
       } catch { /* no readable catalogue: the page decides as before */ }
       // The loader uses a small, already-approved portrait of the selected shard from its first paint.
-      // Whitelist the filename: ?chunk is a shard selector, never an arbitrary asset path.
-      const loadShard = homeParams.get('chunk') || oneCellZone || 'driftwood-isle';
+      // Whitelist the filename: the zone is a shard selector, never an arbitrary asset path.
+      const loadShard = homeZone || oneCellZone || 'driftwood-isle';
       if (['driftwood-isle', 'pine-hollow', 'nalati-grasslands', 'nine-dragon-stack'].includes(loadShard)) {
         document.documentElement.style.setProperty('--ws-load-portrait', 'url("' + titleAssetURLs['/assets/title/' + loadShard + '-portrait.jpg'] + '")');
       }
@@ -802,7 +805,7 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
           const id = [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join('');
           outbox.push({ id, at: Date.now(), message: code + ': the game code didn\'t load (' + why + ')', stack: '',
             tags: { system: 'boot', build: String(globalThis.__WS_BUILD_ID__ || ''), shard: '', bootStage: 'loading', fatal: true, screen: 'boot-fail',
-              exit: { code, zone: (typeof homeParams === 'undefined' ? '' : homeParams.get('chunk') || ''), revision: '', room: '', step: card.dataset.step || '' } } });
+              exit: { code, zone: (typeof homeZone === 'undefined' ? '' : homeZone), revision: '', room: '', step: card.dataset.step || '' } } });
           keys['screen.reports'] = { v: 1, data: outbox.slice(-8) }; localStorage.setItem(key, JSON.stringify(doc));
         } catch { /* storage off: the card still says it */ }
         const kicker = card.querySelector('[data-el="kicker"]'); if (kicker) kicker.textContent = 'Couldn\'t start';
@@ -855,11 +858,11 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
         // network yield can paint the default place before this atomic insert.
         const template = document.getElementById('ws-loading-shell');
         try {
-        // CHUNK-PARAM CP2 (J522): the zone is the tap's this document took (the first script's `taken`), or a `?chunk=` until CP22
-        const card = template instanceof HTMLTemplateElement ? template.content.querySelector('.ws-load[data-shell]') : document.querySelector('.ws-load[data-shell]'), addressed = new URLSearchParams(location.search).get('chunk');
+        // CHUNK-PARAM CP2, CP22 (J522): the zone is the tap's this document took (the first script's `taken`); no address names one
+        const card = template instanceof HTMLTemplateElement ? template.content.querySelector('.ws-load[data-shell]') : document.querySelector('.ws-load[data-shell]');
         const field = name => card.querySelector('[data-el="' + name + '"]'), entry = (store, scope, key) => { try { const item = JSON.parse(store().getItem('wildshard.save.v2@2.' + scope) || '{}').keys?.[key]?.data; return typeof item === 'string' ? JSON.parse(item) : item; } catch { return null; } };
         const found = [entry(() => sessionStorage, 'session', 'titleArrival'), entry(() => localStorage, 'device', 'titleArrival.once')]
-          .find(a => a && (addressed ? a.slug === addressed : a.taken === performance.timeOrigin) && Date.now() - a.at < 60000), slug = addressed || found?.slug;
+          .find(a => a && a.taken === performance.timeOrigin && Date.now() - a.at < 60000), slug = found?.slug;
         if (!card || !slug) return;
         // Adopt the clock's existing parsed handoff; no extra storage read on boot.
         if (found?.timing && window.__bootTiming) window.__bootTiming.handoff = {...found.timing,wall:found.at,received:performance.now(),newTimeOrigin:window.__bootTiming.timeOrigin,source:'title-arrival-clock-read',validated:false};

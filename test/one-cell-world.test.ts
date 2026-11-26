@@ -83,8 +83,8 @@ test('the entry and the first paint read the one-cell world, and no address name
   expect(entry, 'a one-cell world reads its own zone\'s set, never its neighbours\' files').toContain("flow = inlineCell === null && (pageGridRecovery() !== null || pendingGridEntry(slug)) ? 'grid' : 'client'");
   const page = readFileSync('index.html', 'utf8');
   expect(page, 'the first paint shows the zone\'s loading card, never the title').toContain("document.documentElement.classList.remove('title-first', 'boot-menu');");
-  expect(page).toContain("const loadShard = homeParams.get('chunk') || oneCellZone || 'driftwood-isle';");
-  expect(page).toContain("!homeParams.has('chunk') && Array.isArray(cells) && cells.length === 1");
+  expect(page).toContain("const loadShard = homeZone || oneCellZone || 'driftwood-isle';");
+  expect(page).toContain("location.pathname === '/' && homeZone === '' && Array.isArray(cells) && cells.length === 1");
   const worker = readFileSync('src/client/game/shardfile/clientWorker.ts', 'utf8');
   expect(worker, 'CP25: a one-cell page never leaves for a one-shard page because its world hosts one cell').toContain('reshard !== undefined && oneCellWorld() === null &&');
   const cost = readFileSync('src/client/game/shardfile/folderCost.ts', 'utf8');

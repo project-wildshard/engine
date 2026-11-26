@@ -82,7 +82,7 @@ function reentryAllowed(now: number): boolean {
 }
 
 /** GO4: the world seats this player in another cell than the page booted. Enter the grid again in that cell, as a title tap enters it:
- *  the intent names the cell, and the page that boots is a grid page with a bare URL, never a `?chunk=` page. */
+ *  the intent names the cell, and the page that boots is a grid page with a bare URL, never a one-shard page. */
 export function reenterGrid(instance: string): void {
   const cell = new GridAssembly(gridMode(DEVSERVER)).cells.find(row => row.instance === instance), target = cell === undefined ? undefined : findTitleManifest(cell.slug);
   // A cell this build has no page for, or a seat that keeps moving: the title, never a loop of entries.
@@ -113,7 +113,7 @@ export function reenterGridInPage(instance: string, handOver: () => void): boole
 }
 
 /** OFFLINE OF2 (J298): a grid page on a build whose world is known to host one cell (production before GC16) re-enters as that cell's
- *  one-shard page, online, never the solo grid. The page that boots is a `?chunk=` page with no grid intent; Shard select's one way in
+ *  one-shard page, online, never the solo grid. The page that boots is a one-shard page (the tap names its zone) with no grid intent; Shard select's one way in
  *  keeps it a one-shard page, since the same word (kept a minute, and in the device's route memory) says the world opens one cell. */
 export function reenterShard(instance: string): void {
   const cell = new GridAssembly(gridMode(DEVSERVER)).cells.find(row => row.instance === instance), target = cell === undefined ? undefined : findTitleManifest(cell.slug);
@@ -251,7 +251,7 @@ export function enterOneCellWorld(instance: string, slug: string): void { pageGr
 export function intendGridHome(instance: string, slug: string): void { pageGridIntents().set({ instance, slug }); }
 
 /** The grid page's address: its path, and only the harness flags skipintro, mute and nolock, none of which selects a level, and `skipintro` dropped here sent a
- *  `?chunk=<slug>&skipintro` link on a world build back under the title (OFFLINE OF18: every Open Plot in the offline proof). */
+ *  `skipintro` world page on a world build back under the title (OFFLINE OF18: every Open Plot in the offline proof). */
 export function gridPageUrl(href: string): URL {
   const from = new URL(href).searchParams, to = new URL(new URL(href).pathname, new URL(href).origin);
   const skipintro = from.get('skipintro'), mute = from.get('mute'), nolock = from.get('nolock'), crash = from.get('crash');

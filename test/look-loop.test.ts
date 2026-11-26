@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { captureName, contextOptions, facing, parseCameraFile, parseFlags, resolveCameras, resolveMissing, SHOTS, yawTo } from '../src/scripts/look-loop/cameras.mjs';
 
 const file = () => parseCameraFile({
-  query: 'chunk=brasscap-mesa', fp: { viewport: [390, 844] }, god: { viewport: [1600, 900], topUp: 40, diagUp: 18, diagOut: 24, lookAhead: 8 },
+  zone: 'brasscap-mesa', query: 'mute=1', fp: { viewport: [390, 844] }, god: { viewport: [1600, 900], topUp: 40, diagUp: 18, diagOut: 24, lookAhead: 8 },
   anchors: [{ id: 'spawn', P: { x: 0, z: 0 }, faceTo: { x: 0, z: -12 } }],
 });
 const near = (a: readonly number[] | undefined, b: readonly number[]): void => {

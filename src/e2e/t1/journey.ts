@@ -182,10 +182,10 @@ async function tapIntoZone(
     undefined,
     { timeout: 30_000 },
   )
-  expect(new URL(page.url()).searchParams.has('chunk')).toBe(false)
+  expect(page.url()).not.toMatch(/[?&]chunk=/u)
 }
 
-/** Every main-frame navigation and socket URL on `page` that names a zone (`chunk=`), as it happens. */
+/** Every main-frame navigation and socket URL on `page` that names a zone (a chunk query pair), as it happens. */
 function zoneAddresses(page: Page): readonly string[] {
   const named: string[] = []
   const watch = (url: string): void => {

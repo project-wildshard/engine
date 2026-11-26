@@ -35,7 +35,7 @@ function slice(file: string, from: string, to: string, name: string, ports: obje
 }
 function page(): { readonly went: string[]; readonly location: object } {
   const went: string[] = [];
-  return { went, location: { href: 'https://example.test/?chunk=fixture&v=old', origin: 'https://example.test', replace: (url: string) => { went.push(url); }, reload: () => { went.push('reload'); } } };
+  return { went, location: { href: 'https://example.test/?v=old', origin: 'https://example.test', replace: (url: string) => { went.push(url); }, reload: () => { went.push('reload'); } } };
 }
 const marks = { markReload: (): void => undefined, markUnload: (): void => undefined, leftByPlayer: (): void => undefined };
 // RL3/RL4 (reloadCover.ts): the cover's own calls, as ports. The cover and the one-frame paint wait are not what this file
@@ -84,12 +84,12 @@ test('SR12: Settings ▸ Reload now from a world comes back in the same shard wh
   const at = page(), session = held(), arrivals: unknown[] = [], reasons: string[] = [];
   const reload = slice('src/client/engine/ui/ReloadPrompt.ts', 'export function reloadWithPicks', '', 'reloadWithPicks', { ...marks, ...cover, location: at.location, settingsReloadUrl: (href: string) => href,
     TITLE_SKIPPERS: [], currentPose: () => ({ x: 12.345, y: 7, z: -3, yaw: 1.5, pitch: 0.25 }), terrainDatum: () => 2, RELOAD_PARAM: 'glreload',
-    handZoneOnReload: (zone: unknown) => { arrivals.push(zone); return zone; }, oneShardZone: () => null, __WS_WORLD__: { release: 'proof' }, markReload: (_: string, reason: string) => { reasons.push(reason); } });
+    handZoneOnReload: (zone: unknown) => { arrivals.push(zone); return zone; }, oneShardZone: () => 'fixture', __WS_WORLD__: { release: 'proof' }, markReload: (_: string, reason: string) => { reasons.push(reason); } });
   reload(); await settle(); session.land(); await settle();
   expect(at.went).toHaveLength(1);
   const went = new URL(at.went[0] ?? '');
   // CHUNK-PARAM CP3 (J522): the zone rides in the tab, never the address
-  expect(went.searchParams.has('chunk')).toBe(false);
+  expect(went.searchParams.has('chunk')).toBe(false); // chunk-param-guard: old link
   expect(went.searchParams.get('at')).toBe('12.35,5,-3,1.5,0.25'); // y in the level's authored frame (less the datum)
   expect(went.searchParams.get('glreload')).toBe('1'); expect(went.searchParams.has('v')).toBe(false);
   expect(reasons, 'a settings reload, not an explicit RELOAD (which returns to the title)').toEqual(['settings']);
@@ -143,6 +143,6 @@ test('CHUNK-PARAM CP3: Reload now on a one-shard page with a bare address hands 
     handZoneOnReload: (zone: unknown) => { arrivals.push(zone); return zone; }, oneShardZone: () => 'pine-hollow', markReload: () => true });
   reload(); await settle(); session.land(); await settle();
   const went = new URL(at.went[0] ?? '');
-  expect(went.searchParams.has('chunk')).toBe(false); expect(went.searchParams.get('mute')).toBe('1');
+  expect(went.searchParams.has('chunk')).toBe(false); expect(went.searchParams.get('mute')).toBe('1'); // chunk-param-guard: old link
   expect(arrivals).toEqual(['pine-hollow']);
 });

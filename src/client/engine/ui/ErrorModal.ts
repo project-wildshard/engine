@@ -96,9 +96,9 @@ function reloadHere(atSpot: boolean): void {
   countReload();
   const url = cleanHref();
   const pose = atSpot ? currentPose() : null;
-  // CHUNK-PARAM CP3 (J522): a one-shard page's zone rides in the tab (handZoneOnReload), never the address
-  const zone = url.searchParams.get('chunk') ?? oneShardZone();
-  url.searchParams.delete('at'); url.searchParams.delete(RELOAD_PARAM); url.searchParams.delete('chunk');
+  // CHUNK-PARAM CP3, CP22 (J522): a one-shard page's zone rides in the tab (handZoneOnReload), never the address
+  const zone = oneShardZone();
+  url.searchParams.delete('at'); url.searchParams.delete(RELOAD_PARAM);
   if (pose) {
     url.searchParams.set('at', [pose.x, pose.y - terrainDatum(), pose.z, pose.yaw, pose.pitch].map((v) => (Math.round(v * 100) / 100).toString()).join(','));
     url.searchParams.set(RELOAD_PARAM, '1'); // index.html's RESUMING screen from the first paint; main.ts skips the title and pauses

@@ -65,7 +65,7 @@ export function oneCellPage(html, zone) {
  *  @param {string} origin @param {string | Record<string, string>} [flags] */
 export function zoneHome(origin, flags = '') {
   const query = new URLSearchParams(flags);
-  if (query.has('chunk')) throw new Error('zone-entry: no zone in the address (J522); enterZone names it in the tap');
+  if (query.has('chunk')) throw new Error('zone-entry: no zone in the address (J522); enterZone names it in the tap'); // chunk-param-guard: old link
   const search = query.toString();
   return `${origin}/${search === '' ? '' : `?${search}`}`;
 }

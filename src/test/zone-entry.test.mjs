@@ -67,5 +67,5 @@ test('the address enterZone opens carries the run\'s flags and never a zone (CP1
   assert.equal(zoneHome('http://127.0.0.1:4401'), 'http://127.0.0.1:4401/');
   assert.equal(zoneHome('http://127.0.0.1:4401', 'mute=1&nolock=1&skipintro=1'), 'http://127.0.0.1:4401/?mute=1&nolock=1&skipintro=1');
   assert.equal(zoneHome('https://staging.wildshard.io', { sw: '0' }), 'https://staging.wildshard.io/?sw=0');
-  assert.throws(() => zoneHome('http://127.0.0.1:4401', 'chunk=pine-hollow&mute=1'), /no zone in the address/u);
+  assert.throws(() => zoneHome('http://127.0.0.1:4401', 'chunk=pine-hollow&mute=1'), /no zone in the address/u); // chunk-param-guard: old link
 });

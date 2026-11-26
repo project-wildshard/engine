@@ -61,9 +61,10 @@ test('the pre-module clock consumes the current epoch title handoff', async () =
   const dom = new Window();
   dom.document.body.innerHTML = '<template id="ws-loading-shell"><div class="ws-load" data-shell><b data-el="slug"></b><b data-el="tier"></b><b data-el="clock"></b></div></template>';
   try {
-  const arrival = { slug: 'pine-hollow', at: Date.now(), name: 'Pine Hollow', tier: 'Explorer' };
+  // CP22 (J522): the clock reads the tap this document took (`taken`), never the address
+  const at = Date.now(), arrival = { slug: 'pine-hollow', at, taken: at, name: 'Pine Hollow', tier: 'Explorer' };
   runInNewContext(script('data-loading-clock'), {
-    window:{}, document: dom.document, HTMLTemplateElement: dom.HTMLTemplateElement, location: { search: '?chunk=pine-hollow' }, URLSearchParams,
+    window:{}, document: dom.document, HTMLTemplateElement: dom.HTMLTemplateElement, location: { search: '' }, URLSearchParams,
     sessionStorage: storage({ [`${prefix}session`]: JSON.stringify({ keys: { titleArrival: { data: arrival } } }) }),
     localStorage: storage(), performance: { now: () => 20, timeOrigin: arrival.at }, setInterval: () => 1,
   });

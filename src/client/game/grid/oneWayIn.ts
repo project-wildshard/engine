@@ -4,7 +4,7 @@
 // word is missing, late or never kept; only a world known to host one cell (production before GC16) keeps GO4's one-shard page. On a
 // world build, a shard the world doesn't open (the grid doesn't place it, or its kept word leaves it out) is never entered (OFFLINE OF3). J311: a build with no world (preview) does the same with
 // its in-page server, which hosts the whole grid: a Shard select tap enters the solo grid at the shard's cell (`entry.ts` asks only
-// for a tap, so a bare `?chunk=` link, a harness or an author's embedded product still opens the shard alone).
+// for a tap, so a harness's zone (enterZone) or an author's embedded product still opens the shard alone; no address names a zone, J522).
 import { pageScope } from '@wildshard/engine/app/resources';
 import { jsonSlot, type Json } from '@wildshard/engine/saves/slots';
 import { GridAssembly, type GridCell } from '../../../shared/game/grid/assembly';
@@ -18,7 +18,7 @@ export function shardCell(slug: string, assembly: GridAssembly = new GridAssembl
   return assembly.cells.find(cell => [slug].includes(cell.slug));
 }
 
-/** What a `?chunk=` page decides before anything loads. */
+/** What a zone's page decides before anything loads. */
 export interface OneWayIn {
   /** the build is stamped with a world (play, staging); false: the in-page server hosts the grid (J311) */
   readonly online: boolean;
@@ -43,7 +43,7 @@ export function inThisWorld(slug: string, shards: readonly string[] | null, asse
   return shardCell(slug, assembly) !== undefined && (shards === null || shards.includes(slug));
 }
 
-/** OF3: the title's line after a `?chunk=` link to a shard this world doesn't open (here, so the entry's static graph stays small). */
+/** OF3: the title's line after a tap to a shard this world doesn't open (here, so the entry's static graph stays small). */
 export function notInWorldLine(name: string): string { return GAME_STRINGS.notInWorld.line(name); }
 
 /** The cell a one-shard page enters instead, or null when it stays a one-shard page. */
@@ -59,7 +59,7 @@ export interface OnlineGate { readonly worldWord: (world: { readonly release: st
 /** opus-wordkeep: the word the door said, which release and when (`online.js`'s `KeptWord`). */
 interface KeptWord { readonly of: string; readonly at: number; readonly word: unknown }
 interface WordKeep { readonly read: () => KeptWord | null; readonly write: (kept: KeptWord) => void }
-/** opus-wordkeep: the tab's kept word, in the page's own session saves. `online.js` keeps the word a minute (so the title, a `?chunk=`
+/** opus-wordkeep: the tab's kept word, in the page's own session saves. `online.js` keeps the word a minute (so the title, a zone's
  *  page and the grid page share one socket), but its own store has no storage (OF4's finding for `release.kept`), so the page lends
  *  this one. The release is under `of`, not `release`: an older build in the same tab kept only a yes there. */
 export function tabWordKeep(): WordKeep {
@@ -180,7 +180,7 @@ export async function readHosted(world: unknown, waitMs: number, gate: () => Pro
 }
 
 /**
- * ZS5 on a `?chunk=` page: when the world hosts the grid and the grid places this shard, the page enters the grid at its cell. The
+ * ZS5 on a zone's page: when the world hosts the grid and the grid places this shard, the page enters the grid at its cell. The
  * goto intent turns this same page into a grid page (`bootPageMode` consumes it), so Shard select loads once. Returns the cell's
  * instance, or null when the page stays a one-shard page.
  */

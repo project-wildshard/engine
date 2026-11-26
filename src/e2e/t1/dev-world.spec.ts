@@ -9,6 +9,7 @@ import { expect, test as base } from '../../scripts/browser-test.mjs'
 import { harnessPins, saveFixture } from '../../scripts/debug-settings.mjs'
 import { openDevWorld } from '../../scripts/dev-world.mjs'
 import { enterBrasscap } from './fixtures.ts'
+import { oldLinkIsTitle } from './old-link.ts'
 
 import type { DevWorld } from '../../scripts/dev-world.mjs'
 
@@ -207,4 +208,16 @@ test('the dev page plays on the local Node server, a restart keeps its save and 
   } finally {
     await context.close()
   }
+})
+
+test('CP22: an old chunk link to the dev world is its title and takes no seat', async ({
+  browser,
+  dev,
+}): Promise<void> => {
+  // The first test's page has closed: its seat goes first
+  await expect
+    .poll(async (): Promise<number> => await seated(dev), { timeout: 30_000 })
+    .toBe(0)
+  await oldLinkIsTitle(browser, dev.url)
+  expect(await seated(dev), 'no seat taken').toBe(0)
 })

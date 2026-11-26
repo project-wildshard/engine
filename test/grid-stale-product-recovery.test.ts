@@ -176,7 +176,7 @@ test.each([
   expect(fixture().read({ ...previous, ...change })).toBeNull();
 });
 
-test.each(['', 'chunk=driftwood-isle&v=new', 'v=new&explore=hub'])('an ordinary or explicit route stays selected: %s', query => {
+test.each(['', 'mute=1&v=new', 'v=new&explore=hub'])('an ordinary or explicit route stays selected: %s', query => {
   expect(fixture().read(previous, query)).toBeNull();
 });
 

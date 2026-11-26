@@ -111,9 +111,9 @@ export function installGpuRecovery(host: RecoveryHost): void {
       catch { fragileBoot = true; }
     }
     const url = fragileBoot ? new URL('/', location.origin) : new URL(location.href);
-    // CHUNK-PARAM CP3 (J522): a one-shard page's zone rides in the tab (handZoneOnReload below), never the address
-    const zone = fragileBoot ? null : url.searchParams.get('chunk') ?? oneShardZone();
-    url.searchParams.delete('v'); url.searchParams.delete('chunk');
+    // CHUNK-PARAM CP3, CP22 (J522): a one-shard page's zone rides in the tab (handZoneOnReload below), never the address
+    const zone = fragileBoot ? null : oneShardZone();
+    url.searchParams.delete('v');
     const pose = fragileBoot ? null : host.pose();
     // y in the level's authored frame (less its runtime datum, G164): the reload stands on the same ground in either state
     if (pose) url.searchParams.set('at', [pose.x, pose.y - terrainDatum(), pose.z, pose.yaw, pose.pitch].map((v) => (Math.round(v * 100) / 100).toString()).join(','));

@@ -4,7 +4,7 @@ import '@wildshard/engine/core/portableMathFirst';
 import './identity';
 import { dataPointer } from '@wildshard/engine/game/shard/pointer';
 import { findTitleManifest, installTitleManifests, listedArrival, readTitleRows, titleManifests, unloadedTitleRow, withCatalogueHeads } from '@wildshard/engine/game/shard/titleList';
-import { bareSlug, installedCatalogue, installInlineCatalogue, oneCellWorld } from '@wildshard/engine/game/grid/catalogueSlot';
+import { installedCatalogue, installInlineCatalogue, oneCellWorld } from '@wildshard/engine/game/grid/catalogueSlot';
 import { installOfflineDownload } from '@wildshard/engine/ui/offlineDownload';
 import { noteWorldBoot, noteWorldStep } from '@wildshard/engine/telemetry/runtime';
 import { armAnalyticsBeacon } from '@wildshard/engine/telemetry/analyticsBeacon';
@@ -47,7 +47,7 @@ import { installDropNotes, markDropStep, takeDrop, type Drop } from '@wildshard/
 import { isLeavingPlay, showEnd } from '@wildshard/engine/boot/endPlay';
 import { consumeCrashResume, type CrashResume } from '@wildshard/engine/game/session/crashResume';
 import { bootAwait, bootMark, bootTask, bootTiming, endBootOperation } from '@wildshard/engine/boot/timing';
-import { currentSlug, exploreSlugOfPath, retiredSlugs, slugOfPath, slugPathOf } from './slugPath';
+import { exploreSlugOfPath, retiredSlugs, slugOfPath, slugPathOf } from './slugPath';
 
 
 import { installForceUpdate } from '@wildshard/engine/boot/forceUpdate';
@@ -100,24 +100,24 @@ installOfflineDownload({
 });
 persistHomeScreen();
 definePageSaveKeys(saves);
-/** the page's address as the boot reads it; a same-page entry (ZE10a3) reads it again for its next session */
+/** the page's address as the boot reads it (its harness settings, never a zone); a same-page entry (ZE10a3) reads it again */
 let search = new URLSearchParams(location.search);
-/** CHUNK-PARAM CP1 (J522): a tap names its zone in the tab (`titleArrival`) and leaves the address bare; the boot reads the tap's
- *  zone where it read the address's. Only on the game's own `/` (Explore's too): a `/slug/` page or an author's inline shard keeps
- *  its own. Not consumed here: the session consumes it, and the player's reload below drops it. */
-function adoptTap(into: URLSearchParams): void {
-  if (into.has('chunk') || document.getElementById('ws-shardfile') !== null || location.pathname !== '/') return;
-  const tap = pendingTitleArrival();
-  if (tap !== null) into.set('chunk', tap.slug);
+/** CHUNK-PARAM CP1, CP22 (J522): a tap names its zone in the tab (`titleArrival`) and leaves the address bare. Only on the game's own
+ *  `/` (Explore's too): a `/slug/` page or an author's inline shard keeps its own. Not consumed here: the session consumes it, and
+ *  the player's reload below drops it. No address names a zone: an old link's is ignored. */
+function tappedZone(): string | null {
+  if (document.getElementById('ws-shardfile') !== null || location.pathname !== '/') return null;
+  return pendingTitleArrival()?.slug ?? null;
 }
-adoptTap(search);
+/** the zone this boot enters: a tap's, Explore's path's or a record's (CP22: never the address's) */
+let handedZone = tappedZone();
 /** CHUNK-PARAM-REMOVAL CP10 (J522): the cell of the one-cell world this page carries and boots with no tap, or null */
 let inlineCell: { readonly instance: string; readonly slug: string } | null = null;
-/** the zone this boot enters: the address's (until CP22), else the one-cell world's */
-const bootZone = (): string | null => search.get('chunk') ?? inlineCell?.slug ?? null;
+/** the zone this boot enters, else the one-cell world's */
+const bootZone = (): string | null => handedZone ?? inlineCell?.slug ?? null;
 const exploreSlug = exploreChannel() ? exploreSlugOfPath(location.pathname) : null;
-const exploreIndex = exploreChannel() && exploreSlug === null && !search.has('chunk');
-if (exploreChannel() && !exploreIndex) search = exploreBootParams(search, exploreSlug ?? undefined);
+const exploreIndex = exploreChannel() && exploreSlug === null && handedZone === null;
+if (exploreChannel() && !exploreIndex) { search = exploreBootParams(search); handedZone = exploreSlug ?? handedZone; }
 // Jake (11-10): Low Power Mode for Copy diagnostics, from this document's first visible second of rAF (a busy boot can
 // only rule it out); the title's own idle reading starts once the title shows (boot/lowPower.ts)
 startLowPowerProbe();
@@ -168,14 +168,8 @@ async function enterPage(): Promise<unknown> {
   for (const [retired, now] of retiredSlugs()) {
     try { saves.mergeShardEntries(retired, now); } catch (error) { console.warn(`[saves] ${retired} not carried to ${now}:`, error); }
   }
-  // TC-SHIP-a: an old `?chunk=` link (a bookmark, a tab reloaded after the deploy) names its retired slug's replacement
-  // a retired slug the build's catalogue still lists stays itself (Ring 1's blender-template is the format's Template 2)
-  const catalogue = installedCatalogue(), listed = new Set([...catalogue?.placements ?? [], ...catalogue?.grid.cells ?? []].map(row => bareSlug(row.slug)));
-  const asked = search.get('chunk'), requested = asked === null ? null : currentSlug(asked, name => listed.has(name));
-  if (asked !== null && requested !== null && requested !== asked) {
-    search.set('chunk', requested);
-    history.replaceState(history.state, '', `${location.pathname}?${search.toString()}${location.hash}`);
-  }
+  // CP22 (J522): the zone comes from a tap or Explore's path, never an address, so no old link's retired slug is rewritten here
+  const catalogue = installedCatalogue(), requested = handedZone;
   // SA36: a `/slug/<slug>` link opens that one shard's page; its PLAY leaves for `/` with the tap (CP6), so a world never boots here.
   // SA37: on every host, a world build too: PLAY's page enters the world's grid at the shard's cell (GO7 below)
   const slugged = exploreChannel() ? null : slugOfPath(location.pathname);
@@ -184,7 +178,7 @@ async function enterPage(): Promise<unknown> {
   // An inline author shard runs in that cell (CP25: its descriptor, its placement and its residency, clientSource and folderCost)
   inlineCell = requested === null && slugged === null && !exploreChannel() ? oneCellWorld(catalogue) : null;
   const plainTitle = requested === null && slugged === null && inlineCell === null && document.getElementById('ws-shardfile') === null
-    && bootRoute(search, { line: previousBootLine(), level: previousBootLevel() }).titleOnly;
+    && bootRoute(requested, { line: previousBootLine(), level: previousBootLevel() }).titleOnly;
   // The live menu's code can arrive while styles and the previous-end query settle.
   // Placement still gates every route that can admit a world or a public shard card.
   if (plainTitle) pageTitleImports();
@@ -242,15 +236,15 @@ async function enterPage(): Promise<unknown> {
   };
   if (requested !== null && await notInWorld()) return notInWorldTitle(requested);
   const tapped = inlineCell !== null || (requested !== null && (pendingTitleArrival(requested) !== null || pendingGridEntry(requested)));
-  if (document.getElementById('ws-shardfile') === null && onlineTitleFirst(search, online, tapped)) {
+  if (document.getElementById('ws-shardfile') === null && onlineTitleFirst(search, requested, online, tapped)) {
     history.replaceState(history.state, '', new URL('/', location.origin));
     document.documentElement.classList.add('title-first');
     return showPageTitle();
   }
   // GO7 (ZS5), J300: on a world build, a grid shard's page (Shard select, a seat elsewhere, a stale-build reload) enters the grid at
   // that shard's cell, so this page boots as a grid page, unless the world is known to open one cell; anything else stays a one-shard page.
-  // J311: a build with no world (preview) does the same for a Shard select tap only, into its in-page grid; a bare `?chunk=` link or
-  // a harness URL still opens the shard alone.
+  // J311: a build with no world (preview) does the same for a Shard select tap only, into its in-page grid; a harness's zone
+  // (enterZone) still opens the shard alone.
   if ((online || pendingTitleArrival(requested ?? '') !== null) && requested !== null && document.getElementById('ws-shardfile') === null) {
     const { enterByShard } = await bootTask('app:one-way-in-import', () => import('@wildshard/engine/game/grid/oneWayIn'));
     await bootTask('app:one-way-in', () => enterByShard({ online, slug: requested, kept: search.has('explore') || pendingGridEntry(requested) }, world));
@@ -265,16 +259,16 @@ async function enterPage(): Promise<unknown> {
   const server = end.kind === 'unexpected' && end.mode === 'grid' ? await bootTask('app:grid-server-site', serverSites) : undefined;
   const recovery = consumeGridRecovery({ unexpected: end.kind === 'unexpected', previous: end, search, ...(server === undefined ? {} : { server }) });
   if (recovery !== null || crashResume !== null) {
-    // CHUNK-PARAM CP4 (J522): the boot takes the record's zone in its own search; the address never names it. The session
-    // resumes from the record (play.ts `resuming`), so no `glreload` either; a stale `at` leaves the address
-    search.set('chunk', recovery?.slug ?? crashResume?.slug ?? '');
+    // CHUNK-PARAM CP4, CP22 (J522): the boot takes the record's zone; the address never names it. The session resumes from the
+    // record (play.ts `resuming`), so no `glreload` either; a stale `at` leaves the address
+    handedZone = recovery?.slug ?? crashResume?.slug ?? '';
     search.delete('at');
-    const url = new URL(location.href); url.searchParams.delete('at'); url.searchParams.delete('chunk');
+    const url = new URL(location.href); url.searchParams.delete('at');
     history.replaceState(history.state, '', url);
     document.documentElement.dataset['resume'] = recovery !== null ? 'grid' : 'crash';
     document.documentElement.classList.remove('title-first');
   }
-  const route = exploreChannel() || recovery !== null || crashResume !== null || inlineCell !== null ? { rescue: false, titleOnly: false } : gridRecoveryRefused() ? { rescue: true, titleOnly: true } : bootRoute(search, { line: previousBootLine(), level: previousBootLevel(), reload: end.reload === true });
+  const route = exploreChannel() || recovery !== null || crashResume !== null || inlineCell !== null ? { rescue: false, titleOnly: false } : gridRecoveryRefused() ? { rescue: true, titleOnly: true } : bootRoute(bootZone(), { line: previousBootLine(), level: previousBootLevel(), reload: end.reload === true });
   const rescueBoot = route.rescue;
   const titleOnly = route.titleOnly;
   if (rescueBoot) {
@@ -301,7 +295,7 @@ async function enterPage(): Promise<unknown> {
         import('@wildshard/engine/game/grid/menu'), import('@wildshard/engine/game/boot/spawnDownload')]));
       await tier.initializeTier();
       const slug = bootZone();
-      // SA43: a page that owns its inline shard (`wildshard dev`, `wildshard prepare` at `?chunk=`) has no catalogue download
+      // SA43: a page that owns its inline shard (`wildshard dev`, `wildshard prepare`) has no catalogue download
       // for it: that shard's spawn set isn't its download (as startSelected's `authored`)
       const inlineShard = (menu.DEVSERVER || menu.PREPARATION_ONLY) && document.getElementById('ws-shardfile') !== null;
       // OF23a: the inline shard is admitted by its own index, never as a stale copy of a product this build pins
@@ -570,7 +564,7 @@ async function installInPageEntry(): Promise<void> {
       app.render?.dispose(true);
       if (url !== undefined) history.replaceState(history.state, '', url);
       search = new URLSearchParams(location.search);
-      adoptTap(search); // CP1: the zone this entry's travel wrote in the tap
+      handedZone = tappedZone(); // CP1: the zone this entry's travel wrote in the tap
       crashResume = null; // the first boot's crash resume, never the next zone's
       const [{ setActiveChunk }, { retireEntryReloadCapture }, { resetFolderControl }] = await Promise.all([import('@wildshard/engine/game/shard/registry'),
         import('@wildshard/engine/game/grid/pageEntry'), import('@wildshard/engine/game/shardfile/runtimeFolder')]);

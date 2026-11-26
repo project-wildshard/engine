@@ -33,7 +33,7 @@ test('the fresh title waits for first activation before its next controlled docu
   f.finish(); await f.ready; await Promise.resolve();
   expect(f.destinations).toHaveLength(1);
   // CHUNK-PARAM CP1 (J522): the zone rides in the tap, never the address
-  expect(new URL(f.destinations[0] ?? '').searchParams.has('chunk')).toBe(false);
+  expect(new URL(f.destinations[0] ?? '').searchParams.has('chunk')).toBe(false); // chunk-param-guard: old link
   expect(f.arrivals).toEqual([expect.objectContaining({ slug: 'fixture', mode: 'enter' })]);
   expect(f.arrivals).toHaveLength(1); expect(f.unloads).toHaveLength(1);
 });

@@ -43,9 +43,8 @@ function loadNalati(t: ReturnType<typeof tab>): { life: PageLife; notes: DropNot
   world.notes.markStep({ step: 'Joining the world' });
   return world;
 }
-const shardUrl = new URLSearchParams('chunk=nalati-grasslands');
-/** where the next page goes: the title (true) or the shard its URL names (false) */
-const toTitle = (end: LastEnd): boolean => bootRoute(shardUrl, { line: '', level: '', reload: end.reload === true }).titleOnly;
+/** where the next page goes: the title (true) or the zone it was handed (false) */
+const toTitle = (end: LastEnd): boolean => bootRoute('nalati-grasslands', { line: '', level: '', reload: end.reload === true }).titleOnly;
 
 test("the player's reload (browser button, pull-to-refresh) lands on the title with no drop modal", () => {
   const t = tab(), world = loadNalati(t);

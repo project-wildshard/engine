@@ -6,7 +6,7 @@ import { exitSessionToTitle } from '../src/client/game/session/exitToTitle';
 test('main-menu exit replaces the document synchronously without touching the old world or worker', () => {
   const replace = vi.fn<(url: string) => void>();
   const forbidden = (): never => {throw new Error('The old world and worker are not exit work');};
-  const navigation = {url: 'https://wildshard.io/?chunk=driftwood-isle&glreload=1&explore=hub#ws-shardfile', replace,
+  const navigation = {url: 'https://wildshard.io/?chunk=driftwood-isle&glreload=1&explore=hub#ws-shardfile', replace, // chunk-param-guard: old link
     get dispose(): never {return forbidden();}, get activate(): never {return forbidden();}};
   exitSessionToTitle(navigation);
   expect(replace).toHaveBeenCalledExactlyOnceWith('https://wildshard.io/');
@@ -15,13 +15,13 @@ test('main-menu exit replaces the document synchronously without touching the ol
 test.each(['driftwood-isle', 'pine-hollow', 'nalati-grasslands', 'nine-dragon-stack', 'far-reach', 'sunscar-dunes', 'brasscap-mesa'])(
   '%s exits to the actual root title without a stale shard, mode or fragment', slug => {
     const replace = vi.fn<(url: string) => void>();
-    exitSessionToTitle({url: `https://wildshard.io/play?chunk=${slug}&explore=hub#ws-shardfile`, replace});
+    exitSessionToTitle({url: `https://wildshard.io/play?chunk=${slug}&explore=hub#ws-shardfile`, replace}); // chunk-param-guard: old link
     expect(replace).toHaveBeenCalledExactlyOnceWith('https://wildshard.io/');
   });
 
 test('a navigation failure preserves its original error instead of pretending the old session was disposed', () => {
   const failure = new Error('Navigation unavailable');
-  expect(() => exitSessionToTitle({url: 'https://wildshard.io/?chunk=nine-dragon-stack-legacy', replace: () => {throw failure;}})).toThrow(failure);
+  expect(() => exitSessionToTitle({url: 'https://wildshard.io/?chunk=nine-dragon-stack-legacy', replace: () => {throw failure;}})).toThrow(failure); // chunk-param-guard: old link
 });
 
 // N3: a held session's server saves across a port, and nothing written at pagehide reaches a page that's going.
@@ -31,7 +31,7 @@ test('leaving waits for a held session\'s save, once, and a stalled server can\'
   let landed = (): void => undefined;
   try {
     const release = holdLeaving(() => { asked.push('save'); return new Promise<void>(resolve => { landed = resolve; }); });
-    exitSessionToTitle({url: 'https://wildshard.io/?chunk=pine-hollow', replace}); exitSessionToTitle({url: 'https://wildshard.io/?chunk=pine-hollow', replace});
+    exitSessionToTitle({url: 'https://wildshard.io/?chunk=pine-hollow', replace}); exitSessionToTitle({url: 'https://wildshard.io/?chunk=pine-hollow', replace}); // chunk-param-guard: old link
     expect(asked).toEqual(['save']); expect(replace, 'the second tap had nothing held to wait for').toHaveBeenCalledTimes(1);
     replace.mockClear(); landed(); await vi.advanceTimersByTimeAsync(0);
     expect(replace).toHaveBeenCalledExactlyOnceWith('https://wildshard.io/');

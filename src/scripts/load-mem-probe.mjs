@@ -26,6 +26,7 @@ import { launchMemoryBrowser } from './chromium-memory-browser.mjs';
 import { startSampler, webkitProcesses } from './memory/footprint.mjs';
 import { mkdirSync, writeFileSync, createWriteStream } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
+import { enterZone } from './zone-entry.mjs';
 
 const { webkit, devices } = await import("./browser-playwright.mjs");
 const ROOT = resolvePath(new URL('../..', import.meta.url).pathname);
@@ -130,9 +131,10 @@ try {
     }
   })();
   if (SAMPLE && cdp !== null) await cdp.send('HeapProfiler.startSampling', { samplingInterval: 16384, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true });
-  const q = `chunk=${CHUNK}&skipintro=1&nolock=1&mute=1${phone ? '&touch=1&tier=phone' : '&tier=desktop'}`;
+  // CHUNK-PARAM CP22 (J522): the zone boots alone, a one-cell world (a measuring tool, Q1 (a)); no address names it
+  const q = `skipintro=1&nolock=1&mute=1${phone ? '&touch=1&tier=phone' : '&tier=desktop'}`;
   const navAt = Date.now();
-  await page.goto(`${URL_BASE}/?${q}`, { waitUntil: 'commit', timeout: 180_000 });
+  await enterZone(page, { zone: CHUNK, base: URL_BASE, flags: q, alone: true, waitUntil: 'commit', timeout: 180_000 });
   await page.waitForFunction(() => Boolean(window.__wildshard?.world) && !document.querySelector('.ws-load'), null, { timeout: 240_000, polling: 200 });
   const playAt = Date.now();
   let sampled = null;

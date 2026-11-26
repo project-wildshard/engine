@@ -67,7 +67,7 @@ export const GAME_STRINGS = {
     load: "COULDN'T LOAD",
   },
   /** OFFLINE OF3 (J298): on a world build, a shard the world doesn't open (the grid doesn't place it, or the world's word leaves it out).
-   *  Its Shard select card (dimmed, ENTER WORLD off) and the title's line after a `?chunk=` link to it */
+   *  Its Shard select card (dimmed, ENTER WORLD off) and the title's line after a tap to it */
   notInWorld: {
     badge: 'Not in this world yet',
     line: (name: string): string => `${name}: Not in this world yet`,

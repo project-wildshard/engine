@@ -37,11 +37,11 @@ test('a doctor that does not answer keeps the page, shows doctor-http, and Try a
 });
 
 test('CHUNK-PARAM CP7: the doctor\'s address and a note name no zone in a URL; the note carries zone and pose as fields', () => {
-  const doctor = new URL(doctorUrl('load-failure', { origin: 'https://wildshard.io', search: '?chunk=pine-hollow&mute=1' } as Location));
+  const doctor = new URL(doctorUrl('load-failure', { origin: 'https://wildshard.io', search: '?chunk=pine-hollow&mute=1' } as Location)); // chunk-param-guard: old link
   expect([...doctor.searchParams.keys()]).toEqual(['sw', 'from']);
   const filed = filedAt({ shard: 'pine-hollow', pos: [1.234, 2, 3], yaw: 0.5, pitch: -0.1, weapon: 'iron' });
   expect(filed).toMatchObject({ zone: 'pine-hollow' });
   expect(filed['pose']).toHaveLength(5);
-  expect(JSON.stringify(filed)).not.toMatch(/chunk=|https?:/u);
+  expect(JSON.stringify(filed)).not.toMatch(/chunk=|https?:/u); // chunk-param-guard: old link
   expect(filedAt({ shard: 'pine-hollow', explore: 'world', cam: [1, 2, 3, 0, 0], model: 'tree' })).toEqual({ zone: 'pine-hollow', explore: 'world', cam: [1, 2, 3, 0, 0], model: 'tree' });
 });

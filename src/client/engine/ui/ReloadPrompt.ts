@@ -29,8 +29,7 @@ export function reloadWithPicks(why = 'reload prompt: reload now', control?: HTM
   const url = new URL(settingsReloadUrl(location.href, TITLE_SKIPPERS));
   url.searchParams.delete('v');
   // CHUNK-PARAM CP3 (J522): a one-shard page's zone rides in the tab (`handZoneOnReload`), never the address; `at` is a pose
-  const pose = currentPose(), chunk = url.searchParams.get('chunk') ?? oneShardZone();
-  url.searchParams.delete('chunk');
+  const pose = currentPose(), chunk = oneShardZone();
   // a grid page names no shard: its planned-reload record (markReload's capture) carries the cell and pose, on its bare address
   if (pose !== null && chunk !== null) {
     url.searchParams.set('at', [pose.x, pose.y - terrainDatum(), pose.z, pose.yaw, pose.pitch].map((v) => (Math.round(v * 100) / 100).toString()).join(','));
