@@ -8,7 +8,7 @@ import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:
 // oxlint-disable-next-line import/no-nodejs-modules -- Confine the scratch root to this checkout.
 import {join, resolve} from 'node:path';
 import {afterEach, expect, test} from 'vitest';
-import {borrowZoneTable, checkCooked, cookSkew, zoneTableOf, STAGING_PLACEMENTS, STAGING_RELEASE} from '../src/scripts/page-release/zone-table.mjs';
+import {borrowZoneTable, buildZoneTable, checkCooked, cookSkew, zoneTableOf, STAGING_PLACEMENTS, STAGING_RELEASE} from '../src/scripts/page-release/zone-table.mjs';
 import {bakeZoneTable, zoneTableIn} from '../src/scripts/app-build/zoneTable.mjs';
 import {readZoneTable} from '../src/shared/game/grid/zoneTable.ts';
 import {COOKED_ORIGIN} from '../src/shared/game/shardfile/cookedPackPaths.ts';
@@ -34,6 +34,9 @@ test('the table names each zone of the release and its placements once, at its s
   ]);
   expect(readZoneTable(JSON.parse(JSON.stringify(table)))).toEqual(table);
   expect(() => readZoneTable({...table, zones: [{...table.zones[0], index: 'index/x/y.json'}]})).toThrow(/not its cook key/u);
+  // PV4: a table may name its bucket: https anywhere, http on the loopback only (the headless proof's local bucket)
+  for (const origin of ['https://cooked.wildshard.io/', 'http://127.0.0.1:4522/']) expect(readZoneTable({...table, origin}).origin).toBe(origin);
+  for (const origin of ['http://cooked.example/', 'https://cooked.wildshard.io', 'javascript:alert(1)//']) expect(() => readZoneTable({...table, origin})).toThrow();
 });
 
 test('a release with no cook, or a zone with no shard version, is refused by name', () => {
@@ -67,6 +70,22 @@ test('borrowing reads staging\'s signed files from releases.wildshard.io and ref
   expect((await borrowZoneTable({cookVersion: '1.0.0', read, releaseKey: key, placementKey: key})).zones).toHaveLength(2);
   const other = generateKeyPairSync('ed25519').publicKey.export({format: 'der', type: 'spki'}).toString('hex');
   await expect(borrowZoneTable({cookVersion: '1.0.0', read, releaseKey: other, placementKey: key})).rejects.toThrow(/signature/u);
+});
+
+test('PV18: a skew refusal writes one receipt line naming both cook versions and the cook files that differ', async () => {
+  mkdirSync(resolve('tmp'), {recursive: true});
+  const dir = mkdtempSync(join(resolve('tmp'), 'zone-skew-')); scratch.push(dir);
+  const receipts = join(dir, 'receipts.log'), served = new Map([[STAGING_RELEASE, signedText(release())], [STAGING_PLACEMENTS, signedText(placements([]))]]);
+  const read = (url: string): Promise<Response> => Promise.resolve(new Response(served.get(url.split('?')[0] ?? '') ?? '', {status: served.has(url.split('?')[0] ?? '') ? 200 : 404}));
+  const asked: string[] = [];
+  const files = (at: string): string[] => { asked.push(at); return ['src/cook/game/shardCook.ts', 'src/cook/game/cook-version.json']; };
+  await expect(buildZoneTable({cookVersion: '1.1.0', read, releaseKey: key, placementKey: key, receipts, files})).rejects.toThrow(/cook version skew/u);
+  const [line, ...rest] = readFileSync(receipts, 'utf8').trimEnd().split('\n');
+  expect(rest).toEqual([]);
+  expect(asked).toEqual([build]);
+  expect(line).toMatch(/^\d\d:\d\d UTC \S+ BLOCKED preview: cook version skew, main cooks 1\.1\.0 and staging \(serial 159, build aaaaaaaaaa\) cooked 1\.0\.0; .*cook files that differ \(2\): src\/cook\/game\/shardCook\.ts, src\/cook\/game\/cook-version\.json$/u);
+  expect((await buildZoneTable({cookVersion: '1.0.0', read, releaseKey: key, placementKey: key, receipts, files})).zones).toHaveLength(2);
+  expect(readFileSync(receipts, 'utf8').trimEnd().split('\n')).toHaveLength(1);
 });
 
 test('the go-live check passes when every index and object answers 200, and names each miss', async () => {
@@ -103,6 +122,7 @@ test('a build given a zone table bakes it as a file and inline in index.html; on
   mkdirSync(resolve('tmp'), {recursive: true});
   const out = mkdtempSync(join(resolve('tmp'), 'zone-table-')); scratch.push(out);
   writeFileSync(join(out, 'index.html'), '<html><head></head><body></body></html>');
+  writeFileSync(join(out, 'version.json'), JSON.stringify({build: 'b1-x'}));
   bakeZoneTable(out, undefined);
   expect(zoneTableIn(readFileSync(join(out, 'index.html'), 'utf8'))).toBeUndefined();
   const table = zoneTableOf(release(), null), file = join(out, 'in.json');
@@ -113,4 +133,6 @@ test('a build given a zone table bakes it as a file and inline in index.html; on
   expect(zoneTableIn(html)).toEqual(table);
   expect(html.match(/id="ws-zone-table"/gu)).toHaveLength(1);
   expect(JSON.parse(readFileSync(join(out, 'zone-table.json'), 'utf8'))).toEqual(table);
+  // PV14 (codex-cookkeys): beside the build's code too, so its chunk graph carries it
+  expect(JSON.parse(readFileSync(join(out, 'b/b1-x/zone-table.json'), 'utf8'))).toEqual(table);
 });

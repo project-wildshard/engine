@@ -3,6 +3,7 @@
 // emits it under the build's folder. This file must never reach a `server`-tagged module (J2).
 import { installedCatalogue } from '@wildshard/engine/game/grid/catalogueSlot';
 import { bootMark } from '@wildshard/engine/boot/timing';
+import { cookedObjects } from '@wildshard/engine/boot/contentBase';
 import * as v from 'valibot';
 import { Scope } from '@wildshard/engine/app/scope';
 import { NetClient } from '@wildshard/engine/net/client';
@@ -242,7 +243,7 @@ export function startStandalone(config: StandaloneConfig): StandaloneShell {
   // C3: the page's catalogue, read at boot, is the worker's too; it has no document to read it from. So are its build's
   // verdicts, which a worker's reads ask for as the page's do (they are stamped into the document, and into nothing else).
   bootMark('worker:configuration-send');
-  worker.postMessage({ rapier: compiledRapier(), catalogue: installedCatalogue() ?? null, validator: Reflect.get(globalThis, '__WS_SHARDFILE_VALIDATOR__') ?? null, verdicts: Reflect.get(globalThis, '__WS_SHARDFILE_VERDICTS__') ?? null, goto: config.goto ?? null, enter: config.enter ?? null, ownServer: config.ownServer === true ? config.slug : null, backgroundSaves: config.backgroundSaves === true } satisfies ServerWorkerStart,
+  worker.postMessage({ rapier: compiledRapier(), catalogue: installedCatalogue() ?? null, validator: Reflect.get(globalThis, '__WS_SHARDFILE_VALIDATOR__') ?? null, verdicts: Reflect.get(globalThis, '__WS_SHARDFILE_VERDICTS__') ?? null, goto: config.goto ?? null, enter: config.enter ?? null, ownServer: config.ownServer === true ? config.slug : null, backgroundSaves: config.backgroundSaves === true, cooked: cookedObjects() } satisfies ServerWorkerStart,
     [control.port2, game.port2, harness.port2, ...reads === undefined ? [] : [reads.port2]]);
   if (reads !== undefined && config.held !== undefined) answerHeldReads(reads.port1, config.held, config.listed);
   // The worker sits beside this module, so an emitted module's `/b/<build>/` folder is the server's real build (J57).

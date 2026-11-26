@@ -89,6 +89,9 @@ export function installCookedObjects(objects: Iterable<readonly [string, string]
 }
 export function clearCookedObjects(): void { cooked.clear(); cookedBack.clear(); cookedOrigins.clear(); }
 /** Where the cook stores a page path (`/assets/spawn/parts/…`), with `search` kept; undefined for a path no installed zone maps. */
+/** PV4: the installed table, page path to cooked URL, for a worker with no document (the in-page server). */
+export function cookedObjects(): readonly (readonly [string, string])[] { return [...cooked]; }
+
 export function cookedObjectURL(pathname: string, search = ''): string | undefined {
   const url = cooked.size === 0 ? undefined : cooked.get(pathname);
   return url === undefined ? undefined : `${url}${search}`;

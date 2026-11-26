@@ -246,7 +246,8 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
   // Fix preview PV3: a page with a zone table reads every zone from the cook (PV4), so the zone files the engine's public/ copy and the
   // entry bake wrote leave before the service worker lists the bundle, and no product folder is copied in below
   const zoneless = (process.env.WS_ZONE_TABLE ?? "") !== "";
-  if (zoneless) console.log(`zoneless page: ${dropZoneFiles(outDir).length} zone files dropped`);
+  const keep = process.env.WS_ZONE_FILES_OUT;
+  if (zoneless) console.log(`zoneless page: ${dropZoneFiles(outDir, keep === undefined || keep === "" ? {} : { keep: resolve(keep) }).length} zone files ${keep ? `moved to ${keep}` : "dropped"}`);
   // the service worker over the bundle as written (was vite/pwa-plugin.ts): sw.js and its content-named core
   step([
     "--import",

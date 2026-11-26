@@ -1069,3 +1069,23 @@ test('NB11: versioned CDN content and precache share a content key across sets',
   expect(await (await next.dispatch('fetch', {request: new Request(`${nextBase}${path}`)}))?.text()).toBe(`${base}${path}`);
   expect(f.fetch).not.toHaveBeenCalled();
 });
+
+// Fix preview PV4 (J276): a page that bakes a zone table reads its zones from the cooked bucket; the worker goes to the network
+// first and keeps each CORS 200, so an offline reload answers what the online visit read. A page with no table leaves them alone.
+test('PV4: a cooked read is network first and kept, and answered from the cache offline', async () => {
+  const bucket = 'http://127.0.0.1:4522/', index = `${bucket}shards/driftwood-isle/0.3.1/cooks/1.0.0/${'c'.repeat(64)}/index.json`;
+  const page = `<!doctype html><html><head><script type="application/json" id="ws-zone-table">${JSON.stringify({ version: 1, origin: bucket })}</script></head><body>shell</body></html>`;
+  let online = true;
+  const f = fixture(request => online ? Promise.resolve(typed(`cooked:${request.url}`, 'cors')) : Promise.reject(new Error('offline'))), worker = f.load('A', [], [], {}, page);
+  await worker.dispatch('install'); await worker.dispatch('activate');
+  expect(await (await worker.dispatch('fetch', { request: new Request(index) }))?.text()).toBe(`cooked:${index}`);
+  const kept = [...f.books.keys()].find(name => /^ws-(?:[a-z]+-)?cooked-v1$/u.test(name));
+  expect(kept).toBeDefined();
+  expect(await (await f.open(kept ?? '')).match(index)).toBeDefined();
+  online = false;
+  expect(await (await worker.dispatch('fetch', { request: new Request(index) }))?.text()).toBe(`cooked:${index}`);
+  // outside the bucket's /shards/ keys, and on a page with no table, the worker does not answer
+  expect(await worker.dispatch('fetch', { request: new Request(`${bucket}other.json`) })).toBeUndefined();
+  const plain = fixture(() => Promise.resolve(typed('x', 'cors'))).load('B', [], [], {}, previewDocument);
+  expect(await plain.dispatch('fetch', { request: new Request(index) })).toBeUndefined();
+});

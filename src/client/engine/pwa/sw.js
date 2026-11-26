@@ -562,6 +562,32 @@ async function navigation(request) {
   return await Promise.race([online, waited]) ?? bakedDocument(pathname);
 }
 
+/* Fix preview PV4 (J276): a page that bakes a zone table (`#ws-zone-table`, read from the document like the world stamp) reads
+ * every zone from the cooked bucket (`cooked.wildshard.io`, or the origin the table names). Those reads go to the network first and
+ * a CORS 200 is kept in one cross-build cache, so an offline reload answers the index, manifests, parts and loose files the online
+ * visit read. A key under one shard version and cook names the same bytes, but the network still wins while there is one. */
+const COOKED_URL = (() => {
+  const text = /<script type="application\/json" id="ws-zone-table">([^<]*)<\/script>/u.exec(DOCUMENT)?.[1];
+  if (text === undefined) return undefined;
+  try { const table = JSON.parse(text); return new URL(typeof table?.origin === 'string' ? table.origin : 'https://cooked.wildshard.io/'); } catch { return undefined; }
+})();
+const COOKED_CACHE = cacheName('ws-cooked-v1', CHANNEL);
+/** @param {URL} url */
+const isCookedRead = url => COOKED_URL !== undefined && url.origin === COOKED_URL.origin && url.pathname.startsWith('/shards/');
+/** @param {Request} request */
+async function cookedRead(request) {
+  let response;
+  try { response = await fetch(request.mode === 'no-cors' ? corsRequest(request) : request); }
+  catch (error) {
+    const held = await store(COOKED_CACHE).then(cache => cache.match(request.url, MATCH)).catch(() => undefined);
+    if (held !== undefined) return held;
+    throw error;
+  }
+  if (response.type === 'cors' && response.status === 200 && !isHtml(response)) {
+    await store(COOKED_CACHE).then(cache => cache.put(request.url, response.clone())).catch(() => { stores.delete(COOKED_CACHE); });
+  }
+  return response;
+}
 workerScope.listen(self, 'fetch', event => {
   const request = event.request, url = new URL(request.url);
   // A diagnostic document must reach its own host route, not the cached game
@@ -580,6 +606,7 @@ workerScope.listen(self, 'fetch', event => {
   else if (!controlled.has(event.clientId)) event.waitUntil(pauseForClient(event.clientId));
   else if (paused) event.waitUntil(resumeIfLoadersGone());
   if (request.method !== 'GET' || url.searchParams.get('sw') === '0') return;
+  if (isCookedRead(url)) { event.respondWith(cookedRead(request)); return; }
   if (isContentRead(url)) { event.respondWith(contentRead(request)); return; }
   if (url.origin !== self.location.origin) return;
   if (url.pathname === '/version.json' || url.pathname === '/sw.js' || url.pathname.startsWith('/api/')) return;

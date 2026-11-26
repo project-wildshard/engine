@@ -13,3 +13,10 @@ rows, as SA48 does for a placed slug. A zone's programs come through the same ta
 A zone whose index is missing or wrong is left out and named in one `wildshard:cooked-zone-missing` event; PV11 (opus-pvpage)
 turns that into the "Wildshard was updated" card. Still to come in PV4: the headless entry at 402x874 with every part from the
 cook, then an offline reload.
+
+Second slice. The service worker keeps every CORS 200 it reads from the cooked bucket (`ws-<channel>-cooked-v1`, network first),
+so an offline reload answers the index, manifests and parts the online visit read; it finds the bucket in the document's own
+zone table, as it finds the world stamp. The in-page server's worker gets the page's cooked object table in its start message
+and reads a zone's loose files where the cook stored them. A zone table may name its bucket (https, or http on the loopback for
+the headless proof), and a manifest row may carry its code list. `cooked-build-fixture.mjs` lays a zoneless build's set-aside
+zone files (`WS_ZONE_FILES_OUT`) out as a local bucket, and `test/cooked-zones-browser.proof.mjs` is the 402x874 entry.

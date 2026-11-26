@@ -19,13 +19,17 @@ export interface ZoneTable {
   readonly from: { readonly channel: 'staging' | 'production'; readonly serial: number; readonly engineBuild: string };
   readonly cookVersion: string;
   readonly cookHash: string;
+  /** The cooked bucket's origin when it is not `COOKED_ORIGIN`: a local folder served for the headless proof (PV4). https, or http on
+   *  the loopback only. */
+  readonly origin?: string;
   readonly zones: readonly ZoneTableRow[];
 }
 
 const RowSchema = v.strictObject({ slug: v.string(), shardVersion: v.string(), index: v.string() });
 const TableSchema = v.strictObject({ version: v.literal(1),
   from: v.strictObject({ channel: v.picklist(['staging', 'production']), serial: v.pipe(v.number(), v.safeInteger(), v.minValue(1)), engineBuild: v.pipe(v.string(), v.regex(/^[0-9a-f]{40}$/u)) }),
-  cookVersion: v.string(), cookHash: v.string(), zones: v.pipe(v.array(RowSchema), v.minLength(1), v.maxLength(256)) });
+  cookVersion: v.string(), cookHash: v.string(),
+  origin: v.exactOptional(v.pipe(v.string(), v.regex(/^(?:https:\/\/[a-z0-9.-]+|http:\/\/(?:127\.0\.0\.1|localhost)(?::\d{1,5})?)\/$/u))), zones: v.pipe(v.array(RowSchema), v.minLength(1), v.maxLength(256)) });
 
 /** One zone's cooked identity, as `cookedPackPaths.ts` keys it. */
 export const zoneRef = (table: Pick<ZoneTable, 'cookVersion' | 'cookHash'>, row: Pick<ZoneTableRow, 'slug' | 'shardVersion'>): CookedShardRef =>

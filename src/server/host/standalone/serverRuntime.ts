@@ -6,7 +6,7 @@ import { RAPIER_WASM_URL } from '@wildshard/engine/physics/wasmUrl';
 import { isWasmModule } from '@wildshard/engine/physics/rapierModule';
 import { askHeldReads, type HeldRead } from '../../../shared/host/standalone/heldReads';
 import { runStandaloneServer } from './serverHost';
-import { fetchGridCollision, fetchServerFolder } from './serverFolder';
+import { fetchGridCollision, fetchServerFolder, installWorkerCookedObjects } from './serverFolder';
 import { bootMark, bootTask } from '@wildshard/engine/boot/timing';
 import { warmRapier } from '@wildshard/engine/physics/rapierWarm';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
@@ -25,6 +25,9 @@ export interface ServerWorkerStart {
   /** NB19: the page's own inline candidate, whose server files are read beside it (shell.ts `ownServer`), or null. */
   readonly ownServer?: string | null;
   readonly backgroundSaves?: boolean;
+  /** Fix preview PV4: the page's cooked object table (page path, cooked URL), so the server reads a zone's files where the cook
+   *  stored them, as the page does; empty on a page with no zone table. */
+  readonly cooked?: readonly (readonly [string, string])[] | null;
 }
 
 /** Launch only on the first save. Rapier's detached snapshot bytes cross the port by transfer. */
@@ -101,6 +104,7 @@ export function runServerWorker(event: MessageEvent<unknown>): void {
   bootMark('worker:configuration-received');
   const start = event.data as ServerWorkerStart;
   if (start.catalogue !== null) installCatalogue(start.catalogue);
+  if (Array.isArray(start.cooked)) installWorkerCookedObjects(start.cooked);
   // The bare names `@wildshard/format/validationReceipt` reads: this worker's bundle leaves them to its realm.
   if (typeof start.validator === 'string' && Array.isArray(start.verdicts)) Object.assign(globalThis, { __SHARDFILE_VALIDATOR__: start.validator, __SHARDFILE_VERDICTS__: start.verdicts });
   const [control, game, harness, reads] = event.ports;

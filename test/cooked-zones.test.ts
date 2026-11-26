@@ -86,6 +86,22 @@ test('learning the table installs each found zone and names the missing ones for
   expect(entryProgramsURL(SLUG)).toBe(`${ORIGIN}${common('programs')}`);
 });
 
+test('the table\'s own bucket origin is where its zones are read, and a manifest row\'s code list comes along', async () => {
+  const other = 'http://127.0.0.1:4522/', code = { url: '/assets/spawn/code/bbe313ded99e664c.json', bytes: 4130 };
+  const objects = new Map([...served()].map(([key, body]) => [key, key === cookedIndexKey(ref) ? { ...INDEX, manifests: ROWS.map(row => ({ ...row, code })) } : body]));
+  const asked: string[] = [];
+  const read = ((input: string | URL | Request): Promise<Response> => {
+    const url = String(input instanceof Request ? input.url : input); asked.push(url);
+    const body = url.startsWith(other) ? objects.get(url.slice(other.length)) : undefined;
+    return Promise.resolve(body === undefined ? new Response('', { status: 404 }) : new Response(typeof body === 'string' ? body : JSON.stringify(body)));
+  }) as typeof fetch;
+  const row = table.zones[0];
+  if (row === undefined) throw new Error('no zone');
+  const zone = await cookedZone({ ...table, origin: other }, row, { fetch: read, signal: new AbortController().signal, validator: null });
+  expect(asked.every(url => url.startsWith(other))).toBe(true);
+  expect(zone?.content.spawn.entry.phone?.code).toEqual(code);
+});
+
 test('a page carries its table inline, or none', () => {
   expect(bakedZoneTable()).toBeUndefined();
   document.body.innerHTML = `<script type="application/json" id="ws-zone-table">${JSON.stringify(table)}</script>`;

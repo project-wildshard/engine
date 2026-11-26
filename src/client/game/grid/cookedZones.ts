@@ -17,7 +17,8 @@ import { installPlacedContent, type PlacedContent, type PlacedHero } from './pla
 const INDEX_BYTES = 4 * 1024 * 1024, MANIFEST_BYTES = 2_000_000, DISCOVERY_BYTES = 256 * 1024;
 const size = v.pipe(v.number(), v.safeInteger(), v.minValue(0));
 const ManifestRow = v.object({ url: v.pipe(v.string(), v.regex(/^\/assets\/spawn\/[a-z0-9_-]+-(?:entry|whole)-(?:phone|desktop)-[a-f0-9]{16}\.json$/u)),
-  tier: v.picklist(['phone', 'desktop']), set: v.picklist(['entry', 'whole']), files: size, totalBytes: size, wireBytes: size });
+  tier: v.picklist(['phone', 'desktop']), set: v.picklist(['entry', 'whole']), files: size, totalBytes: size, wireBytes: size,
+  code: v.optional(v.object({ url: v.string(), bytes: size })) });
 /** What the page reads of a cooked index beyond its address (`readCookedIndexAddress`): its manifests, header and admission row. */
 const IndexRest = v.object({ header: v.string(), manifests: v.pipe(v.array(ManifestRow), v.maxLength(8)),
   verdict: v.optional(v.looseObject({ revision: v.string() })) });
@@ -59,7 +60,7 @@ export function bakedZoneTable(root: Pick<Document, 'getElementById'> = document
 /** One zone's cooked content, or undefined for anything but the table's own index of it. Never throws. */
 export async function cookedZone(table: ZoneTable, row: ZoneTableRow, ports: CookedZonePorts): Promise<CookedZone | undefined> {
   try {
-    const ref = zoneRef(table, row), product = row.slug, at = (key: string): string => new URL(key, ports.origin ?? COOKED_ORIGIN).href;
+    const ref = zoneRef(table, row), product = row.slug, at = (key: string): string => new URL(key, ports.origin ?? table.origin ?? COOKED_ORIGIN).href;
     const init: RequestInit = { credentials: 'omit', redirect: 'error', signal: ports.signal };
     const body = decode(await bounded(await ports.fetch(at(row.index), init), INDEX_BYTES));
     const address = readCookedIndexAddress(body), rest = v.parse(IndexRest, body);
@@ -79,7 +80,8 @@ export async function cookedZone(table: ZoneTable, row: ZoneTableRow, ports: Coo
       const bytes = await bounded(await ports.fetch(object(manifest.url), init), MANIFEST_BYTES);
       const read = readSpawnManifest(decode(bytes));
       if (read.shard !== product || read.tier !== manifest.tier || read.files.length !== manifest.files || read.totalBytes !== manifest.totalBytes) throw new Error(`${manifest.url} is not its row`);
-      return { manifest, address: readSpawnManifestAddress({ url: manifest.url, bytes: bytes.byteLength, totalBytes: manifest.totalBytes, files: manifest.files, wireBytes: manifest.wireBytes }) };
+      return { manifest, address: readSpawnManifestAddress({ url: manifest.url, bytes: bytes.byteLength, totalBytes: manifest.totalBytes, files: manifest.files, wireBytes: manifest.wireBytes,
+        ...(manifest.code === undefined ? {} : { code: manifest.code }) }) };
     }));
     const pick = (set: 'entry' | 'whole'): Partial<Record<'phone' | 'desktop', SpawnManifestAddress>> =>
       Object.fromEntries(addresses.filter(({ manifest }) => manifest.set === set).map(({ manifest, address: picked }) => [manifest.tier, picked]));

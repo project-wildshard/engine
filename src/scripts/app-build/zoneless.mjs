@@ -2,8 +2,8 @@
 // every zone from the cook (PV4), so its build holds no zone file: no shardfile (S1), part (S2), list (S4), program (S5), zone boot
 // file or shard art (S7), by `page-size.mjs`'s classes. The road the page draws stays (PV6: engine, built from the cook's files), as do
 // the engine's boot tables and world map, and the engine's own spawn book and manifests. Server parts (S3) leave with PV8, which moves the in-page server's reads to the cook.
-import {existsSync, readdirSync, rmSync} from 'node:fs';
-import {join, relative} from 'node:path';
+import {existsSync, mkdirSync, readdirSync, renameSync, rmSync} from 'node:fs';
+import {dirname, join, relative} from 'node:path';
 import {classify, shardNames} from '../page-size.mjs';
 
 /** The page's own S6 files: the road (grid seams, seam plans, strip books, pages and meshes), the boot tables and the world map. */
@@ -31,10 +31,16 @@ export function zoneFiles(dir, {shards = shardNames(dir)} = {}) {
   return found.sort();
 }
 
-/** Removes every zone file a zoneless build was handed (the engine's `public/` copy, a pin's leftovers); returns what went. @param {string} dir */
-export function dropZoneFiles(dir) {
+/** Removes every zone file a zoneless build was handed (the engine's `public/` copy, a pin's leftovers); returns what went. With
+ * `keep`, each file moves there at its page path instead (the PV4 proof lays its local bucket out from them).
+ * @param {string} dir @param {{keep?: string}} [options] */
+export function dropZoneFiles(dir, {keep} = {}) {
   const files = zoneFiles(dir);
-  for (const path of files) rmSync(join(dir, path), {force: true});
+  for (const path of files) {
+    if (keep === undefined) { rmSync(join(dir, path), {force: true}); continue; }
+    mkdirSync(dirname(join(keep, path)), {recursive: true});
+    renameSync(join(dir, path), join(keep, path));
+  }
   return files;
 }
 

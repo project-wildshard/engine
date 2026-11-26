@@ -19,11 +19,21 @@ import type { HeldRead } from '../../../shared/host/standalone/heldReads';
 function heldBytes(url: URL): Promise<Response | undefined> | undefined {
   return typeof caches === 'undefined' ? undefined : caches.match(url.href, { ignoreSearch: true, ignoreVary: true });
 }
+/** Fix preview PV4: the page's cooked object table (page path to cooked URL, `contentBase.ts`), sent in the worker's start. */
+const cookedObjects = new Map<string, string>();
+export function installWorkerCookedObjects(rows: readonly (readonly [string, string])[]): void {
+  for (const [path, url] of rows) if (typeof path === 'string' && typeof url === 'string' && /^https?:\/\//u.test(url) && !cookedObjects.has(path)) cookedObjects.set(path, url);
+}
+/** A page-origin URL a cooked zone maps, read where the cook stored it; anything else as is. */
+const cookedURL = (url: URL): URL => {
+  const at = url.origin === globalThis.location.origin ? cookedObjects.get(url.pathname) : undefined;
+  return at === undefined ? url : new URL(`${at}${url.search}`);
+};
 /** Where server bytes come from, with a verified part hash when available. */
 export type ServerRead = (url: URL, path: string, hash?: string) => Promise<Uint8Array>;
 /** The network's answer, or offline what the device holds: a level the player has been to boots with no link. Every byte is verified after this. */
 async function serverBytes(url: URL, path: string): Promise<Uint8Array> {
-  const response = await bootTask(`server:fetch-headers:${path}`, () => fetch(url)).catch(() => undefined);
+  const response = await bootTask(`server:fetch-headers:${path}`, () => fetch(cookedURL(url))).catch(() => undefined);
   const usable = response?.ok === true ? response : await heldBytes(url);
   if (usable === undefined) throw new Error(`Missing server input ${path}`);
   const body = usable.body;

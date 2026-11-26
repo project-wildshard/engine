@@ -3,7 +3,7 @@
 // zone file (S1, S2, S4, S5, S7 and a zone's boot file, by page-size.mjs's classes); the road, the engine's boot tables and world map,
 // its code and engine art stay. Server parts (S3) stay until PV8.
 // oxlint-disable-next-line import/no-nodejs-modules -- The fixture is a real dist folder in owned scratch under tmp/.
-import {mkdirSync, mkdtempSync, rmSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Confine the scratch root to this checkout.
 import {join, resolve} from 'node:path';
 import {afterEach, expect, test} from 'vitest';
@@ -31,6 +31,13 @@ test('a zoneless page names every zone file and keeps the road, the engine\'s ta
   expect(dropZoneFiles(dir)).toHaveLength(9);
   expect(zoneFiles(dir)).toEqual([]);
   expect(() => { checkZoneless(dir); }).not.toThrow();
+});
+
+test('a build asked to keep its zone files moves each one aside at its page path (the PV4 proof\'s bucket is laid out from them)', () => {
+  const dir = dist([...ZONE, ...PAGE]), keep = join(dir, '..', `${String(Date.now())}-zones`); scratch.push(keep);
+  expect(dropZoneFiles(dir, {keep})).toHaveLength(9);
+  expect(ZONE.every(path => existsSync(join(keep, path)) && !existsSync(join(dir, path)))).toBe(true);
+  expect(PAGE.every(path => existsSync(join(dir, path)))).toBe(true);
 });
 
 test('one leftover zone file, a program included (PV5), fails the check by name', () => {
