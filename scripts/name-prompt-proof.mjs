@@ -17,6 +17,7 @@ import { chromium, devices, webkit } from "./browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { intoWorld, openRig, PG_PORT } from './online-rig.mjs';
+import { enterZone } from './zone-entry.mjs';
 
 const [dist = '', work = '', keyFile = ''] = process.argv.slice(2).filter(value => !value.startsWith('--'));
 if (dist === '' || work === '' || keyFile === '') throw new Error('usage: name-prompt-proof.mjs <app dist> <work dir> <key.json> [--shots=<dir>]');
@@ -104,7 +105,7 @@ try {
   await deskBox.waitFor({ state: 'detached', timeout: 10_000 });
   note('Skip goes on to SHARD SELECT', await desk.page.locator('.ws-title-stack[data-screen="select"]').count() === 1);
   // into the same world by its own link: asked once per device, so no prompt on the way in
-  await desk.page.goto(`${rig.base}/?chunk=driftwood-isle&mute=1&nolock=1&skipintro=1`, { waitUntil: 'load' });
+  await enterZone(desk.page, { zone: 'driftwood-isle', base: rig.base, flags: 'mute=1&nolock=1&skipintro=1' });
   await intoWorld(desk.page);
   note('a page this device enters again does not ask', await desk.page.locator('#ws-name-box').count() === 0);
 

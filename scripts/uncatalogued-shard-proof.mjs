@@ -6,6 +6,7 @@ import {resolve,join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {browserPool} from './parity/pool.mjs';
 import {serve} from './parity/serve.mjs';
+import { initScript } from './zone-entry.mjs';
 
 /** @param {import('playwright').Browser} browser @param {string} base @param {string} slug */
 export async function uncataloguedShardCase(browser,base,slug) {
@@ -19,14 +20,16 @@ export async function uncataloguedShardCase(browser,base,slug) {
   page.on('pageerror',error=>{errors.push(error.message);});
   page.on('framenavigated',frame=>{if(frame===page.mainFrame())navigations++;});
   const url=new URL(base);
-  for(const [key,value] of Object.entries({chunk:slug,tier:'phone',touch:'1',mute:'1',nolock:'1',sw:'0'}))url.searchParams.set(key,value);
+  for(const [key,value] of Object.entries({tier:'phone',touch:'1',mute:'1',nolock:'1',sw:'0'}))url.searchParams.set(key,value);
+  // the unlisted zone rides a tap in the tab, written as the document starts (CHUNK-PARAM-REMOVAL CP16, J522)
+  await page.addInitScript({content:initScript(slug)});
   const started=Date.now(),deadline=started+8000;
   try {
     await page.goto(url.href,{waitUntil:'domcontentloaded',timeout:8000});
     await page.locator('.ws-main-notice').waitFor({state:'visible',timeout:Math.max(1,deadline-Date.now())});
     const notice=await page.locator('.ws-main-notice').textContent()??'';
     assert.match(notice,/world.*not listed/iu,'The refusal must explain why this world did not open');
-    assert.equal(new URL(page.url()).searchParams.get('chunk'),slug,'A miss must not silently select another URL');
+    assert.equal(page.url(),url.href,'A miss must not silently select another URL');
     assert.deepEqual(discoveries,[],'A refused URL must not download a substitute world');
     assert.deepEqual(errors,[]);assert.equal(navigations,1,'A catalogue miss must not retry the same invalid request');
     const ms=Date.now()-started;assert.ok(ms<10000,`Refusal took ${ms} ms`);

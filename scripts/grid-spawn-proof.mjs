@@ -5,8 +5,8 @@
 // (keys on desktop, the touch stick on the phone), one jump, and the seat's cell as the server's own snapshot names it
 // (`__workerClient().cell`) beside the page's grid cell (`grid.state().inside`). A cell with no card that enters (no card, or
 // a Coming soon / Draft card) is red on the card path; the proof then tries the same card with Developer on (it unlocks the
-// Experimental and Developer-only cards), so the report also says whether the cell itself spawns. (A fresh `/?chunk=` visit lands
-// on the deck, the title arrival, so it is no way round a missing card.) One HTML report, 25 rows × 2 layouts, load ms and shots.
+// Experimental and Developer-only cards), so the report also says whether the cell itself spawns. (No address names a zone
+// (J522), so there is no way round a missing card.) One HTML report, 25 rows × 2 layouts, load ms and shots.
 // J205: staging only, never production. At most 3 pages at once (`WORLD_SEATS` 32).
 //   node scripts/grid-spawn-proof.mjs <out dir> [--layouts=desktop,phone] [--cells=<instance,…>] [--parallel=3] [--no-dev]
 //   node scripts/grid-spawn-proof.mjs <out dir> --report-only [--again=<a second run's runs.json>]   (redraws report.html from <out dir>/runs.json)

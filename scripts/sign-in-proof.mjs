@@ -25,6 +25,7 @@ import sharp from 'sharp';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { intoWorld, openRig, PAGE_PORT, PG_PORT, RELEASE_PORT } from './online-rig.mjs';
+import { enterZone } from './zone-entry.mjs';
 
 const work = process.argv.slice(2).find(value => !value.startsWith('--')) ?? '';
 /** @param {string} name @param {string} fallback */
@@ -133,7 +134,7 @@ try {
   };
   /** Into Driftwood, then who the door seated and what the bag holds. @param {import('./browser-playwright.mjs').Page} page @param {string} shot */
   const join_ = async (page, shot) => {
-    await page.goto(`${rig.base}/?chunk=driftwood-isle&mute=1&nolock=1&skipintro=1`, { waitUntil: 'load' });
+    await enterZone(page, { zone: 'driftwood-isle', base: rig.base, flags: 'mute=1&nolock=1&skipintro=1' });
     await intoWorld(page);
     await page.waitForTimeout(1500);
     await page.screenshot({ path: join(shots, `${shot}.png`) });

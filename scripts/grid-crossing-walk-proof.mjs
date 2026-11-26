@@ -7,7 +7,6 @@
 //   scripts/browser-lane.sh node scripts/grid-crossing-walk-proof.mjs <app dist stamped with http://127.0.0.1:18799/release.json> <work dir> <key.json> [--engine=chromium|webkit] [--to=sunscar|pine|farreach|nalati] [--workers=2] [--base=<staging url>] [--out=<dir>] [--layout=phone] [--solo]
 // GRID-CROSSING GC24 (J311): --layout=phone walks at Jake's iPhone layout (402x874, pixel density 3, touch, phone tier), and each
 // leg's control reads the page's memory (JS heap, the grid's resident and playing MB, the owner ledger, the memory warning);
-// --solo then opens both shards' one-shard pages (?chunk=) in fresh profiles for the same read beside it.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { chromium, webkit } from "./browser-playwright.mjs";
@@ -21,7 +20,7 @@ const [dist = '', relativeWork = '', keyFile = ''] = process.argv.slice(2).filte
 if (dist === '' || work === '' || keyFile === '') throw new Error('usage: grid-crossing-walk-proof.mjs <dist> <work> <key.json> [--engine=chromium|webkit] [--to=sunscar|pine|farreach|nalati] [--out=<dir>]');
 const engineName = process.argv.find(arg => arg.startsWith('--engine='))?.slice(9) ?? 'chromium', out = absolute(process.argv.find(arg => arg.startsWith('--out='))?.slice(6) ?? join(work, 'shots'));
 if (engineName !== 'chromium' && engineName !== 'webkit') throw new Error(`No engine ${engineName}`);
-const phone = process.argv.includes('--layout=phone'), solo = process.argv.includes('--solo');
+const phone = process.argv.includes('--layout=phone');
 // GRID-CROSSING GC2: --breach, at the first wall a leg is held at (a neighbour still preparing: the page's loading wall), else when
 // the last leg ends held (a cell on another worker, GC30's Far Reach wall), throws the breach cases at it by real input from where
 // it stands: jump into it, jump along it both ways, and boost-jump into it. A case holds when the page never enters the target
@@ -271,25 +270,6 @@ try {
   note('no page errors', errors.length === 0, errors.slice(0, 5));
   result.legs = legs;
   note('no memory warning at home or any control', /** @type {{ memoryWarning?: boolean } | undefined} */ (result.memoryAtHome)?.memoryWarning !== true && !legs.some(row => /** @type {any[]} */ (row.events).some(e => e.memory?.memoryWarning === true)));
-  if (solo) {
-    // the same two shards' one-shard pages, each in a fresh profile at the same layout, read 10 s after their world boots
-    /** @type {Record<string, any>} */ const pages = {}; result.solo = pages;
-    for (const slug of [HOME, NEXT]) {
-      const alone = await newContext(browser), one = await alone.newPage();
-      await saveFixture(alone, { scope: 'device', key: 'firstPlayDone', data: true });
-      if (phone) await saveFixture(alone, { scope: 'global', key: 'settings', merge: true, data: { tier: 'phone', volume: 0 } });
-      try {
-        await one.goto(`${rig.base}/?chunk=${slug}&skipintro=1&mute=1&nolock=1`, { waitUntil: 'load' });
-        if (await one.locator('#ws-name-box input').waitFor({ timeout: 20_000 }).then(() => true).catch(() => false)) { await one.locator('#ws-name-box input').fill('walker'); await one.locator('#ws-name-box button[type=submit]').click(); }
-        await one.waitForFunction(() => { const W = /** @type {any} */ (window); return typeof W.__workerClient === 'function' && W.__workerClient().frames > 0 && Array.isArray(W.__bootTiming?.entries) && W.__bootTiming.entries.some((/** @type {{ operation: string }} */ row) => row.operation === 'app:loader-complete'); }, undefined, { timeout: 180_000, polling: 250 });
-        await sleep(10_000);
-        pages[slug] = { url: one.url(), ...await one.evaluate(MEMORY_READ) };
-        await one.screenshot({ path: join(out, `${engineName}-solo-${slug}.png`) });
-      } catch (error) { pages[slug] = { error: String(error).slice(0, 300) }; }
-      note(`one-shard page ${slug} read`, pages[slug].error === undefined, pages[slug]);
-      await alone.close();
-    }
-  }
   const samples = await page.evaluate(() => /** @type {any} */ (window).__gc15c.samples);
   writeFileSync(join(out, `${engineName}-samples.json`), JSON.stringify(samples));
   await context.close();

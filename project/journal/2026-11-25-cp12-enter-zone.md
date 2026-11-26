@@ -40,3 +40,9 @@ staging, doctor, offline and journey drivers enter by the tap, written at the do
 own goto (offline, a stop on `version.json` first is a page the run never asked for, and it stalled the Open Plot
 entry). The socket door takes the agent marker alone. The worker-client harness splits the same way as the nine (its
 old address passes, the tap fails), so it waits on a call rather than a twenty-file retirement nobody named.
+
+CP16 splits so CP22 can land: the worker-client harness and the parity tools go to opus-chunk4, starting from the held
+rewrite (now on its own branch, so plan/chunk-m3 lands without it). The last proofs that named a zone move: the rig
+proofs, net-lag, tier-textures and title-update tap in, zone-gate tells a new document by its missing window marker,
+the unlisted-world refusal and the phone memory card take the tap or a one-cell page. Two proofs nothing runs and that
+proved only the one-shard page retire (content-base, audio-download), and grid-crossing-walk's `--solo` read goes too.

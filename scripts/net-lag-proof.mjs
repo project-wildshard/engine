@@ -27,6 +27,7 @@ import { saveFixture } from './debug-settings.mjs';
 import { guardStagingSockets } from './staging-proof-lines.mjs';
 import { watchFaults } from './proof-faults.mjs';
 import { b1Verdict, b3Verdict, boostBack, bridgeVerdict, installBridgeCorrections, proofVerdict } from './net-lag-verdict.mjs';
+import { enterZone } from './zone-entry.mjs';
 
 const arg = (/** @type {string} */ name, /** @type {string} */ fallback) => process.argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 const DECK = ['driftwood-isle', 'sunscar-dunes', 'nalati-grasslands', 'far-reach', 'pine-hollow', 'nine-dragon-stack'];
@@ -119,7 +120,7 @@ async function runOne(browser, engineName, layout, slug, site, socket) {
   /** @type {ReturnType<typeof setInterval> | undefined} */
   let sampler;
   try {
-    await page.goto(`${site}/?chunk=${slug}&mute=1&nolock=1&skipintro=1`, { waitUntil: 'load', timeout: timeout(90_000) });
+    await enterZone(page, { zone: slug, base: site, flags: 'mute=1&nolock=1&skipintro=1', timeout: timeout(90_000) });
     for (const ends = Date.now() + timeout(120_000); Date.now() < ends;) {
       if (await page.locator('#ws-name-box input').isVisible().catch(() => false)) break;
       const clicked = await page.evaluate(title => {

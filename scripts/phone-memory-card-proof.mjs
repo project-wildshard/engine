@@ -5,6 +5,7 @@ import { chromium } from './browser-playwright.mjs';
 import { bootPage } from './boot-memory-peak.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { debugSettings, saveFixture } from './debug-settings.mjs';
+import { oneCellPage } from './zone-entry.mjs';
 
 const [preview, screenshot] = process.argv.slice(2);
 assert.ok(preview && screenshot, 'Supply the loopback preview URL and screenshot path');
@@ -34,7 +35,7 @@ try {
       if (overBudget) {
         // The document carries the verified cook estimates. Keep the shard and spawn-pack bytes intact.
         const table = /(globalThis\.__WS_SHARDFILE_VERDICTS__=)(\[[^;]*?\]);/u;
-        await context.route(url => url.origin === origin && url.pathname === '/' && url.searchParams.get('chunk') === slug, async route => {
+        await context.route(url => url.origin === origin && url.pathname === '/', async route => {
           const response = await route.fetch(), html = await response.text();
           const body = html.replace(table, (_stamp, prefix, json) => {
             const verdicts = /** @type {{path:string,worst:{playing:number,loading:number}}[]} */ (JSON.parse(json));
@@ -46,7 +47,8 @@ try {
             return `${prefix}${encoded};`;
           });
           assert.ok(response.ok() && changed, 'Expected the server to stamp Brasscap’s cook estimate');
-          await route.fulfill({ response, body });
+          // the one-cell world the over-budget run boots by itself (CP10): bootPage's own route would serve the stamp untouched
+          await route.fulfill({ response, body: oneCellPage(body, slug) });
         });
       }
       const page = await context.newPage();
@@ -54,7 +56,7 @@ try {
       await page.addInitScript(() => {
         document.addEventListener('ws:control-ready', () => { document.documentElement.dataset.memoryProofControl = 'true'; });
       });
-      await bootPage(page, origin, slug);
+      await bootPage(page, origin, overBudget ? '' : slug);
       const card = page.getByRole('dialog', { name: 'This world may crash this phone' });
       const error = page.locator('#wserr');
       const control = page.locator('html[data-memory-proof-control=true]');

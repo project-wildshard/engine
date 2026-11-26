@@ -13,6 +13,7 @@ import { chromium, webkit } from "./browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { pageMemoryAttributionExpression } from './memory-report-snapshot.mjs';
+import { enterZone } from './zone-entry.mjs';
 
 const { tierGlb, trimKtx2 } = await import('../src/cook/game/tierTextures.ts');
 
@@ -74,7 +75,7 @@ try {
   });
   const page = await context.newPage(); page.setDefaultTimeout(240_000);
   page.on('pageerror', error => { result.errors.push(error.message.slice(0, 240)); });
-  await page.goto(`${base}/?chunk=${slug}&skipintro&mute=1&nolock=1`, { waitUntil: 'commit', timeout: 120_000 });
+  await enterZone(page, { zone: slug, base, flags: 'skipintro&mute=1&nolock=1', waitUntil: 'commit', timeout: 120_000 });
   const started = Date.now();
   for (;;) {
     await sleep(500);

@@ -17,6 +17,7 @@ import {chromium} from './browser-playwright.mjs';
 import {KEYCHAIN_ARGS} from './chromium-keychain.mjs';
 import {mutedLaunch, silenced} from './browser-silence.mjs';
 import {agentUserAgent} from './agent-marker.mjs';
+import { enterZone } from './zone-entry.mjs';
 
 export const TITLE_MS = 2000, FROZEN_MS = 1000;
 // The title, muted (`skipintro` would skip it straight into play); the warm seed's zone visit adds the rest.
@@ -82,7 +83,7 @@ export async function main(args) {
         await page.waitForTimeout(5000);
       }
       if (kind === 'warm') {
-        await page.goto(`${origin}/${QUERY}&nolock=1&skipintro=1&chunk=driftwood-isle`, {waitUntil: 'domcontentloaded', timeout: 60_000});
+        await enterZone(page, {zone: 'driftwood-isle', base: origin, flags: `${QUERY.slice(1)}&nolock=1&skipintro=1`, waitUntil: 'domcontentloaded', timeout: 60_000});
         await page.waitForFunction(() => window.__wildshard?.shard?.grid?.state?.()?.live?.live?.gameplayReady === true, undefined, {timeout: 120_000}).catch(() => undefined);
         await page.goto(`${origin}/${QUERY}`, {waitUntil: 'domcontentloaded', timeout: 60_000});
         await page.waitForFunction(() => (/** @type {any} */ (window).__titleProbe?.mainAt ?? -1) >= 0, undefined, {timeout: 60_000});

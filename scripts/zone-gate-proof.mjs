@@ -284,8 +284,8 @@ try {
     const consoleRows = /** @type {string[]} */ ([]); /** @type {any} */ (result).console = consoleRows;
     page.on('console', message => { if (message.type() === 'error' || message.type() === 'warning' || /reload|recover|unload|leav|\[grid\]/iu.test(message.text())) consoleRows.push(`${message.type()}: ${message.text().slice(0, 300)}`); });
     // the old world goes one of two ways: the same-page entry (ZE10a3) retires its Game in this document (marked from inside the
-    // page, the window marker kept), or the reload form's new document (`?chunk=`; the entry first rewrites the old page's own
-    // address, a same-document event 0.2 s before the old document went)
+    // page, the window marker kept), or the reload form's new document (the zone rides the tab, J522; a new
+    // document has no window marker, so a same-document address event never counts)
     // the same-page form is timed on the page's own clock: the gate's 0 (the loading screen's navigation shell), the old Game's
     // dispose and every resource read of the target (a PerformanceObserver), since the protocol's network and navigation events
     // reach this script in no fixed order under load. A read before the 0 is the road's own view of the cell (its ring tiles and
@@ -299,7 +299,7 @@ try {
       W.__zeMark = 1; game.dispose = (/** @type {unknown[]} */ ...args) => { const done = retire(...args); W.__zeLeftAt = Date.now(); W.__zeLeftPerf = performance.now(); return done; };
     }, targetSlug);
     const departure = await Promise.any([
-      page.waitForEvent('framenavigated', { predicate: frame => frame === page.mainFrame() && frame.url().includes('chunk='), timeout: 8000 }).then(() => ({ how: 'navigation', at: Date.now() })),
+      page.waitForFunction(() => /** @type {any} */ (window).__zeMark === undefined, undefined, { timeout: 8000, polling: 20 }).then(() => ({ how: 'navigation', at: Date.now() })),
       page.waitForFunction(() => /** @type {any} */ (window).__zeLeftAt !== undefined, undefined, { timeout: 8000, polling: 20 })
         .then(async () => ({ how: 'same page', at: /** @type {number} */ (await page.evaluate(() => /** @type {any} */ (window).__zeLeftAt)) })),
     ]).catch(() => null);
