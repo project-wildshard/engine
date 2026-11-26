@@ -240,6 +240,24 @@ test('a quit on the link that came back for a held body ends the hold at once', 
   await vi.waitFor(() => { expect(bench?.room(SHARD)?.holds(IDENTITY.player)).toBe(false); expect(bench?.world.health().players).toBe(0); }, { timeout: 3000 });
 });
 
+// QA 11-25 row 85: a page with a cell to ask for holds its hello for the door's first word (CHUNK-PARAM CP5, gotoFirst); its quit
+// link needs no goto, and a quit said before its hello reaches a door that knows no seat, so the held body (or a full world's ticket,
+// failmode 25) stayed
+test('a quit from a page with a goto word still lets the held body go at once', { timeout: 30_000 }, async () => {
+  bench = await roomBench();
+  const first = connectOnline({ socket: bench.url, build: 'bench', loaded: SHARD, identity: IDENTITY }, { link: () => undefined, countdown: () => undefined, elsewhere: () => undefined });
+  pump = setInterval(() => { first.client.present(); first.client.flush(); }, 16);
+  await first.booted;
+  first.ready();
+  await vi.waitFor(() => { expect(bench?.room(SHARD)?.holds(IDENTITY.player)).toBe(true); }, { timeout: 5000 });
+  clearInterval(pump); first.dispose();
+  await new Promise(resolve => { setTimeout(resolve, 500); });
+  expect(bench.room(SHARD)?.holds(IDENTITY.player), 'a lost link holds its body (J114)').toBe(true);
+  shell = connectOnline({ socket: bench.url, goto: () => ({ cell: SHARD, spawn: false }), build: 'bench', loaded: SHARD, identity: IDENTITY }, { link: () => undefined, countdown: () => undefined, elsewhere: () => undefined });
+  void shell.leave();
+  await vi.waitFor(() => { expect(bench?.room(SHARD)?.holds(IDENTITY.player)).toBe(false); expect(bench?.world.health().players).toBe(0); }, { timeout: 3000 });
+});
+
 test('a quit while the link is down and redialling still lets the held body go', { timeout: 30_000 }, async () => {
   bench = await roomBench();
   const links: LinkState[] = [];

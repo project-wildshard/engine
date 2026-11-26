@@ -128,9 +128,20 @@ export class NetClient {
   hello(build = '', identity: NetIdentity = GUEST, ledger = 0): void {
     this.ledgerSerial = ledger; this.said = { build, identity };
     const transport = this.transport;
-    const send = (): void => { if (this.transport === transport) transport.send('reliable', helloMessage({ build, player: identity.player, name: identity.name, ledger }).buffer); };
+    let sent = false;
+    const send = (): void => {
+      if (sent || this.transport !== transport) return;
+      sent = true; if (this.heldHello === send) this.heldHello = null;
+      transport.send('reliable', helloMessage({ build, player: identity.player, name: identity.name, ledger }).buffer);
+    };
+    this.heldHello = send;
     if (this.helloFirst === null) send(); else this.helloFirst(transport, send);
   }
+  /** QA 11-25 row 85: a hello `sayFirst` still holds (a goto page waiting for the door's first word); null once it went. */
+  private heldHello: (() => void) | null = null;
+  /** A page that leaves says its held hello now, without the goto word, so its quit follows a hello the door can name a seat
+   *  from; the wait's own later send then says nothing. */
+  helloNow(): void { this.heldHello?.(); }
   /**
    * The link died and `transport` is its replacement (E7.1, C2): a fresh `hello` on it. What was held named the old link, so it
    * goes as a crossing's does, and what this client has heard of the ledger stays, so no receipt comes twice. A server always

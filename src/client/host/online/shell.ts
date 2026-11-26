@@ -288,11 +288,15 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
     // in the same turn as the close, before the page heard it), so the quit is said once more on a fresh link.
     leave: () => {
       redial.dispose();
+      // QA 11-25 row 85: a leaving page asks for no cell, so its hello goes at once (no `gotoFirst` wait for the door's word) and
+      // reaches the door before the quit: a quit ahead of any hello names no seat, so a held body or a line's ticket stayed
+      client.sayFirst(null);
       const say = (again: boolean): Promise<void> => {
         let quitting = link;
         // A retry always dials: the link it follows is closed, whether or not `hear` was watching it.
         if (quitting === null || down || !again) { quitting = new WebSocketTransport(address()); link = quitting; down = false; client.rejoin(quitting); }
         const gone = new Promise<void>(resolve => { quitting.onClose(reason => { if (again && reason === 'stalled') void say(false).then(resolve); else resolve(); }); });
+        client.helloNow();
         quitting.control('ready', new Uint8Array([LEAVE_FLAG]).buffer);
         return gone;
       };
