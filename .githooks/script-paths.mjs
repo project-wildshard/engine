@@ -555,6 +555,18 @@ export function judge(found, baseline) {
   return { added: found.filter((line) => !known.has(line)), shrunk: baseline.filter((line) => !now.has(line)) };
 }
 
+/**
+ * Meta QA 11-25 row 145: whether a repo path, a file or a folder, is in git's tracked tree (`paths`, from
+ * `git ls-files`). The push gate judges a clean copy of the pushed commit, so an untracked or ignored folder on disk
+ * must not change the verdict here.
+ * @param {readonly string[]} paths @returns {(path: string) => boolean}
+ */
+export function trackedExists(paths) {
+  const tree = new Set(['.']);
+  for (const path of paths) for (let at = path; at !== '.' && !tree.has(at); at = posix.dirname(at)) tree.add(at);
+  return (path) => tree.has(posix.normalize(path).replace(/\/$/u, '') || '.');
+}
+
 /** The repo at `root`, judged: its tracked scripts against its baseline. @param {string} root */
 export function scriptPathsVerdict(root) {
   const paths = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8', maxBuffer: 64 << 20 }).split('\0').filter(Boolean);
@@ -566,7 +578,9 @@ export function scriptPathsVerdict(root) {
       return false;
     }
   };
-  const read = (/** @type {string} */ path) => readFileSync(join(root, path), 'utf8'), exists = (/** @type {string} */ path) => existsSync(join(root, path));
+  // Meta QA 11-25 row 145: a path exists when git tracks it (or a file under it), never by the disk, so an untracked
+  // local folder (engine-quickfix's stray scripts/) cannot hide a finding the push gate's clean copy refuses.
+  const read = (/** @type {string} */ path) => readFileSync(join(root, path), 'utf8'), exists = trackedExists(paths);
   const found = [...scriptPathFindings({ paths, read, exists, ignored }), ...movedFindings({ paths, read, exists })];
   const file = join(root, BASELINE), recorded = existsSync(file);
   /** @type {string[]} */
