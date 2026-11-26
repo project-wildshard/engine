@@ -13,3 +13,6 @@
   depend on the param (or on `sw=0` switching the worker off), so they move with CP22, when the code stops reading it.
 - CP21: the trailer's lone-zone shot (`singleZone: true`) now boots a one-cell world through `enterZone({ alone: true })`.
   Nobody answered the NOTE, and the trailer lanes had nothing in flight, so it went in as described.
+- CP18: the drain-inbox, look-loop and mockup-to-model skills, `docs/look-loop.md` and `docs/trailer.md` now describe
+  entering a zone by its tap (`zone-entry.mjs --init` or `enterZone`), and `cameras.json` gets a `zone` field. The
+  look-loop skill changed the same way in repo-kit, and engine's `AGENTS.md` has the one-line rule.

@@ -125,6 +125,9 @@ Docs / Repo shape
 Code rules
 
  - In the test suite, No LLM, no claude, no herdr.
+ - **No zone in a URL (J522):** a page enters a zone by its tap, its tab's handoff or a record, never a `chunk` query
+   param; a tool enters with `scripts/zone-entry.mjs` `enterZone` (`alone: true` when it measures one zone), and the
+   chunk-param guard refuses a new one.
  - **Wire and save freeze (WIRE-STABILITY WR14, declared 2026-11-19 under J432):** a wire change is a lock diff
    (`@wildshard/wire` in shard-format: a new minor, `wire check`, then the engine pin); a save change is a `v`, a
    migration and a pin (`saves.lock.json`, `pnpm check:saves`). `check:wire` and `check:saves` run in the push gate

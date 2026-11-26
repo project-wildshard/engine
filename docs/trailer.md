@@ -8,8 +8,9 @@
 
 Every frame comes from the game itself, posed and stepped by the capture clock; nothing is rendered
 outside it. Trailers shoot the grid as players see it: every page comes in through the title's MMO card
-and stands in its shot's cell, neighbours at the edges (`grid.mjs`); `?chunk=`, a zone alone, which no
-player ever sees, boots only for a shot that says `singleZone: true`. A trailer is two data files (its shots and its cut) and six commands.
+and stands in its shot's cell, neighbours at the edges (`grid.mjs`); a zone alone (a one-cell world
+through zone-entry's `alone`; no URL names a zone, J522), which no player ever sees, boots only for a shot that says
+`singleZone: true`. A trailer is two data files (its shots and its cut) and six commands.
 
 ## The pieces
 

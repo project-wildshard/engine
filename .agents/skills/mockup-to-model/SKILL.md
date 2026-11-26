@@ -57,8 +57,10 @@ void.
    reviews at: serve a build
    (`URL=$(scripts/serve-build.sh --head --shard <slug>)`),
    `agent-browser --session <s> set viewport 390 844`, then open
-   `${URL}?touch&tier=phone&skipintro&nolock&mute=1&chunk=<slug>`
-   (headless, always muted). Walk or fly to the spot, `screenshot`, and
+   `${URL}version.json`, run the tap from
+   `node scripts/zone-entry.mjs --init <slug>` there, and open
+   `${URL}?touch&tier=phone&skipintro&nolock&mute=1` (headless, always
+   muted; no URL names a zone, J522). Walk or fly to the spot, `screenshot`, and
    `close`.
    - Before you open a browser, check `agent-browser session list` and
      `pgrep -fl chrome-headless-shell`: at most 3 game browsers run on
@@ -298,8 +300,9 @@ Read `docs/design/blender-practice.md` first.
   - `node scripts/physics-baseline.mjs --no-build --mode=walk` (and
     `--trails`): 0 stuck is the bar;
   - if structures moved, re-check the owning shard's navmesh bake.
-- **Check the card** in the Model Explorer (the harness param
-  `?explore=model&chunk=<slug>`):
+- **Check the card** in the Model Explorer (the zone's tap from
+  `node scripts/zone-entry.mjs --init <slug> --mode explore`, then
+  `/?explore=model`):
   - it is under the right tab;
   - the triangles per copy and the draws are what §2 planned;
   - TIERS shows the phone copy;

@@ -57,12 +57,16 @@ CI). A note about one shard's content gets its ask in that shard repo
 
 ## 3. Reproduce on the spot
 
-`context.repro` is the note's own URL path:
-`/?chunk=<shard>&at=x,y,z,yaw,pitch&weapon=<id>&skipintro`; the game
-starts you exactly where the note was filed. Serve a build
-(`scripts/serve-build.sh --head`, or `--rev <build sha>`) and open
-`<preview URL><repro>` with agent-browser, headless, at the note's
-`viewport` (add `&tier=phone&touch` when `tier` is `phone`). Wrap
+A note's context names where it was filed as fields: `zone`, and
+`pose` (x, y, z, yaw, pitch) or Explore's `explore`, `cam` and `model`.
+No URL names a zone (J522). Serve a build (`scripts/serve-build.sh
+--head`, or `--rev <build sha>`); in agent-browser, headless, at the
+note's `viewport`, open `<preview URL>/version.json`, run the tap from
+`node scripts/zone-entry.mjs --init <zone>` there (Playwright code calls
+`enterZone` from the same file), then open
+`<preview URL>/?at=<pose, comma-joined>&weapon=<id>&skipintro` (add
+`&tier=phone&touch` when `tier` is `phone`). The game starts you where
+the note was filed. Wrap
 browser work in `scripts/browser-lane.sh` (at most 3 game browsers on
 this Mac) and close the session when done. Screenshot it and compare
 with the note's jpg. Cannot reproduce it? Say so in the ask and move on.

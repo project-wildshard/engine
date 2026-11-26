@@ -84,7 +84,8 @@ e.g. `art/look/<round>/cameras.json`):
 ```json
 {
   "about": "what this round is, and why P and faceTo",
-  "query": "chunk=<slug>&mute=1&skipintro=1&nolock=1&sw=0",
+  "zone": "<slug>",
+  "query": "mute=1&skipintro=1&nolock=1&sw=0",
   "settings": { "weather": "clear" },
   "fp": { "viewport": [390, 844], "dpr": 3, "pitch": -0.06 },
   "god": { "viewport": [1600, 900], "fovV": 72, "topUp": 90, "diagUp": 45, "diagOut": 55, "lookAhead": 20 },
