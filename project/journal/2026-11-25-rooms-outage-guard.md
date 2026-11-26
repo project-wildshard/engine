@@ -77,3 +77,7 @@
   version needs a maintainer's 2FA, so it waits on Jake.
 - The publish step now polls `npm view <name>@<version>` (40 tries, 30 s apart) after `npm publish` and fails naming
   staged publishing and `npm stage approve` when the version never appears. Test: `test/npm-release-ci.test.ts`.
+- Correction, same night: npm listed 0.1.92 at 01:36 UTC, 56 min after the publish; "previously staged" was npm's
+  own processing, which repo-kit's `release.sh vX --published` (AR6) already waits out (it names 9 to 55 min and the
+  E409). The in-job poll could not work under the job's 10 min timeout, so it is removed; the release lane runs
+  `--published` after a `publish_final` dispatch.

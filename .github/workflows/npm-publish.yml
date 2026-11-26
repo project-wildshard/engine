@@ -341,17 +341,6 @@ jobs:
             exit 0
           fi
           npm publish --provenance --access public --ignore-scripts --tag "$NPM_CHANNEL" "$ENGINE_NPM_ARCHIVE"
-          # QA 11-25 row 76: npm printed "+ @wildshard/engine@0.1.92" and then held it in staged publishing, so the run
-          # went green with nothing on the registry. A publish is done only when npm lists the version.
-          for _ in $(seq "${NPM_VISIBLE_TRIES:-40}"); do
-            if npm view "$name@$NPM_VERSION" version --prefer-online >/dev/null 2>&1; then
-              echo "::notice::npm lists $name@$NPM_VERSION."
-              exit 0
-            fi
-            sleep "${NPM_VISIBLE_WAIT:-30}"
-          done
-          echo "::error::npm accepted $name@$NPM_VERSION but does not list it: it is probably in staged publishing. A maintainer approves it with 2FA: npm stage list $name, then npm stage approve <stage-id>."
-          exit 1
 
   placeholder:
     # Only main's copy of this file: the trusted publisher is bound to the file name, not the branch.
