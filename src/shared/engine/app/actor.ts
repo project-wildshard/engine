@@ -42,12 +42,19 @@ export function classifyActor(facts: ActorFacts): ActorMark {
 
 /** The public key every real release is signed with: src/scripts/vps/setup.sh's EXPECTED_RELEASE_PUBLIC_KEY (a test holds them equal). */
 export const PINNED_RELEASE_KEY = '302a300506032b657003210012e17122631777e2a6ad68e2fb4883d856def46f812aa9a3e49d701ed44ad17b';
+/** A release key as every signer writes it: an Ed25519 public key, SPKI DER in lowercase hex (`export({ type: 'spki', format: 'der' })`). */
+const RELEASE_KEY_SHAPE = /^302a300506032b6570032100[0-9a-f]{64}$/u;
 /** J205/J209: production is humans only. A server refuses a marked agent at its door on a production release the pinned
  *  key signed. A production release its own throwaway key signed is a local replica (mmo-bots, room-soak, the box's
  *  replica.mjs: QA 11-24 row 72 found every marked bot refused there), never production: the real one verifies the
- *  pipeline's signature with the pinned key, so it can't boot on any other. A caller that names no key is refused. */
+ *  pipeline's signature with the pinned key, so it can't boot on any other. A caller that names no key is refused.
+ *  It fails closed: on production only a well-formed key that is not the pinned one admits agents, so an empty, blank,
+ *  malformed or unreadable key (a missing env read as `''`) refuses them. */
 export const agentsRefusedOn = (channel: string, releaseKey: string = PINNED_RELEASE_KEY): boolean =>
-  channel === 'production' && releaseKey.trim().toLowerCase() === PINNED_RELEASE_KEY;
+  channel === 'production' && (!RELEASE_KEY_SHAPE.test(releaseKey) || releaseKey === PINNED_RELEASE_KEY);
+/** The door's agent mode, for the boot log: a wrong mode shows in the journal. */
+export const agentDoorMode = (channel: string, releaseKey: string): string =>
+  agentsRefusedOn(channel, releaseKey) ? 'refusing agents' : channel === 'production' ? 'replica, admitting agents' : `${channel}, admitting agents`;
 /** What a refused agent reads: plain words, no code. */
 export const AGENTS_REFUSED = 'Wildshard agents never join production (J205); use staging.';
 const CARRIERS: ReadonlySet<ActorMark['why']> = new Set(['door-pass', 'header', 'query', 'user-agent', 'stored']);

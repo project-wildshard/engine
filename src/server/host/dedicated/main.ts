@@ -20,7 +20,7 @@ import { guestExpiryDays, startGuestExpiry } from './saves/expiry';
 import { accountRoutes } from './accountRoutes';
 import { PLAYER_TICKET_PUBLIC_KEY } from './ticket';
 import { Scope } from '@wildshard/engine/app/scope';
-import { agentsRefusedOn } from '@wildshard/engine/app/actor';
+import { agentDoorMode, agentsRefusedOn } from '@wildshard/engine/app/actor';
 import type { ReleaseFile } from '../../../shared/host/releaseRows';
 import { fetchReleaseFile, readPulledReleaseCells, servingRelease, ReleaseWatch } from './releaseFile';
 import { savesUrl } from './saves/pgDatabase';
@@ -136,6 +136,9 @@ const failed = (error: unknown): void => { if (ending) return; ending = true; lo
 process.on('uncaughtException', failed);
 // VH10: which forwarded header the door believes, and which pages may open a socket. A word it doesn't know stops here.
 const trust = doorTrust(process.env);
+// J205: the door's agent mode, decided once and logged, so a box refusing or admitting agents by mistake shows in the journal
+const refuseAgents = agentsRefusedOn(release.channel, releaseKey);
+log({ at: 'door.agents', channel: release.channel, mode: agentDoorMode(release.channel, releaseKey) });
 // MMO-PLAN MP2.2c: a proof's or a dev box's own ticket key, SPKI DER hex; unset, the pinned one (`ticket.ts`). The box's settings
 // are root's (`wildshard-config`), and the boot log says when the pin is overridden.
 const ticketKey = setting('PLAYER_TICKET_PUBLIC_KEY');
@@ -144,7 +147,7 @@ if (ticketKey !== undefined) log({ at: 'tickets.key', pinned: false, key: ticket
 // the measured table's row. An author's local product has one cell and no book to read.
 const declared: DeclaredCells = authorProduct === undefined ? await declaredCells(cells, cell => readPackHeader(cellShard(cell), build, { origin, cache }, itemReads)) : new Map();
 if (declared.size > 0) log({ at: 'world.declared', cells: Object.fromEntries(declared) });
-const world: World = await World.open({ build, cells, declared, roads: crossing, ...worldSettings(release.channel, process.env), ...trust, refuseAgents: agentsRefusedOn(release.channel, releaseKey), ...(ticketKey === undefined ? {} : { ticketKey }), secret: seatSecret, saves, log, boot: bootWorker, ...(grace === undefined ? {} : { graceMs: Number(grace) }),
+const world: World = await World.open({ build, cells, declared, roads: crossing, ...worldSettings(release.channel, process.env), ...trust, refuseAgents, ...(ticketKey === undefined ? {} : { ticketKey }), secret: seatSecret, saves, log, boot: bootWorker, ...(grace === undefined ? {} : { graceMs: Number(grace) }),
   ...(arrivals === undefined ? {} : { entered: (seat, slug, actor) => { if (arrivals.entered(seat, slug, actor)) metrics?.entered(slug, actor.actor); } }),
   ...(sessions === undefined ? {} : { sessions }),
   // Q77: a worker that fails ends the process. systemd starts it again, clients redial, and saves stand at the last checkpoint.
@@ -169,7 +172,7 @@ const zoneSelect = zoneSelectRoute({
   log,
 });
 const zoneSelectPress = zoneSelectPressRoute({
-  ...trust, channel: release.channel, refuseAgents: agentsRefusedOn(release.channel, releaseKey),
+  ...trust, channel: release.channel, refuseAgents,
   enterable: slug => world.openShards().includes(slug),
   press: (slug, actor) => { arrivals?.pressed(slug, actor); },
 });

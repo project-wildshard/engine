@@ -6,7 +6,7 @@ import { once } from 'node:events';
 import { readFileSync } from 'node:fs';
 import { WebSocket } from 'ws';
 import { afterEach, expect, test, vi } from 'vitest';
-import { AGENTS_REFUSED, PINNED_RELEASE_KEY, agentsRefusedOn, carriesAgentMarker, classifyActor } from '../src/shared/engine/app/actor';
+import { AGENTS_REFUSED, PINNED_RELEASE_KEY, agentDoorMode, agentsRefusedOn, carriesAgentMarker, classifyActor } from '../src/shared/engine/app/actor';
 import { World, type WorkerLink } from '../src/server/host/dedicated/world';
 import { memoryPlayerSaves } from '../src/server/host/dedicated/playerSaves';
 import { SocketTransport } from '../src/server/host/dedicated/socketTransport';
@@ -123,4 +123,25 @@ test('a self-signed production replica admits agents; the pinned key is the rele
   expect(agentsRefusedOn('staging', PINNED_RELEASE_KEY)).toBe(false);
   const setup = /^EXPECTED_RELEASE_PUBLIC_KEY=([0-9a-f]+)$/mu.exec(readFileSync('src/scripts/vps/setup.sh', 'utf8'))?.[1];
   expect(setup).toBe(PINNED_RELEASE_KEY);
+});
+
+// QA 11-24 row 72 (planner, 11-26): the door fails closed. An exact match on the pinned key let an empty, blank or malformed
+// RELEASE_PUBLIC_KEY (a missing env read as '') admit agents on production; only a well-formed other key is a replica.
+test('a production door refuses agents unless its release key is a well-formed key other than the pinned one', () => {
+  const other = '302a300506032b6570032100' + 'ab'.repeat(32);
+  for (const key of ['', ' ', '\n\t', 'not-a-key', '302a300506032b6570032100', `${other}00`, other.slice(0, -2), other.toUpperCase(), ` ${other}`,
+    '3059301306072a8648ce3d020106082a8648ce3d030107034200' + 'ab'.repeat(32), PINNED_RELEASE_KEY, ` ${PINNED_RELEASE_KEY}\n`, PINNED_RELEASE_KEY.toUpperCase()]) {
+    expect(agentsRefusedOn('production', key), JSON.stringify(key)).toBe(true);
+    expect(agentDoorMode('production', key)).toBe('refusing agents');
+  }
+  expect(agentsRefusedOn('production', other)).toBe(false);
+  expect(agentDoorMode('production', other)).toBe('replica, admitting agents');
+  for (const key of ['', PINNED_RELEASE_KEY, other]) expect(agentsRefusedOn('staging', key)).toBe(false);
+  expect(agentDoorMode('staging', PINNED_RELEASE_KEY)).toBe('staging, admitting agents');
+});
+
+test('the dedicated server decides the door once and logs its mode at boot', () => {
+  const main = readFileSync('src/server/host/dedicated/main.ts', 'utf8');
+  expect(main).toMatch(/log\(\{ at: 'door\.agents', channel: release\.channel, mode: agentDoorMode\(release\.channel, releaseKey\) \}\)/u);
+  expect(main.match(/agentsRefusedOn\(/gu)).toHaveLength(1);
 });
