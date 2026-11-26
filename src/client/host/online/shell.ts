@@ -71,7 +71,7 @@ export interface OnlineConfig {
   /** The cell this page has loaded. */
   readonly loaded: string;
   readonly identity: NetIdentity;
-  /** GO4: a grid page, and the grid cell (instance) it booted in. A seat elsewhere re-enters the grid there, never a `?chunk=` page. */
+  /** GO4: a grid page, and the grid cell (instance) it booted in. A seat elsewhere re-enters the grid there, never a one-shard page. */
   readonly gridCell?: string;
   /** The grid's cells by instance, in frame order (a frame's cell number less one): what a held seat's first frame names. */
   readonly gridCells?: readonly string[];

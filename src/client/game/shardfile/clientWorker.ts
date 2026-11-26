@@ -89,7 +89,7 @@ export interface WorkerClientGrid {
   readonly saveLocation: () => void;
   /** GO5: the world's door named where this player stands (a grid instance, cell-local). The page's own hint and card follow it. */
   readonly serverPlace?: (instance: string, at: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }) => void;
-  /** GO4: the seat is in another cell than this page booted: enter the grid again there (a grid entry, never a `?chunk=` page). */
+  /** GO4: the seat is in another cell than this page booted: enter the grid again there (a grid entry, never a one-shard page). */
   readonly reenter?: (instance: string) => void;
   /** GO5: the same entry on this page (the app's same-page entry): `handOver` runs once it will go, before the page leaves, and the
    *  answer is true; false when this page can't enter in place (nothing ran). */
@@ -538,7 +538,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   }
   const standalone = (): Promise<Shell> => adopted?.shell ?? bootStandalone(slug, ports.grid === null, () => { card.add(); });
   // E7.2d, GO4: a build stamped with a world puts every page in it, a grid page as well as a one-shard page (no URL switches). A grid
-  // page whose seat is in another cell enters the grid again there, never a `?chunk=` page; GO5's hint makes that rare.
+  // page whose seat is in another cell enters the grid again there, never a one-shard page; GO5's hint makes that rare.
   const onlineModule = (): Promise<OnlineModule> => bootTask('server:online-module', () => import(/* @vite-ignore */ `${root}/online.js`)) as Promise<OnlineModule>;
   const online = async (world: BuildWorld, storage: SaveStorage): Promise<Shell> => {
     const { grid } = ports, booted = grid?.booted;

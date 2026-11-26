@@ -1,7 +1,7 @@
 // SHARD-AUTHORING SA33 to SA35, the page half (meta SHARD-AUTHORING-PLAN): a released page (staging, production) learns the cells the API
 // placed after its build, at runtime, from the same signed placement file the MMO reads (`releases/<channel>-placements.json`, SA33a).
 // Its build bakes the pinned grid (`catalogue.json`, C3); the MMO's grid is that plus this file, so without it a placed shard had no
-// Shard Select card and `?chunk=<slug>` landed on the deck. The file is believed only under the API's placement key, as the box and
+// Shard Select card and its zone landed on the deck. The file is believed only under the API's placement key, as the box and
 // SA35's preview bake believe it. A missing, late, unreadable or refused file keeps the build's grid: boot never waits past
 // `PLACED_DEADLINE_MS` and never fails here. The bucket sends it `no-store`, the read asks `no-store`, and the service worker leaves
 // `/releases/` to the network (sw.js `isContentRead`), so no cache serves an old file.
@@ -164,7 +164,7 @@ const cookContent = (url: string, read: typeof fetch): NonNullable<PlacedPorts['
     : placedContent(slug, hash, { fetch: read, signal, packs: new URL('/', url).href, build, validator: typeof validator === 'string' ? validator : null });
 };
 /** HERO-GATE HG4: a carded slug wears the hero its upload carried (`placedContent.ts`); one with none keeps its cell and its
- *  `?chunk=` way in, but its plain card is Developer only (`hidden`): a player never sees a zone without its picture. */
+ *  way in (a harness's), but its plain card is Developer only (`hidden`): a player never sees a zone without its picture. */
 const heroed = (row: TitleManifest, content: PlacedContent | undefined): TitleManifest =>
   content?.card === undefined ? { ...row, status: 'hidden' } : { ...row, card: content.card };
 /** After every row's `order`, so a carded shard is last in the deck. */

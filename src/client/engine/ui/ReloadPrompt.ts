@@ -21,9 +21,9 @@ const TITLE_SKIPPERS = ['skipintro', 'tour', 'showcase', 'nolock', 'x', 'z', 'ya
 
 /** reload the page with the saved picks; `control` (the tapped button) turns into a loading button and the full-page
  *  RELOADING cover goes up in the tap's own turn (RL3). SR12: in a world it comes back in the same shard where the player
- *  stands: a shard page by `?at=` (the level's authored frame) and `?glreload`, as GPU recovery does; a grid page (no
- *  `?chunk=`) by the planned-reload capture markReload's `settings` reason runs, on its bare address; an online build also carries the tap that seated it (QA
- *  row 16), since a level there enters only from one. On the title (no pose) it is an explicit reload: back to the title. */
+ *  stands: a one-shard page by `?at=` (the level's authored frame) and `?glreload`, its zone handed in the tab (CHUNK-PARAM
+ *  CP3), as GPU recovery does; a grid page by the planned-reload capture markReload's `settings` reason runs. Every address is bare
+ *  of a zone, and the tab's handoff is the tap a level enters from (QA row 16). On the title (no pose) it is an explicit reload: back to the title. */
 export function reloadWithPicks(why = 'reload prompt: reload now', control?: HTMLElement): void {
   showReloading(control);
   const url = new URL(settingsReloadUrl(location.href, TITLE_SKIPPERS));

@@ -13,15 +13,11 @@ export function defaultShard(): string {
 }
 export const playable = (manifest: Pick<ShardManifest, 'status'>): boolean => manifest.status !== 'hidden';
 
-/** CHUNK-PARAM CP1 (J522): the zone this page boots, as the entry resolved it (a tap's zone on a bare address), set before the
- *  running manifest is first read; the address's `?chunk=` stays the fallback until CP22. */
+/** CHUNK-PARAM CP1, CP8 (J522): the zone this page boots, as the entry resolved it (a tap's, a record's, an inline world's), set
+ *  before the running manifest is first read; no address names it. None: the default level's. */
 let pageZone: string | null = null;
 export function setPageZone(slug: string | null): void { pageZone = slug; }
-export function shardSlugFromUrl(search?: string): string {
-  if (search === undefined && pageZone !== null) return pageZone;
-  const named = new URLSearchParams(search ?? (typeof location === 'undefined' ? '' : location.search)).get('chunk');
-  return named ?? defaultShard();
-}
+function pageZoneSlug(): string { return pageZone ?? defaultShard(); }
 
 /** O15: each installed list's slug table, built once (a Map of every manifest per call was ~500 Simulator samples of
  *  Driftwood's road-entry drive: the grid's per-frame readers look shards up by slug) */
@@ -39,7 +35,7 @@ export function findShard(slug: string): ShardManifest | undefined {
 }
 
 function initialShard(): ShardManifest {
-  const manifest = findShard(shardSlugFromUrl()) ?? findShard(defaultShard());
+  const manifest = findShard(pageZoneSlug()) ?? findShard(defaultShard());
   if (manifest === undefined) throw new Error(`Missing default shard ${defaultShard()}`);
   return manifest;
 }
@@ -76,4 +72,4 @@ export function setActiveChunk(slug: string): ShardManifest {
   return game.shard;
 }
 
-export { findShard as findChunk, shardSlugFromUrl as chunkSlugFromUrl, defaultShard as defaultChunk };
+export { findShard as findChunk, defaultShard as defaultChunk };

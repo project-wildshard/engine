@@ -55,15 +55,14 @@ export interface World {
  * Builds the base chunk (renderer, sky, terrain, forest, player) and returns the handles.
  * Feature entry points (dev/*.html) and main.ts both start here.
  *
- * URL params: ?chunk=<slug>  which shard (default driftwood-isle, see src/client/game/shard/registry.ts)
- *             ?x=&z=&yaw=&pitch=  spawn pose (metres / radians)
+ * The shard is the one the entry booted (src/client/game/shard/registry.ts; no address names it, CHUNK-PARAM CP8).
+ * URL params: ?x=&z=&yaw=&pitch=  spawn pose (metres / radians)
  */
 export async function bootstrap(step: StepRunner, level: LevelSpec, inputContexts: readonly InputContextDef[] = []): Promise<World> {
   applyLevelTier(level.tiers?.[TIER]);
   applyDensityLod(TIER_CONFIG, TIER, densityIn(graphicsMode())); // IP34: phone Low's LOD knobs at its drawing density
   const params = new URLSearchParams(location.search);
   const num = (k: string, d: number): number => { const v = params.get(k); return v === null ? d : Number.parseFloat(v); };
-  // The selected shard was resolved before main.ts removes ?chunk from a standalone PWA URL.
   const def = level;
   const rapier = loadRapier(); // streamed compile from the first moment of boot; the `physics` step below awaits it
   const navmesh = loadNavmesh(def.id, levelBakedId(def), def.navigation);

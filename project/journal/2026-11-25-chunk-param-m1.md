@@ -53,3 +53,11 @@
   same-origin handoff the page already writes (`doctor.earlier`, `zone` from the alive beat's `runningZone()`).
 - A review note sent `repro`, a reload link with `?chunk=`; it sends `zone` and `pose` (or Explore's view) as fields instead
   (`filedAt`). The drain-inbox skill reads them in meta CP18.
+
+# The deep link's PLAY and the running zone (opus-chunk, CP6 and CP8)
+
+- CP6: the `/slug/<slug>` page's PLAY already left through `travel`, which since CP1 goes to `/` with the tap; only its comments
+  still said `/?chunk=`. Explore's path zone goes into the boot's own search (`exploreBootParams`), never the address.
+- CP8: the registry's running zone is the one the entry set (`setPageZone`); `shardSlugFromUrl` and its address read went, and
+  `prepareSelectedShard` takes the boot's zone. The standalone app's strip keeps dropping `v` only. Comments that described the
+  param say what is true now.

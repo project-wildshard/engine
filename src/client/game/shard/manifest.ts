@@ -497,7 +497,7 @@ export interface ShardManifest {
   status: 'live' | 'experimental' | 'earlyAccess' | 'hidden';
   /** False keeps a grid destination out of SHARD SELECT, including Developer. */
   shardSelect?: boolean;
-  /** URL-safe key used by `?chunk=<slug>` and the registry */
+  /** URL-safe key: the zone's name in a tap, a record, the registry and its `/slug/` link */
   slug: ShardSlug;
   name: string;
   /** world-grid position shown in the HUD, e.g. `(+3, −2)` */

@@ -35,7 +35,7 @@ export async function completeCatalogue(wait=true):Promise<void>{
 /** Phones prepare their original selected manifest, never every world's data.
  * Desktop background prefetch retains full discovery; frozen phone entries prepare
  * only their inventoried primary pair, preserving content and save namespaces. Explore always opens just one shard. */
-export async function prepareSelectedShard(named: string | null = new URLSearchParams(location.search).get('chunk')):Promise<void>{
+export async function prepareSelectedShard(named: string | null):Promise<void>{
   setPageZone(named); // CP1: the running manifest resolves at the zone the entry picked (a tap's, on a bare address)
   const rows=titleManifests();
   // C3: a catalogue shard with no discovery enters on the first row's page; its product replaces it in admission.

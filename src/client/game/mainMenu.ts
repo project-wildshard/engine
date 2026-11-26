@@ -121,7 +121,7 @@ function orderTitleCards(cards: TitleDeck['cards'], served: readonly { readonly 
  *  build's cards it does not name (hidden ones too), laid out as a list. */
 export function zoneTabs(cards: TitleDeck['cards'], served: ZoneSelectDocument | null | undefined, developer: boolean): DeckTab[] {
   const s = GAME_STRINGS.mainMenu.tabs;
-  // No door answer (preview, solo, a standalone `?chunk=` boot): the build's own cards, hidden ones too, as before row 26. A
+  // No door answer (preview, solo, a one-shard boot): the build's own cards, hidden ones too, as before row 26. A
   // hidden shard booted by its route (cook-to-play's Brasscap Mesa) must stay the deck's card, or ENTER enters another shard.
   if (served === null || served === undefined) return [{ id: 'featured', label: s.featured, cards }, { id: 'popular', label: s.popular, cards },
     { id: 'new', label: s.new, cards }, ...developer ? [{ id: 'all' as const, label: s.all, cards, list: true as const }] : []];

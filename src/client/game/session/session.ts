@@ -92,8 +92,8 @@ export async function startSession(manifest: ShardManifest, kit: KitPorts, optio
     setAliveSource((): AliveInfo<PageMode> => ({ slug: selected, resident: '', mode }));
     if (matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true) {
       const home = new URL(location.href);
-      if (home.searchParams.has('chunk') || home.searchParams.has('v')) {
-        home.searchParams.delete('chunk'); home.searchParams.delete('v');
+      if (home.searchParams.has('v')) {
+        home.searchParams.delete('v');
         history.replaceState(history.state, '', home);
       }
     }

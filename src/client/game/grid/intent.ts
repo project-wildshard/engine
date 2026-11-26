@@ -28,7 +28,7 @@ export interface GridIntents {
   pending: (slug: string) => boolean;
   /** the boot's one read: the intent for this page's shard (fresh at document arrival, at most 60 s old) or null; both copies are removed */
   consume: (slug: string) => GridIntent | null;
-  /** GO7: this document turned its own `?chunk=` page into a grid page. Held in the document, so a slow boot can't age it out. */
+  /** GO7: this document turned its own one-shard page into a grid page. Held in the document, so a slow boot can't age it out. */
   admit: (target: { readonly instance: string; readonly slug: string; readonly goto?: boolean }) => void;
 }
 
