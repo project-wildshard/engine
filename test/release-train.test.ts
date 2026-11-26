@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { attributionGap, fullCommitArgs, gateInputsMoved, nextAdmission, provesNpmNext, releaseCiAdmission, provesReleaseReuse, provesTrainCi, retryRead, watchTrainRun } from '../scripts/release-train-proof.mjs';
+import { attributionGap, fullCommitArgs, gateInputsMoved, localAttemptDir, nextAdmission, provesNpmNext, releaseCiAdmission, provesReleaseReuse, provesTrainCi, retryRead, watchTrainRun } from '../scripts/release-train-proof.mjs';
 import { createTempRepo } from '../src/test/helpers/git';
 
 const build = 'a'.repeat(40);
@@ -176,4 +176,11 @@ describe('gateInputsMoved', () => {
     expect(gateInputsMoved('Error: Installed inputs changed during the gate; rerun the exact tree')).toBe(true);
     expect(gateInputsMoved('Error: release: main is past its newest green ci')).toBe(false);
   });
+});
+
+// QA 11-25 row 80: v0.1.93's local QA held on a phone-leg flake, and every rerun read the held verdict back.
+test('a held local QA verdict stays as evidence and the rerun takes the next local folder', () => {
+  const held = new Set(['/saved/local', '/saved/local-1']);
+  expect(localAttemptDir('/saved', dir => held.has(dir))).toBe('/saved/local-2');
+  expect(localAttemptDir('/saved', () => false)).toBe('/saved/local');
 });

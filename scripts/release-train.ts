@@ -9,7 +9,7 @@ import { dirname, join, resolve as absolute } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
-import { attributionGap, fullCommitArgs, gateInputsMoved, nextAdmission, releaseCiAdmission, provesNpmNext, provesReleaseReuse, provesTrainCi, retryRead, trainSha as sha, trainTag as tagPattern, watchTrainRun,
+import { attributionGap, fullCommitArgs, gateInputsMoved, localAttemptDir, nextAdmission, releaseCiAdmission, provesNpmNext, provesReleaseReuse, provesTrainCi, retryRead, trainSha as sha, trainTag as tagPattern, watchTrainRun,
   type Alias, type Leg, type Run } from './release-train-proof.mjs';
 import { CHANNELS, localQaGap, RELEASE_PUBLIC_KEY, type QaVerdict } from './page-release/flow.mjs';
 import { pidLock } from './pid-lock.mjs';
@@ -205,7 +205,8 @@ async function main(args: string[]) {
     const out = scratch.work, saved = join(dirname(scratch.proof), `train-${tag}-${source.headSha.slice(0, 8)}`);
     evidence = saved;
     mkdirSync(saved, { recursive: true, mode: 0o700 });
-    const localDir = join(saved, 'local');
+    const localDir = localAttemptDir(saved, dir => existsSync(join(dir, 'verdict.json'))
+      && localQaGap(read(join(dir, 'verdict.json')) as QaVerdict | undefined, source.headSha, tag) !== undefined);
     const local = join(localDir, 'verdict.json');
     if (!existsSync(local)) await runLogged(root, join(out, 'local.log'), 'bash', [
       'scripts/browser-lane.sh', '--max', '20', process.execPath, 'scripts/staging-qa.mjs',

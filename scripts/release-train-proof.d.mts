@@ -17,5 +17,6 @@ export function provesReleaseReuse(run: Run, build: string, tag: string, cut: st
 export function attributionGap(env: Record<string, string | undefined>, prepared: boolean): string | undefined;
 export function retryRead<T>(read: () => T, opts?: {tries?: number, pauseMs?: number, pause?: (ms: number) => void}): T;
 export function fullCommitArgs(args: readonly string[]): readonly string[];
+export function localAttemptDir(saved: string, held: (dir: string) => boolean): string;
 export function releaseCiAdmission(build: string, ci: number): { staging_build: string; staging_qualification: string };
 export function gateInputsMoved(log: string): boolean;

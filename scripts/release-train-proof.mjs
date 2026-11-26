@@ -105,6 +105,16 @@ export function fullCommitArgs(args) {
  * npm (the SDK waited on it). This is that J475 admission: the build and its release CI run, no staging serial.
  * @param {string} build @param {number} ci @returns {{staging_build: string, staging_qualification: string}}
  */
+/** QA 11-25 row 80: a held local QA verdict stays as evidence, and a rerun runs local QA again in the next `local-N`
+ * folder; v0.1.93's held phone-leg flake was otherwise read back on every rerun.
+ * @param {string} saved @param {(dir: string) => boolean} held @returns {string} */
+export function localAttemptDir(saved, held) {
+  for (let attempt = 0; ; attempt += 1) {
+    const dir = `${saved}/${attempt === 0 ? 'local' : `local-${attempt}`}`;
+    if (!held(dir)) return dir;
+  }
+}
+
 export function releaseCiAdmission(build, ci) {
   if (!trainSha.test(build) || !Number.isSafeInteger(ci) || ci <= 0) throw new Error('npm next needs the full build SHA and its release CI run');
   return { staging_build: build, staging_qualification: JSON.stringify({ build, j475: { releaseCi: ci } }) };
