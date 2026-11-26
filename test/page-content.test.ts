@@ -1,4 +1,6 @@
 // @vitest-environment node
+// oxlint-disable-next-line import/no-nodejs-modules -- CF2's refusal runs page-release.mjs itself.
+import {spawnSync} from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- A read-back compares the decoded bytes' SHA-256.
 import {createHash} from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- The fixture is a built page tree under the repository's tmp.
@@ -8,7 +10,7 @@ import {dirname, join, resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- A `.pack.br` part is stored Brotli and read back decoded.
 import {brotliCompressSync, brotliDecompressSync} from 'node:zlib';
 import {afterEach, expect, test} from 'vitest';
-import {COPY_WIDTH, contentBaseOf, contentHeaders, contentKey, contentSet, publishContent, r2Content, r2Copies, readBack, scanContent, type ContentStore, type Put} from '../src/scripts/page-release/content.mjs';
+import {COPY_WIDTH, contentBaseOf, contentHeaders, contentKey, contentKeys, contentSet, missingKeysMessage, publishContent, r2Content, r2Copies, readBack, scanContent, type ContentStore, type Put} from '../src/scripts/page-release/content.mjs';
 
 const ORIGIN = 'https://play.wildshard.io';
 const scratchRoot = resolve(import.meta.dirname, '../tmp/page-content-test');
@@ -118,7 +120,7 @@ test('a key that exists with other bytes is uploaded again, not skipped', async 
   expect(brotliDecompressSync(bucket.objects.get(short)?.body ?? new Uint8Array()).toString()).toBe('part bytes');
 });
 
-test('a failed bulk put is retried with only the keys still missing', async () => {
+test('a failed put is retried with only the keys still missing', async () => {
   const dir = page(), bucket = fakeBucket(), put = bucket.store.put, batches: string[][] = [];
   let failed = false;
   bucket.store.put = items => {
@@ -173,12 +175,10 @@ test('a read-back with other bytes, or without the game CORS, fails the publish 
   await expect(run(dir, closed.store)).rejects.toThrow(/CORS is https:\/\/elsewhere\.example, not https:\/\/play\.wildshard\.io/u);
 });
 
-test('the real store reads through packs.wildshard.io cache-busted with the Origin, and never puts the token in argv', async () => {
-  const token = ['cf', 'secret', 'marker'].join('-'), seen: {url: string, init?: RequestInit | undefined}[] = [], runs: {args: string[], secrets: string[], list: unknown}[] = [];
+test('the real store reads through packs.wildshard.io cache-busted with the Origin, and refuses a put without the S3 keys (CF2)', async () => {
+  const seen: {url: string, init?: RequestInit | undefined}[] = [];
   const store = r2Content({
-    root: '/repo', scratch: join(scratchRoot, 'store'), token,
     fetch: ((url: URL, init?: RequestInit) => { seen.push({url: url.href, init}); return Promise.resolve(new Response('x', {status: 200, headers: {'access-control-allow-origin': ORIGIN}})); }) as typeof fetch,
-    exec: (_file, args, _options, secrets) => { runs.push({args, secrets, list: JSON.parse(readFileSync(args[args.indexOf('--filename') + 1] ?? '', 'utf8'))}); return ''; },
   });
   expect(await store.exists('content/s/a.json')).toBe(true);
   expect(await store.read('content/s/a.json', ORIGIN)).toMatchObject({status: 200, cors: ORIGIN});
@@ -186,14 +186,37 @@ test('the real store reads through packs.wildshard.io cache-busted with the Orig
   expect(seen[1]?.init?.headers).toEqual({Origin: ORIGIN});
   expect(new Set(seen.map(read => read.url)).size).toBe(2);
   for (const read of seen) expect(read.url).toMatch(/^https:\/\/packs\.wildshard\.io\/content\/s\/a\.json\?content=/u);
-  await store.put([
-    {key: 'content/s/a.json', file: '/d/a.json', headers: contentHeaders('a.json')},
-    {key: 'content/s/p.pack.br', file: '/d/p.pack.br', headers: contentHeaders('p.pack.br')},
-  ]);
-  expect(runs).toHaveLength(2);
-  expect(runs.map(call => call.list)).toEqual([[{key: 'content/s/a.json', file: '/d/a.json'}], [{key: 'content/s/p.pack.br', file: '/d/p.pack.br'}]]);
-  expect(runs[1]?.args).toEqual(expect.arrayContaining(['bulk', 'put', 'wildshard-packs', '--remote', '--content-encoding', 'br', '--concurrency', '2']));
-  for (const call of runs) { expect(call.args.join(' ')).not.toContain(token); expect(call.secrets).toEqual([token]); }
+  // Meta Cloudflare audit CF2: no `wrangler r2 bulk put` fallback (v0.1.97's production stall); the refusal names the keys.
+  await expect(store.put([{key: 'content/s/a.json', file: '/d/a.json', headers: contentHeaders('a.json')}]))
+    .rejects.toThrow(/R2_ACCOUNT_ID, R2_PACKS_ACCESS_KEY_ID, R2_PACKS_SECRET_ACCESS_KEY/u);
+});
+
+test('CF2: the content keys come from the environment, else the keys file, and the names still missing are listed', () => {
+  mkdirSync(scratchRoot, {recursive: true});
+  const dir = mkdtempSync(join(scratchRoot, 'keys-'));
+  made.push(dir);
+  const file = join(dir, 'cook.env'), account = 'a'.repeat(32), hidden = ['s', 'e', 'c', 'r', 'e', 't'].join('');
+  writeFileSync(file, ["# the box's cook.env", `R2_ACCOUNT_ID=${account}`, 'R2_PACKS_ACCESS_KEY_ID=from-file', `R2_PACKS_SECRET_ACCESS_KEY=${hidden}`, 'COOK_NOTIFY_TOKEN=not-read', ''].join('\n'));
+  const filled = contentKeys({R2_PACKS_ACCESS_KEY_ID: 'from-env'}, file);
+  expect(filled.missing).toEqual([]);
+  expect(filled.env['R2_ACCOUNT_ID']).toBe(account);
+  expect(filled.env['R2_PACKS_ACCESS_KEY_ID']).toBe('from-env');
+  expect(filled.env['R2_PACKS_SECRET_ACCESS_KEY']).toBe(hidden);
+  expect(filled.env['COOK_NOTIFY_TOKEN']).toBeUndefined();
+  const none = contentKeys({R2_ACCOUNT_ID: ' '}, join(dir, 'absent.env'));
+  expect(none.missing).toEqual(['R2_ACCOUNT_ID', 'R2_PACKS_ACCESS_KEY_ID', 'R2_PACKS_SECRET_ACCESS_KEY']);
+  expect(missingKeysMessage(none.missing)).toContain('R2_PACKS_SECRET_ACCESS_KEY');
+});
+
+test('CF2: page-release --content refuses before the build without the keys, naming them', () => {
+  mkdirSync(scratchRoot, {recursive: true});
+  const home = mkdtempSync(join(scratchRoot, 'home-'));
+  made.push(home);
+  const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith('R2_')));
+  const run = spawnSync(process.execPath, [resolve(import.meta.dirname, '../src/scripts/page-release.mjs'), 'explore', 'build,upload', '--content', '--catalogue=x.json'],
+    {cwd: resolve(import.meta.dirname, '..'), env: {...env, HOME: home}, encoding: 'utf8', timeout: 60_000});
+  expect(run.status).toBe(2);
+  expect(run.stderr).toMatch(/a content publish needs R2_ACCOUNT_ID, R2_PACKS_ACCESS_KEY_ID, R2_PACKS_SECRET_ACCESS_KEY/u);
 });
 
 /** PZ6: the fake bucket's `sets` and `copy`, as R2's S3 API answers them (a copy takes the target's headers). */

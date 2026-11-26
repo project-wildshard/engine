@@ -91,6 +91,14 @@ node src/scripts/page-release.mjs production build|upload|check|go-live --qa=<ve
 node src/scripts/page-release.mjs preview build,upload,check,go-live
 ```
 
+With `--content` (every channel but a solo local run), the content set
+goes up through R2's S3 API with the packs bucket's keys: `R2_ACCOUNT_ID`,
+`R2_PACKS_ACCESS_KEY_ID` and `R2_PACKS_SECRET_ACCESS_KEY` from the
+environment, else from `~/.config/wildshard/cook.env`. Without them the
+script refuses before the build (meta Cloudflare audit CF2; v0.1.97's
+production upload fell back to `wrangler r2 bulk put` without them and
+stalled).
+
 A comma list runs the phases in order and stops at the first failure.
 Every channel's page is a Cloudflare Worker (OFF-VERCEL OV6 preview,
 OV7 staging, OV8 production), so `--host` has one value, `workers`, the

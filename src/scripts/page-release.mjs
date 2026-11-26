@@ -36,7 +36,7 @@ import {agentFetch} from './agent-requests.mjs';
 import {missingProductionPacks, waitForPacks} from './page-release/production-packs.mjs';
 import {workersHost} from './page-release/hosts/workers.mjs';
 import {r2Packs} from './page-release/packs.mjs';
-import {publishContent, r2Content, r2Copies} from './page-release/content.mjs';
+import {contentKeys, missingKeysMessage, publishContent, r2Content, r2Copies} from './page-release/content.mjs';
 import {deployStaging} from './page-release/staging-deploy.mjs';
 import {contentReach, fetchAnswer, pageReader, reachProblems, reachSummary} from './page-release/content-reach.mjs';
 import {openReleaseRun} from './release-run.mjs';
@@ -99,8 +99,15 @@ async function fetch200(url) {
 }
 
 const host = workersHost({token: () => cloudflareToken, log});
-// PZ6: a content publish copies unchanged files from an older set on R2 when the bucket's S3 keys are in the environment
-const contentCopies = flag('content') === undefined ? undefined : r2Copies(process.env);
+// PZ6: a content publish copies unchanged files from an older set on R2 and puts the rest, through R2's S3 API.
+// Meta Cloudflare audit CF2 (v0.1.97's production stall): the keys come from the environment, else ~/.config/wildshard/
+// cook.env, and a publish without them refuses here, before the build, instead of falling back to wrangler.
+const contentEnv = flag('content') === undefined ? undefined : contentKeys(process.env);
+if (contentEnv !== undefined && contentEnv.missing.length > 0 && flag('dry-run') === undefined && phaseList.split(',').some(step => step === 'build' || step === 'upload')) {
+  console.error(`page-release: ${missingKeysMessage(contentEnv.missing)}`);
+  process.exit(2);
+}
+const contentCopies = contentEnv === undefined ? undefined : r2Copies(contentEnv.env, log);
 if (contentCopies !== undefined) secrets.push(...contentCopies.secrets);
 
 let phase = '';
@@ -123,7 +130,7 @@ async function run(step, generatedQa) {
       packs: r2Packs({log}),
       ...(flag('content') === undefined || work === undefined ? {} : {content: {
         publish: ({dir, cors, dryRun}) => publishContent({dir, origin: cors, dryRun, log,
-          scratch: work, store: r2Content({root, scratch: work, token: cloudflareToken, copies: contentCopies})}),
+          scratch: work, store: r2Content({copies: contentCopies})}),
       }}),
       run: (file, argv, env) => {
         const signing = file === 'node' && (argv[2] === 'src/scripts/page-release/preview.mjs' || argv[0] === 'src/scripts/code-retention.mjs') && signingKey !== undefined

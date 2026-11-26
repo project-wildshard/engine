@@ -16,20 +16,21 @@
 // size on R2, and a sample of copies is read back through the CDN like an upload; a failed copy is uploaded instead.
 //
 // A key that already answers (a cache-busted HEAD on packs.wildshard.io) is skipped only when it reads back with the
-// same decoded bytes and CORS; one with other bytes is uploaded again. The rest go up through
-// `wrangler r2 bulk put` (CLOUDFLARE_API_TOKEN from the environment, else wrangler's own login), headers from the cook's
-// `objectHeaders()` with `immutable` for every key. Every uploaded key is then read back, cache-busted, with the game's
-// Origin: 200, that Origin in Access-Control-Allow-Origin, and the same decoded bytes, or the publish fails.
+// same decoded bytes and CORS; one with other bytes is uploaded again. The rest go up through R2's S3 API with the
+// bucket's keys (meta Cloudflare audit CF2: `wrangler r2 bulk put` is gone; without the keys a publish refuses), headers
+// from the cook's `objectHeaders()` with `immutable` for every key. Every uploaded key is then read back, cache-busted,
+// with the game's Origin: 200, that Origin in Access-Control-Allow-Origin, and the same decoded bytes, or the publish fails.
 // --sample=<n|all> instead reads back n random keys (or every key) of each kind from a published set (no upload).
 import {createHash, randomInt} from 'node:crypto';
-import {mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync} from 'node:fs';
+import {homedir} from 'node:os';
 import {join, resolve} from 'node:path';
 import {setTimeout as delay} from 'node:timers/promises';
+import {parseEnv} from 'node:util';
 import {brotliDecompressSync} from 'node:zlib';
 import {CopyObjectCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client} from '@aws-sdk/client-s3';
 import {carriedPaths, classify, shardNames} from '../page-size.mjs';
 import {PACKS_ORIGIN} from './flow.mjs';
-import {runRedacted} from './redact.mjs';
 
 export const BUCKET = 'wildshard-packs';
 export const CLOUDFLARE_ACCOUNT = '0a870ffdd1b0bca67f7fedad77f67957';
@@ -64,6 +65,37 @@ const sha256 = (/** @type {Uint8Array} */ bytes) => createHash('sha256').update(
 /** PZ6: how many recent complete sets a new set may copy from, and how many copies each publish reads back in full. */
 export const DONOR_SETS = 4;
 export const COPY_SAMPLE = 24;
+/** Meta Cloudflare audit CF2 (v0.1.97's production stall, 2026-11-26): the three names a content publish needs, R2's S3
+ * API on the packs bucket. A hand-typed production run lacked them, fell back to `wrangler r2 bulk put` of every file two
+ * at a time with no word, and stalled on one 502. Now the keys file fills them and a publish without them refuses. */
+export const CONTENT_KEYS = /** @type {const} */ (['R2_ACCOUNT_ID', 'R2_PACKS_ACCESS_KEY_ID', 'R2_PACKS_SECRET_ACCESS_KEY']);
+/** The MacBook's copy of the box's cook.env, which holds the packs bucket's S3 keys (release-train.ts loads it too). */
+export const KEYS_FILE = join(homedir(), '.config/wildshard/cook.env');
+/** CF2: a request that answers nothing in this long is retried, so one stuck socket never freezes a publish. */
+export const REQUEST_MS = 120_000;
+/** CF2: a put prints its progress at least this often. */
+export const PROGRESS_MS = 30_000;
+
+/**
+ * CF2: the environment with each content key filled from `file` where it is unset or blank, and the names still missing.
+ * Only the three names are read from the file; their values stay in the returned environment, never in a message.
+ * @param {NodeJS.ProcessEnv} env @param {string} [file]
+ * @returns {{env: NodeJS.ProcessEnv, missing: string[]}}
+ */
+export function contentKeys(env, file = KEYS_FILE) {
+  /** @type {NodeJS.ProcessEnv} */ const filled = {...env};
+  const blank = (/** @type {string} */ name) => (filled[name] ?? '').trim() === '';
+  if (CONTENT_KEYS.some(blank) && existsSync(file)) {
+    const parsed = parseEnv(readFileSync(file, 'utf8'));
+    for (const name of CONTENT_KEYS) if (blank(name) && (parsed[name] ?? '').trim() !== '') filled[name] = parsed[name];
+  }
+  return {env: filled, missing: CONTENT_KEYS.filter(blank)};
+}
+
+/** The refusal for a content publish without its keys: names, never values. @param {readonly string[]} missing */
+export const missingKeysMessage = missing =>
+  `a content publish needs ${missing.join(', ')} (the packs bucket's S3 keys): export them or put them in ${KEYS_FILE}`;
+
 /** FAST-RELEASE FR-A12: server-side copies in flight. Preview copied 9,680 files 8 at a time in 18.7 of its 24 min
  * (engine run 45511749250); 11-15's 429s were on uploads (still 4 at a time), and a refused copy is uploaded instead. */
 export const COPY_WIDTH = 24;
@@ -174,7 +206,7 @@ export async function publishContent({dir, store, scratch, origin = GAME_ORIGIN,
     ({set, base: contentBaseOf(set), files: files.length, bytes, uploaded, uploadedBytes, held: files.length - uploaded, copied, copiedBytes, kinds, cors: origin});
   const indexKey = contentKey(set, 'content.json');
   if (dryRun) {
-    log(`DRY-RUN would publish ${files.length} files (${mb(bytes)} MB) as ${contentBaseOf(set)}: HEAD each on ${PACKS_ORIGIN}, wrangler r2 bulk put the missing ones to ${BUCKET}, read each back with CORS ${origin}, then ${indexKey}`);
+    log(`DRY-RUN would publish ${files.length} files (${mb(bytes)} MB) as ${contentBaseOf(set)}: HEAD each on ${PACKS_ORIGIN}, copy or S3-put the missing ones to ${BUCKET}, read each back with CORS ${origin}, then ${indexKey}`);
     return summary(0, 0);
   }
   if (await store.exists(indexKey)) {
@@ -207,8 +239,8 @@ export async function publishContent({dir, store, scratch, origin = GAME_ORIGIN,
   const uploadedBytes = missing.reduce((sum, file) => sum + file.bytes, 0);
   log(`content ${set}: ${files.length} files (${mb(bytes)} MB), ${files.length - written} held (read back equal), ${copied.length} copied on R2 (${mb(copiedBytes)} MB), ${missing.length} to upload (${mb(uploadedBytes)} MB, ${wrong} present with other bytes)`);
   if (missing.length > 0) {
-    // `wrangler r2 bulk put` stops at the first failed object (a 502 and a 429 were seen); what landed answers a HEAD, so a retry
-    // puts only the rest.
+    // A put stops at the first object that fails after the client's own retries (a 502 and a 429 were seen); what landed
+    // answers a HEAD, so a retry puts only the rest.
     for (let round = 0, left = missing; ; round++) {
       try {
         await store.put(left.map(file => ({key: contentKey(set, file.path), file: join(root, file.path), headers: contentHeaders(file.path)})));
@@ -281,15 +313,17 @@ export async function copyFromSets({set, missing, store, origin, log, sleep}) {
 /**
  * PZ6: R2's S3 API on the packs bucket, for the store's `sets` and `copy`. Credentials from the environment
  * (R2_ACCOUNT_ID, R2_PACKS_ACCESS_KEY_ID, R2_PACKS_SECRET_ACCESS_KEY: server-release's bucket-scoped keys), else none.
- * @param {NodeJS.ProcessEnv} env
- * With them the store also puts through S3 (4 at a time), not `wrangler r2 bulk put`, so a CI token needs no R2 write.
+ * @param {NodeJS.ProcessEnv} env @param {(line: string) => void} [log] CF2: a put's progress, at least every PROGRESS_MS
+ * With them the store also puts through S3 (4 at a time), so a CI token needs no R2 write. Every request has a
+ * REQUEST_MS limit and the client's 6 attempts.
  * @returns {{sets: () => Promise<string[]>, empty: (set: string) => Promise<boolean>, copy: (from: string, to: string, headers: Headers, bytes: number) => Promise<void>, put: (puts: readonly Put[]) => Promise<void>, secrets: string[], close: () => void} | undefined}
  */
-export function r2Copies(env) {
+export function r2Copies(env, log = () => undefined) {
   const account = env.R2_ACCOUNT_ID?.trim(), accessKeyId = env.R2_PACKS_ACCESS_KEY_ID?.trim(), secretAccessKey = env.R2_PACKS_SECRET_ACCESS_KEY?.trim();
   if (account === undefined || accessKeyId === undefined || secretAccessKey === undefined || account === '' || accessKeyId === '' || secretAccessKey === '') return undefined;
   if (!/^[0-9a-f]{32}$/u.test(account)) throw new Error('Invalid R2_ACCOUNT_ID');
-  const client = new S3Client({region: 'auto', maxAttempts: 6, endpoint: `https://${account}.r2.cloudflarestorage.com`, credentials: {accessKeyId, secretAccessKey}});
+  const client = new S3Client({region: 'auto', maxAttempts: 6, endpoint: `https://${account}.r2.cloudflarestorage.com`, credentials: {accessKeyId, secretAccessKey},
+    requestHandler: {requestTimeout: REQUEST_MS, connectionTimeout: 10_000}});
   return {
     secrets: [accessKeyId, secretAccessKey],
     close: () => client.destroy(),
@@ -317,10 +351,15 @@ export function r2Copies(env) {
       return (page.KeyCount ?? page.Contents?.length ?? 0) === 0;
     },
     async put(puts) {
+      let done = 0, bytes = 0, said = Date.now();
       await pool(puts, 4, async item => {
-        await client.send(new PutObjectCommand({Bucket: BUCKET, Key: item.key, Body: readFileSync(item.file),
+        const body = readFileSync(item.file);
+        await client.send(new PutObjectCommand({Bucket: BUCKET, Key: item.key, Body: body,
           ContentType: item.headers.type, CacheControl: item.headers.cache, ...(item.headers.encoding === undefined ? {} : {ContentEncoding: item.headers.encoding})}));
+        done++; bytes += body.length;
+        if (Date.now() - said >= PROGRESS_MS) { said = Date.now(); log(`content put: ${done}/${puts.length} (${mb(bytes)} MB)`); }
       });
+      if (puts.length > 1) log(`content put: ${done}/${puts.length} (${mb(bytes)} MB)`);
     },
     async copy(from, to, headers, bytes) {
       await client.send(new CopyObjectCommand({Bucket: BUCKET, Key: to, CopySource: `${BUCKET}/${from.split('/').map(encodeURIComponent).join('/')}`,
@@ -353,19 +392,19 @@ export async function sampleContent({dir, store, count, origins, log, sleep = de
 
 
 /**
- * The real store: HEAD and GET through packs.wildshard.io, writes through `wrangler r2 bulk put`, one call per header set.
- * PZ6: with `copies` (r2Copies) the store also lists complete sets, copies keys server side, and puts through S3.
- * @param {{root: string, scratch: string, token?: string, fetch?: typeof fetch, exec?: typeof runRedacted, copies?: Pick<ContentStore, 'sets' | 'copy' | 'empty'> & {put?: ContentStore['put']}}} options
+ * The real store: HEAD and GET through packs.wildshard.io, writes through R2's S3 API (`copies.put`, from r2Copies).
+ * PZ6: with `copies` (r2Copies) the store also lists complete sets and copies keys server side. CF2: with no `copies.put`
+ * a write refuses: the `wrangler r2 bulk put` fallback that stalled v0.1.97's production upload is gone.
+ * @param {{fetch?: typeof fetch, copies?: Pick<ContentStore, 'sets' | 'copy' | 'empty'> & {put?: ContentStore['put']}}} options
  * @returns {ContentStore}
  */
-export function r2Content({root, scratch, token, fetch: get = fetch, exec = runRedacted, copies}) {
+export function r2Content({fetch: get = fetch, copies} = {}) {
   let reads = 0;
   const bust = (/** @type {string} */ key) => {
     const url = new URL(`/${key}`, PACKS_ORIGIN);
     url.searchParams.set('content', `${Date.now().toString(36)}-${(reads++).toString(36)}`);
     return url;
   };
-  const secrets = token === undefined || token === '' ? [] : [token];
   return {
     ...(copies?.sets === undefined || copies.copy === undefined ? {} : {sets: copies.sets, copy: copies.copy, ...(copies.empty === undefined ? {} : {empty: copies.empty})}),
     async exists(key) {
@@ -378,26 +417,7 @@ export function r2Content({root, scratch, token, fetch: get = fetch, exec = runR
         await delay(2_000);
       }
     },
-    put: copies?.put ?? (puts => {
-      /** @type {Map<string, Put[]>} */
-      const groups = new Map();
-      for (const item of puts) {
-        const id = JSON.stringify(item.headers);
-        groups.set(id, [...(groups.get(id) ?? []), item]);
-      }
-      mkdirSync(scratch, {recursive: true});
-      for (const [id, items] of groups) {
-        /** @type {Headers} */ const headers = JSON.parse(id);
-        const list = join(scratch, `bulk-${createHash('sha256').update(id).digest('hex').slice(0, 8)}.json`);
-        writeFileSync(list, JSON.stringify(items.map(item => ({key: item.key, file: item.file}))));
-        const args = ['r2', 'bulk', 'put', BUCKET, '--remote', '--filename', list, '--content-type', headers.type, '--cache-control', headers.cache, '--concurrency', '2', '--force'];
-        if (headers.encoding !== undefined) args.push('--content-encoding', headers.encoding);
-        try {
-          exec(join(root, 'node_modules/.bin/wrangler'), args, {cwd: root, env: {...process.env, CLOUDFLARE_ACCOUNT_ID: CLOUDFLARE_ACCOUNT}, timeout: 3 * 60 * 60_000}, secrets);
-        } finally { rmSync(list, {force: true}); }
-      }
-      return Promise.resolve();
-    }),
+    put: copies?.put ?? (() => Promise.reject(new Error(missingKeysMessage(CONTENT_KEYS)))),
     async read(key, origin) {
       for (let attempt = 0; ; attempt++) {
         try {
@@ -414,12 +434,19 @@ async function main() {
   const value = (/** @type {string} */ name) => args.find(arg => arg.startsWith(`--${name}=`))?.split('=').slice(1).join('=');
   const dir = args.find(arg => !arg.startsWith('--'));
   if (dir === undefined) throw new Error('usage: node src/scripts/page-release/content.mjs <dist> [--origin=<page origin>] [--sample=<n>] [--dry-run]');
-  const root = resolve(import.meta.dirname, '../../..'), token = process.env.CLOUDFLARE_API_TOKEN, copies = r2Copies(process.env);
-  const secrets = [...(token === undefined || token === '' ? [] : [token]), ...copies?.secrets ?? []];
+  const root = resolve(import.meta.dirname, '../../..'), sample = value('sample');
+  const keys = contentKeys(process.env);
+  if (sample === undefined && !args.includes('--dry-run') && keys.missing.length > 0) {
+    console.error(`content: ${missingKeysMessage(keys.missing)}`);
+    process.exitCode = 2;
+    return;
+  }
+  /** @type {string[]} */ const secrets = [];
   const hide = (/** @type {string} */ text) => secrets.reduce((out, secret) => out.split(secret).join('<token>'), text);
   const log = (/** @type {string} */ line) => console.log(hide(line));
-  const scratch = join(root, 'tmp/page-release/content'), store = r2Content({root, scratch, token, copies});
-  const sample = value('sample');
+  const copies = r2Copies(keys.env, log);
+  secrets.push(...copies?.secrets ?? []);
+  const scratch = join(root, 'tmp/page-release/content'), store = r2Content({copies});
   try {
     if (sample !== undefined) {
       const origins = (value('origin') ?? GAME_ORIGIN).split(',');

@@ -35,6 +35,12 @@ export function sampleContent(options: { dir: string; store: ContentStore; count
 export const DONOR_SETS: number;
 export const COPY_SAMPLE: number;
 export const COPY_WIDTH: number;
+export const CONTENT_KEYS: readonly ['R2_ACCOUNT_ID', 'R2_PACKS_ACCESS_KEY_ID', 'R2_PACKS_SECRET_ACCESS_KEY'];
+export const KEYS_FILE: string;
+export const REQUEST_MS: number;
+export const PROGRESS_MS: number;
+export function contentKeys(env: NodeJS.ProcessEnv, file?: string): { env: NodeJS.ProcessEnv; missing: string[] };
+export function missingKeysMessage(missing: readonly string[]): string;
 export function copyFromSets(options: { set: string; missing: readonly ContentFile[]; store: ContentStore; origin: string; log: (line: string) => void; sleep: (ms: number) => Promise<void> }): Promise<ContentFile[]>;
-export function r2Copies(env: NodeJS.ProcessEnv): { sets: () => Promise<string[]>; empty: (set: string) => Promise<boolean>; copy: (from: string, to: string, headers: Headers, bytes: number) => Promise<void>; put: (puts: readonly Put[]) => Promise<void>; secrets: string[]; close: () => void } | undefined;
-export function r2Content(options: { root: string; scratch: string; token?: string; fetch?: typeof fetch; copies?: Pick<ContentStore, 'sets' | 'copy' | 'empty'> & { put?: ContentStore['put'] }; exec?: (file: string, args: string[], options: { cwd: string; env: NodeJS.ProcessEnv; timeout?: number }, secrets: string[]) => string }): ContentStore;
+export function r2Copies(env: NodeJS.ProcessEnv, log?: (line: string) => void): { sets: () => Promise<string[]>; empty: (set: string) => Promise<boolean>; copy: (from: string, to: string, headers: Headers, bytes: number) => Promise<void>; put: (puts: readonly Put[]) => Promise<void>; secrets: string[]; close: () => void } | undefined;
+export function r2Content(options?: { fetch?: typeof fetch; copies?: Pick<ContentStore, 'sets' | 'copy' | 'empty'> & { put?: ContentStore['put'] } }): ContentStore;
