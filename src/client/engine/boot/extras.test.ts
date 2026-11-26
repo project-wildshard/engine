@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import {afterEach,beforeEach,expect,test,vi} from 'vitest';
-import {bootFiles,extraFetches,startDeferredAudioPreload,startMenuPreload,startLateAudio} from './extras';
+import {bootFiles,extraFetches,pathOf,startDeferredAudioPreload,startMenuPreload,startLateAudio} from './extras';
 import {setBootCatalog,type BootLevel} from './catalog';
 import {prepareBootAudio} from './audioInventory';
 import {declareTotals,installByteCounter,releaseByteCounter,type ChunkFiles} from './bytes';
@@ -231,4 +231,13 @@ test('menu preparation counts pictures without reserving UI module work',async()
   const set=vi.fn<StepProgress['set']>();
   await startMenuPreload(blank,home).wait({set,detail:()=>undefined});
   expect(set).toHaveBeenLastCalledWith(0,0,'0 / 0 pictures');
+});
+
+// Meta QA 11-25 row 144 (nightly 45818175476): a stored cook's card and Explorer art live in its upload's loose folder on the
+// cook's origin. The path alone was asked of the page, and every cold head's Explorer failed on its 404.
+test('art on this page is read by its path; art on another origin keeps its whole URL', () => {
+  const loose = `http://127.0.0.1:9/loose/${'a'.repeat(64)}/shardfiles/plot/blobs/image/${'b'.repeat(64)}.jpg`;
+  expect(pathOf(loose)).toBe(loose);
+  expect(pathOf(`${location.origin}/shardfiles/plot/blobs/image/x.jpg?v=1`)).toBe('/shardfiles/plot/blobs/image/x.jpg');
+  expect(pathOf('/assets/art/card.jpg')).toBe('/assets/art/card.jpg');
 });

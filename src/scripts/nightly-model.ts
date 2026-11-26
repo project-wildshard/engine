@@ -28,6 +28,22 @@ const serialTests: ReadonlySet<string> = new Set(NIGHTLY_SERIAL_TESTS);
 export const digest = (value: unknown): string => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export const read = (path: string): unknown => JSON.parse(readFileSync(path, 'utf8'));
 
+/** The packs book rows a cold head touches: client rows by slug, grid rows by variant then slug. */
+export interface PacksBookRows {client?: Record<string, unknown>; grid?: Record<string, Record<string, unknown>>}
+
+/** Meta QA 11-25 row 144: since CP22 (88865e789) a head's page boots its one cell on the grid path, which reads the
+ *  packs book's grid rows. A cold cook writes only client rows, so the head's grid rows still named the build's own
+ *  grid manifests, now asked of the cold origin: every boot 404'd. Production plays a stored cook's grid entry from its
+ *  whole-level rows (placedSpawn's `whole`), so the head's grid rows become its cold whole rows in every variant. */
+export function coldGridRows(book: PacksBookRows, slug: string, same: (left: string, right: string) => boolean): PacksBookRows {
+  const key = Object.keys(book.client ?? {}).find(name => same(name, slug));
+  const whole = key === undefined ? undefined : book.client?.[key];
+  if (key === undefined || whole === undefined) throw new Error(`The cold cook wrote no client row for ${slug}`);
+  const grid = Object.fromEntries(Object.entries(book.grid ?? {}).map(([variant, rows]) => [variant,
+    {...Object.fromEntries(Object.entries(rows).filter(([name]) => !same(name, slug))), [key]: whole}]));
+  return {...book, grid};
+}
+
 export function plan(root = process.cwd()): Plan {
   const {shards} = read(`${root}/test/pins/shardfiles.json`) as {shards: Head[]};
   const tests = read(`${root}/test/pins/ring-2-tests.json`) as string[];

@@ -661,6 +661,7 @@
     "src/client/game/boot/roomsAhead.ts": "client",
     "src/client/game/session/afterBootAudio.ts": "client",
     "src/client/game/session/cellCreatures.ts": "client",
+    "src/client/game/session/exploreStarts.ts": "client",
     "src/client/engine/practice/roomStands.ts": "client",
     "src/client/game/session/talkReach.ts": "client",
     "src/client/game/session/harvestBodies.ts": "client",

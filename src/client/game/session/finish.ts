@@ -11,6 +11,7 @@ import { reenterGrid, reenterGridInPage, reenterShard, showGridDestination } fro
 import type { playStage } from './play';
 import type { WorkerClientGrid } from '../shardfile/clientWorker';
 import { loadWorkerClient } from './data';
+import { exploreStarts } from './exploreStarts';
 import { asShell } from '@wildshard/engine/app/ownership';
 import { app } from '@wildshard/engine/app/runtime';
 import { releaseByteCounter } from '@wildshard/engine/boot/bytes';
@@ -490,8 +491,11 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   };
   const titleShaders = warmRest();
   const exploreApp = exploreChannel();
-  if (!exploreApp && (arrival?.mode === 'enter' || arrival?.mode === 'arena' || ctx.continuingGridEntry || (arrival === null && loading.playRequested))) enter();
-  else if (arrival?.mode === 'explore') hud.startExplore(); // import the viewer only after shader compilation and the loader's peak
+  const enters = !exploreApp && (arrival?.mode === 'enter' || arrival?.mode === 'arena' || ctx.continuingGridEntry || (arrival === null && loading.playRequested));
+  // the viewer starts once: a tap's Explore arrival, else the page's own ?explore= route (below)
+  const starts = exploreStarts(!enters && arrival?.mode === 'explore', ctx.startExplore !== undefined);
+  if (enters) enter();
+  else if (starts.arrival) hud.startExplore(); // import the viewer only after shader compilation and the loader's peak
   if (arrival?.mode === 'arena') hud.enterArenaNow();
   if (ctx.gridLive === null) installCrashCheckpoint(game.levelScope, manifest.slug, () => hud.entered && !world.freeCamera && !world.tour.active && !exploring()
     ? { x: player.position.x, y: player.position.y, z: player.position.z, yaw: player.yaw, pitch: player.pitch } : null);
@@ -559,7 +563,7 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     restart: () => window.__workerClientDevRestart ?? null, quests: () => window.__shardfileDevQuests ?? null,
     player: () => world.player, terrainField: captureHeightfield, watchFrames: fn => game.watchFrames(fn) }))
     .catch((cause: unknown) => { console.error('[devScene]', cause); });
-  ctx.startExplore?.();
+  if (starts.route) ctx.startExplore?.();
   document.dispatchEvent(new Event('ws:ready')); // booted to the title
   const completeOfflineCopy = async (): Promise<void> => {
     try { await completeManifestCache(manifest, levelScope, ctx.product); }

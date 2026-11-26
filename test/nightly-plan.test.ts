@@ -6,7 +6,7 @@ import { expect, test } from 'vitest';
 import { CELL_HEIGHT, CHUNK_SIZE } from '@wildshard/format/contentBounds';
 import type { StandaloneCatalogue } from '@wildshard/format/standaloneCatalogue';
 import { nightlyHeadCatalogue } from '../src/scripts/app-build/catalogue';
-import { plan } from '../src/scripts/nightly-model';
+import { coldGridRows, plan } from '../src/scripts/nightly-model';
 import { bareSlug } from '../src/shared/game/grid/catalogueSlot';
 import { DEFAULT_LIMITS } from '../src/cook/game/cookWorker';
 
@@ -108,4 +108,16 @@ test('FS30 separates the two trusted hover taps even when the renderer stops pre
   expect(firstTap).toBeGreaterThan(0);
   expect(gap).toBeGreaterThan(firstTap);
   expect(secondTap).toBeGreaterThan(gap);
+});
+
+// Meta QA 11-25 row 144 (nightly 45818175476, every head's boot 404'd): since CP22 a head boots its cell on the grid path,
+// whose packs book rows still named the build's own grid manifests on the cold cook's origin. Made-up rows (J507).
+test('a cold head\'s grid rows are its cold whole rows in every variant, other slugs untouched', () => {
+  const cold = {phone: {url: '/assets/spawn/plot-client-phone-cold.json'}, desktop: {url: '/assets/spawn/plot-client-desktop-cold.json'}};
+  const built = {phone: {url: '/assets/spawn/plot-grid-phone-built.json'}};
+  const other = {phone: {url: '/assets/spawn/pine-grid-phone.json'}};
+  const book = {client: {plot: cold}, grid: {'000': {plot: built, pine: other}, '101': {_plot: built}}};
+  const same = (left: string, right: string): boolean => bareSlug(left) === bareSlug(right);
+  expect(coldGridRows(book, '_plot', same).grid).toEqual({'000': {plot: cold, pine: other}, '101': {plot: cold}});
+  expect(() => coldGridRows({grid: {}}, 'plot', same)).toThrow(/no client row/u);
 });

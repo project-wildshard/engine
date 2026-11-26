@@ -71,6 +71,16 @@ export function shardFromDiscovery(input: unknown, home?: string): ShardManifest
   } as Parameters<typeof defineAuthoredShard>[3], images);
 }
 
+/** Where a row's art keys (page paths, `/shardfiles/<slug>/…`) are read: everything before the document's own `/shardfiles/`.
+ *  A stored or placed cook keeps its loose files under its upload's folder (SA48, `…/loose/<hash>/shardfiles/…`); the origin
+ *  alone dropped that folder, and every card and Explorer image 404'd on the cook's origin (meta QA 11-25 row 144). A page
+ *  path has no home. */
+export function discoveryHome(discovery: string): string | undefined {
+  if (!/^https?:\/\//u.test(discovery)) return undefined;
+  const at = discovery.indexOf('/shardfiles/', discovery.indexOf('//') + 2);
+  return at === -1 ? /^https?:\/\/[^/]+/u.exec(discovery)?.[0] : discovery.slice(0, at);
+}
+
 /** SB28: off the boot path a read that failed twice throws instead of waiting on a RETRY nobody sees. */
 const refuse = (error: ContentReadError): Promise<never> => { throw error; };
 
@@ -92,7 +102,7 @@ export async function readDiscovery(row: Pick<TitleManifest, 'slug' | 'discovery
     .catch((error: unknown) => {
       throw error instanceof ContentReadError && error.status !== null ? new Error(`Discovery of ${row.slug} answered ${String(error.status)}`, { cause: error }) : error;
     });
-  const manifest = shardFromDiscovery(JSON.parse(new TextDecoder().decode(bytes)), /^https?:\/\/[^/]+/u.exec(row.discovery)?.[0]);
+  const manifest = shardFromDiscovery(JSON.parse(new TextDecoder().decode(bytes)), discoveryHome(row.discovery));
   if (!new Set([row.slug]).has(manifest.slug)) throw new Error('Selected discovery identity differs');
   return manifest;
 }

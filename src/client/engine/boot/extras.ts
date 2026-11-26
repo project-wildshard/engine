@@ -50,7 +50,11 @@ import { currentLoadingTimeline } from '../../../shared/engine/boot/timeline';
 import { ENGINE_MUSIC_STYLE, musicDir, sfxDir, type MusicStyle } from '../../../shared/engine/audio/bootAudio';
 
 
-const pathOf = (url: string): string => { try { return new URL(url, location.href).pathname; } catch { return url; } };
+/** A page file by its path; a file on another origin (a stored or placed cook's loose folder, SA48) keeps its whole URL: its
+ *  path alone was asked of this page and 404'd (meta QA 11-25 row 144, every cold head's Explorer). */
+export const pathOf = (url: string): string => {
+  try { const address = new URL(url, location.href); return address.origin === location.origin ? address.pathname : address.href; } catch { return url; }
+};
 
 /** the shard cards' pictures among the art (the rest is the Explore viewer's) */
 const cardArt = new Set<string>();

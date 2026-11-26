@@ -12,7 +12,7 @@ import {captureNightlyBootFrame, nightlyDrawSamples, NIGHTLY_FRAME_LIMIT as HOVE
 import {sweepExplorer} from './parity/explorer-smoke.mjs';
 import {serve} from './parity/serve.mjs';
 import {levelDownloadFixtures, saveFixture} from './debug-settings.mjs';
-import {headGroups, plan, read, requireBuild, type HeadResult, type HeadsReport} from './nightly-model.ts';
+import {coldGridRows, headGroups, plan, read, requireBuild, type HeadResult, type HeadsReport, type PacksBookRows} from './nightly-model.ts';
 import type {CookIndex} from '../cook/game/cookWorker.ts';
 import type {StandaloneCatalogue} from '@wildshard/format/standaloneCatalogue';
 import { KEYCHAIN_ARGS } from './.kit/chromium-keychain.mjs';
@@ -132,6 +132,8 @@ try {
         hash => Promise.resolve(readFileSync(join(process.env.WILDSHARD_PIN_CACHE ?? join(homedir(), '.cache/wildshard/pins'), `${hash}.tar`))),
         {base: `http://127.0.0.1:${address.port}`, shards: []}, nightlyHeadCatalogue(live, reviewed, head));
       if (added.length !== 1 || added[0] !== head.slug) throw new Error('Cold cook was not attached');
+      // CP22: the head boots its cell on the grid path, whose rows must name the cold cook too (row 144)
+      writeFileSync(bookFile, JSON.stringify(coldGridRows(JSON.parse(readFileSync(bookFile, 'utf8')) as PacksBookRows, head.slug, (left, right) => bareSlug(left) === bareSlug(right))));
       const titlesText = /<script type="application\/json" id="ws-title-rows">([^<]*)<\/script>/u.exec(readFileSync(join(dist, 'index.html'), 'utf8'))?.[1];
       if (titlesText === undefined) throw new Error('No title routes');
       const title = (JSON.parse(titlesText) as {slug: string; shardSelect?: boolean}[]).find(row => bareSlug(row.slug) === bareSlug(head.slug));
