@@ -19,6 +19,8 @@
 //                            page-release/content.mjs); preview.yml passes it (PZ6), staging and production with PZ8
 //   --catalogue=<file>       preview build: bake this catalogue, the grid borrowed from staging (SHARD-AUTHORING SA35,
 //                            src/scripts/preview-grid.ts); default test/pins/catalogue.json. Refused on staging and production
+//   --zone-table=<file>      preview build: bake this zone table, staging's cook (fix preview PV2,
+//                            src/scripts/page-release/zone-table.mjs build); check: HEAD every cooked object it names
 //
 //   node src/scripts/page-release.mjs --print-env <preview|staging|production|explore> [--root=<dir>] [--catalogue=<file>]
 //                            print the channel's build environment for the root's HEAD (--catalogue on preview only),
@@ -70,7 +72,7 @@ if (flag('print-env') !== undefined) {
   process.exit(0);
 }
 if (channel === undefined || phaseList === undefined || hostName !== 'workers') {
-  console.error('usage: node src/scripts/page-release.mjs <preview|staging|production|explore> <build|upload|check|go-live>[,...] [--host=workers] [--root=<dir>] [--dry-run] [--wait=<minutes>] [--local-qa=<verdict.json>] [--qa=<verdict.json>] [--content] [--catalogue=<file>]');
+  console.error('usage: node src/scripts/page-release.mjs <preview|staging|production|explore> <build|upload|check|go-live>[,...] [--host=workers] [--root=<dir>] [--dry-run] [--wait=<minutes>] [--local-qa=<verdict.json>] [--qa=<verdict.json>] [--content] [--catalogue=<file>] [--zone-table=<file>]');
   process.exit(2);
 }
 // A build signs code-retention.json (FM7) after the whole page build; v0.1.96's production build ran minutes before it
@@ -177,6 +179,7 @@ async function run(step, generatedQa) {
       ...(localQa === undefined ? {} : {localQa}),
       // the build runs in `root`, so a relative path is the caller's
       ...(value('catalogue') === undefined ? {} : {catalogue: resolve(value('catalogue') ?? '')}),
+      ...(value('zone-table') === undefined ? {} : {zoneTable: resolve(value('zone-table') ?? '')}),
     });
     if (refusals.length > 0) log(`DRY-RUN ${channel} ${step}: ${refusals.length} gate(s) would refuse today`);
 }

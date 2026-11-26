@@ -65,7 +65,8 @@ export function bundleDescriptor(archive, tag) {
  * @param {unknown} pins @param {string} names @returns {ReleaseFile['shards']} */
 export function releaseShards(pins, names) {
   const upload = v.optional(v.pipe(v.number(), v.integer(), v.minValue(0)));
-  const head = v.object({slug: v.string(), uploadNumber: upload, revision: upload});
+  // Fix preview PV2: a pin that names its raw shard version (R2 layout RL12) carries it into the release, for preview's zone table.
+  const head = v.object({slug: v.string(), uploadNumber: upload, revision: upload, shardVersion: v.exactOptional(v.string())});
   const rows = v.parse(v.object({shards: v.array(head)}), pins).shards;
   const selected = names.split(',').map(name => name.trim()).filter(Boolean).map(servedSlug);
   if (selected.length === 0 || new Set(selected).size !== selected.length) throw new Error('E7_SERVER_SHARDS must name unique pinned shards');
@@ -74,6 +75,6 @@ export function releaseShards(pins, names) {
     const uploadNumber = row?.uploadNumber ?? row?.revision;
     if (uploadNumber === undefined) throw new Error(`No pinned uploadNumber for ${slug}`);
     // Deployed readers of the signed release still use the old field.
-    return {slug, revision: uploadNumber};
+    return {slug, revision: uploadNumber, ...(row?.shardVersion === undefined ? {} : {shardVersion: row.shardVersion})};
   });
 }

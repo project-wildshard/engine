@@ -184,7 +184,7 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
     "./src/scripts/bake-loader.mjs",
     "--input-type=module",
     "-e",
-    "await (await import('./src/scripts/app-build/catalogue.ts')).bakeCatalogue(process.argv[1], process.cwd());",
+    "await (await import('./src/scripts/app-build/catalogue.ts')).bakeCatalogue(process.argv[1], process.cwd()); (await import('./src/scripts/app-build/zoneTable.mjs')).bakeZoneTable(process.argv[1], process.env.WS_ZONE_TABLE);",
     outDir,
   ]);
 

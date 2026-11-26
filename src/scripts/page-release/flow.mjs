@@ -152,6 +152,8 @@ export function pinnedReleaseKey(configured) {
  * @property {string} [releaseKey]  Defaults to RELEASE_PUBLIC_KEY; tests sign with their own.
  * @property {string} [catalogue]  Preview only (SA35): the catalogue the page bakes, staging's borrowed grid (src/scripts/preview-grid.ts);
  *   default the pinned `test/pins/catalogue.json`.
+ * @property {string} [zoneTable]  Preview only (fix preview PV2): the zone table the page bakes, from staging's signed release
+ *   (src/scripts/page-release/zone-table.mjs build); the check phase HEADs every cooked object it names before the alias moves.
  */
 
 const sha256 = (/** @type {Uint8Array} */ bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -190,6 +192,7 @@ export async function runPhase(phase, deps) {
   if (!deps.git.clean()) refuse('the release tree is not clean (one clean clone per channel)');
   if (!(deps.manifest.saveEpoch >= 1)) refuse('save-epoch.json must be at least 1');
   if (deps.catalogue !== undefined && !channel.solo) refuse(`--catalogue is preview's (SA35): ${channel.channel} bakes the pinned catalogue`);
+  if (deps.zoneTable !== undefined && !channel.solo) refuse(`--zone-table is preview's (PV2): ${channel.channel} reads its own release`);
   deps.log(`${channel.channel} ${phase} ${deps.build} v${deps.manifest.version} epoch ${deps.manifest.saveEpoch} on ${deps.host.name}${dry ? ' (dry run)' : ''}`);
 
   if (phase === 'build') {
@@ -291,6 +294,11 @@ export async function runPhase(phase, deps) {
       plan('ready every signed extra placement for this exact build before checking the page');
       if (!dry) deps.run('node', ['--import', './src/scripts/bake-loader.mjs', 'src/scripts/release-placed-ready.mjs', 'staging'], {WS_BUILD_ID: deps.build});
     }
+    if (deps.zoneTable !== undefined) {
+      // PV2: no 404 at go-live. One missing index or object refuses, and preview keeps its last build.
+      plan(`HEAD every cooked index and object ${deps.zoneTable} names, with ${channel.origin}'s Origin (PV2)`);
+      if (!dry) deps.run('node', ['--import', './src/scripts/bake-loader.mjs', 'src/scripts/page-release/zone-table.mjs', 'check', deps.zoneTable, `--page=${channel.origin}`], {});
+    }
     for (const line of deps.host.describe('deployedDigests', deployed)) plan(line);
     if (!dry) await checkDeployed(deps, deployed, refuse);
     if (channel.channel === 'preview') {
@@ -359,6 +367,8 @@ export function buildEnv(channel, deps) {
   const common = {
     // SA35: preview bakes the grid it borrowed from staging when the workflow names one; staging and production bake the pin.
     WS_BUILD_ID: deps.build, WILDSHARD_CATALOGUE: (channel.solo ? deps.catalogue : undefined) ?? 'test/pins/catalogue.json',
+    // PV2: preview bakes the zone table it took from staging's release
+    ...(channel.solo && deps.zoneTable !== undefined ? {WS_ZONE_TABLE: deps.zoneTable} : {}),
     WS_PREVIOUS_DEPLOY_ORIGIN: channel.origin, WS_RELEASE: '1', WS_CHANNEL: channel.channel,
     // API-CLOUDFLARE AC11: errors, telemetry and the inbox go to the api-server Worker on every channel.
     VITE_API_ORIGIN: API_ORIGIN, WILDSHARD_RELEASE_KEY: deps.releaseKey ?? RELEASE_PUBLIC_KEY,

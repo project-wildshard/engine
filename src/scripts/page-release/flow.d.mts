@@ -64,6 +64,7 @@ export interface Deps {
   localQaSource?: string;
   releaseKey?: string;
   catalogue?: string;
+  zoneTable?: string;
 }
 export const SMOKE_SCENARIOS: readonly string[];
 /** STAGING-QA SQ15: one staging-qa.mjs verdict, the candidate's or live staging's. */
