@@ -1,7 +1,11 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Run the hosted shell admission against a fake Actions API.
 import { spawnSync } from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- Exercise the same shell block the npm workflow runs.
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
+// oxlint-disable-next-line import/no-nodejs-modules -- A scratch folder per fake publish.
+import { tmpdir } from 'node:os';
+// oxlint-disable-next-line import/no-nodejs-modules -- A scratch folder per fake publish.
+import { join } from 'node:path';
 import { expect, test } from 'vitest';
 
 const workflow = readFileSync('.github/workflows/npm-publish.yml', 'utf8');
@@ -125,4 +129,31 @@ test('FR6: a release run that reused main\'s proof admits only on the selector\'
   // Reuse never excuses a failed job or a short inventory.
   expect(admit(proof, { ...report, jobs: [...report.jobs, { name: 'boundaries', conclusion: 'failure' }] }, { reuse: reused }).status).not.toBe(0);
   expect(admit(proof, { ...report, jobs: report.jobs.slice(1) }, { reuse: reused }).status).not.toBe(0);
+});
+
+// QA 11-25 row 76: npm accepted engine 0.1.92 into staged publishing and the run went green with nothing published.
+test('the publish step fails when npm accepts a version it never lists', () => {
+  const publish = workflow.slice(workflow.indexOf('      - name: Publish the exact archive with its channel tag'));
+  const script = publish.slice(publish.indexOf('        run: |\n') + '        run: |\n'.length, publish.indexOf('\n\n'))
+    .split('\n').map(line => line.replace(/^ {10}/u, '')).join('\n');
+  const fake = (listed: boolean) => `npm() {
+  if [ "$1" = publish ]; then echo "+ @wildshard/engine@9.9.9"; return 0; fi
+  if [ "$1" = view ] && [ "$2" = "@wildshard/engine" ]; then echo 0.1.90; return 0; fi
+  if [ "$1" = view ] && [ "$2" = "@wildshard/engine@9.9.9" ]; then [ -f published ] && ${listed ? 'true' : 'false'}; return; fi
+  return 1
+}
+node() { echo @wildshard/engine; }
+seq() { printf '1\\n2\\n'; }
+sleep() { touch published; }
+`;
+  const runStep = (listed: boolean) => spawnSync('bash', ['-c', `${fake(listed)}\n${script}`], {
+    cwd: mkdtempSync(join(tmpdir(), 'npm-visible-')), encoding: 'utf8',
+    env: { ...process.env, NPM_VERSION: '9.9.9', NPM_CHANNEL: 'latest', ENGINE_NPM_ARCHIVE: 'x.tgz' },
+  });
+  const staged = runStep(false);
+  expect(staged.status).toBe(1);
+  expect(staged.stdout).toMatch(/staged publishing[^]*npm stage approve/u);
+  const listed = runStep(true);
+  expect(listed.status, listed.stdout + listed.stderr).toBe(0);
+  expect(listed.stdout).toMatch(/npm lists @wildshard\/engine@9\.9\.9/u);
 });

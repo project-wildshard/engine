@@ -69,3 +69,11 @@
   run and held a wait 20 minutes past a green ci).
 - v0.1.93's prepare stopped once because its push gate saw the shared install move mid-gate (a land refreshed it). The
   train now prepares once more on exactly that stop; repo-kit rolls back the half-made branch, so the retry starts clean.
+
+## npm latest is done only when npm lists it (QA 11-25 row 76)
+
+- v0.1.92's npm latest run 45730072797 printed `+ @wildshard/engine@0.1.92` and went green, but npm held the version
+  in staged publishing: the registry never listed it, and a rerun got E409 "previously staged". Approving a staged
+  version needs a maintainer's 2FA, so it waits on Jake.
+- The publish step now polls `npm view <name>@<version>` (40 tries, 30 s apart) after `npm publish` and fails naming
+  staged publishing and `npm stage approve` when the version never appears. Test: `test/npm-release-ci.test.ts`.
