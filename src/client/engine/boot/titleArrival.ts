@@ -91,10 +91,20 @@ function claim(kept: 'session' | 'device', key: string, raw: string | null): str
     return taken;
   } catch { return raw; }
 }
+/** QA 11-25 row 90: the record says this document wrote it or took it (an in-page travel's own tap), whatever navigated here. */
+function thisDocuments(raw: string | null): boolean {
+  if (raw === null) return false;
+  try {
+    const value: unknown = JSON.parse(raw), own = ownDocument();
+    return typeof value === 'object' && value !== null && (Reflect.get(value, 'from') === own || Reflect.get(value, 'taken') === own);
+  } catch { return false; }
+}
 function deviceBackup(take: boolean): string | null {
-  if (!tapNavigatedHere()) return null;
   try {
     const raw = saveStorage('device').getItem(BACKUP_KEY);
+    // QA 11-25 row 90: an in-page travel writes its tap on a page no tap navigated (a bookmark, a reload, a harness URL). The
+    // copy is still this document's own to read and to spend; kept, the title after the player's Exit took it and re-entered.
+    if (!tapNavigatedHere() && !thisDocuments(raw)) return null;
     if (take) saveStorage('device').removeItem(BACKUP_KEY);
     return raw;
   } catch { return null; }
@@ -132,6 +142,13 @@ export function handZoneOnReload(zone: string | null = shardZone): string | null
 /** A tab's own handoff (`setTitleArrival(…, {tab: true})`) whose reload did not happen. */
 export function dropTabArrival(): void {
   try { saveStorage('session').removeItem(KEY); } catch { /* nothing was kept */ }
+}
+
+/** QA 11-25 row 90: the player's own Exit to the main menu carries no tap. The tab's copy goes, and the device copy if this
+ *  document wrote or took it (another tab's fresh tap stays that tab's). */
+export function dropOwnArrival(): void {
+  dropTabArrival();
+  try { if (thisDocuments(saveStorage('device').getItem(BACKUP_KEY))) saveStorage('device').removeItem(BACKUP_KEY); } catch { /* nothing was kept */ }
 }
 
 /** The tap this document arrived with, consumed (both copies): the zone it names, or, given `slug`, only a tap for that zone. */

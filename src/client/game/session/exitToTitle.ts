@@ -1,6 +1,7 @@
 import { leaveSaved, markUnload } from '@wildshard/engine/boot/lastEnd';
 import { leftByPlayer } from '@wildshard/engine/boot/dropNotice';
 import { replaceFresh } from '@wildshard/engine/boot/freshPage';
+import { dropOwnArrival } from '@wildshard/engine/boot/titleArrival';
 
 interface TitleNavigation {
   readonly url: string;
@@ -16,5 +17,6 @@ function browserNavigation(): TitleNavigation { return {
  * No disposal chain or worker handover may gate the replacement title. */
 export function exitSessionToTitle(navigation: TitleNavigation = browserNavigation()): void {
   // the player's own exit: the title it reaches shows no drop modal (src/client/engine/boot/dropNotice.ts)
-  leaveSaved(() => { leftByPlayer(); navigation.replace(new URL('/', navigation.url).href); });
+  // QA 11-25 row 90: and no tap: a bare `/` adopts a fresh one (CP1), and a travel's left behind re-entered its zone
+  leaveSaved(() => { leftByPlayer(); dropOwnArrival(); navigation.replace(new URL('/', navigation.url).href); });
 }

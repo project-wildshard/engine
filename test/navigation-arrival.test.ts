@@ -197,3 +197,46 @@ test('a tap is the writer\'s and the next document\'s only: the first other page
   expect(pendingTitleArrival(), 'a later page in the tab (the title after an exit, a reload) finds it taken').toBeNull();
   expect(consumeTitleArrival(), 'and never spends it as its own').toBeNull();
 });
+
+const leavePages = (): void => { Reflect.deleteProperty(globalThis, 'document'); Reflect.deleteProperty(globalThis, 'location'); };
+/** QA 11-25 row 90: a page in the tab, `referrer` its address's (empty for a bookmark or a harness URL) and `at` its start. */
+function pageAt(at: number, referrer: string): void {
+  vi.spyOn(performance, 'timeOrigin', 'get').mockReturnValue(at);
+  Reflect.set(globalThis, 'document', { referrer });
+  Reflect.set(globalThis, 'location', { origin: 'https://play.example' });
+}
+
+test('QA 11-25 row 90: an in-page travel\'s tap is spent on a page no tap navigated, so Exit to the main menu lands on the title', () => {
+  vi.spyOn(Date, 'now').mockReturnValue(10_000);
+  try {
+    dropTabArrival(); saveStorage('device').removeItem('titleArrival.once');
+    pageAt(9_000, ''); // a bookmark or a harness URL: the page the player crosses Pine Hollow -> Mossgate on
+    setTitleArrival({ slug: 'mossgate', mode: 'enter' }); // travel.ts arriveAt, as an in-page entry writes it (both copies)
+    expect(pendingTitleArrival(), 'the in-page entry reads its own tap').toEqual({ slug: 'mossgate', mode: 'enter' });
+    expect(consumeTitleArrival('mossgate'), 'and the session spends it').toEqual({ slug: 'mossgate', mode: 'enter' });
+    pageAt(9_500, 'https://play.example/leave?to=%2F'); // the title the Exit replaces it with, seconds later
+    expect(pendingTitleArrival(), 'no copy is left for the title to re-enter Mossgate with').toBeNull();
+  } finally { leavePages(); }
+});
+
+test('QA 11-25 row 90: the player\'s Exit drops a tap its page wrote and never spent; another tab\'s stays', async () => {
+  const { exitSessionToTitle } = await import('../src/client/game/session/exitToTitle');
+  vi.spyOn(Date, 'now').mockReturnValue(10_000);
+  try {
+    dropTabArrival(); saveStorage('device').removeItem('titleArrival.once');
+    pageAt(9_000, '');
+    setTitleArrival({ slug: 'mossgate', mode: 'enter' });
+    const replace = vi.fn<(url: string) => void>();
+    exitSessionToTitle({ url: 'https://play.example/?mute=1', replace });
+    expect(replace).toHaveBeenCalledExactlyOnceWith('https://play.example/');
+    pageAt(9_500, 'https://play.example/leave?to=%2F');
+    expect(pendingTitleArrival(), 'the title after Exit').toBeNull();
+
+    pageAt(9_600, '');
+    setTitleArrival({ slug: 'pine-hollow', mode: 'enter' }); // another tab's fresh tap, its device copy
+    dropTabArrival(); // (the other tab's session copy is its own)
+    pageAt(9_700, 'https://play.example/');
+    exitSessionToTitle({ url: 'https://play.example/', replace });
+    expect(saveStorage('device').getItem('titleArrival.once'), 'another tab\'s tap is not this Exit\'s to drop').not.toBeNull();
+  } finally { leavePages(); }
+});
