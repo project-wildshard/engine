@@ -38,12 +38,12 @@ export function releaseCookedPack(release: ReleaseCook, slug: string, placed?: {
   const slugOf = (name: string): string => name.replace(/^_/u, '');
   const current = release.shards.find(row => slugOf(row.slug) === slugOf(slug) && (placed?.hash === undefined || row.hash === placed.hash));
   const hash = placed?.hash ?? current?.hash, shardVersion = placed?.shardVersion ?? current?.shardVersion;
-  if (hash === undefined || shardVersion === undefined) {
+  if (shardVersion === undefined) {
     throw new Error(`Signed cook address is incomplete for ${slug}`);
   }
   const ref = {slug: slugOf(slug), shardVersion, cookVersion, cookHash};
   cookedIndexKey(ref);
-  return {ref, hash};
+  return {ref, ...(hash === undefined ? {} : {hash})};
 }
 const RawVersions = v.object({shardfiles: v.array(v.object({hash: v.string(), shard: v.optional(v.string()), shardVersion: v.optional(v.string())}))});
 

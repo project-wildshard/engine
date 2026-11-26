@@ -78,6 +78,7 @@ test('a room reads the signed cook address and accepts the placement version for
   expect(releaseCookedPack(legacy, identity.slug)).toBeUndefined();
   const release = {...legacy, cook: {version: identity.cookVersion, hash: identity.cookHash}};
   expect(releaseCookedPack(release, identity.slug)).toEqual({ref: identity, hash});
+  expect(releaseCookedPack({...release, shards: [{slug: identity.slug, shardVersion: identity.shardVersion}]}, identity.slug)).toEqual({ref: identity});
   const advanced = {hash: 'e'.repeat(64), shardVersion: '0.3.0-candidate.1'};
   expect(releaseCookedPack(release, identity.slug, advanced)).toEqual({ref: {...identity, shardVersion: advanced.shardVersion}, hash: advanced.hash});
   expect(() => releaseCookedPack(release, identity.slug, {hash: advanced.hash})).toThrow('Signed cook address is incomplete');

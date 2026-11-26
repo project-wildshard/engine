@@ -8,6 +8,7 @@
 #   wildshard-config cook <tag>                                     AUTO-RELEASE AR4 (J355): move the cook worker to vX.Y.Z and
 #                                                                   the build a signed release names for it; roll back on failure
 #   wildshard-config show cook                                      print the cook worker's tag and build
+#   wildshard-config cook-store stage < credentials.json             stage the cooked bucket's scoped credentials
 #   wildshard-config replica start [--seconds S] [--workers N] [--seats N] [--cells a,b] [--saves memory|postgres]
 #                                   | replica pg-restart [--checkpoint] | replica stop
 #                                                                   MP1.2.d: the cap bench's replica on staging's CPUs, tailnet only;
@@ -19,8 +20,8 @@
 #   wildshard-config saves worn                                     FORMAT-PRUNE FP22c: staging's worn-skin keys, counted per
 #                                                                   shard, revision, slot and skin; no player id, read-only
 # Settings live in /etc/wildshard/<channel>.settings (640 root:wildshard-<channel>), which the units read after <channel>.env.
-# Secrets stay in the root-only .env. The dedicated async-upload staging verb writes only its two fixed credentials
-# from stdin; it never prints them. Other verbs never write secrets (they read only the placement rows there, for
+# Secrets stay in the root-only .env. Dedicated verbs accept only their fixed credentials
+# from stdin and never print them. Normal settings commands never write secrets (they read only the placement rows there, for
 # the pair check below): only the keys in SETTINGS below, each
 # checked by its own rule. A production change needs --production, so no one changes the live world by a slip.
 # The two placement keys (SA33, GC33) go together: the server throws at boot on one without the other, so a `set` that would
@@ -63,6 +64,7 @@ SETTINGS = {
     # MMO-SERVER E7.8a.b1: the measured playtest file (PlaytestFile, PLAYTEST_DIR from the unit), staging only. Production
     # never writes one: an agent proof runs on staging (J205), and a sitting there is the E7 table's input.
     'PLAYTEST': lambda value, channel: channel == 'staging' and value in ('0', '1'),
+    'ROOMS_VERSIONED_COOK': lambda value, channel: value in ('0', '1'),
 }
 RULES = {'WORLD_CELLS': "'grid' or comma-separated cell names (a-z, 0-9, -), none twice",
          'WORLD_WORKERS': 'a whole number from 1 to the channel\'s pinned CPUs (production 9, staging 4)',
@@ -72,7 +74,8 @@ RULES = {'WORLD_CELLS': "'grid' or comma-separated cell names (a-z, 0-9, -), non
          'PLACEMENT_URL': "https://packs.wildshard.io/releases/<channel>-placements.json for this channel, or blank",
          'PLACEMENT_PUBLIC_KEY': f'the API placement key {PLACEMENT_PUBLIC_KEY}, or blank',
          'METRICS_PORT': "the channel's own metrics port (production 9790, staging 9791), or blank (off)",
-         'PLAYTEST': '0 or 1, on staging only (production never records a playtest file)'}
+         'PLAYTEST': '0 or 1, on staging only (production never records a playtest file)',
+         'ROOMS_VERSIONED_COOK': '0 or 1'}
 
 # The engine's tests hand it a made-up /etc and no systemctl; never as root, so sudo (which drops the environment anyway) cannot.
 TEST = os.geteuid() != 0 and os.environ.get('WILDSHARD_CONFIG_TEST_ROOT')
@@ -416,9 +419,17 @@ select 'changed', 0;
     return 0
 
 
+def lock_cook_env():
+    """Serialize the root-only credential updates that share cook.env."""
+    import fcntl
+    lock = os.fdopen(os.open(f'{ETC}/.async-upload.lock', os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600), 'w')
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    return lock
+
+
 def write_secret_rows(path, rows):
     """Atomic root-only env update. Never print a credential or accept an arbitrary key."""
-    fd, temporary = tempfile.mkstemp(dir=os.path.dirname(path), prefix='.async-upload.')
+    fd, temporary = tempfile.mkstemp(dir=os.path.dirname(path), prefix='.secret-rows.')
     try:
         with os.fdopen(fd, 'w', encoding='utf-8') as handle:
             handle.write('\n'.join(rows) + '\n')
@@ -466,7 +477,7 @@ def async_upload(args):
     """SP22's staging-only credential seam; two fixed secrets arrive on stdin, never argv."""
     if args != ['async-upload', 'staging']:
         stop('usage: wildshard-config async-upload staging < private-credentials.json')
-    import json, fcntl
+    import json
     try:
         payload = sys.stdin.read(4097)
         values = json.loads(payload)
@@ -478,8 +489,7 @@ def async_upload(args):
             raise ValueError()
     except (ValueError, TypeError):
         stop('invalid async-upload credential document')
-    lock = os.fdopen(os.open(f'{ETC}/.async-upload.lock', os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600), 'w')
-    fcntl.flock(lock, fcntl.LOCK_EX)
+    lock = lock_cook_env()
     paths = [f'{ETC}/staging.env', f'{ETC}/cook.env']
     before = [read_rows(path) for path in paths]
     if not all(before) or not running('staging'):
@@ -510,6 +520,34 @@ def async_upload(args):
     return 2
 
 
+def stage_cook_store(args):
+    """Write the two scoped R2 rows once, leaving the running cook on its configured bucket."""
+    if args != ['cook-store', 'stage']:
+        stop('usage: wildshard-config cook-store stage < credentials.json')
+    import json
+    keys = {'R2_COOKED_ACCESS_KEY_ID': 32, 'R2_COOKED_SECRET_ACCESS_KEY': 64}
+    try:
+        payload = sys.stdin.read(1025)
+        values = json.loads(payload)
+        if len(payload) > 1024 or not isinstance(values, dict) or set(values) != set(keys):
+            raise ValueError()
+        if any(not isinstance(values[key], str) or re.fullmatch(f'[0-9a-f]{{{size}}}', values[key]) is None
+               for key, size in keys.items()):
+            raise ValueError()
+    except (ValueError, TypeError):
+        stop('invalid cooked bucket credential document')
+    with lock_cook_env():
+        path = f'{ETC}/cook.env'
+        before = read_rows(path)
+        if not before:
+            stop('cook-store stage needs the installed cook env')
+        rows = [row for row in before if key_of(row) not in keys] + [f'{key}={values[key]}' for key in keys]
+        if rows != before:
+            write_secret_rows(path, rows)
+    say('ok      cooked bucket credentials staged')
+    return 0
+
+
 # MMO-OBSERVABILITY OB11 (QA 11-24 rows 62 and 63): the cook's alarms reach Sentry only when cook.env names SENTRY_DSN. A DSN
 # is a secret, so `set` refuses it; this one verb takes exactly one Sentry ingest DSN on stdin (never argv, never printed),
 # writes it into the root-only cook.env, rebuilds the cook step alone and puts the old file back if the worker fails /health.
@@ -525,28 +563,29 @@ def cook_sentry(args):
     dsn = payload.strip()
     if len(payload) > 512 or SENTRY_DSN.fullmatch(dsn) is None:
         stop('cook-sentry takes one Sentry ingest DSN on stdin')
-    path = f'{ETC}/cook.env'
-    before = read_rows(path)
-    if not before:
-        stop('cook-sentry needs the installed cook env')
-    rows = [row for row in before if key_of(row) != 'SENTRY_DSN'] + [f'SENTRY_DSN={dsn}']
-    if rows == before:
-        say('ok      the cook already sends its alarms to that Sentry project')
-        return 0
-    import signal
-    signal.signal(signal.SIGHUP, signal.SIG_IGN)
-    signal.signal(signal.SIGPIPE, signal.SIG_IGN)
-    try:
-        write_secret_rows(path, rows)
-        if cook_rebuild():
-            say('ok      cook.env names a Sentry DSN; the cook worker restarted and answers /health')
+    with lock_cook_env():
+        path = f'{ETC}/cook.env'
+        before = read_rows(path)
+        if not before:
+            stop('cook-sentry needs the installed cook env')
+        rows = [row for row in before if key_of(row) != 'SENTRY_DSN'] + [f'SENTRY_DSN={dsn}']
+        if rows == before:
+            say('ok      the cook already sends its alarms to that Sentry project')
             return 0
-    except BaseException:
-        pass
-    write_secret_rows(path, before)
-    cook_rebuild()
-    say('undo    the cook failed health with the DSN; the previous cook.env is back', error=True)
-    return 2
+        import signal
+        signal.signal(signal.SIGHUP, signal.SIG_IGN)
+        signal.signal(signal.SIGPIPE, signal.SIG_IGN)
+        try:
+            write_secret_rows(path, rows)
+            if cook_rebuild():
+                say('ok      cook.env names a Sentry DSN; the cook worker restarted and answers /health')
+                return 0
+        except BaseException:
+            pass
+        write_secret_rows(path, before)
+        cook_rebuild()
+        say('undo    the cook failed health with the DSN; the previous cook.env is back', error=True)
+        return 2
 
 
 def cook_sentry_test():
@@ -584,6 +623,8 @@ def main(argv):
     args = [arg for arg in argv if arg != '--production']
     if args and args[0] == 'async-upload':
         return async_upload(args)
+    if args and args[0] == 'cook-store':
+        return stage_cook_store(args)
     if args and args[0] == 'cook-sentry':
         return cook_sentry(args)
     if args and args[0] == 'saves':
@@ -598,7 +639,7 @@ def main(argv):
         stop('the cook worker moves with: wildshard-config cook vX.Y.Z')
     if not args or args[0] not in ('show', 'set', 'split'):
         stop('usage: wildshard-config show <channel> | set <channel> <KEY> <value> [<KEY> <value>]... [--production] | split <channel> '
-             '| cook vX.Y.Z | show cook | cook-sentry < dsn | cook-sentry --test | replica start|stop | saves list|delete-test ...')
+             '| cook vX.Y.Z | show cook | cook-store stage < credentials.json | cook-sentry < dsn | cook-sentry --test | replica start|stop | saves list|delete-test ...')
     verb = args[0]
     if len(args) < 2 or args[1] not in CHANNELS:
         stop('the channel is production or staging')

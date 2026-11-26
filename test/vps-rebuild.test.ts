@@ -131,6 +131,12 @@ test('the cook worker waits for its credentials and exactly one kind of store', 
       name,
     ).not.toBe(0)
   }
+  const cooked =
+    'R2_ACCOUNT_ID=a\nR2_COOKED_ACCESS_KEY_ID=k\nR2_COOKED_SECRET_ACCESS_KEY=s\n'
+  const versioned = 'COOK_VERSIONED_STORE=1\n'
+  expect(complete(base + versioned + cooked)).toBe(0)
+  expect(complete(base + versioned + r2)).not.toBe(0)
+  expect(complete(base + cooked)).not.toBe(0)
   // The template rebuild.sh writes is incomplete as written, so a fresh box waits rather than starting a worker.
   const template = source.slice(
     source.indexOf('# C4: the cook worker.'),
@@ -380,7 +386,7 @@ test('Caddy is never started by the rebuild, and only the package file or its ow
 
 test('a blank COOK_STORE_DIR means R2, and the template leaves it commented', () => {
   expect(readFileSync('src/scripts/cook-worker.mjs', 'utf8')).toContain(
-    "env.COOK_STORE_DIR === undefined || env.COOK_STORE_DIR === ''",
+    "storeDirectory !== undefined && storeDirectory !== ''",
   )
   expect(source).toMatch(
     /^# COOK_STORE_DIR=\/var\/lib\/wildshard-cook\/store$/mu,

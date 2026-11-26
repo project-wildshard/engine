@@ -435,6 +435,25 @@ test('async upload provisions staging credentials from stdin, keeps them private
   expect(read(root, 'production.env')).toBe(before);
 });
 
+test('cook-store stages only scoped R2 credentials without switching or restarting the cook', () => {
+  const root = etc(), path = join(root, 'etc/wildshard/cook.env');
+  const before = 'R2_BUCKET_PACKS=fixture\nCOOK_VERSIONED_STORE=0\n';
+  const keys = {R2_COOKED_ACCESS_KEY_ID: 'b'.repeat(32), R2_COOKED_SECRET_ACCESS_KEY: 'c'.repeat(64)};
+  writeFileSync(path, before);
+  const run = (input: unknown) => spawnSync('python3', [CONFIG, 'cook-store', 'stage'], {input: JSON.stringify(input), encoding: 'utf8',
+    env: {PATH: process.env['PATH'] ?? '', WILDSHARD_CONFIG_TEST_ROOT: root}});
+  const success = run(keys);
+  expect(success.status, success.stderr).toBe(0);
+  expect(success.stdout + success.stderr).not.toContain(keys.R2_COOKED_ACCESS_KEY_ID);
+  expect(success.stdout + success.stderr).not.toContain(keys.R2_COOKED_SECRET_ACCESS_KEY);
+  const staged = read(root, 'cook.env');
+  expect(staged).toBe(before + Object.entries(keys).map(([key, value]) => `${key}=${value}\n`).join(''));
+  expect(statSync(path).mode & 0o777).toBe(0o600);
+  expect(run({...keys, COOK_VERSIONED_STORE: '1'}).status).toBe(1);
+  expect(run({...keys, R2_COOKED_SECRET_ACCESS_KEY: 'invalid'}).status).toBe(1);
+  expect(read(root, 'cook.env')).toBe(staged);
+});
+
 test('OB11: cook-sentry puts one Sentry DSN from stdin into cook.env, never prints it, and rolls back on a failed cook', () => {
   const root = etc(), path = join(root, 'etc/wildshard'), rebuild = join(root, 'rebuild.sh'), broken = join(root, 'rebuild-broken.sh');
   writeFileSync(join(path, 'cook.env'), 'R2_BUCKET_PACKS=fixture\nSENTRY_DSN=https://0000@old.invalid/1\n');

@@ -82,7 +82,8 @@ async function cookedPack(root: string, slug: string, cooked: Readonly<{ build: 
 
 export interface CookedServerSource {
   readonly ref: CookedShardRef;
-  readonly hash: string;
+  /** Signed placements pin a raw upload hash as well as its canonical version. */
+  readonly hash?: string;
   readonly origin?: string;
 }
 
@@ -90,7 +91,7 @@ export interface CookedServerSource {
 async function versionedServerPack(cooked: CookedServerSource, read: ServerRead): Promise<{readonly pack: ServerPack; readonly objectKey: (path: string) => string}> {
   const {ref, hash} = cooked, root = cooked.origin ?? COOKED_ORIGIN, path = cookedIndexKey(ref);
   const input = await originJson(root, path, read, true), index = readCookedIndexAddress(input);
-  if (cookedIndexKey(index) !== path || index.hash !== hash) throw new Error(`The cook's ${path} is not ${ref.slug}'s`);
+  if (cookedIndexKey(index) !== path || (hash !== undefined && index.hash !== hash)) throw new Error(`The cook's ${path} is not ${ref.slug}'s`);
   const {serverPack} = readCookedServerIndex(input);
   if (serverPack === undefined) throw new Error(`No server pack for ${ref.slug} in the cook's ${path}`);
   const objectKey = (name: string): string => {
