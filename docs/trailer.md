@@ -72,6 +72,8 @@ shot: a world keeps a closed page's body a while, and a scout's ghosts stand whe
 # 1. scout: three stills a shot, to a sheet; then the real capture of only the frames the cut uses
 node src/scripts/trailer/capture.mjs <frames> --shots <slug>,<slug> --base <url> --dry
 node src/scripts/trailer/capture.mjs <frames> --shots <slugs> --base <url> --edl <cut>/edl.json
+# a zone drawn whole with AO on, through the MMO card and its cell (exit 1 on a one-colour frame, AT16)
+node src/scripts/trailer/flat-frame-check.mjs --base <url> --zone nalati-grasslands
 # a party shot: the party first (loopback worlds only, a cue port), then the capture on the page's
 # real clock; the shot cues the march itself and its lens follows the bodies the page draws
 node src/scripts/trailer/party.mjs <url> --zone driftwood-isle --at 0,-200 --go 4498 --spread 1 --secs 600 &
@@ -150,8 +152,6 @@ Claude Code.
   zone 5 minutes after probing it before its shots, or re-take the shot.
 - On the grid `window.__hf` is the home level's heightfield; a `rel` rig reads the active cell's
   ground from the player's frame queries (`capture.mjs` `tr.ground`).
-- Nalati entered through the grid draws one flat colour with the AO pass on (meta AT16): its
-  shots set `NO_AO` until the engine fix lands.
 - A grid cell keeps its own sky and weather: the shot's `time` and `weather` reach the home level
   only, so Nalati shoots under its own dusk.
 - A session's pictures can be mislabelled (a PNG type on JPEG bytes): `panel.mjs` sniffs and

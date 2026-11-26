@@ -319,6 +319,15 @@ export function composerTriangle(): THREE.BufferGeometry | null {
   return geometry instanceof THREE.BufferGeometry ? geometry : null;
 }
 
+/** A screen pass's triangle or quad, drawn on its own (no parent, never culled, at most four vertices): its arrays stay.
+ *  Libraries share one such geometry between all their passes at module level and dispose it with any one pass (n8ao's
+ *  FullScreenTriangle, three's), so the next pass uploads it again from its arrays; released, they would come back
+ *  zero-filled. Its few dozen bytes were never worth letting go. */
+export function screenGeometry(geometry: THREE.BufferGeometry, object: THREE.Object3D): boolean {
+  const position = geometry.getAttribute('position');
+  return object.parent === null && !object.frustumCulled && position !== undefined && position.count <= 4;
+}
+
 /**
  * The renderer's hooks: every texture is looked at when three first asks for its properties (before its upload), every
  * geometry when it first draws.
@@ -382,7 +391,10 @@ export function installMemorySaver(renderer: Renderer, releaseShape = false): vo
     // Three shares one quad between all sprites, including the next renderer's sprites. postprocessing shares one fullscreen
     // triangle between every composer: a composer's dispose deletes its buffers and a same-page zone entry's next composer
     // uploads it again from its arrays (J451: released, they came back zero-filled and the final pass drew a transparent world)
-    if (seenGeometry.has(geometry) || geometry === composerTriangle() || object instanceof THREE.SkinnedMesh || object instanceof THREE.Sprite
+    // AT16 (meta ALPHA-2-TRAILER): n8ao's FullScreenTriangle is the same kind of module geometry, shared by every AO pass, and
+    // each of its quads' dispose disposes it: a composer rebuild in the page (Nalati on the grid) re-uploaded its released uv
+    // zero-filled, every AO quad sampled one texel and the frame drew one flat colour. `screenGeometry` keeps every such one.
+    if (seenGeometry.has(geometry) || geometry === composerTriangle() || screenGeometry(geometry, object) || object instanceof THREE.SkinnedMesh || object instanceof THREE.Sprite
       || (object instanceof THREE.BatchedMesh && !(releaseShape && fixedBatchGeometry(geometry)))) return;
     seenGeometry.add(geometry);
     // The scene/cache owns live geometry; this delayed optimization only borrows it.

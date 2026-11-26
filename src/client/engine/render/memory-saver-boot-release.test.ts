@@ -1,4 +1,5 @@
 import { afterAll, expect, test, vi } from 'vitest';
+import { N8AOPostPass } from 'n8ao';
 import { BufferAttribute, BufferGeometry, Group, Mesh, MeshBasicMaterial, PerspectiveCamera, Raycaster, Scene, Sphere, Sprite, SpriteMaterial, Vector3, WebGLRenderer } from 'three';
 import { textureUploadRenderer } from '../../../test/engine/textureUploadRenderer';
 import { ChangedBatchedMesh, prepareBatchGeometryRetirement } from './changedTextureUploads';
@@ -190,5 +191,38 @@ test('phone keeps the composer fullscreen triangle readable for the next compose
     gl.uploads.clear();
     geometry.dispose();
     for (const [name, values] of Object.entries(expected)) expect(Array.from(geometry.getAttribute(name).array)).toEqual(values);
+  } finally { material.dispose(); }
+});
+
+// AT16 (meta ALPHA-2-TRAILER): n8ao's FullScreenTriangle is one module geometry shared by every AO pass's quads, and any
+// quad's dispose disposes it. Nalati on the grid rebuilt its composer after the boot's release: the next AO pass uploaded
+// the triangle's released uv zero-filled, every AO quad sampled one texel and the whole frame drew one flat colour.
+for (const phone of [false, true]) test(`${phone ? 'phone' : 'desktop'} keeps n8ao's fullscreen triangle readable for the next AO pass`, () => {
+  vi.stubGlobal('WebGL2RenderingContext', FakeGL);
+  vi.stubGlobal('WebGLBuffer', FakeBuffer);
+  const gl = new FakeGL(), renderer = Object.assign(textureUploadRenderer(), { getContext: () => gl });
+  installFrameCounter(renderer); installMemorySaver(renderer, phone);
+  const ao = new N8AOPostPass(new Scene(), new PerspectiveCamera(), 16, 16);
+  const quad: unknown = Reflect.get(ao, 'copyQuad'), screen: unknown = typeof quad === 'object' && quad !== null ? Reflect.get(quad, '_mesh') : null;
+  const shared: unknown = screen instanceof Mesh ? Reflect.get(screen, 'geometry') : null;
+  if (!(screen instanceof Mesh) || !(shared instanceof BufferGeometry)) throw new Error('n8ao no longer draws a FullScreenTriangle mesh');
+  const geometry: BufferGeometry = shared, material = new MeshBasicMaterial();
+  geometry.computeBoundingSphere();
+  const read = (name: string): number[] => { const a: unknown = geometry.getAttribute(name); return a instanceof BufferAttribute ? Array.from(a.array, Number) : []; };
+  const expected = Object.fromEntries(Object.keys(geometry.attributes).map(name => [name, read(name)]));
+  expect(expected['uv']).toEqual([0, 0, 2, 0, 0, 2]);
+  try {
+    for (const name of Object.keys(geometry.attributes)) {
+      const attribute: unknown = geometry.getAttribute(name);
+      if (!(attribute instanceof BufferAttribute)) continue;
+      gl.bindBuffer(gl.ARRAY_BUFFER, new FakeBuffer());
+      gl.bufferData(gl.ARRAY_BUFFER, attribute.array);
+    }
+    renderer.renderBufferDirect(new PerspectiveCamera(), new Scene(), geometry, material, screen, { start: 0, count: 3, materialIndex: 0 });
+    expect(releaseDrawnGeometry(renderer)).toBe(0);
+    // the AO pass's dispose deletes the triangle's GPU copies (the fake's buffers go with their uploads)
+    gl.uploads.clear();
+    ao.dispose();
+    for (const [name, values] of Object.entries(expected)) expect(read(name)).toEqual(values);
   } finally { material.dispose(); }
 });

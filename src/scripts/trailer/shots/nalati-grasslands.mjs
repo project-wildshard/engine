@@ -1,20 +1,20 @@
 // Nalati Grasslands (painterly steppe), shot data for any trailer. Ported from singleplayer
 // scripts/steam-trailer/shots/nalati.mjs (cf104912d3^): the URL harness (elite=, ride=, boss=) is gone, so fights take
 // the creatures the zone spawns. Rig keys: p [x, dy, z] above the ground (rel), l absolute unless relLook.
-import { NO_AO, NO_VIEWMODEL, VIEWMODEL, CALM, WILD, held, at, aimAt, NEAR_KINDS, preyNear, js, lerp, ease, PREY } from './lib.mjs';
+import { NO_VIEWMODEL, VIEWMODEL, CALM, WILD, held, at, aimAt, NEAR_KINDS, preyNear, js, lerp, ease, PREY } from './lib.mjs';
 
 const Z = 'nalati-grasslands', T = 'golden', W = 'clear';
 export const shots = [
   // the valley from above: a push down over the steppe to the camp, the mountains behind
   { name: 'n-open', zone: Z, time: T, weather: W, secs: 4,
-    setup: NO_AO + NO_VIEWMODEL + CALM,
+    setup: NO_VIEWMODEL + CALM,
     rig: { rel: true, ease: true, keys: [
       { t: 0, p: [40, 48, 262], l: [0, 30, 40], fov: 50 },
       { t: 4, p: [22, 20, 196], l: [-10, 12, 40], fov: 55 },
     ] } },
   // the yurt camp: a slow low drift past the tents
   { name: 'n-camp', zone: Z, time: T, weather: W, secs: 4,
-    setup: NO_AO + NO_VIEWMODEL + CALM,
+    setup: NO_VIEWMODEL + CALM,
     rig: { rel: true, relLook: true, keys: [
       { t: 0, p: [66, 3.2, 190], l: [90, 2, 212], fov: 50 },
       { t: 2, p: [72, 3.6, 186], l: [90, 2, 212], fov: 50 },
@@ -22,12 +22,12 @@ export const shots = [
     ] } },
   // play: a sprint down the track on the game's own camera
   { name: 'n-run', zone: Z, time: T, weather: W, secs: 4, warm: 90,
-    setup: NO_AO + VIEWMODEL + CALM,
+    setup: VIEWMODEL + CALM,
     afterWarm: held('move.forward') + held('sprint'),
     tick: (t) => `window.__wildshard.world.player.pitch = ${lerp(-0.03, 0.02, ease(t / 4)).toFixed(4)};` },
   // fight: the bow drawn on whatever hunts the steppe (wolf first), loosed twice
   { name: 'n-bow', zone: Z, time: T, weather: W, secs: 4, warm: 120,
-    setup: js(NO_AO, VIEWMODEL, WILD, 'try { window.__wildshard.combat.equip("bow"); } catch {}'),
+    setup: js(VIEWMODEL, WILD, 'try { window.__wildshard.combat.equip("bow"); } catch {}'),
     afterWarm: preyNear('/wolf|kokbori|boar|bear|deer|saiga|horse/', 14),
     probe: NEAR_KINDS,
     tick: (t, i, sb, step) => js(aimAt(PREY, 0.15, 0.6),
