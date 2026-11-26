@@ -89,7 +89,7 @@ export async function pineEconomy(browser, phone, base, step) {
       const r = await read(); return { ok: r.pitch === 9 && r.iron === 30 && r.selected === 'pitch' && r.owned['ammo.pitch'] === 10, ...r };
     });
     await step('Pine: saves retain the unclaimed drop, journal and finish purchases', async () => {
-      await page.evaluate(() => (/** @type {WorkerWindow} */ (window)).__workerClientSave()); await page.reload({ waitUntil: 'load' }); await enter();
+      await page.evaluate(() => (/** @type {WorkerWindow} */ (window)).__workerClientSave()); await enterZone(page, { zone: 'pine-hollow', base, flags: 'mute=1&nolock=1', waitUntil: 'load' }); await enter();
       await page.waitForFunction(() => ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.interactables?.() ?? (/** @type {WorkerWindow} */ (window)).__wildshard.world.interactables).some(row => row.label === 'Take the Ghost Stag crossbow' && row.radius > 0), undefined, { timeout: 4000 });
       const r = await read(), out = await page.evaluate(() => ({ journal: JSON.parse(localStorage.getItem('wildshard.save.v2@2.pine-hollow') ?? '{}').keys?.compendium?.data, legacy: (/** @type {WorkerWindow} */ (window)).__wildshard.shard.play.skins.has('scarback-furnace') }));
       return { ok: r.finish && r.pitch === 9 && r.selected === 'pitch' && r.owned['finish-drop.ghost-stag'] === 1 && out.journal?.['ghost-stag']?.t === 3 && out.legacy, ...r, ...out };
@@ -110,7 +110,7 @@ export async function pineEconomy(browser, phone, base, step) {
       return { ok: out.owned['finish.ghost-stag'] === 1 && out.owned['finish-drop.ghost-stag'] === undefined && out.taken === 3, ...out };
     });
     await step('Pine: the claimed finish and totals survive another reload', async () => {
-      await page.evaluate(() => (/** @type {WorkerWindow} */ (window)).__workerClientSave()); await page.reload({ waitUntil: 'load' }); await enter();
+      await page.evaluate(() => (/** @type {WorkerWindow} */ (window)).__workerClientSave()); await enterZone(page, { zone: 'pine-hollow', base, flags: 'mute=1&nolock=1', waitUntil: 'load' }); await enter();
       const out = await page.evaluate(() => ({ finish: (/** @type {WorkerWindow} */ (window)).__wildshard.shard.play.skins.has('ghost-stag'), owned: (/** @type {WorkerWindow} */ (window)).__workerClient().owned, taken: JSON.parse(localStorage.getItem('wildshard.save.v2@2.pine-hollow') ?? '{}').keys?.compendium?.data?.['ghost-stag']?.t }));
       return { ok: out.finish && out.owned['finish-drop.ghost-stag'] === undefined && out.taken === 3 && errors.length === 0, ...out, errors };
     });

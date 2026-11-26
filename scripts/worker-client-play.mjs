@@ -185,7 +185,7 @@ export async function play(browser, phone, base, only = '') {
   });
   await step('driftwood saves', async () => { await drift.page.evaluate(() => Promise.race([window.__workerClientSave(), new Promise(resolve => { setTimeout(resolve, 20_000); })])); const r = await report(drift.page); return { ok: r.savedOk, tick: r.savedTick }; });
   await step('driftwood resumes: the quest is where it stood', async () => {
-    await drift.page.reload({ waitUntil: 'load' }); await entered(drift.page);
+    /* CP16: a reload of a grid page lands on the title (its tap is spent); reopen the zone */ await enterZone(drift.page, { zone: 'driftwood-isle', base, flags: 'mute=1&nolock=1', waitUntil: 'load' }); await entered(drift.page);
     await drift.page.waitForTimeout(2500);
     const r = await report(drift.page); return { ok: r.restored && r.quests['sealed-ring'] !== undefined && r.quests['sealed-ring'] !== 'unstarted', restored: r.restored, quests: r.quests, x: r.x, z: r.z, serverX: r.serverX, serverZ: r.serverZ };
   });
@@ -369,7 +369,7 @@ export async function play(browser, phone, base, only = '') {
         const distance = () => nalati.page.evaluate(() => { const { world, shard } = window.__wildshard; return shard.ride.taming.companion?.position.distanceTo(world.player.position) ?? 1e6; });
         await nalati.page.evaluate(() => window.__workerClientSave());
         const saved = await report(nalati.page), before = await distance();
-        await nalati.page.reload({ waitUntil: 'load' }); await entered(nalati.page);
+        await enterZone(nalati.page, { zone: 'nalati-grasslands', base, flags: 'mute=1&nolock=1', waitUntil: 'load' }); await entered(nalati.page);
         await nalati.page.waitForTimeout(1200);
         const r = await report(nalati.page), after = await distance(), companion = await nalati.page.evaluate(() => { const { taming } = window.__wildshard.shard.ride; return { phase: taming.phase, companion: taming.companion !== null }; });
         return { ok: saved.savedOk && r.restored && companion.phase === 'bonded' && companion.companion && after < Math.max(4, before - .5) && r.closed === null, saved: saved.savedOk, restored: r.restored, companion, before, after, closed: r.closed };
@@ -437,7 +437,7 @@ export async function play(browser, phone, base, only = '') {
   await step('nine saves and resumes where it stood', async () => {
     await nine.page.evaluate(() => Promise.race([window.__workerClientSave(), new Promise(resolve => { setTimeout(resolve, 20_000); })]));
     const stood = await report(nine.page);
-    await nine.page.reload({ waitUntil: 'load' }); await entered(nine.page);
+    await enterZone(nine.page, { zone: 'nine-dragon-stack', base, flags: 'mute=1&nolock=1', waitUntil: 'load' }); await entered(nine.page);
     await nine.page.waitForTimeout(1500);
     const r = await report(nine.page);
     return { ok: stood.savedOk && r.restored && Math.hypot(r.serverX - stood.serverX, r.serverZ - stood.serverZ) < 3, restored: r.restored, flags: r.flags.length };
