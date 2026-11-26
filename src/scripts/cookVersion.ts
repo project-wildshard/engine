@@ -91,7 +91,7 @@ async function main(): Promise<void> {
   await import(new URL('./format-hook.mjs', import.meta.url).href);
   const {SHARDFILE_VERSION: formatVersion} = await import('@wildshard/format/version');
   const actual = {cookHash: cookHash(ROOT).cookHash, formatVersion};
-  const previous = fromBase(values.base ?? 'HEAD');
+  const previous = fromBase(values.base === undefined ? 'HEAD' : /^0+$/u.test(values.base) ? 'HEAD~1' : values.base);
   if (values.bump === undefined && values.same !== true) {
     const current = recordedCookVersion();
     await checkCookVersion(current, actual, previous, goldenCook);

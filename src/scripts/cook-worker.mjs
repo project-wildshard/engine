@@ -14,7 +14,8 @@
 //     headroom and the serve loop nightly
 //   node --import ./src/scripts/bake-loader.mjs src/scripts/cook-worker.mjs report    print usage against the budget (J89)
 // Environment: WILDSHARD_API_URL, WILDSHARD_BUILD; R2_ACCOUNT_ID, R2_BUCKET_PACKS, R2_PACKS_ACCESS_KEY_ID,
-// R2_PACKS_SECRET_ACCESS_KEY, or COOK_STORE_DIR for a folder; COOK_NOTIFY_TOKEN; COOK_PORT (8792; 8790 and 8791 are the game's), COOK_HOST (127.0.0.1);
+// R2_PACKS_SECRET_ACCESS_KEY, or COOK_STORE_DIR for a folder; COOK_VERSIONED_STORE uses the dedicated
+// wildshard-cooked bucket and R2_COOKED_ACCESS_KEY_ID / R2_COOKED_SECRET_ACCESS_KEY instead; COOK_NOTIFY_TOKEN; COOK_PORT (8792; 8790 and 8791 are the game's), COOK_HOST (127.0.0.1);
 // COOK_SERVER_PACKS, COOK_SCRATCH, COOK_LISTING_FILE (FR-A21); COOK_SECONDS, COOK_MEMORY_MB, COOK_HEAP_MB, COOK_MAX_SHARDFILE_BYTES; COOK_JOB_WRAP, a JSON array the host puts
 // before each job to take its network away (see the wildshard-cook unit in src/scripts/vps/rebuild.sh). SP1b-T: COOK_SIDECARS, the
 // folder of cook preparation sidecars every job reads; COOK_RECORDER (the `wildshard` command, a JSON array),
@@ -35,6 +36,7 @@ const { folderStore, r2Store } = await import('../cook/game/packStore.ts');
 const { rendererRevision } = await import('./renderer-revision.mjs');
 const { shardfileValidationRevision } = await import('./shardfile-validation-revision.mjs');
 const { liveDeployBuilds } = await import('./app-build/previousDeploy.mjs');
+const { COOKED_BUCKET } = await import('../shared/game/shardfile/cookedPackPaths.ts');
 const { serverSentry } = await import('../server/host/dedicated/serverSentry.ts');
 
 const env = process.env;
@@ -45,11 +47,16 @@ const cookSentry = serverSentry({ dsn: env.SENTRY_DSN, version: undefined, build
 const cookAlarm = line => { cookSentry?.capture(new Error(line), { system: 'cook' }); };
 /** @param {string} name */
 const need = name => { const value = env[name]; if (value === undefined || value === '') throw new Error(`cook-worker needs ${name}`); return value; };
-// An env file's blank row is unset: a blank COOK_STORE_DIR means R2, never a folder at the working directory.
-const store = env.COOK_STORE_DIR === undefined || env.COOK_STORE_DIR === ''
-  ? r2Store({ endpoint: `https://${need('R2_ACCOUNT_ID')}.r2.cloudflarestorage.com`, bucket: need('R2_BUCKET_PACKS'), accessKeyId: need('R2_PACKS_ACCESS_KEY_ID'), secretAccessKey: need('R2_PACKS_SECRET_ACCESS_KEY') })
-  : folderStore(env.COOK_STORE_DIR);
 const root = fileURLToPath(new URL('../..', import.meta.url));
+const [command, ...rest] = process.argv.slice(2);
+const versioned = env.COOK_VERSIONED_STORE === '1' || command === 'recook-live';
+const storeDirectory = env.COOK_STORE_DIR?.trim();
+const store = storeDirectory !== undefined && storeDirectory !== ''
+  ? folderStore(storeDirectory)
+  : r2Store({ endpoint: `https://${need('R2_ACCOUNT_ID')}.r2.cloudflarestorage.com`,
+    bucket: versioned ? COOKED_BUCKET : need('R2_BUCKET_PACKS'),
+    accessKeyId: need(versioned ? 'R2_COOKED_ACCESS_KEY_ID' : 'R2_PACKS_ACCESS_KEY_ID'),
+    secretAccessKey: need(versioned ? 'R2_COOKED_SECRET_ACCESS_KEY' : 'R2_PACKS_SECRET_ACCESS_KEY') });
 const maxBytes = Number(env.COOK_MAX_SHARDFILE_BYTES ?? MAX_SHARDFILE_BYTES);
 /** J262: the jobs can't compute it under `--permission`; a host that can't either cooks every preparation as stale. */
 const renderer = (() => { try { return rendererRevision(root); } catch { return undefined; } })();
@@ -62,11 +69,12 @@ const cookHashId = await (async () => { try { return (await import('./cookHash.t
 if (cookHashId === undefined) console.warn(`cook-worker: no cook hash (${cookHashError}), so every head cooks again for this build (SP7)`);
 else console.log(`cook-worker: cook hash ${cookHashId}`);
 if (validator === undefined) console.warn('cook-worker: no shardfile validator revision, so no index carries a verdict and no page enters a placed slug from it (SA48)');
+const recipe = versioned ? (await import('./cookVersion.ts')).recordedCookVersion(root) : undefined;
+if (recipe !== undefined && recipe.cookHash !== cookHashId) throw new Error('Cook hash differs from cook-version.json');
 const uploadApi = env.COOK_SIGNING_KEY === undefined || env.COOK_SIGNING_KEY === '' ? undefined : cookApi(need('WILDSHARD_API_URL'), env.COOK_SIGNING_KEY, fetch, Date.now, maxBytes);
-const publicSource = apiSource(env.WILDSHARD_API_URL ?? 'https://api.wildshard.io', fetch, maxBytes);
+const publicSource = apiSource(env.WILDSHARD_API_URL ?? 'https://api.wildshard.io', fetch, maxBytes, versioned);
 const privateSource = uploadApi === undefined ? undefined : pendingSource(uploadApi, publicSource);
 const uploadSource = privateSource ?? publicSource;
-const [command, ...rest] = process.argv.slice(2);
 const sidecars = cookSidecars(env), scratch = resolve(env.COOK_SCRATCH ?? 'tmp/cook/scratch');
 /** SP1b-T: record a sidecar for every stale head before a recook cooks it, so a render change ends `prepared by cook`. */
 const record = () => recordPass(env, renderer, scratch, uploadSource, line => { console.log(line); });
@@ -88,10 +96,11 @@ const reclaim = async () => {
  *  scratch folder and named for its bucket; COOK_LISTING_FILE moves it, and a blank one turns it off. A folder store lists fast. */
 const listingFile = (() => {
   if (env.COOK_LISTING_FILE !== undefined) return env.COOK_LISTING_FILE === '' ? undefined : resolve(env.COOK_LISTING_FILE);
-  return env.COOK_STORE_DIR === undefined || env.COOK_STORE_DIR === '' ? join(dirname(scratch), `listing-${need('R2_BUCKET_PACKS')}.tsv`) : undefined;
+  return versioned || storeDirectory !== undefined && storeDirectory !== '' ? undefined : join(dirname(scratch), `listing-${need('R2_BUCKET_PACKS')}.tsv`);
 })();
 const worker = () => createCookWorker({ alarm: cookAlarm, ...(listingFile === undefined ? {} : { listingFile }),
-  build: need('WILDSHARD_BUILD'), store, source: uploadSource, log: line => { console.log(line); }, reclaim,
+  build: need('WILDSHARD_BUILD'), store, source: uploadSource, log: line => { console.log(line); },
+  ...(recipe === undefined ? { reclaim } : { versioned: {...recipe, store} }),
   serverPacks: resolve(env.COOK_SERVER_PACKS ?? 'tmp/cook/server'), scratch,
   ...(validator === undefined ? {} : { validator }), ...(cookHashId === undefined ? {} : { cook: cookHashId }),
   launcher: {
@@ -118,7 +127,7 @@ if (command === 'serve') {
   const nightly = async () => {
     try { await reclaim(); } catch (/** @type {unknown} */ error) { console.warn(`pack store reclaim failed: ${error instanceof Error ? error.message : String(error)}`); }
   };
-  setInterval(() => { void nightly(); }, 24 * 3600_000).unref();
+  if (!versioned) setInterval(() => { void nightly(); }, 24 * 3600_000).unref();
   if (uploadApi !== undefined && privateSource !== undefined) {
     // The initial rollout is staging only; production keeps its existing upload law.
     need('COOK_STAGING_ACTIVATION_URL'); need('COOK_STAGING_ACTIVATION_TOKEN');
@@ -136,6 +145,18 @@ if (command === 'serve') {
   }
 } else if (command === 'record') {
   console.log(JSON.stringify(await record()));
+} else if (command === 'recook-live') {
+  // PV25 bootstrap is a single catalogue snapshot. Refuse to start a partial first population.
+  const heads = await publicSource.heads('live');
+  const expected = Number(rest.find(arg => arg.startsWith('--expect='))?.slice(9) ?? 27);
+  if (!Number.isSafeInteger(expected) || expected <= 0 || heads.length !== expected || heads.some(head => head.shardVersion === undefined)) {
+    throw new Error(`Need ${expected} live heads with raw shardVersion; got ${heads.length}, ${heads.filter(head => head.shardVersion === undefined).length} missing shardVersion`);
+  }
+  const cook = worker();
+  const rows = await Promise.all(heads.map(head => cook.cook(head)));
+  const refusal = uncookedLiveRefusal(need('WILDSHARD_BUILD'), rows);
+  if (refusal !== undefined) throw new Error(refusal);
+  console.log(JSON.stringify({bucket: COOKED_BUCKET, heads: rows.length, cooked: rows.filter(row => row.state === 'cooked').length}));
 } else if (command === 'recook') {
   await record();
   const cook = worker(), rows = await cook.recook(['live']), preview = await cook.recook(['preview', 'staging']);
@@ -147,6 +168,7 @@ if (command === 'serve') {
   if (refusal !== undefined) console.error(refusal);
   process.exit(refusal === undefined ? 0 : 1);
 } else if (command === 'bake') {
+  if (versioned) throw new Error('The versioned cook is read via its indexes');
   // A deploy's step after `recook`: a page reads each head's packs from the store (J138), with no client rebuild.
   const [dist, origin] = rest, api = need('WILDSHARD_API_URL'), source = apiSource(api, fetch, maxBytes);
   if (dist === undefined || origin === undefined || origin === '') throw new Error('usage: cook-worker bake <dist> <origin>');
@@ -158,16 +180,18 @@ if (command === 'serve') {
   if (added.length > 0) refreshServiceWorker(out, page);
   console.log(JSON.stringify(added));
 } else if (command === 'gc') {
+  if (versioned) throw new Error('Build-key garbage collection cannot sweep the cooked bucket');
   // PZ5: a carried build's book, parts and content stay on R2, so a build any channel still carries is never collected.
   const channels = await liveDeployBuilds();
   const required = channels.flatMap(row => row.builds);
   const builds = [...new Set([...rest, ...required])];
   console.log(JSON.stringify({ channels, ...await collectGarbage(store, builds, Number(env.COOK_BUDGET_BYTES ?? PACK_BUDGET_BYTES), Date.now(), undefined, required) }));
 } else if (command === 'reclaim') {
+  if (versioned) throw new Error('Build-key garbage collection cannot sweep the cooked bucket');
   // J505: the protected collection by hand (the same one a publish and the nightly run make)
   console.log(JSON.stringify(await reclaim()));
 } else if (command === 'report') {
   console.log(JSON.stringify(await storeUsage(store, Number(env.COOK_BUDGET_BYTES ?? PACK_BUDGET_BYTES))));
 } else {
-  throw new Error('usage: cook-worker serve | recook | record | bake <dist> <origin> | gc <build>... | reclaim [<build>...] | report');
+  throw new Error('usage: cook-worker serve | recook | recook-live [--expect=27] | record | bake <dist> <origin> | gc <build>... | reclaim [<build>...] | report');
 }

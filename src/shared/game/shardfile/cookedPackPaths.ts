@@ -9,17 +9,21 @@ export interface CookedShardRef {
 }
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
-const SEMVER = /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/u;
+const INTEGER = String.raw`(?:0|[1-9][0-9]*)`;
+const CORE = String.raw`${INTEGER}\.${INTEGER}\.${INTEGER}`;
+const PRERELEASE = String.raw`(?:${INTEGER}|[0-9]*[A-Za-z-][0-9A-Za-z-]*)`;
+const COOK_VERSION = new RegExp(`^${CORE}$`, 'u');
+const SHARD_VERSION = new RegExp(String.raw`^${CORE}(?:-${PRERELEASE}(?:\.${PRERELEASE})*)?$`, 'u');
 const HASH = /^[a-f0-9]{64}$/u;
 const PATH_SEGMENT = /^[\w-][\w.-]*$/u;
 
 export function cookedShardPrefix({slug, shardVersion}: Pick<CookedShardRef, 'slug' | 'shardVersion'>): string {
-  if (!SLUG.test(slug) || !SEMVER.test(shardVersion)) throw new Error('Invalid cooked shard identity');
+  if (!SLUG.test(slug) || !SHARD_VERSION.test(shardVersion)) throw new Error('Invalid cooked shard identity');
   return `shards/${slug}/${shardVersion}/`;
 }
 
 export function cookedVersionPrefix(ref: Pick<CookedShardRef, 'slug' | 'shardVersion' | 'cookVersion'>): string {
-  if (!SEMVER.test(ref.cookVersion)) throw new Error('Invalid cook version');
+  if (!COOK_VERSION.test(ref.cookVersion)) throw new Error('Invalid cook version');
   return `${cookedShardPrefix(ref)}cooks/${ref.cookVersion}/`;
 }
 

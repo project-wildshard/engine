@@ -7,6 +7,8 @@ test('a cooked index is addressed by the raw shard version and cook identity', (
   expect(new URL(cookedIndexKey(ref), COOKED_ORIGIN).href).toBe(
     `https://cooked.wildshard.io/shards/driftwood-isle/0.2.13/cooks/1.0.0/${ref.cookHash}/index.json`,
   );
+  expect(cookedIndexKey({ ...ref, shardVersion: '0.2.13-candidate.1' })).toContain('/0.2.13-candidate.1/');
+  expect(() => cookedIndexKey({ ...ref, shardVersion: '0.2.13-candidate.01' })).toThrow('Invalid cooked shard identity');
   expect(() => cookedIndexKey({ ...ref, shardVersion: '13' })).toThrow('Invalid cooked shard identity');
   expect(() => cookedIndexKey({ ...ref, cookHash: '../preview' })).toThrow('Invalid cook hash');
 });

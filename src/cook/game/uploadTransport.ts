@@ -13,9 +13,9 @@ import {readCapped, type CookRow, type CookWorker, type ShardfileSource} from '.
 
 const Id = v.pipe(v.string(), v.regex(/^[a-f0-9-]{36}$/u));
 const identity = {uploadId: Id, hash: ShardfileHashSchema, slug: ShardSlugSchema};
-const Pending: v.GenericSchema<PendingUpload> = v.object({...identity, revision: v.pipe(v.number(), v.safeInteger(), v.minValue(1)), formatVersion: v.string(), armed: v.optional(v.boolean())});
+const Pending: v.GenericSchema<PendingUpload> = v.object({...identity, revision: v.pipe(v.number(), v.safeInteger(), v.minValue(1)), formatVersion: v.string(), shardVersion: v.optional(v.string()), armed: v.optional(v.boolean())});
 const Activation: v.GenericSchema<ActivationNotice> = v.object({...identity, channels: v.array(v.picklist(['preview', 'staging', 'production'])), place: v.optional(v.boolean())});
-export interface PendingUpload {readonly uploadId: string; readonly hash: string; readonly slug: string; readonly revision: number; readonly formatVersion: string;
+export interface PendingUpload {readonly uploadId: string; readonly hash: string; readonly slug: string; readonly revision: number; readonly formatVersion: string; readonly shardVersion?: string | undefined;
   /** FORMAT-PRUNE FP27c: the catalogue's armed word for the slug (`memory_armed`); an older API sends none. */
   readonly armed?: boolean | undefined}
 export interface ActivationNotice {readonly uploadId: string; readonly hash: string; readonly slug: string; readonly channels: readonly ('preview' | 'staging' | 'production')[]; readonly place?: boolean | undefined}
@@ -171,7 +171,7 @@ export function uploadDelivery(options: UploadDeliveryOptions): {readonly sweep:
       if (outbox.blocked(job.uploadId) || !outbox.due(job.uploadId, (options.now ?? Date.now)())) return;
       if (outbox.read(job.uploadId) === undefined) {
         source.bind(job);
-        const row: CookRow = await worker.cook({slug: job.slug, hash: job.hash, ...(job.armed === undefined ? {} : {armed: job.armed})});
+        const row: CookRow = await worker.cook({slug: job.slug, hash: job.hash, shardVersion: job.shardVersion, ...(job.armed === undefined ? {} : {armed: job.armed})});
         if (row.hash !== job.hash || !new Set([job.slug]).has(row.slug)) throw new Error('The cook reported another upload');
         if (row.state === 'failed') {outbox.defer(job.uploadId, (options.now ?? Date.now)()); log(`upload ${job.uploadId}: cook failed; retry next poll`); return;}
         if (row.state !== 'refused' && !row.check?.pass) throw new Error('No successful full check for pending upload');

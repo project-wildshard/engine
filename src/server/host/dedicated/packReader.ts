@@ -9,7 +9,7 @@ import { brotliDecompressSync } from 'node:zlib';
 import type { Rapier } from '@wildshard/engine/physics/rapier';
 import type { HeadlessRuntimeInput } from '../headlessRuntime';
 import type { GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
-import { readGridCollisionPack, readServerFolder, readServerHeader, type ServerRead } from '../standalone/serverFolder';
+import { readGridCollisionPack, readServerFolder, readServerHeader, type CookedServerSource, type ServerRead } from '../standalone/serverFolder';
 import type { ReleaseFile } from '../../../shared/host/releaseRows';
 import { readPlatformItemCatalogue, type PlatformItemCatalogue } from '@wildshard/engine/game/loot/platformCatalogue';
 import { admitLedgerRewards, type LedgerCatalogueItem } from '@wildshard/engine/game/ledger';
@@ -20,6 +20,7 @@ export interface PackReads { fetched: number; fetchedBytes: number; cached: numb
 export interface PackReaderOptions {
   /** Where the book and its parts are: `https://…`, or a `file:` folder laid out the same. */
   readonly origin: string;
+  readonly cooked?: CookedServerSource;
   /** Where parts are kept, one folder per part's SHA-256. */
   readonly cache: string;
 }
@@ -67,11 +68,11 @@ export function readPackGrid(build: string, options: PackReaderOptions, reads: P
 }
 /** ONE-FORMAT OF31h2: one shard's header through its build's book, read before any worker boots for what it declares about its worker. */
 export function readPackHeader(slug: string, build: string, options: PackReaderOptions, reads: PackReads): Promise<unknown> {
-  return readServerHeader(new URL(`shards/${slug}/`, options.origin.endsWith('/') ? options.origin : `${options.origin}/`).href, build, packRead(options, reads));
+  return readServerHeader(new URL(`shards/${slug}/`, options.origin.endsWith('/') ? options.origin : `${options.origin}/`).href, build, packRead(options, reads), options.cooked);
 }
 /** One shard's server inputs, through its build's book, or for a placed slug the book lacks, the cook's index of `hash` (SA47). */
 export async function readPackFolder(slug: string, build: string, rapier: Rapier, options: PackReaderOptions, reads: PackReads, hash?: string, catalogue: readonly LedgerCatalogueItem[] = [], exactHash?: boolean): Promise<HeadlessRuntimeInput> {
-  const input = await readServerFolder(new URL(`shards/${slug}/`, options.origin.endsWith('/') ? options.origin : `${options.origin}/`).href, () => build, packRead(options, reads), rapier, undefined, hash, undefined, false, exactHash);
+  const input = await readServerFolder(new URL(`shards/${slug}/`, options.origin.endsWith('/') ? options.origin : `${options.origin}/`).href, () => build, packRead(options, reads), rapier, undefined, hash, undefined, false, exactHash, options.cooked);
   admitLedgerRewards(input.shard.ledger, catalogue);
   return { ...input, catalogue };
 }

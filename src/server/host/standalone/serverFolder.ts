@@ -10,6 +10,7 @@ import { carryOutputDescriptor, isBuildValidatedOutput, outputDescriptor, resolv
 import { serverReadsFile } from '@wildshard/format/serverReads';
 import { shardFolderData } from '@wildshard/engine/game/shardfile/folderData';
 import { GRID_COLLISION_BODY, GRID_COLLISION_HEADER, readGridCollision, type GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
+import { COOKED_ORIGIN, cookedIndexKey, cookedObjectKey, readCookedIndexAddress, type CookedShardRef } from '@wildshard/engine/game/shardfile/cookedPackPaths';
 import { cookIndexPath, readCookedServerIndex, readServerPack, readServerPackBook, serverPackBookPath, serverPackFile, serverPackPart, type ServerPack, type ServerPackBook, type ServerPackPart } from '@wildshard/engine/game/shardfile/serverPack';
 import type { HeadlessRuntimeInput } from '../headlessRuntime';
 import type { HeldRead } from '../../../shared/host/standalone/heldReads';
@@ -79,6 +80,27 @@ async function cookedPack(root: string, slug: string, cooked: Readonly<{ build: 
   return readServerPack(await originJson(root, index.serverPack.index.slice(1), read));
 }
 
+export interface CookedServerSource {
+  readonly ref: CookedShardRef;
+  readonly hash: string;
+  readonly origin?: string;
+}
+
+/** A versioned room pack uses the same signed shard identity and object paths as the page. */
+async function versionedServerPack(cooked: CookedServerSource, read: ServerRead): Promise<{readonly pack: ServerPack; readonly objectKey: (path: string) => string}> {
+  const {ref, hash} = cooked, root = cooked.origin ?? COOKED_ORIGIN, path = cookedIndexKey(ref);
+  const input = await originJson(root, path, read, true), index = readCookedIndexAddress(input);
+  if (cookedIndexKey(index) !== path || index.hash !== hash) throw new Error(`The cook's ${path} is not ${ref.slug}'s`);
+  const {serverPack} = readCookedServerIndex(input);
+  if (serverPack === undefined) throw new Error(`No server pack for ${ref.slug} in the cook's ${path}`);
+  const objectKey = (name: string): string => {
+    const key = cookedObjectKey(ref, index.objects, name);
+    if (key === undefined) throw new Error(`Cook index has no server input ${name}`);
+    return key;
+  };
+  return {pack: readServerPack(await originJson(root, objectKey(serverPack.index), read)), objectKey};
+}
+
 /** C2: the road's collision from this build's grid pack: nothing a page reads, and no shard's. */
 export async function fetchGridCollision(base: string): Promise<readonly GridCollisionStrip[]> {
   // Async so a bad base rejects, as it always did, rather than throwing.
@@ -101,12 +123,18 @@ export async function readGridCollisionPack(root: string, build: string, read: S
 /** C2: reads a server file from its product's pack, fetching the book once and a part only for a file it holds. The browser
  *  undoes `br`. A read file is copied out and its part left to the collector: a phone's worker shouldn't hold a level's worth
  *  of them, and reading one again is a cache hit. */
-function serverPackReader(root: string, slug: string, build: () => string, source: ServerRead, hash?: string, exactHash?: boolean): (path: string) => Promise<Uint8Array> {
+function serverPackReader(root: string, slug: string, build: () => string, source: ServerRead, hash?: string, exactHash?: boolean, versioned?: CookedServerSource): (path: string) => Promise<Uint8Array> {
   const opening = new Map<string, Promise<Uint8Array>>(), opened = new Map<string, WeakRef<Uint8Array>>();
   let pack: Promise<ServerPack> | undefined, book: Promise<ServerPackBook> | undefined;
+  let objectKey: ((path: string) => string) | undefined;
   // SA47: the book wins; only a slug it has no row for, with the shardfile hash its placement names, reads the cook's index. The book
   // is read once, as before SA47; only a refused index is asked again (review)
   const packOf = async (): Promise<ServerPack> => {
+    if (versioned !== undefined) {
+      const cooked = await versionedServerPack(versioned, source);
+      objectKey = cooked.objectKey;
+      return cooked.pack;
+    }
     if (exactHash && hash !== undefined) return cookedPack(root, slug, {build: build(), hash}, source);
     const row = (await (book ??= serverBook(root, build(), source))).shards[slug];
     if (row !== undefined) return row;
@@ -122,7 +150,8 @@ function serverPackReader(root: string, slug: string, build: () => string, sourc
     if (kept !== undefined) return Promise.resolve(kept);
     const waiting = opening.get(part.url);
     if (waiting !== undefined) return waiting;
-    const read = source(besideShard(part.url, root), part.url, part.hash).then(bytes => { opened.set(part.url, new WeakRef(bytes)); return bytes; }).finally(() => { opening.delete(part.url); });
+    const key = objectKey?.(part.url), url = key === undefined ? besideShard(part.url, root) : new URL(key, versioned?.origin ?? COOKED_ORIGIN);
+    const read = source(url, key ?? part.url, part.hash).then(bytes => { opened.set(part.url, new WeakRef(bytes)); return bytes; }).finally(() => { opening.delete(part.url); });
     opening.set(part.url, read);
     return read;
   };
@@ -134,10 +163,12 @@ function serverPackReader(root: string, slug: string, build: () => string, sourc
 }
 
 /** ONE-FORMAT OF31h2: a shard's header (`shard.json`) from its build's server pack, unchecked: what the worker table reads before any worker boots. */
-export async function readServerHeader(root: string, build: string, source: ServerRead): Promise<unknown> {
+export async function readServerHeader(root: string, build: string, source: ServerRead, versioned?: CookedServerSource): Promise<unknown> {
   const slug = new URL('.', root).pathname.split('/').at(-2) ?? '';
-  const header: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await serverPackReader(root, slug, () => build, source)('shard.json').catch(() => source(new URL('shard.json', root), 'shard.json'))));
-  return header;
+  const header = serverPackReader(root, slug, () => build, source, undefined, undefined, versioned)('shard.json');
+  const bytes = versioned === undefined ? await header.catch(() => source(new URL('shard.json', root), 'shard.json')) : await header;
+  const parsed: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+  return parsed;
 }
 
 /**
@@ -150,14 +181,15 @@ export function fetchServerFolder(base: string, rapier: Rapier, held?: HeldRead,
 /** A shard's server inputs under `root`, whichever server is reading: `source` is what differs. `hash`, a placed slug's shardfile (SA47),
  *  lets a slug the build's book lacks open from the cook's index. `patch` (DEVSERVER, SHARD-SOURCE AP19: `withDevGameplay`) changes
  *  the read shardfile before the product is made of it. */
-export async function readServerFolder(root: string, build: () => string, source: ServerRead, rapier: Rapier, held?: HeldRead, hash?: string, patch?: (shard: Shardfile) => Shardfile, ownServer = false, exactHash?: boolean): Promise<HeadlessRuntimeInput> {
+export async function readServerFolder(root: string, build: () => string, source: ServerRead, rapier: Rapier, held?: HeldRead, hash?: string, patch?: (shard: Shardfile) => Shardfile, ownServer = false, exactHash?: boolean, versioned?: CookedServerSource): Promise<HeadlessRuntimeInput> {
   const slug = new URL('.', root).pathname.split('/').at(-2) ?? '';
   // C2: all of it is in the pack this build's book names, the server class only there (J91). The page lends what it holds
   // (DL25), so that moves no bytes. A host with no book, or one offline after a new build, reads what the device kept.
   // NB19: an author's own inline candidate has no pack yet (the book names the pinned revision's): it is read beside `root`,
   // and every byte is still verified against its descriptor below.
   // Exact cooked hashes always use their index, including when a caller also requests inline author inputs.
-  const serverFile = ownServer && !exactHash ? (path: string): Promise<Uint8Array> => source(new URL(path, root), path) : serverPackReader(root, slug, build, source, hash, exactHash);
+  const pinned = exactHash === true || versioned !== undefined;
+  const serverFile = ownServer && !pinned ? (path: string): Promise<Uint8Array> => source(new URL(path, root), path) : serverPackReader(root, slug, build, source, hash, pinned, versioned);
   // QA 11-25 row 68r (heldReads.ts): once the descriptor names the server's files, one ask learns which of them the page lists;
   // a file it doesn't list goes to the network without waiting for the page's main thread to say so.
   let listing: Promise<ReadonlyMap<string, boolean>> | undefined;
@@ -166,7 +198,7 @@ export async function readServerFolder(root: string, build: () => string, source
     const url = new URL(path, root), lent = held === undefined || (await listing)?.get(url.href) === false ? undefined : await held(url.href);
     if (lent !== undefined && lent !== null) return new Uint8Array(lent);
     // Activation must never fall back to an unrelated loose header after exact-pack refusal.
-    return exactHash ? serverFile(path) : serverFile(path).catch(() => source(url, path));
+    return pinned ? serverFile(path) : serverFile(path).catch(() => source(url, path));
   };
   const input: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await read('shard.json')));
   if (!isOutputIndex(input)) throw new Error('Standalone needs a format-2 output');

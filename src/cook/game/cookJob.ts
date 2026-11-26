@@ -23,6 +23,7 @@ import {MAX_SHARDFILE_BYTES} from '@wildshard/format/uploadCaps';
 import {cookShard, openShardfile, serverRows, type CookReport, type CookShardPhase, type OpenShardfile, type WireBytes} from './shardCook';
 import type {PartEncoder} from './spawnParts';
 import type {CookSidecar} from './cookSidecar';
+import {classifyCookObjects, type CookObjectProvenance} from './cookObjectProvenance';
 import {cookProvenance, provenanceRefusal, type CookProvenance, type ExpectedCopy} from './cookProvenance';
 
 /** A shardfile the cook refuses for what it is. A retry can't change it, unlike a killed child or a lost network. */
@@ -40,6 +41,7 @@ type CookJobPhase = 'validation' | 'proof' | 'server-files' | CookShardPhase;
 export interface CookJobPorts {
   /** Host-owned notice identity; reject a valid product for another shard before its simulation/cook. */
   readonly expectedSlug?: string;
+  readonly versionedOutput?: boolean;
   /** SP19: mandatory full check, composed by the host above this layer. */
   readonly check: (shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>, sections: ReadonlyMap<string, unknown>) => Promise<ShardfileCheckReport>;
   readonly wireBytes: WireBytes;
@@ -73,6 +75,8 @@ export interface CookJobReport {
   readonly provenance?: CookProvenance;
   /** SA48: what a page's admission row needs of these bytes, from the receipt the validator just held (`cookReceipt`). */
   readonly receipt?: CookReceipt;
+  readonly objects?: CookObjectProvenance;
+  readonly rawShardVersion?: string;
 }
 /** SHARD-AUTHORING SA48: the facts a bake's `folderVerdict` stamps on a page, read here from a product the format's validator has
  *  just admitted, so a page whose build never saw the shard can admit it from the cook's index. The worker stamps its validator
@@ -185,6 +189,13 @@ export async function runCookJob(tarball: Uint8Array, out: string, ports: CookJo
   // Each manifest names the header at its product URL, and no part holds it (DL18); its `?v=` is what caches it.
   const shard = openShardfile(cooked, renderer), header = `shardfiles/${shard.slug}/shard.json`, file = join(client, header);
   mkdirSync(dirname(file), {recursive: true}); writeFileSync(file, shard.header);
+  const raw = ports.versionedOutput === true ? readTar(tarball) : undefined;
+  const rawHeader = raw?.get('shard.json');
+  const original: unknown = rawHeader === undefined ? undefined : JSON.parse(new TextDecoder().decode(rawHeader));
+  const rawShardVersion = object(original) && typeof original['shardVersion'] === 'string' ? original['shardVersion'] : undefined;
+  const objects = raw === undefined ? undefined
+    : classifyCookObjects(raw, out, shard.slug, cook.manifests.map(row => row.url), cook.server.index, shard.cook?.mounts ?? []);
   return {slug: product.index.identity.slug, hash: sha256(tarball), proof, check, cook, header, server: writeServerPack(shard, join(out, 'server')), seconds: (ports.now() - started) / 1000,
-    ...(receipt === undefined ? {} : {receipt}), ...(provenance === undefined ? {} : {provenance})};
+    ...(receipt === undefined ? {} : {receipt}), ...(provenance === undefined ? {} : {provenance}),
+    ...(objects === undefined ? {} : {objects}), ...(rawShardVersion === undefined ? {} : {rawShardVersion})};
 }

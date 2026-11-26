@@ -873,6 +873,7 @@
     "./game/shardfile/bakedTiles": "./src/client/game/shardfile/bakedTiles.ts",
     "./game/shardfile/skinPlayback": "./src/client/game/shardfile/skinPlayback.ts",
     "./game/shardfile/serverPack": "./src/shared/game/shardfile/serverPack.ts",
+    "./game/shardfile/cookedPackPaths": "./src/shared/game/shardfile/cookedPackPaths.ts",
     "./game/shardfile/saveRevision": "./src/shared/game/shardfile/saveRevision.ts",
     "./game/quest/chapterBindings": "./src/shared/game/quest/chapterBindings.ts",
     "./game/ui/panels": "./src/client/game/ui/panels.ts",

@@ -34,14 +34,16 @@ import type {CookJobReport} from './cookJob';
 import {expectedCopyOf, provenanceRefusal, type ExpectedCopy, type ListedCopy} from './cookProvenance';
 import {stalePreparationLine, type PreparationState} from './shardCook';
 import {cookPreparedLine, sidecarPath} from './cookSidecar';
-import type {ObjectHeaders, PackStore, StoredObject} from './packStore';
+import type {ImmutablePackStore, ObjectHeaders, PackStore, StoredObject} from './packStore';
 import {appendPut, loadListing, saveListing} from './keptListing';
 import {installedRuntimeReads} from './installedRuntimeReads';
 import {cookIndexPath, readServerPackBook, serverPackBookPath} from '../../shared/game/shardfile/serverPack';
 import {cookedMapPath} from '../../shared/game/shardfile/cookedMapPath';
+import {cookedIndexKey, type CookedShardRef} from '../../shared/game/shardfile/cookedPackPaths';
+import {publishCooked, readVersionedCook, verifyCookReuse, writeVersionedCook, type VersionedCookIndex} from './publishCooked';
 
 /** `expected`: the API's migrated copy of this head at the engine's format (CP2b2b), which the cook's own copy must match. */
-export interface CatalogueRow {readonly slug: string; readonly revision?: number; readonly hash: string; readonly expected?: ExpectedCopy}
+export interface CatalogueRow {readonly slug: string; readonly revision?: number; readonly shardVersion?: string | undefined; readonly hash: string; readonly expected?: ExpectedCopy}
 /** A head the cook can be asked for. `live` is production and `preview` the preview channel (the old two stages); MS2.4:
  *  `staging` is the staging channel's pointer, which is where `upload --channel staging` puts a new author's shard. */
 export type CookStage = 'live' | 'preview' | 'staging';
@@ -60,15 +62,15 @@ const NoticeSchema: v.GenericSchema<CookNotice> = v.strictObject({
   revision: RevisionNumberSchema,
   hash: ShardfileHashSchema,
 });
-interface RevisionRef {readonly revision: number; readonly hash: string}
-const RevisionSchema: v.GenericSchema<RevisionRef> = v.object({revision: RevisionNumberSchema, hash: ShardfileHashSchema});
+interface RevisionRef {readonly revision: number; readonly hash: string; readonly shardVersion?: string | undefined}
+const RevisionSchema: v.GenericSchema<RevisionRef> = v.object({revision: RevisionNumberSchema, hash: ShardfileHashSchema, shardVersion: v.optional(v.string())});
 /** `GET /api/catalogue`: it answers before a grid is set, unlike the `catalogue.json` a build bakes. */
 /** J275 (AC17): a channel's pointer names the raw upload (`raw`); the cook downloads and migrates that, as for `live`. The API
  *  sends every channel's block for every slug and leaves `raw` out where the channel has no pointer. */
 /** CP2b2b: each block also lists the API's migrated copies (`migrations`), whose digest the cook's own copy must match. */
-interface ChannelHead {readonly raw?: string | undefined; readonly migrations?: readonly ListedCopy[] | undefined}
+interface ChannelHead {readonly raw?: string | undefined; readonly shardVersion?: string | undefined; readonly migrations?: readonly ListedCopy[] | undefined}
 const ListedCopySchema: v.GenericSchema<ListedCopy> = v.object({raw: ShardfileHashSchema, format: v.string(), hash: v.optional(ShardfileHashSchema), chainId: v.string(), status: v.string()});
-const ChannelHeadSchema: v.GenericSchema<ChannelHead> = v.object({raw: v.optional(ShardfileHashSchema), migrations: v.optional(v.array(ListedCopySchema))});
+const ChannelHeadSchema: v.GenericSchema<ChannelHead> = v.object({raw: v.optional(ShardfileHashSchema), shardVersion: v.optional(v.string()), migrations: v.optional(v.array(ListedCopySchema))});
 interface Channels {readonly staging?: ChannelHead | undefined; readonly preview?: ChannelHead | undefined; readonly production?: ChannelHead | undefined}
 const CatalogueSchema: v.GenericSchema<{readonly shards: readonly {readonly slug: string; readonly live?: RevisionRef | undefined; readonly preview?: RevisionRef | undefined; readonly channels?: Channels | undefined}[]}> = v.object({shards: v.array(v.object({slug: ShardSlugSchema, live: v.optional(RevisionSchema), preview: v.optional(RevisionSchema), channels: v.optional(v.object({staging: v.optional(ChannelHeadSchema), preview: v.optional(ChannelHeadSchema), production: v.optional(ChannelHeadSchema)}))}))});
 /** The head with the API's copy of it attached when one is listed at the engine's format. */
@@ -152,6 +154,7 @@ export type JobOutcome = JobOutcomeOk | JobOutcomeRefused | JobOutcomeKilled;
 export interface JobLauncher {
   /** Node flags and script of one job; reads cover the repo and its installed runtime dependencies. */
   readonly root: string;
+  readonly versionedOutput?: boolean;
   readonly execPath: string;
   readonly loader: string;
   readonly script: string;
@@ -198,7 +201,7 @@ export function runJob(launcher: JobLauncher, tarball: string, out: string, expe
   return new Promise(resolve => {
     // No credentials, no home: the cook's only inputs are its arguments. The encoder's cache survives jobs, and each entry
     // is decoded against its hash before use, so one job can't poison the next.
-    const child = spawn(command, args, {cwd: work, env: {PATH: process.env['PATH'] ?? '', WILDSHARD_SPAWN_PART_CACHE: cache, NODE_ENV: 'production', COOK_MAX_SHARDFILE_BYTES: String(limits.maxBytes ?? MAX_SHARDFILE_BYTES),
+    const child = spawn(command, args, {cwd: work, env: {PATH: process.env['PATH'] ?? '', WILDSHARD_SPAWN_PART_CACHE: cache, NODE_ENV: 'production', ...(launcher.versionedOutput === true ? {COOK_VERSIONED_OUTPUT: '1'} : {}), COOK_MAX_SHARDFILE_BYTES: String(limits.maxBytes ?? MAX_SHARDFILE_BYTES),
       ...(cpuSlots === undefined ? {} : {COOK_CPU_SLOTS: String(cpuSlots)}), ...(launcher.renderer === undefined ? {} : {COOK_RENDERER: launcher.renderer}), ...(sidecar === undefined ? {} : {COOK_SIDECAR: sidecar}), ...(armed === undefined ? {} : {COOK_ARMED: String(armed)})}, stdio: ['ignore', 'pipe', 'pipe']});
     let stdout = '', stderr = '', peak = 0, why: string | undefined;
     const take = (text: string, kept: string): string => (kept + text).slice(-CAPTURE_BYTES);
@@ -268,15 +271,32 @@ export interface ShardfileSource {
 }
 
 /** `api-server`: public, read-only, and validated its own bytes first. Its download is a redirect to a signed R2 GET. */
-export function apiSource(base: string, read: typeof fetch = fetch, maxBytes: number = MAX_SHARDFILE_BYTES): ShardfileSource {
+export function apiSource(base: string, read: typeof fetch = fetch, maxBytes: number = MAX_SHARDFILE_BYTES, versioned = false): ShardfileSource {
   return {
     heads: async stage => {
       const response = await read(`${base}/api/catalogue`, {signal: AbortSignal.timeout(30_000)});
       if (!response.ok) throw new Error(`Catalogue answered ${response.status}`);
-      return v.parse(CatalogueSchema, await response.json()).shards.flatMap(row => {
-        if (stage === 'staging') { const raw = row.channels?.staging?.raw; return raw === undefined ? [] : [withExpected({slug: row.slug, hash: raw}, row.channels)]; }
-        const head = row[stage]; return head === undefined ? [] : [withExpected({slug: row.slug, ...head}, row.channels)];
+      const heads = v.parse(CatalogueSchema, await response.json()).shards.flatMap(row => {
+        const channel = stage === 'live' ? row.channels?.production : row.channels?.[stage];
+        const head = stage === 'staging' ? undefined : row[stage];
+        const hash = stage === 'staging' ? channel?.raw : head?.hash;
+        if (hash === undefined) return [];
+        const shardVersion = head?.shardVersion ?? (channel?.raw === hash ? channel.shardVersion : undefined);
+        return [withExpected({slug: row.slug, hash, ...(head === undefined ? {} : {revision: head.revision}), ...(shardVersion === undefined ? {} : {shardVersion})}, row.channels)];
       });
+      if (!versioned || heads.every(head => head.shardVersion !== undefined)) return heads;
+      // Channel blocks on older API versions carry a hash without the author's label. Join raw uploads by exact hash.
+      const listed = await read(`${base}/api/shardfiles`, {signal: AbortSignal.timeout(30_000)});
+      if (!listed.ok) throw new Error(`Shardfile versions answered ${listed.status}`);
+      const rows = v.parse(v.object({shardfiles: v.array(v.object({
+        hash: ShardfileHashSchema, shardVersion: v.optional(v.string()),
+      }))}), await listed.json()).shardfiles;
+      const versions = new Map(rows.map(row => [row.hash, row.shardVersion]));
+      for (const head of heads) {
+        const shardVersion = versions.get(head.hash);
+        if (head.shardVersion === undefined && shardVersion !== undefined) Object.assign(head, {shardVersion});
+      }
+      return heads;
     },
     download: async hash => {
       const response = await read(`${base}/api/shardfiles/${hash}`, {signal: AbortSignal.timeout(300_000)});
@@ -446,6 +466,13 @@ export function cookOutputDigest(root: string): string {
 }
 
 
+type CookHead = Pick<CatalogueRow, 'slug' | 'hash' | 'shardVersion'>;
+export interface VersionedCook {
+  readonly store: ImmutablePackStore;
+  readonly cookVersion: string;
+  readonly cookHash: string;
+  readonly sameOutputFrom?: string;
+}
 export interface CookWorkerOptions {
   readonly build: string;
   readonly store: PackStore;
@@ -472,6 +499,7 @@ export interface CookWorkerOptions {
    *  revision (and validator) is carried: its index is copied under this build, with no download and no job. A moved
    *  revision recooks every head. Without it every head cooks, as before. */
   readonly cook?: string;
+  readonly versioned?: VersionedCook;
 }
 export interface CookRow {
   readonly slug: string; readonly hash: string; readonly state: 'cooked' | 'present' | 'refused' | 'failed'; readonly detail?: string; readonly seconds?: number; readonly peakMB?: number;
@@ -484,7 +512,7 @@ const TRANSIENT_TRIES = 3;
  *  is a real one (a broken file, a full store), so retrying each poll would only cook it again and again. */
 const FAILED_RETRY_MS = 10 * 60_000, FAILED_RETRY_MAX_MS = 6 * 3_600_000;
 /** A retry can't change these: another clock runs out the same way, and a store stays full. */
-const FINAL = /^(?:past |Over the pack budget)/u;
+const FINAL = /^(?:past |Over the pack budget|Missing raw shardVersion|Cook output changed|Cook object bytes differ)/u;
 /** QA 11-24 row 62: a full pack store alarms at most this often. */
 export const STORE_FULL_ALARM_MS = 86_400_000;
 /** A publish the pack budget refuses; `never` when the upload alone needs more than the whole budget. */
@@ -497,7 +525,7 @@ class PackBudgetError extends Error {
 
 export interface CookWorker {
   /** Cook one head unless this build already has it. Never throws: the row says what happened. */
-  readonly cook: (head: {readonly slug: string; readonly hash: string; readonly armed?: boolean}) => Promise<CookRow>;
+  readonly cook: (head: CookHead & {readonly armed?: boolean}) => Promise<CookRow>;
   /** J29, and J30's list: every head of the catalogue at the stages asked for. */
   readonly recook: (stages: readonly CookStage[]) => Promise<readonly CookRow[]>;
   readonly enqueue: (notice: CookNotice) => void;
@@ -509,7 +537,8 @@ export interface CookWorker {
 }
 
 export function createCookWorker(options: CookWorkerOptions): CookWorker {
-  const {build, store, source, launcher, serverPacks, scratch} = options, budget = options.budgetBytes ?? PACK_BUDGET_BYTES;
+  const {build, store, source, serverPacks, scratch, versioned} = options, budget = options.budgetBytes ?? PACK_BUDGET_BYTES;
+  const launcher = versioned === undefined ? options.launcher : {...options.launcher, versionedOutput: true};
   const log = options.log ?? ((): void => undefined), clock = options.now ?? Date.now;
   if (!/^[\w.-]{1,64}$/u.test(build)) throw new Error('A build id names a store folder');
   // SP7: an index carries only between builds of the same cook revision and the same validator (its verdict's revision).
@@ -591,6 +620,18 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     listing?.rows.set(key, row);
     if (listingFile !== undefined && listing !== undefined && noting) noting = saved('note', () => { appendPut(listingFile, row); });
   };
+  const parkServer = (work: string, slug: string, hash: string): void => {
+    const target = join(serverPacks, slug, hash), parked = `${target}.${process.pid}.tmp`;
+    rmSync(parked, {recursive: true, force: true}); mkdirSync(dirname(target), {recursive: true});
+    cpSync(join(work, 'out/server'), parked, {recursive: true}); rmSync(target, {recursive: true, force: true}); renameSync(parked, target);
+  };
+  const indexOf = (report: CookJobReport, hash: string, keys: readonly string[]): CookIndex => ({
+    version: 1, build, slug: report.slug, hash, header: report.header, manifests: report.cook.manifests, keys,
+    server: report.server, serverPack: report.cook.server, proof: indexProof(report.proof), check: report.check, seconds: report.seconds,
+    ...(report.cook.preparation === undefined ? {} : {preparation: report.cook.preparation}),
+    ...(report.receipt === undefined || options.validator === undefined ? {} : {verdict: {...report.receipt, revision: options.validator}}),
+    ...(carryKey === undefined ? {} : {cook: carryKey}),
+  });
   const publish = async (work: string, report: CookJobReport, hash: string): Promise<void> => {
     const client = join(work, 'out/client'), keys = filesUnder(client);
     if (keys.some(key => !cookOutputKey(key))) throw new Error('Cook output names a key outside its publication paths');
@@ -642,13 +683,8 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     // FR-A2: where a publish's time goes, so the next slow one names its part (listing, reclaim or PUTs).
     const sent = puts - putsBefore, seconds = (ms: number): string => (ms / 1000).toFixed(1);
     log(`publish ${report.slug} ${hash.slice(0, 12)}: listing ${seconds(listed - began)} s, ${sent} PUT(s) of ${keys.length} in ${seconds(clock() - listed)} s`);
-    const target = join(serverPacks, report.slug, hash), parked = `${target}.${process.pid}.tmp`;
-    rmSync(parked, {recursive: true, force: true}); mkdirSync(dirname(target), {recursive: true});
-    cpSync(join(work, 'out/server'), parked, {recursive: true}); rmSync(target, {recursive: true, force: true}); renameSync(parked, target);
-    const index: CookIndex = {version: 1, build, slug: report.slug, hash, header: report.header, manifests: report.cook.manifests, keys: [...shared, ...loose.map(key => folder + key)], loose: folder, server: report.server, serverPack: report.cook.server, proof: indexProof(report.proof), check: report.check, seconds: report.seconds,
-      ...(report.cook.preparation === undefined ? {} : {preparation: report.cook.preparation}),
-      ...(report.receipt === undefined || options.validator === undefined ? {} : {verdict: {...report.receipt, revision: options.validator}}),
-      ...(carryKey === undefined ? {} : {cook: carryKey})};
+    parkServer(work, report.slug, hash);
+    const index: CookIndex = {...indexOf(report, hash, [...shared, ...loose.map(key => folder + key)]), loose: folder};
     await put(indexKey(build, hash), new TextEncoder().encode(JSON.stringify(index)), {type: 'application/json', cache: 'public, max-age=300'});
   };
   /** CP2b2b: the API's copy digest for each head it listed (`source.heads`), checked after the job, before publishing. */
@@ -656,10 +692,50 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   /** FORMAT-PRUNE FP27c: the catalogue's armed word per hash, from the upload feed. A head without one (a recook) leaves the
    *  format to decide; a stored file's memory policy only reports there (CP10). */
   const armedWords = new Map<string, boolean>();
-  const attempt = async (head: {readonly slug: string; readonly hash: string}, tarball: Uint8Array, work: string): Promise<CookRow> => {
+  const versionedRef = (recipe: VersionedCook, head: CookHead, cookHash = recipe.cookHash): CookedShardRef => {
+    if (head.shardVersion === undefined) throw new Error(`Missing raw shardVersion for ${head.slug}`);
+    const ref = {slug: shardSlugOf(head.slug), shardVersion: head.shardVersion, cookVersion: recipe.cookVersion, cookHash};
+    cookedIndexKey(ref);
+    return ref;
+  };
+  let versionedUsage: {readonly at: number; readonly sizes: Map<string, number>} | undefined;
+  const reserveVersioned = async (recipe: VersionedCook, objects: readonly {readonly key: string; readonly bytes: number}[]): Promise<void> => {
+    if (versionedUsage === undefined || clock() - versionedUsage.at >= LISTING_MAX_AGE_MS) {
+      versionedUsage = {at: clock(), sizes: new Map((await recipe.store.list('shards/')).map(row => [row.key, row.bytes]))};
+    }
+    const {sizes} = versionedUsage;
+    const fresh = new Map(objects.filter(row => !sizes.has(row.key)).map(row => [row.key, row.bytes]));
+    const sum = (bytes: Iterable<number>): number => [...bytes].reduce((total, value) => total + value, 0);
+    const used = sum(sizes.values()), added = sum(fresh.values());
+    if (added > budget) throw new PackBudgetError(`Over the pack budget: a shard needs ${added} B out of ${budget}`, true);
+    if (used + added > budget) throw new PackBudgetError(`Over the pack budget: ${used} + ${added} out of ${budget}`, false);
+    for (const [key, bytes] of fresh) sizes.set(key, bytes);
+  };
+  const publishProduct = async (work: string, report: CookJobReport, head: CookHead): Promise<void> => {
+    if (versioned === undefined) { await publish(work, report, head.hash); return; }
+    const out = join(work, 'out'), client = join(out, 'client');
+    if (report.rawShardVersion !== undefined && head.shardVersion !== undefined && report.rawShardVersion !== head.shardVersion)
+      throw new Error(`Raw shardVersion does not match the catalogue for ${head.slug}`);
+    const ref = versionedRef(versioned, {...head, shardVersion: head.shardVersion ?? report.rawShardVersion});
+    if (report.objects === undefined) throw new Error('Versioned cook has no object provenance');
+    const keys = filesUnder(client), common = new Set(report.objects.common), mounts = new Set(report.objects.mounts);
+    if (keys.some(path => !cookOutputKey(path) && !mounts.has(path))) throw new Error('Cook output names a key outside its publication paths');
+    const files = keys.map(path => ({path, file: `client/${path}`, common: common.has(path), mount: mounts.has(path)}));
+    const parallel = <T>(items: readonly T[], job: (item: T) => Promise<void>): Promise<void> => inParallel(items, PUT_PARALLEL, job);
+    parkServer(work, report.slug, head.hash);
+    try {
+      await publishCooked({store: versioned.store, headers: objectHeaders, parallel, reserve: objects => reserveVersioned(versioned, objects)},
+        ref, indexOf(report, head.hash, []), cookOutputDigest(out), out, files);
+    } catch (error) {
+      versionedUsage = undefined;
+      throw error;
+    }
+    log(`published ${cookedIndexKey(ref)}: ${keys.length} objects, ${common.size} in common`);
+  };
+  const attempt = async (head: CookHead, tarball: Uint8Array, work: string): Promise<CookRow> => {
     const file = join(work, 'shard.tar'), out = join(work, 'out');
     writeFileSync(file, tarball);
-    prefetch();
+    if (versioned === undefined) prefetch();
     const outcome = await runJob(launcher, file, out, shardSlugOf(head.slug), phases => {
       log(`cook ${head.slug} ${head.hash.slice(0, 12)}: phases ${phases}`);
     }, sidecarPath(launcher.sidecars, head.hash, launcher.renderer), armedWords.get(head.hash));
@@ -676,7 +752,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     const client = join(work, 'out/client'), report = outcome.report;
     if (report.cook.map === undefined || !(['full', 'cell'] as const).every(size => existsSync(join(client, cookedMapPath(report.slug, size)))))
       return {...head, state: 'failed', detail: 'The cook drew no map (J450): its index would list no cooked-map-v1'};
-    try { await publish(work, outcome.report, head.hash); }
+    try { await publishProduct(work, outcome.report, head); }
     catch (error) { if (error instanceof PackBudgetError && error.never) return {...head, state: 'refused', detail: error.message}; throw error; }
     const {preparation} = outcome.report.cook;
     return {...head, state: 'cooked', check: outcome.report.check, seconds: outcome.report.seconds, peakMB: outcome.peakMB, ...(preparation === undefined ? {} : {preparation})};
@@ -715,22 +791,70 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     }
     return undefined;
   };
-  const cookOnce = async (head: {readonly slug: string; readonly hash: string}): Promise<CookRow> => {
+  let reuseProof: Promise<boolean> | undefined;
+  const proveReuse = async (recipe: VersionedCook, donor: string): Promise<boolean> => {
+    const canaries = new Map<string, {head: CatalogueRow; index: VersionedCookIndex}>();
+    const live = await source.heads('live');
+    for (const head of live) {
+      if (head.shardVersion === undefined || canaries.has(head.slug)) continue;
+      const index = await readVersionedCook(recipe.store, versionedRef(recipe, head, donor), head.hash);
+      if (index !== undefined) canaries.set(head.slug, {head, index});
+      if (canaries.size === 2) break;
+    }
+    if (canaries.size !== 2) return false;
+    const samples = [...canaries.values()].map(({head, index}) => ({slug: head.slug, outputDigest: index.outputDigest}));
+    await verifyCookReuse(samples, async slug => {
+      const row = canaries.get(slug);
+      if (row === undefined) throw new Error(`Missing canary for ${slug}`);
+      mkdirSync(scratch, {recursive: true});
+      const work = mkdtempSync(join(scratch, 'canary-')), tar = join(work, 'input.tar'), out = join(work, 'out');
+      try {
+        writeFileSync(tar, await source.download(row.head.hash));
+        const outcome = await runJob(launcher, tar, out, shardSlugOf(slug), undefined,
+          sidecarPath(launcher.sidecars, row.head.hash, launcher.renderer));
+        if (outcome.kind !== 'cooked') throw new Error(`Cook canary ${slug} ${outcome.kind}: ${outcome.reason}`);
+        if (outcome.report.hash !== row.head.hash || !outcome.report.check.pass) throw new Error(`Cook canary ${slug} failed validation`);
+        const disagrees = provenanceRefusal(slug, outcome.report.provenance, row.head.expected);
+        if (disagrees !== undefined) throw new Error(disagrees);
+        return cookOutputDigest(out);
+      } finally { rmSync(work, {recursive: true, force: true}); }
+    });
+    log(`cook hash reuse matched: ${samples.map(row => row.slug).join(', ')}`);
+    return true;
+  };
+  const versionedHit = async (recipe: VersionedCook, head: CookHead): Promise<CookRow | undefined> => {
+    const ref = versionedRef(recipe, head), existing = await readVersionedCook(recipe.store, ref, head.hash);
+    if (existing !== undefined) return {...head, state: 'present', check: existing.check};
+    const donor = recipe.sameOutputFrom;
+    if (donor === undefined) return undefined;
+    const heldDonor = await readVersionedCook(recipe.store, versionedRef(recipe, head, donor), head.hash);
+    if (heldDonor === undefined) return undefined;
+    reuseProof ??= proveReuse(recipe, donor);
+    if (!await reuseProof) return undefined;
+    await writeVersionedCook(recipe.store, ref, {...heldDonor, ...ref, carried: heldDonor.build});
+    return {...head, state: 'present', detail: `carried from ${donor.slice(0, 12)}`, check: heldDonor.check};
+  };
+  const cookOnce = async (head: CookHead): Promise<CookRow> => {
     const known = verdicts.get(head.hash);
     if (known?.state === 'refused' && new Set([head.slug]).has(known.slug)) return known;
-    const held = await store.get(indexKey(build, head.hash));
-    if (held !== undefined) {
-      const index = JSON.parse(new TextDecoder().decode(held)) as CookIndex;
-      if (index.check?.pass && index.hash === head.hash && new Set([shardSlugOf(head.slug)]).has(index.slug)) return {...head, state: 'present', check: index.check};
+    if (versioned !== undefined) {
+      const held = head.shardVersion === undefined ? undefined : await versionedHit(versioned, head);
+      if (held !== undefined) return held;
+    } else {
+      const held = await store.get(indexKey(build, head.hash));
+      if (held !== undefined) {
+        const index = JSON.parse(new TextDecoder().decode(held)) as CookIndex;
+        if (index.check?.pass && index.hash === head.hash && new Set([shardSlugOf(head.slug)]).has(index.slug)) return {...head, state: 'present', check: index.check};
+      }
+      const carried = await carry(head);
+      if (carried !== undefined) return carried;
     }
-    const carried = await carry(head);
-    if (carried !== undefined) return carried;
     mkdirSync(scratch, {recursive: true});
     const work = mkdtempSync(join(scratch, 'job-'));
     try { return await attempt(head, await source.download(head.hash), work); }
     finally { rmSync(work, {recursive: true, force: true}); }
   };
-  const cook = async (head: {readonly slug: string; readonly hash: string}): Promise<CookRow> => {
+  const cook = async (head: CookHead): Promise<CookRow> => {
     let row: CookRow = {...head, state: 'failed', detail: 'never ran'};
     for (let tries = 0; tries < TRANSIENT_TRIES; tries++) {
       try {
@@ -749,7 +873,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   // FAST-RELEASE FR-A20 (11-25): after v0.1.90's cook move an upload no channel advertises (an old pine-hollow, 849 s) jumped all
   // 37 recooks while Brasscap r19, the head staging QA needed, waited 33rd. Order: an advertised head no build has indexed (a
   // new pin), then advertised heads in catalogue order, then anything no catalogue advertises (a bare upload notice), last.
-  interface Job {readonly head: {readonly slug: string; readonly hash: string}; fresh: boolean; readonly seq: number; readonly done: Promise<CookRow>; readonly settle: (row: CookRow) => void}
+  interface Job {readonly head: CookHead; fresh: boolean; readonly seq: number; readonly done: Promise<CookRow>; readonly settle: (row: CookRow) => void}
   const waiting: Job[] = [], pending = new Map<string, Job>();
   /** The heads the catalogues advertised at the last look, in catalogue order. */
   let advertised = new Map<string, number>();
@@ -781,7 +905,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
       }
     } finally { running = false; }
   };
-  const schedule = (head: {readonly slug: string; readonly hash: string}, fresh: boolean): Promise<CookRow> => {
+  const schedule = (head: CookHead, fresh: boolean): Promise<CookRow> => {
     const known = pending.get(head.hash);
     if (known !== undefined) { known.fresh ||= fresh; return known.done; }
     let settle: (row: CookRow) => void = () => undefined;
@@ -797,12 +921,13 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   /** The hashes some build has indexed (`index/<build>/<hash>.json`): a hash in none is a new upload. A store that can't list
    *  makes every hash new, which is the old first-come order. */
   const indexed = async (): Promise<ReadonlySet<string>> => {
+    if (versioned !== undefined) return new Set();
     try { return new Set((await store.list('index/')).flatMap(row => /\/([a-f0-9]{64})\.json$/u.exec(row.key)?.[1] ?? [])); } catch { return new Set(); }
   };
-  const headsOf = async (stages: readonly CookStage[]): Promise<{readonly slug: string; readonly hash: string}[]> => {
-    const seen = new Map<string, {readonly slug: string; readonly hash: string}>();
+  const headsOf = async (stages: readonly CookStage[]): Promise<CookHead[]> => {
+    const seen = new Map<string, CookHead>();
     for (const stage of stages) for (const row of await source.heads(stage)) {
-      seen.set(row.hash, {slug: row.slug, hash: row.hash});
+      seen.set(row.hash, {slug: row.slug, hash: row.hash, shardVersion: row.shardVersion});
       if (row.expected !== undefined) expectations.set(row.hash, row.expected);
     }
     advertised = new Map([...seen.keys()].map((hash, at) => [hash, at]));

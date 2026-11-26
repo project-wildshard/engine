@@ -2,9 +2,9 @@
  * SDK; `folderStore` has the same shape for a local run and for tests. Keys are the URLs' paths, so a client's pack base
  * plus a manifest's URL is the object. */
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
-import {createHash, createHmac} from 'node:crypto';
+import {createHash, createHmac, randomUUID} from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
-import {mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync} from 'node:fs';
+import {linkSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {dirname, join, relative, resolve, sep} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
@@ -20,12 +20,17 @@ export interface PackStore {
   readonly remove: (key: string) => Promise<void>;
 }
 
+export interface ImmutablePackStore extends PackStore {
+  /** Atomically create a content object, or verify the existing object's bytes. */
+  readonly putImmutable: (key: string, body: Uint8Array, headers: ObjectHeaders) => Promise<void>;
+}
+
 /** Keys come from cooked names, but a store is the last place a `..` could turn into a write. */
 function assertKey(key: string): void {
   if (key.length === 0 || key.length > 512 || key.startsWith('/') || key.split('/').some(part => part === '' || part === '.' || part === '..') || !/^[\w./-]+$/u.test(key)) throw new Error(`Bad store key: ${key.slice(0, 80)}`);
 }
 
-export function folderStore(root: string): PackStore {
+export function folderStore(root: string): ImmutablePackStore {
   const base = resolve(root);
   mkdirSync(base, {recursive: true});
   const at = (key: string): string => { assertKey(key); return join(base, key); };
@@ -34,6 +39,23 @@ export function folderStore(root: string): PackStore {
     has: key => Promise.resolve(present(at(key))),
     get: key => { const file = at(key); return Promise.resolve(present(file) ? Uint8Array.from(readFileSync(file)) : undefined); },
     put: (key, body) => { const file = at(key); mkdirSync(dirname(file), {recursive: true}); writeFileSync(file, body); return Promise.resolve(); },
+    putImmutable: (key, body) => {
+      const file = at(key);
+      mkdirSync(dirname(file), {recursive: true});
+      if (present(file)) {
+        if (!readFileSync(file).equals(body)) throw new Error(`Cook object bytes differ: ${key}`);
+        return Promise.resolve();
+      }
+      const parked = `${file}.${randomUUID()}.tmp`;
+      try {
+        writeFileSync(parked, body, {flag: 'wx'});
+        linkSync(parked, file);
+      } catch (error) {
+        if (!(error instanceof Error) || !('code' in error) || error.code !== 'EEXIST') throw error;
+        if (!readFileSync(file).equals(body)) throw new Error(`Cook object bytes differ: ${key}`, {cause: error});
+      } finally { rmSync(parked, {force: true}); }
+      return Promise.resolve();
+    },
     list: prefix => {
       const rows: StoredObject[] = [];
       for (const row of readdirSync(base, {recursive: true, withFileTypes: true})) {
@@ -65,7 +87,7 @@ const escape = (text: string): string => encodeURIComponent(text).replaceAll(/[!
 const EMPTY = new Uint8Array();
 const PUT_RETRY_DELAYS_MS = [250, 1_000] as const;
 
-export function r2Store(config: R2Config): PackStore {
+export function r2Store(config: R2Config): ImmutablePackStore {
   const origin = new URL(config.endpoint), read = config.fetch ?? fetch, clock = config.now ?? ((): Date => new Date());
   const send = (method: string, key: string, query: Readonly<Record<string, string>>, body: Uint8Array, extra: Readonly<Record<string, string>>): Promise<Response> => {
     if (key !== '') assertKey(key);
@@ -81,6 +103,19 @@ export function r2Store(config: R2Config): PackStore {
   };
   /** The body's text is the store's: never echo a signed request back. */
   const failed = (verb: string, key: string, status: number): Error => new Error(`R2 ${verb} ${key.slice(0, 80)} answered ${status}`);
+  const put = async (key: string, body: Uint8Array, headers: ObjectHeaders, expected?: string): Promise<boolean> => {
+    const extra = {'cache-control': headers.cache, 'content-type': headers.type, ...(headers.encoding === undefined ? {} : {'content-encoding': headers.encoding}),
+      ...(expected === undefined ? {} : {'if-none-match': '*', 'x-amz-meta-sha256': expected})};
+    for (let attempt = 0;; attempt++) {
+      const response = await send('PUT', key, {}, body, extra);
+      await response.body?.cancel();
+      if (response.ok) return true;
+      if (expected !== undefined && response.status === 412) return false;
+      const wait = PUT_RETRY_DELAYS_MS[attempt];
+      if (wait === undefined || (response.status !== 429 && response.status < 500)) throw failed('PUT', key, response.status);
+      await delay(wait);
+    }
+  };
   return {
     has: async key => {
       const response = await send('HEAD', key, {}, EMPTY, {});
@@ -94,17 +129,15 @@ export function r2Store(config: R2Config): PackStore {
       if (!response.ok) { await response.body?.cancel(); throw failed('GET', key, response.status); }
       return new Uint8Array(await response.arrayBuffer());
     },
-    put: async (key, body, headers) => {
-      const extra = {'cache-control': headers.cache, 'content-type': headers.type, ...(headers.encoding === undefined ? {} : {'content-encoding': headers.encoding})};
-      for (let attempt = 0;; attempt++) {
-        const response = await send('PUT', key, {}, body, extra);
-        await response.body?.cancel();
-        if (response.ok) return;
-        const wait = PUT_RETRY_DELAYS_MS[attempt];
-        if (wait === undefined || (response.status !== 429 && response.status < 500)) throw failed('PUT', key, response.status);
-        // Retry the same object before the worker has to recook the whole shard.
-        await delay(wait);
-      }
+    put: async (key, body, headers) => { await put(key, body, headers); },
+    putImmutable: async (key, body, headers) => {
+      const expected = sha256(body);
+      // An existing object costs one class B HEAD. The atomic write handles parallel publishers.
+      const held = await send('HEAD', key, {}, EMPTY, {});
+      if (held.status === 404 && await put(key, body, headers, expected)) return;
+      const existing = held.status === 404 ? await send('HEAD', key, {}, EMPTY, {}) : held;
+      if (!existing.ok) throw failed('HEAD', key, existing.status);
+      if (existing.headers.get('x-amz-meta-sha256') !== expected) throw new Error(`Cook object bytes differ: ${key}`);
     },
     list: async prefix => {
       const rows: StoredObject[] = [];

@@ -91,7 +91,11 @@ cook_env_complete() {
   # The signed staging release supplies the ref and build. cook.env has credentials only.
   for name in COOK_NOTIFY_TOKEN; do [ -n "$(env_value "$file" "$name")" ] || return 1; done
   if [ -n "$(env_value "$file" COOK_STORE_DIR)" ]; then return 0; fi
+  if [ "$(env_value "$file" COOK_VERSIONED_STORE)" = 1 ]; then
+    for name in R2_ACCOUNT_ID R2_COOKED_ACCESS_KEY_ID R2_COOKED_SECRET_ACCESS_KEY; do [ -n "$(env_value "$file" "$name")" ] || return 1; done
+  else
   for name in R2_ACCOUNT_ID R2_BUCKET_PACKS R2_PACKS_ACCESS_KEY_ID R2_PACKS_SECRET_ACCESS_KEY; do [ -n "$(env_value "$file" "$name")" ] || return 1; done
+  fi
 }
 # AUTO-RELEASE AR3 (J355) writes an explicit tag and build to cook.settings. It wins over staging's signed follow state,
 # which wins over legacy cook.env values, exactly as the service's EnvironmentFile order does.
@@ -442,6 +446,10 @@ R2_ACCOUNT_ID=
 R2_BUCKET_PACKS=wildshard-packs
 R2_PACKS_ACCESS_KEY_ID=
 R2_PACKS_SECRET_ACCESS_KEY=
+# Set to 1 when the signed releases and page tables name the versioned cook.
+COOK_VERSIONED_STORE=
+R2_COOKED_ACCESS_KEY_ID=
+R2_COOKED_SECRET_ACCESS_KEY=
 # COOK_STORE_DIR=/var/lib/wildshard-cook/store
 EOF
 then :; fi
