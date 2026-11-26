@@ -11,7 +11,7 @@ const tracked = execFileSync('git', ['ls-files', '-z'], {encoding: 'utf8'}).spli
 
 // The box hardened from v0.1.96's lean tag on 2026-11-26 (its stamp names 48084eb2), so the bridge an old apply ran
 // (scripts/vps/harden.sh, d14a43d7d) is gone and the pre-lean scripts/ folder holds nothing tracked again.
-test('nothing is tracked under the pre-lean scripts/', () => {
+test('the pre-lean folder holds nothing tracked', () => {
   expect(tracked.filter(path => path.startsWith('scripts/'))).toEqual([]); // script-paths: proves the pre-lean folder stays empty
 });
 
