@@ -19,6 +19,8 @@ export function publicPolicyAdmission(observation: { shard:string; appState:stri
 /** Complete selectable public, Developer and grid cases; frozen copies and explicit grid-only rows are excluded. */
 export function bootCases(catalogue: readonly { slug: string; status: string; legacy: boolean; shardSelect?: boolean }[], group?: 'all' | 'public' | 'developer' | 'grid'): readonly (readonly ['standalone' | 'grid' | 'public-policy', string, boolean])[];
 
+/** A page read that a navigation cut short, not a boot failure. */
+export function navigationCut(error: unknown): boolean;
 /** CHUNK-PARAM CP16 (J522): select a zone's card on Shard select by its title row's name; no address names it. */
 export function pickZoneCard(page: Page, slug: string): Promise<void>;
 /** A grid page standing in the zone's cell with play ready. */

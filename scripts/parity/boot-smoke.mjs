@@ -77,14 +77,25 @@ export function titleViewVisible() {
   return visible(titles[0] ?? null) && ![...document.querySelectorAll('.ws-load')].some(visible);
 }
 
+/** A page read that a navigation cut short (the document it ran in is gone), not a boot failure. @param {unknown} error */
+export function navigationCut(error) {
+  return error instanceof Error && /Execution context was destroyed|Cannot find context with specified id|frame was detached/u.test(error.message);
+}
+
 /** @param {import('playwright').Page} page @param {string[]} faults @param {(observation:ReturnType<typeof bootObservation>) => Promise<boolean>} condition @param {string} label @param {number} deadline @param {(label:string, observation:Awaited<ReturnType<typeof bootObservation>>)=>void} [observe] */
 async function until(page, faults, condition, label, deadline, observe) {
   while (Date.now() < deadline) {
     if (faults.length > 0) throw new Error(faults.join('\n'));
-    const observed = await page.evaluate(bootObservation);
-    observe?.(label, observed);
-    if (observed.fatal.length > 0) throw new Error(`Fatal boot: ${observed.fatal.join('\n')}`);
-    if (await condition(observed)) return;
+    try {
+      const observed = await page.evaluate(bootObservation);
+      observe?.(label, observed);
+      if (observed.fatal.length > 0) throw new Error(`Fatal boot: ${observed.fatal.join('\n')}`);
+      if (await condition(observed)) return;
+    } catch (error) {
+      // CP16 (J522): a standalone case's card tap may open the zone's grid page, a new document; a read that the
+      // navigation cut short is read again on the new one
+      if (!navigationCut(error)) throw error;
+    }
     await new Promise(resolve => { setTimeout(resolve, 100); });
   }
   throw new Error(`Boot deadline: ${label}; ${JSON.stringify(await page.evaluate(bootObservation))}`);

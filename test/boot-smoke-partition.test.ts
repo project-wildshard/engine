@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { bootCaseBrowser, bootCases, bootJobs, gameplayProbeTime } from '../scripts/parity/boot-smoke.mjs';
+import { bootCaseBrowser, bootCases, bootJobs, gameplayProbeTime, navigationCut } from '../scripts/parity/boot-smoke.mjs';
 
 const catalogue = [
   { slug: 'driftwood-isle', status: 'live', legacy: false },
@@ -48,4 +48,12 @@ test('FS30 an independent gameplay probe leaves the boot capture budget intact',
   const probeMs = await gameplayProbeTime(async () => { now += 97_000; }, () => now);
   expect(deadline + probeMs - now).toBe(50_000);
   await expect(gameplayProbeTime(() => Promise.reject(new Error('probe failed')), () => now)).rejects.toThrow('probe failed');
+});
+
+// CP16 (J522), main red 45750864926: cook-to-play's standalone tap opened the zone's grid page and the wait's read died
+// with its document; a read a navigation cut short is read again, any other failure still throws
+test('a read a navigation cut short is not a boot failure', () => {
+  expect(navigationCut(new Error('page.evaluate: Execution context was destroyed, most likely because of a navigation'))).toBe(true);
+  expect(navigationCut(new Error('Fatal boot: shader link failed'))).toBe(false);
+  expect(navigationCut('Execution context was destroyed')).toBe(false);
 });
