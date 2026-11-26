@@ -69,8 +69,9 @@ export function installQuestHints(ctx: ShardContext, input: unknown): void {
   if (ctx.scope.disposed || ctx.scope.disposing || !isJsonData(input)) throw new Error('Quest hints require live JSON rows');
   const runtime = ctx.game.runtime, world = runtime?.world, play = runtime?.play, hints = play?.firstHints;
   if (runtime === undefined || world === undefined || world === null || play === undefined || play === null || hints === undefined) throw new Error('Missing entered quest hint owners');
-  const animals = play.animals, ui = ctx.app.ui;
-  const feed = new QuestHintFeed(input, { hints, animals: () => animals.animals, player: world.player, prompt: () => ui.prompt() }, lockOn);
+  const animals = play.animals, fighting = play.fighting ?? ((): typeof animals => animals), ui = ctx.app.ui;
+  // QA 11-25 row 86 (c): on the grid the wind-ups and the near hostiles are the entered cell's creatures, not the page's
+  const feed = new QuestHintFeed(input, { hints, animals: () => fighting().animals, player: world.player, prompt: () => ui.prompt() }, lockOn);
   ctx.on('ai.windup', ({ actor }) => { feed.windup(actor); });
   ctx.system({ ...feed.rows.system, phase: 'update', run: dt => { feed.update(dt); } });
 }

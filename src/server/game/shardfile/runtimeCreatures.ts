@@ -170,7 +170,7 @@ export function installRuntimeCreatures(host: SimHost, shard: Shardfile, assets:
     creatures.brains.filter(brain => brain.kind !== 'script'), brains, resolveCreatureLayers(shard.rows, creatures.brains));
   installDeclaredSpawnWhen(host, creatures.spawns, ports.restoring, countSlots(shard));
   installDataRespawns(host, creatures.spawns);
-  installLayerHunts(host, shard.rows, creatures);
+  installLayerHunts(host, shard.rows, creatures, shard.manifest?.fight);
   data.install();
   // One owner per decision row: the keeper's rows stay with its borrowed authority, every other row is the declared host's
   const owned = scripts.filter(row => !ports.keeper.scripts.has(row.id));

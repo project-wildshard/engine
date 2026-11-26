@@ -146,7 +146,7 @@ async function buildLoadout(ctx: Awaited<ReturnType<typeof worldStage>>) : Promi
   const readArena = async (): Promise<Arena> => {
     const { TrainingArena } = await loadPractice();
     if (game.levelScope.disposed) throw new Error('Practice owner retired while loading code');
-    arena = withOwner(game.levelScope, () => new TrainingArena(game, registry, world.physics, { x: chunk.spawn.x, z: chunk.spawn.z }));
+    arena = withOwner(game.levelScope, () => new TrainingArena(game, registry, () => world.physics, { x: chunk.spawn.x, z: chunk.spawn.z }));
     return arena;
   };
   const prepareArena = async (): Promise<Arena> => {

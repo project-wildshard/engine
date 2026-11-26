@@ -1,6 +1,8 @@
 import { compileIncomingCapPolicy } from '@wildshard/format/incomingCapPolicy';
 import { syncTalkReach } from './talkReach';
 import { harvestBodies } from './harvestBodies';
+import { forwardCellCreatures } from './cellCreatures';
+import type { LevelSpec } from '@wildshard/engine/level/spec';
 
 import { readOnlySave, wirePage } from '../shardfile/wirePage';
 import { ownedSave } from '../../../shared/game/saves';
@@ -122,7 +124,7 @@ import { PlayerHurt } from '@wildshard/engine/ui/playerHurt';
 import { onReview, queuedCount, quickNote } from '@wildshard/engine/ui/review';
 import { installBounds, playBounds } from '@wildshard/engine/world/bounds';
 import { gridCells, gridHomeSim, pageMode } from '../plugin/context';
-import type { RowBodies } from '@wildshard/engine/entities/RowBodies';
+import type { RowBodies, RowBodiesView } from '@wildshard/engine/entities/RowBodies';
 import { whenControl } from '@wildshard/engine/boot/prefetch';
 import { installMemoryWarning, residentOverLimit } from '../grid/memoryWarning';
 import { installFirstPlay } from '../firstPlay';
@@ -396,9 +398,11 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   // Registered cosmetics restyle the held model and persist in this shard's locker.
   const weaponModel = (w: SkinDef['weapon']) => { const model = weapons.get(w).model; return model instanceof THREE.Group ? model : null; };
   const wearSkin = (skin: SkinDef) => { const m = weaponModel(skin.weapon); if (m) { applySkin(m, skin, sky); effects.sync(weapons.get(skin.weapon), [{ id: `effect.finish.${skin.id}` }]); } skins.wear(skin.weapon, skin.id); };
+  // QA 11-25 row 86 (c): on the grid the page's level is the platform's, with no fight rows: the entered zone's are the rules
+  const fight = (): LevelSpec['fight'] => gridLive?.enteredFight() ?? game.level.fight;
   animals.onKill = (a) => {
     // a sword kill is at arm's length: "Reef crab · 1 m" read as a marker to crabs 30 m off (E296); a shot keeps its distance
-    hud.killFeed(game.level.fight.telegraphed === true ? `${a.label} killed` : `${a.label} · ${Math.round(a.position.distanceTo(player.position))} m`);
+    hud.killFeed(fight().telegraphed === true ? `${a.label} killed` : `${a.label} · ${Math.round(a.position.distanceTo(player.position))} m`);
     if (player.link === null) progress.recordKill(a.kind, a.variant);
   };
   // E314 stage 3: the body shadow (ShardManifest.bodyShadow, src/engine/player/BodyShadow.ts) — hidden off play (the title, a practice
@@ -409,12 +413,12 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
     : null;
   for (const { id: w } of weapons.list) { const s = skins.wearing(w); if (s) wearSkin(s); }
   Gunfire.for(game); // QA42: tracers, flashes and dust for every shot, the player's and the creatures'
-  new Combat(game, animals, weapons, game.camera); // health bars over animals + MMO-style damage / MISS floats (self-wiring); Combat only taps onFire / onImpact, which the manager forwards for every weapon
+  const combat = new Combat(game, animals, weapons, game.camera); // health bars over animals + MMO-style damage / MISS floats (self-wiring); Combat only taps onFire / onImpact, which the manager forwards for every weapon
   // taking a hit (B3): the arc points at the attacker (src/client/engine/ui/HurtArc.ts), a hurt grunt panned toward it (Audio.hurt — it
   // used to be the landing thud), and the killer is remembered for the death toast (B2)
   const hurtArc = new HurtArc();
   const playerHurt = new PlayerHurt(app.events, game.levelScope, app.combat, playerHealth, {
-    player, serverOwned: () => player.link !== null, directional: () => game.level.fight.telegraphed === true || boot.runtime.hooks.directional === true,
+    player, serverOwned: () => player.link !== null, directional: () => fight().telegraphed === true || boot.runtime.hooks.directional === true,
     flash: () => hud.damageFlash(), toast: (text) => hud.toast(text),
     combat: (value) => music.combat(value), hurt: (strength, pan) => audio.hurt(strength, pan), land: (hard) => audio.land(hard),
     arc: (x, z, at, yaw, damage) => hurtArc.hit(x, z, at, yaw, damage),
@@ -423,9 +427,14 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   animals.onSound = (name, pos) => { audio.animal(name, pos, player.position, player.yaw); };
   // E297 fight rules (Driftwood): an amber edge chevron toward an enemy winding up where you can't see it (src/client/engine/ui/WindupWarn.ts);
   // chained after the wind-up's sound cue
-  const windupWarn = Number.isFinite(game.level.fight.attackers) ? new WindupWarn<(typeof animals.animals)[number]>() : null;
+  const windupWarn = grid !== null || Number.isFinite(game.level.fight.attackers) ? new WindupWarn<(typeof animals.animals)[number]>() : null;
   // the session owns the wind-up hook: the typed 'ai.windup' event first (listeners subscribe there), then the sound cue, then the edge chevron
-  animals.onWindup = (a, duration) => { app.events.emit('ai.windup', { actor: a.combatActor(), duration }); audio.cue('cue.ai.windup', { kind: a.kind, point: a.position }); windupWarn?.start(a, duration); };
+  animals.onWindup = (a, duration) => { app.events.emit('ai.windup', { actor: a.combatActor(), duration }); audio.cue('cue.ai.windup', { kind: a.kind, point: a.position }); if (Number.isFinite(fight().attackers)) windupWarn?.start(a, duration); };
+  // QA 11-25 row 86 (c): on the grid the player stands among the entered cell's creatures, whose manager the page never
+  // wired: its kill feed, cries and wind-up warnings run the page's callbacks above, and Combat's floats and bars follow it
+  const cellCreatures = new WeakSet<RowBodiesView>();
+  combat.follow(() => gridLive?.enteredAnimals() ?? null);
+  game.onUpdate(() => { const cell = gridLive?.enteredAnimals() ?? null; if (cell !== null) forwardCellCreatures(cell, animals, cellCreatures); }, 'grid.cell.creatures');
   // the dev fps panel's COUNTS (src/client/engine/ui/perfHud.ts; read ≤ 4× a second while it is open): who is running AI near you
   perf.addCounts(() => {
     let alive = 0, near = 0, motors = 0, chase = 0, flee = 0;
@@ -810,7 +819,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
     // E296: no prompt over a fight on a melee shard — in the wreck's hold the guarded sword's and the jammed winch's (on the
     // phone the big USE band) sat across the drowned sailor. A fight = a hit in the last 3 s, or an enemy on you within 5 m;
     // E still works
-    if (prompt !== undefined && game.level.fight.telegraphed === true) {
+    if (prompt !== undefined && fight().telegraphed === true) {
       let fighting = performance.now() - playerHealth.lastHurt < 3000;
       for (const a of animals.animals) {
         if (fighting) break;
@@ -858,7 +867,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   if (params.has('glreload')) { const u = new URL(location.href); u.searchParams.delete('glreload'); u.searchParams.delete('at'); history.replaceState(history.state, '', u); }
 
   app.ui.bind(game.levelScope, () => hud.promptText);
-  boot.runtime.play = { animals, weapons, primary: crossbow, rifle, secondary: longbow, inventory, owned, progress, hud, menu, fullMap, audio, music, skins, wearSkin, touchUi, nolock, disposeRifleDrop: () => { boot.runtime.hooks.disposeRifleDrop?.(); }, cues: combatCues, firstHints, minimap, bodyShadow };
+  boot.runtime.play = { animals, weapons, primary: crossbow, rifle, secondary: longbow, inventory, owned, progress, hud, menu, fullMap, audio, music, skins, wearSkin, touchUi, nolock, disposeRifleDrop: () => { boot.runtime.hooks.disposeRifleDrop?.(); }, cues: combatCues, firstHints, fighting: () => gridLive?.enteredAnimals() ?? animals, minimap, bodyShadow };
   const getPlayground = (): Playground | null => playground;
   return { ...ctx, grid, gridLive, leakPhysics, perf, audio, music, playerHealth, serverDied, serverHurt: (amount: number, point: THREE.Vector3, blow: boolean) => { playerHurt.serverHit(amount, point, blow); }, exploring, hands, windupWarn, resuming, continuingGridEntry, arrival, menuFirst, enter, getPlayground, minimap, startExplore };
 }

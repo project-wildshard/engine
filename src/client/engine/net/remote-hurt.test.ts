@@ -102,3 +102,24 @@ test('Combat draws another player\'s blow on a creature in the pale style, and t
   const shown = [...document.querySelectorAll('.ws-combat-float.show')].map(el => ({ text: el.querySelector('b')?.textContent, other: el.classList.contains('other') }));
   expect(shown).toEqual([{ text: '17', other: true }, { text: '40', other: false }]);
 });
+
+// QA 11-25 row 86: on the grid a hit lands on the entered cell's manager, which Combat follows, so its number shows.
+test("Combat follows the entered cell's creatures: a hit there shows its number, and none comes twice", async () => {
+  const { Combat } = await import('../ui/Combat');
+  const camera = new THREE.PerspectiveCamera(70, 402 / 874, 0.1, 500); camera.position.set(0, 1, 5); camera.lookAt(0, 1, 0); camera.updateMatrixWorld(true);
+  const page = { animals: [], nearRay: () => null } as unknown as ConstructorParameters<typeof Combat>[1];
+  const cell = { animals: [], nearRay: () => null } as unknown as ConstructorParameters<typeof Combat>[1];
+  let frame: (dt: number, t: number) => void = () => undefined, entered: typeof cell | null = null;
+  const game = { onUpdate: (run: typeof frame) => { frame = run; } } as unknown as ConstructorParameters<typeof Combat>[0];
+  const combat = new Combat(game, page, {}, camera);
+  scopes.push(combat.scope);
+  combat.follow(() => entered);
+  entered = cell; frame(0.016, 1); frame(0.016, 2);
+  const creature = { headWorld: (out: THREE.Vector3) => out.set(0, 1.2, 0) };
+  cell.onDamage?.(creature as never, 12, new THREE.Vector3(0.3, 1, 0), false, false);
+  const shown = (): (string | null | undefined)[] => [...document.querySelectorAll('.ws-combat-float.show')].map(el => el.querySelector('b')?.textContent);
+  expect(shown()).toEqual(['12']);
+  entered = null; frame(0.016, 3); entered = cell; frame(0.016, 4); // off the cell and back: still one tap
+  cell.onDamage?.(creature as never, 16, new THREE.Vector3(0.3, 1, 0), false, false);
+  expect(shown()).toEqual(['12', '16']);
+});

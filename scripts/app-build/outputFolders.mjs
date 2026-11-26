@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs';
 import { basename, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 /** The app publishes its data products, never their temporary TypeScript sources: each built product's folder under
@@ -11,8 +11,27 @@ import { basename, isAbsolute, join, relative, resolve, sep } from 'node:path';
  *  which nothing precaches and no client manifest names.
  * @param {string} root @param {string} outDir */
 export function copyOutputFolders(root, outDir) {
-  const products = resolve(root, 'out'), shardfiles = resolve(outDir, 'shardfiles');
-  rmSync(shardfiles, { recursive: true, force: true });
+  const products = resolve(root, 'out'), shardfiles = resolve(outDir, 'shardfiles'), cooked = resolve(outDir, '.shardfiles-cooked');
+  // QA 11-25 row 86 (c): the build's cook has already written the phone tier's own files (`*.t512-*.glb`) beside each product;
+  // set them aside rather than delete them, or the served discovery names files the build no longer has (Sky Reach's 404s)
+  rmSync(cooked, { recursive: true, force: true });
+  if (existsSync(shardfiles)) renameSync(shardfiles, cooked);
+  try { copyProducts(products, shardfiles, outDir, cooked); }
+  finally { rmSync(cooked, { recursive: true, force: true }); rmSync(resolve(outDir, '.discovery'), { recursive: true, force: true }); }
+}
+
+/** A served discovery's own files under `/shardfiles/` the cook wrote (set aside in `cooked`) and no product copy holds.
+ * @param {string} discovery @param {string} outDir @param {string} cooked */
+function keepCooked(discovery, outDir, cooked) {
+  for (const [url] of readFileSync(discovery, 'utf8').matchAll(/\/shardfiles\/[\w./-]+/gu)) {
+    const from = resolve(cooked, url.slice('/shardfiles/'.length)), to = resolve(outDir, url.slice(1));
+    if (!from.startsWith(cooked + sep) || existsSync(to) || !existsSync(from)) continue;
+    mkdirSync(resolve(to, '..'), { recursive: true }); copyFileSync(from, to);
+  }
+}
+
+/** @param {string} products @param {string} shardfiles @param {string} outDir @param {string} cooked */
+function copyProducts(products, shardfiles, outDir, cooked) {
   if (!existsSync(products)) return;
   for (const entry of readdirSync(products, { withFileTypes: true })) {
     if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
@@ -24,9 +43,8 @@ export function copyOutputFolders(root, outDir) {
     if (existsSync(own)) cpSync(own, resolve(shardfiles, entry.name), { recursive: true });
     // S12d: the discovery document as the build's cook serves it (the phone tier's table), over the product's own.
     const served = resolve(outDir, '.discovery', entry.name, 'discovery.json');
-    if (existsSync(served)) copyFileSync(served, resolve(shardfiles, entry.name, 'discovery.json'));
+    if (existsSync(served)) { copyFileSync(served, resolve(shardfiles, entry.name, 'discovery.json')); keepCooked(served, outDir, cooked); }
   }
-  rmSync(resolve(outDir, '.discovery'), { recursive: true, force: true });
 }
 
 /** A product's mounts serve from `public/` (`pins.ts install` publishes them), so a product dropped into `out/` by hand keeps

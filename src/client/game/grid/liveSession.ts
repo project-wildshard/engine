@@ -533,6 +533,13 @@ export class LiveGridSession {
     this.ports.scope.onDispose(() => { this.wire = null; });
   }
 
+  /** QA 11-25 row 86 (c): the entered zone's authored fight (telegraphed, attackers), which the grid's own platform level
+   *  lacks; null on the road or in a data cell. */
+  enteredFight(): PreparedRegionalRuntime['fight'] | null {
+    const instance = this.enteredRuntimeInstance();
+    return instance === null ? null : this.runtimeRegions.get(instance)?.fight ?? null;
+  }
+
   /** The entered region's creature manager, where this cell's rows are drawn; none on the road or in a data cell. */
   enteredAnimals(): ReturnType<PreparedRegionalRuntime['animals']> {
     const instance = this.enteredRuntimeInstance();

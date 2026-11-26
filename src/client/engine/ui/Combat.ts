@@ -154,9 +154,13 @@ export class Combat {
   private weapon: { readonly reach?: number | undefined };
 
   private animals: RowBodiesView;
+  /** QA 11-25 row 86: the manager whose creatures the player stands among (a grid cell's, else the page's), and every one tapped */
+  private following: (() => RowBodiesView | null) | null = null;
+  private readonly tapped = new WeakSet<RowBodiesView>();
+  private readonly page: RowBodiesView;
   private camera: THREE.Camera;
   constructor(game: Game, animals: RowBodiesView, weapon: Pick<Weapon, 'onFire' | 'onImpact'> & { readonly reach?: number | undefined }, camera: THREE.Camera) {
-    this.animals = animals;
+    this.animals = animals; this.page = animals;
     this.camera = camera;
     this.weapon = weapon;
     this.layer = document.createElement('div');
@@ -185,10 +189,19 @@ export class Combat {
 
     tap(weapon, 'onFire', () => { this.fired(); });
     tap(weapon, 'onImpact', (surface, point) => { this.impact(surface as string, point as THREE.Vector3); });
-    tap(animals, 'onDamage', (a, amount, point, headshot, died) => { this.damage(a as Animal, amount as number, point as THREE.Vector3, headshot as boolean, died as boolean); });
-    tap(animals, 'onOthersHit', (a, amount, point, died) => { this.othersHit(a as Animal, amount as number, point as THREE.Vector3, died as boolean); });
+    this.tapCreatures(animals);
     game.onUpdate((dt, t) => { this.update(dt, t); }, 'hud.combat');
     setLive(this); this.scope.onDispose(() => { if (liveCombat === this) setLive(null); });
+  }
+
+  /** QA 11-25 row 86: on the grid the creatures live in the entered cell's manager, not the page's: its floats, bars and aim
+   *  follow `source` (null keeps the page's), each manager tapped once. */
+  follow(source: () => RowBodiesView | null): void { this.following = source; }
+  private tapCreatures(animals: RowBodiesView): void {
+    if (this.tapped.has(animals)) return;
+    this.tapped.add(animals);
+    tap(animals, 'onDamage', (a, amount, point, headshot, died) => { this.damage(a as Animal, amount as number, point as THREE.Vector3, headshot as boolean, died as boolean); });
+    tap(animals, 'onOthersHit', (a, amount, point, died) => { this.othersHit(a as Animal, amount as number, point as THREE.Vector3, died as boolean); });
   }
 
   /** QA42: the row body nearest along a round's ray, for `bodyOnRay`. */
@@ -254,6 +267,8 @@ export class Combat {
 
   private update(dt: number, t: number): void {
     this.t = t;
+    const followed = this.following?.() ?? this.page;
+    if (followed !== this.animals) { this.tapCreatures(followed); this.animals = followed; }
     const cam = this.camera;
     // crosshair target: the animal nearest along the aim ray, within AIM_TOL m of it
     _o.setFromMatrixPosition(cam.matrixWorld);

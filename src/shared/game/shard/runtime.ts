@@ -34,6 +34,8 @@ export interface ShardPlayHost {
   audio: Audio; music: Music; skins: SkinLocker; wearSkin: (skin: SkinDef) => void;
   touchUi: () => boolean; nolock: boolean; disposeRifleDrop: () => void; cues: CombatCues;
   firstHints?: FirstHints;
+  /** QA 11-25 row 86 (c): the creatures the player meets, the entered grid cell's own manager there, else `animals`. */
+  fighting?: () => RowBodiesView;
   minimap?: { setMarks: (source: (() => readonly MapMark[]) | null) => void; addMarks: (source: () => readonly MapMark[]) => () => void } | null;
   bodyShadow?: BodyShadow | null;
 }

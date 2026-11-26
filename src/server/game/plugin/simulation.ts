@@ -773,7 +773,7 @@ export function bindShardfileSim(host: SimHost, source: Shardfile, assets: Reado
     installDeclaredBrains(host, creatures.spawns.filter((spawn) => spawn.brain === null || (!custom.has(spawn.brain) && !groupIds.has(spawn.brain))), creatures.brains.filter((brain) => brain.kind !== 'script'), ports.brains ?? dataBrains, resolveCreatureLayers(shard.rows, creatures.brains));
     installDeclaredSpawnWhen(host, creatures.spawns, ports.restoring === true, countSlots(shard)); // OF29a: a `when` row stands only while it holds
     installDataRespawns(host, creatures.spawns);
-    installLayerHunts(host, shard.rows, creatures);
+    installLayerHunts(host, shard.rows, creatures, shard.manifest?.fight);
     dataPorts?.install();
     const decisionRows = decisionScriptsFromSections(ports.sections);
     const decisionActors = new Set(decisionRows.flatMap(row => Object.values(row.actors)));

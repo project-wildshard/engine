@@ -5,6 +5,7 @@ import { huntMemoryCodec, type HuntGround } from '@wildshard/engine/ai/huntPatte
 import { canReach } from '@wildshard/engine/ai/reach';
 import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
 import type { SimHost } from '@wildshard/engine/sim';
+import type { FightRules } from '@wildshard/engine/level/spec';
 import type { ShardRows } from '@wildshard/format/rows';
 import type { ShardCreatures } from '@wildshard/format/creatures';
 import { resolveCreatureLayers } from './creatureLayers';
@@ -22,8 +23,22 @@ const Saved = v.strictObject({ contract: v.string(), clock: finite, memory: v.un
 /** A leashed hunt is home within this many metres (or its temperament's stop, when wider). */
 const LEASH_ARRIVE = 3;
 
-/** Layer-owned hunts reuse the existing controller, cadence and memory codec over actual host bodies. */
-export function installLayerHunts(host: SimHost, rows: ShardRows, creatures: ShardCreatures): void {
+/** A shard's authored fight rows (its manifest's `fight`), as the hunt reads them. */
+export type LayerHuntFight = { readonly telegraphed?: boolean; readonly attackers?: number | 'unbounded' } | undefined;
+
+/** The hunt's fight from the shard's: a telegraphed shard's charge winds up, connects on its arc and keeps its attack tokens. */
+export function layerHuntFight(fight: LayerHuntFight): FightRules {
+  if (fight === undefined) return {};
+  const { telegraphed, attackers } = fight;
+  return { ...(telegraphed === undefined ? {} : { telegraphed }),
+    ...(attackers === undefined ? {} : { attackers: attackers === 'unbounded' ? Infinity : attackers }) };
+}
+
+/** Layer-owned hunts reuse the existing controller, cadence and memory codec over actual host bodies.
+ * QA 11-25 row 86 (c): `fight` is the shard's authored fight. With none, Driftwood's bears charged with no wind-up (no
+ * warning, no dodge hint) and their contact carried no `feel.blow` (no grunt, shove or fight music). */
+export function installLayerHunts(host: SimHost, rows: ShardRows, creatures: ShardCreatures, fight?: LayerHuntFight): void {
+  const rules = layerHuntFight(fight);
   const layers = resolveCreatureLayers(rows, creatures.brains);
   const ground: HuntGround = {
     heightAt: (x, z) => host.groundHeightAt(x, z),
@@ -83,7 +98,7 @@ export function installLayerHunts(host: SimHost, rows: ShardRows, creatures: Sha
       if (observed !== undefined) player.copy(observed.position);
     };
     const hunt = new StalkerBrain<AnimalSim>({ pattern: 'hunt', config: { rng: host.rng.stream('ai'),
-      fight: {}, faunaTuning: () => undefined, species: () => species }, player, sampleTerrain: () => undefined,
+      fight: rules, faunaTuning: () => undefined, species: () => species }, player, sampleTerrain: () => undefined,
       ports: { ground, nav: () => null, reach: (body, target) => canReach(body, target, host.physics),
         // OF23c: a body in a declared herd wanders to the goal the rain shelter gives its herd
         wanderGoal: () => spawn.group === undefined ? null : declaredHerdGoal(host, actor),
@@ -94,7 +109,7 @@ export function installLayerHunts(host: SimHost, rows: ShardRows, creatures: Sha
         now: () => host.clock.now * 1000, sound: () => undefined,
         charge: (body, damage) => { const target = perception === undefined ? host.nearestPlayer(body.position) : observed;
           if (target === undefined || (perception !== undefined && (!target.health.alive || host.parked.has(target.id)))) return;
-          host.combat.hit({ source: body.combatActor(), sourceTags: [`creature.${spawn.species}`], target: target.health,
+          host.combat.hit({ source: body.combatActor(), sourceTags: [`creature.${spawn.species}`, 'feel.blow'], target: target.health,
             amount: damage, point: body.position.clone(), dir: new Vector3().subVectors(target.position, body.position).normalize(), cause: { kind: body.kind, label: body.label } }); },
       } });
     hunt.adopt(actor, spawn.at[0], spawn.at[2]);

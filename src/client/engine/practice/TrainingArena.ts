@@ -12,7 +12,9 @@ import * as THREE from 'three';
 import type { Game } from '../core/Game';
 import { practiceFps } from '../core/tier';
 import type { Physics } from '../../../shared/engine/physics/Physics';
-import { addTrainingTarget, trainingTargetRaycast, type TrainingTargetBodies } from '../../../shared/engine/physics/trainingTargets';
+import { trainingTargetRaycast } from '../../../shared/engine/physics/trainingTargets';
+import { withOwner } from '../../../shared/engine/app/ownership';
+import { RoomStands } from './roomStands';
 import type { Player } from '../player/Player';
 import type { TargetAnimal, TargetHit } from '../combat/types';
 import type { EquipmentService } from '../combat/EquipmentService';
@@ -57,8 +59,6 @@ export class TrainingTarget implements TargetAnimal {
   ready = false;
   readonly variant: DummyVariant;
   readonly label: HTMLElement;
-  /** its Rapier colliders (src/shared/engine/physics/trainingTargets.ts), on only while the room is open */
-  bodies: TrainingTargetBodies | null = null;
   /** the springs (hit-driven motion) and the bones they drive; the pose waits for the model */
   readonly motion: DummyMotion;
   private pose: DummyPose | null = null;
@@ -299,10 +299,12 @@ export class TrainingArena {
   private weapons: EquipmentService | null = null;
 
   private readonly game: Game;
-  private readonly physics: Physics;
-  constructor(game: Game, registry: WorldRegistry, physics: Physics, center: { x: number; z: number }) {
+  /** The physics the player walks in: the room opens there (QA 11-25 row 86 (c), roomStands.ts). */
+  private readonly livePhysics: () => Physics;
+  private readonly stands: RoomStands;
+  constructor(game: Game, registry: WorldRegistry, physics: () => Physics, center: { x: number; z: number }) {
     this.game = game;
-    this.physics = physics;
+    this.livePhysics = physics;
     app.encounters.register({ id: 'training-dummy', displayName: 'Training dummy', showHeadBar: false }, game.levelScope);
     this.center = center;
     const { root, colliders } = makeRoom(center.x, center.z);
@@ -312,7 +314,7 @@ export class TrainingArena {
     // puts sunk feet back on top. It answers only while the room is open: the room hangs over the shard's spawn.
     const floor = (x: number, z: number): number | undefined =>
       this.active && Math.abs(x - center.x) < HALF_WIDTH && Math.abs(z - center.z) < HALF_DEPTH ? Y : undefined;
-    registry.add({ id: 'practice-arena', name: 'HUD + Weapon Explorer arena', category: 'ground', file: 'src/client/engine/practice/TrainingArena.ts', object: root, colliders, surface: 'metal', floor, solidFloor: false });
+    registry.add({ id: 'practice-arena', name: 'HUD + Weapon Explorer arena', category: 'ground', file: 'src/client/engine/practice/TrainingArena.ts', object: root, surface: 'metal', floor, solidFloor: false });
     const overlay = document.createElement('div'); overlay.className = 'ws-practice';
     mountUi(overlay, this.scope); this.overlay = overlay;
     const preparation = document.createElement('div'); preparation.className = 'ws-practice-preparing'; preparation.textContent = engineString('s_392e9e34e810');
@@ -321,13 +323,12 @@ export class TrainingArena {
     this.targets = LINEUP.map((spot, i) => {
       const x = center.x + spot.x, z = center.z + spot.z;
       const target = new TrainingTarget(paramsOf(trainingDummy, spot.variant, spot.params).variant, x, Y, z, spot.x, spot.z, overlay, i + 1, game.levelScope);
-      target.bodies = addTrainingTarget(physics, target, x, Y, z);
-      target.bodies.setEnabled(false); // E300: shot at only while the room is open (enter / exit)
       const ring = new THREE.Mesh(new THREE.TorusGeometry(0.69, 0.012, 6, 48).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: CYAN, fog: false, toneMapped: false }));
       ring.position.set(spot.x, 0.01, spot.z); root.add(ring);
       target.onDamage = (amount, point) => { this.float(String(amount), point, 'hit'); };
       return target;
     });
+    this.stands = new RoomStands(colliders, this.targets.map((target, i) => { const spot = LINEUP[i] ?? { x: 0, z: 0 }; return { target, x: center.x + spot.x, y: Y, z: center.z + spot.z }; }));
     const combatTargets = this.targets.map((target, index) =>
       app.combat.targetPort(practiceActor(target, `practice.${String(index)}`), target, undefined,
         () => !game.levelScope.disposed && app.levelScope === game.levelScope && this.active && target.ready));
@@ -387,7 +388,8 @@ export class TrainingArena {
     app.setState('practice');
     practiceFps.on = true; // mobile targets 60 in here (E290, tier.ts frameCapFps)
     this.player = player;
-    for (const t of this.targets) { t.attacker = player.position; t.bodies?.setEnabled(true); }
+    for (const t of this.targets) t.attacker = player.position;
+    const live = this.livePhysics(); withOwner(this.game.levelScope, () => { this.stands.open(live); });
     document.dispatchEvent(new CustomEvent('ws:practice-active', { detail: true }));
     app.events.emit('practice.active', true);
     this.overlay.parentElement?.classList.add('practice-active');
@@ -404,7 +406,7 @@ export class TrainingArena {
   exit(): void {
     this.active = false; this.root.visible = false; this.overlay.classList.remove('show');
     app.setState('play');
-    for (const t of this.targets) t.bodies?.setEnabled(false); // E300: no dummy volume left for the world's rays over the shard
+    this.stands.close(); // E300: no dummy volume or wall left for the world's rays over the shard
     practiceFps.on = false;
     exitPracticeLoan(this.weapons); this.weapons = null; // the world's own unlocks again
     this.player = null;
@@ -417,7 +419,8 @@ export class TrainingArena {
 
   raycast(origin: THREE.Vector3, dir: THREE.Vector3, maxDist: number): TargetHit | null {
     if (!this.active || !this.targets.every((t) => t.ready)) return null;
-    const hit = trainingTargetRaycast(this.physics, origin, dir, maxDist);
+    const physics = this.stands.physics; if (physics === null) return null;
+    const hit = trainingTargetRaycast(physics, origin, dir, maxDist);
     const target = this.targets.find((t) => t === hit?.target);
     return hit && target ? { animal: target, point: new THREE.Vector3(hit.point.x, hit.point.y, hit.point.z), distance: hit.distance, headshot: hit.headshot } : null;
   }

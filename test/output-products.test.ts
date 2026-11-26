@@ -165,3 +165,24 @@ it('refuses a build whose public copy of a product mount has other bytes',()=>{
     expect(()=>checkPublishedMounts(root)).toThrow(`public/ holds 1 mount with other bytes than their product in out/ (dawn ${url})`);
   }finally{rmSync(root,{recursive:true,force:true});}
 });
+
+// QA 11-25 row 86 (c): the build's cook writes the phone tier's own files beside each product before the products are
+// copied; the copy kept the served discovery naming them and deleted the files (Sky Reach's 404s on a local build).
+it("keeps the cook's tier files its served discovery names, and nothing else the cook left",()=>{
+  const root=mkdtempSync(join(process.cwd(),'tmp/output-tier-')),outDir=join(root,'dist');
+  try{
+    write(root,'out/reach/shard.json','{}');
+    write(root,'out/reach/blobs/glb/a.glb','own');
+    const tier='/shardfiles/reach/blobs/glb/a.t512-1234abcd.glb';
+    write(outDir,tier.slice(1),'tier');
+    write(outDir,'shardfiles/reach/stale.json','old');
+    write(outDir,'.discovery/reach/discovery.json',JSON.stringify({native:{ktx2:{GPU_FILES:{phone:{a:tier}}}}}));
+    copyOutputFolders(root,outDir);
+    expect(readFileSync(join(outDir,tier.slice(1)),'utf8')).toBe('tier');
+    expect(readFileSync(join(outDir,'shardfiles/reach/blobs/glb/a.glb'),'utf8')).toBe('own');
+    expect(JSON.parse(readFileSync(join(outDir,'shardfiles/reach/discovery.json'),'utf8')).native.ktx2.GPU_FILES.phone.a).toBe(tier);
+    expect(existsSync(join(outDir,'shardfiles/reach/stale.json'))).toBe(false);
+    expect(existsSync(join(outDir,'.shardfiles-cooked'))).toBe(false);
+    expect(existsSync(join(outDir,'.discovery'))).toBe(false);
+  }finally{rmSync(root,{recursive:true,force:true});}
+});

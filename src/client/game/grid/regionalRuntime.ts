@@ -1,3 +1,4 @@
+import type { LevelSpec } from '@wildshard/engine/level/spec';
 import { bindResidentTileEntry } from '../shardfile/tileEntry';
 import {bindEquipmentActors} from '../loadout/actors';
 import { freezeParkedMatrices } from '@wildshard/engine/render/precompile';
@@ -134,6 +135,8 @@ export interface PreparedRegionalRuntime {
   readonly aimAnimals: () => RowBodiesView['animals'];
   /** Its creature manager once built, where a row is drawn (J130). */
   readonly animals: () => RowBodiesView | null;
+  /** QA 11-25 row 86 (c): the zone's authored fight (its manifest's), which the grid page's own platform level lacks. */
+  readonly fight: LevelSpec['fight'];
   /** This cell's item rows: a ranged row names the server's slot for it. */
   readonly items: Shardfile['items']['rows'];
   /** Its own scoped runtime's interact prompts (frame-local; emptied on entry, ended with the runtime); callers scan them
@@ -537,6 +540,7 @@ export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts)
         ghostRoots: [...foundation.region.ghostRoots ?? [], scope, view.root] }, queries: view.queries, checkpoint,
         aimAnimals: () => localPlay?.animals.animals ?? [], items: request.admitted.source.items.rows,
         animals: () => localPlay?.animals ?? null,
+        fight: request.manifest.fight ?? {},
         interactables: () => localRuntime?.interactables ?? [],
         park: () => { if (!parked) { parked = true; freezeParkedMatrices(view.root); } },
         ownsGround,

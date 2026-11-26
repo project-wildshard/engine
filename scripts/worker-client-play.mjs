@@ -180,8 +180,12 @@ export async function play(browser, phone, base, only = '') {
   });
   await step('the day is on the wire and the page follows', async () => {
     const first = await report(drift.page); await drift.page.waitForTimeout(3000); const next = await report(drift.page);
-    const clock = await drift.page.evaluate(() => window.__wildshard?.world?.game?.sky?.dayNight?.phase ?? null);
-    return { ok: typeof next.day === 'number' && (first.day !== next.day) && (clock === null || Math.min(Math.abs(clock - next.day), 1 - Math.abs(clock - next.day)) < 0.02), first: first.day, next: next.day, clock };
+    // QA 11-25 row 86 (c): the clock the page draws by is the app's (on the grid the entered zone's sky, not the platform's
+    // backdrop, which keeps its own); Driftwood holds midday (shard-driftwood db75bf3, a 1e9 s cycle), so its day is on the
+    // wire and followed but never moves
+    const clock = await drift.page.evaluate(() => { const game = window.__wildshard?.world?.game, day = game?.app?.dayCycle ?? game?.sky?.dayNight ?? null; return day === null ? null : { phase: day.phase, cycle: day.cycle }; });
+    const held = clock !== null && clock.cycle > 1e6;
+    return { ok: typeof next.day === 'number' && (held || first.day !== next.day) && (clock === null || Math.min(Math.abs(clock.phase - next.day), 1 - Math.abs(clock.phase - next.day)) < 0.02), first: first.day, next: next.day, clock, held };
   });
   await step('driftwood saves', async () => { await drift.page.evaluate(() => Promise.race([window.__workerClientSave(), new Promise(resolve => { setTimeout(resolve, 20_000); })])); const r = await report(drift.page); return { ok: r.savedOk, tick: r.savedTick }; });
   await step('driftwood resumes: the quest is where it stood', async () => {
@@ -424,7 +428,9 @@ export async function play(browser, phone, base, only = '') {
     const r = await report(nine.page), parted = Math.hypot(r.x - r.serverX, r.z - r.serverZ), moved = Math.hypot(r.x - at.x, r.z - at.z);
     return { ok: moved > 3 && parted < 1 && r.closed === null, moved, parted, corrections: r.corrections - before.corrections, worst: r.worstOffset };
   });
-  await step('nine: a fall off the stack comes back to firm ground, unhurt', async () => {
+  // QA 11-25 row 86 (c): on the grid a fall below a zone's floor is a death, as the page has it (play.ts toSpawn, the server's
+  // FallFloor); the soft net is a lone cell's, and a zone opens on the grid (J522). The fall counts once; the player comes back whole
+  await step('nine: a fall off the stack is one death, and the player comes back on the stack, whole', async () => {
     const stood = await nine.page.evaluate(() => { const { position: p } = window.__wildshard.world.player; return { x: p.x, y: p.y, z: p.z }; }), before = await report(nine.page);
     await nine.page.waitForTimeout(800);
     await nine.page.evaluate(({ x, z }) => { window.__wildshard.world.player.link.place(x, 26, z, 0); }, stood);
@@ -432,7 +438,7 @@ export async function play(browser, phone, base, only = '') {
     for (let i = 0; i < 24; i++) { lowest = Math.min(lowest, await nine.page.evaluate(() => window.__wildshard.world.player.position.y)); await nine.page.waitForTimeout(150); }
     await nine.page.waitForTimeout(1000);
     const back = await nine.page.evaluate(() => window.__wildshard.world.player.position.y), r = await report(nine.page);
-    return { ok: back > 25 && r.falls === before.falls && r.hp === before.hp, stood: stood.y, lowest, back, falls: r.falls, hp: r.hp };
+    return { ok: back > 25 && r.falls === before.falls + 1 && r.hp === before.hp, stood: stood.y, lowest, back, falls: r.falls, hp: r.hp };
   });
   await step('nine saves and resumes where it stood', async () => {
     await nine.page.evaluate(() => Promise.race([window.__workerClientSave(), new Promise(resolve => { setTimeout(resolve, 20_000); })]));
