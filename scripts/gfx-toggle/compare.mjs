@@ -16,6 +16,7 @@ import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { chromium, devices } from "../browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
+import { enterZone } from '../zone-entry.mjs';
 import { developerSettings, saveFixture, hideDeveloperOverlays } from '../debug-settings.mjs';
 
 const { values } = parseArgs({ options: { base: { type: 'string' }, out: { type: 'string' }, only: { type: 'string' } } });
@@ -97,7 +98,8 @@ async function shots(name) {
 
 const results = [];
 try {
-  await page.goto(`${base}/?chunk=driftwood-isle&tier=phone&mute=1&nolock=1&sw=0&skipintro=1`);
+  // CHUNK-PARAM CP16 (J522): Driftwood alone, a one-cell world, entered straight (no zone in the URL; Q1 (a): it measures)
+  await enterZone(page, { zone: 'driftwood-isle', base, flags: 'tier=phone&mute=1&nolock=1&sw=0&skipintro=1', alone: true });
   await page.waitForFunction(`(() => { const w = window.__wildshard?.world; try { return !!w?.hud.entered && w.game.frameGate() && !document.querySelector('.ws-load'); } catch { return false; } })()`, null, { timeout: 240_000, polling: 300 });
   await sleep(3000);
   for (const step of STEPS) {

@@ -4,7 +4,8 @@
 // chain from its client plan, the room's resident built none, and a room player walked on air and fell.
 //
 // Two halves, one inventory function:
-//   - the page: the production bundle in headless Chromium, `?chunk=<slug>`, `app.physics` after boot (this file's CLI);
+//   - the page: the production bundle in headless Chromium, the zone alone as a one-cell world (`enterZone`, CHUNK-PARAM CP16,
+//     J522), `app.physics` after boot (this file's CLI);
 //   - the server: `openCellWorld`, the room's own composition (test/side-parity.test.ts, under Vitest for its TS imports).
 // Each side lists every collider as (owner, material, rounded AABB); `sideParityDiff` groups them by owner and diffs.
 // The page half is recorded into test/side-parity.page.json, reviewed like any fixture; CI diffs the live server against
@@ -196,6 +197,7 @@ async function recordPage(argv) {
   const { chromium, devices } = await import("./browser-playwright.mjs");
   const { KEYCHAIN_ARGS } = await import('./chromium-keychain.mjs');
   const { waitForPhysicsBoot } = await import('./physics-grid-entry.mjs');
+  const { enterZone } = await import('./zone-entry.mjs');
   const only = flag('shard', ''), shards = only === '' ? SIDE_PARITY_SHARDS : only.split(','), port = Number(flag('port', '4177')), timeout = Number(flag('timeout', '240')) * 1000;
   let base = flag('url', ''), preview = null;
   if (base === '') {
@@ -218,7 +220,7 @@ async function recordPage(argv) {
     for (const slug of shards) {
       const context = await browser.newContext({ ...devices['iPhone 16 Pro'] }), page = await context.newPage();
       try {
-        await page.goto(`${base}/?chunk=${slug}&tier=phone&skipintro=1&nolock=1&sw=0&mute=1`, { waitUntil: 'commit', timeout });
+        await enterZone(page, { zone: slug, base, flags: 'tier=phone&skipintro=1&nolock=1&sw=0&mute=1', alone: true, waitUntil: 'commit', timeout });
         await waitForPhysicsBoot(page, 'standalone', timeout);
         await page.waitForTimeout(Number(flag('settle', '3000')));
         // a page's movers ride the wire; the room's half stands at tick 0, so each is read at its declared rest (TEMPLATE-E2E TC-E5c)

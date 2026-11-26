@@ -8,6 +8,7 @@ import { browserPool, parallel } from './pool.mjs';
 import { registerCaptureTrace } from './capture-trace.mjs';
 import { serve } from './serve.mjs';
 import { NAME_ASKED, saveFixture } from '../debug-settings.mjs';
+import { initScript } from '../zone-entry.mjs';
 import { captureBootFrame } from './black-frame.mjs';
 import { observeTitleCapture } from './title-trace.mjs';
 import { gridBootWaitHistory } from './grid-boot-waits.mjs';
@@ -159,6 +160,28 @@ export function bootJobs(value) {
   return Number(value);
 }
 
+/** CHUNK-PARAM CP16 (J522): select `slug`'s card on Shard select by its title row's name (Developer's ALL tab lists every zone),
+ * the way a player picks a zone; no address names it. @param {import('playwright').Page} page @param {string} slug */
+export async function pickZoneCard(page, slug) {
+  const rows = /** @type {unknown} */ (JSON.parse((await page.locator('#ws-title-rows').textContent()) ?? 'null'));
+  const row = Array.isArray(rows) ? rows.find((/** @type {unknown} */ value) => typeof value === 'object' && value !== null && 'slug' in value && value.slug === slug) : undefined;
+  if (typeof row !== 'object' || row === null || !('name' in row)) throw new Error(`The title lists no ${slug}`);
+  const all = page.locator('.ws-menu-tab[data-tab="all"]');
+  if (await all.count() > 0) await all.click();
+  const names = await page.locator('.ws-menu-card b').allTextContents(), index = names.indexOf(String(row.name));
+  if (index < 0) throw new Error(`Shard select shows no ${slug} card`);
+  await page.locator(`.ws-menu-card[data-i="${String(index)}"]`).click();
+  await page.locator(`.ws-menu-card.selected[data-i="${String(index)}"]`).waitFor();
+}
+
+/** A grid page standing in `slug`'s cell with play ready. @param {unknown} grid @param {string} slug */
+export function gridStandsIn(grid, slug) {
+  const session = typeof grid === 'object' && grid !== null && 'live' in grid ? grid.live : null;
+  const live = typeof session === 'object' && session !== null && 'live' in session ? session.live : null;
+  return typeof live === 'object' && live !== null && 'current' in live && typeof live.current === 'string' && live.current.replace(/^_/u, '') === slug
+    && 'gameplayReady' in live && live.gameplayReady === true;
+}
+
 /** Every public primary enters through its real public button; experimental primaries enter with Developer on.
  * @param {readonly {slug:string,status:string,legacy:boolean,shardSelect?:boolean}[]} catalogue
  * @param {'all'|'public'|'developer'|'grid'} [group]
@@ -178,11 +201,9 @@ export function bootCases(catalogue, group = 'all') {
   const home = publicRows.at(0)?.slug ?? (process.env.WILDSHARD_RING === '1' ? 'sunscar-dunes' : undefined); // Ring 1's three products are all Developer cards.
   if (home === undefined) throw new Error('No public shard page-ready cases');
   if (process.env.WILDSHARD_RING !== '1' && !primary.some(row => row.slug === 'nine-dragon-stack')) throw new Error('Nine Developer-off page-ready case is missing from the built catalogue'); // Ring 1 builds three products; Ring 2 still holds Nine to this.
-  // Direct Nine chunk hydration uses the public playing envelope even while
-  // its experimental picker card stays locked. The Developer case separately
-  // proves entered gameplay; admission is never labelled public gameplay.
-  const publicCases = primary.filter(row => row.status !== 'hidden' && (row.status !== 'experimental' || row.slug === 'nine-dragon-stack'))
-    .map(row => /** @type {const} */ ([row.status === 'experimental' ? 'public-policy' : 'standalone', row.slug, false]));
+  // CHUNK-PARAM CP16 (J522): the public-policy case (an address link hydrating Nine's locked card) retired with the address;
+  // a locked card has no way in without Developer, and the Developer case proves Nine's gameplay.
+  const publicCases = publicRows.map(row => /** @type {const} */ (['standalone', row.slug, false]));
   const developerCases = primary.filter(row => row.status === 'experimental' || row.status === 'hidden').map(row => /** @type {const} */ (['standalone', row.slug, true]));
   const gridCases = [/** @type {const} */ (['grid', home, false])];
   return group === 'public' ? publicCases : group === 'developer' ? developerCases : group === 'grid' ? gridCases : [...publicCases, ...developerCases, ...gridCases];
@@ -489,7 +510,9 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
   try {
     const url = new URL(base);
     for (const [key, value] of Object.entries({ tier: 'phone', touch: '1', mute: '1', nolock: '1', sw: '0' })) url.searchParams.set(key, value);
-    if (mode !== 'grid') url.searchParams.set('chunk', shard);
+    // CHUNK-PARAM CP16 (J522): no zone in the address. A standalone case taps its zone's card on Shard select (below); an
+    // arrival writes the tab's tap, as the engine's own handoff does (titleArrival.ts handZoneOnReload), and opens `/`.
+    if (mode === 'arrival') await page.addInitScript(initScript(shard));
     // NINE-DRAGON-BENCHMAX NB6: a standalone load whose props stage sits idle with no named wait is refused at control
     // (the world may build behind the title, so the profile runs from the document's start)
     if (mode === 'standalone') stallProfile = await startStallProfile(page);
@@ -516,6 +539,7 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
         writeFileSync(join(out, `${receipt}.json`), `${JSON.stringify(result, null, 2)}\n`);
         return result;
       }
+      await pickZoneCard(page, shard);
       const play = page.locator('.ws-menu-play');
       await play.waitFor();
       await until(page, faults, async () => await play.isVisible() && await play.isEnabled(), 'available shard entry', deadline);
@@ -531,7 +555,9 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
       // Register before the tap: evaluating the old document while this expected
       // navigation commits destroys its execution context. Keep the same bound.
       await Promise.all([
-        page.waitForURL(destination => destination.searchParams.get('chunk') === shard, { waitUntil: 'domcontentloaded', timeout: Math.max(1, deadline - Date.now()) }),
+        // CP1 (J522): the grid page's address is bare; wait for the new document the tap opens
+        page.waitForEvent('framenavigated', { predicate: frame => frame === page.mainFrame(), timeout: Math.max(1, deadline - Date.now()) })
+          .then(() => page.waitForLoadState('domcontentloaded', { timeout: Math.max(1, deadline - Date.now()) })),
         page.locator('.ws-main-grid').click(),
       ]);
     }
@@ -545,7 +571,7 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
         revealSkipped = await page.locator('.ws-grid-reveal').dispatchEvent('pointerdown').then(() => true, () => false);
       }
       if (!value.ready) return false;
-      if (mode === 'standalone' || mode === 'arrival') return value.shard === shard && value.grid === null;
+      if (mode === 'standalone' || mode === 'arrival') return value.grid === null ? value.shard === shard : gridStandsIn(value.grid, shard);
       const grid = value.grid;
       if (typeof grid !== 'object' || grid === null || !('home' in grid) || typeof grid.home !== 'string' || grid.home.length === 0 ||
         !('inside' in grid) || grid.home !== grid.inside || (requireRings && (!('ringsReady' in grid) || grid.ringsReady !== true)) ||

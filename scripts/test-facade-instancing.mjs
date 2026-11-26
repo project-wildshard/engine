@@ -4,6 +4,7 @@ import { debugSettings, saveFixture } from './debug-settings.mjs';
 // See docs/audits/nine-dragon-mobile-multidraw.md. This guards routing, not native phone memory.
 import { chromium } from "./browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
+import { enterZone } from './zone-entry.mjs';
 
 const base = (process.argv.find((arg) => arg.startsWith('--url='))?.slice(6) ?? 'http://127.0.0.1:4184').replace(/\/$/, '');
 const mobileUA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6 Mobile/15E148 Safari/604.1';
@@ -22,14 +23,12 @@ try {
       const errors = [];
       let navigations = 0;
       page.on('pageerror', (error) => { errors.push(error.message); });
-      page.on('framenavigated', (frame) => { if (frame === page.mainFrame()) navigations++; });
-      await page.goto(`${base}/?chunk=nine-dragon-stack&tier=${profile.tier}&touch=1&nolock=1&mute=1&sw=0`, { waitUntil: 'domcontentloaded' });
-      await page.waitForFunction(() => Boolean(window.__wildshard?.world) || Boolean(document.querySelector('#wserr')), null, { timeout: 90_000 });
-      // meta EXPLORE-MODE EX1: the deck has no EXPLORE WORLD; the HUD's own entry opens Explore's hub (as `?explore=` does)
-      await page.evaluate(() => { window.__wildshard.world.hud.startExplore(); });
-      await page.locator('.ws-x-card[data-m="world"]').click();
-      await page.waitForFunction(() => Boolean(document.querySelector('.ws-x.show[data-mode="world"]')) &&
-        (window.__wildshard?.world?.game.renderer.info.render.calls ?? 0) > 0, null, { timeout: 20_000 });
+      // CP16 (J522): count documents, not URL changes; the grid page tidies its address in place (a same-document navigation)
+      page.on('domcontentloaded', () => { navigations++; });
+      // CHUNK-PARAM CP16 (J522): Nine enters alone, a one-cell world, straight into play (no zone in the URL, no Explore hub)
+      await enterZone(page, { zone: 'nine-dragon-stack', base, flags: `tier=${profile.tier}&touch=1&nolock=1&mute=1&sw=0&skipintro=1`, alone: true, waitUntil: 'domcontentloaded' });
+      await page.waitForFunction(() => Boolean(document.querySelector('#wserr')) || (Boolean(window.__wildshard?.world?.hud.entered) &&
+        (window.__wildshard?.world?.game.renderer.info.render.calls ?? 0) > 0 && Boolean(window.__wildshard?.world?.game.scene.getObjectByName('facade'))), null, { timeout: 180_000 });
       const state = await page.evaluate(() => {
         const game = window.__wildshard.world.game;
         const facade = game.scene.getObjectByName('facade');

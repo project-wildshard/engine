@@ -25,7 +25,8 @@ test('the independent grid leg keeps the actual public home and the mandatory ro
     ['standalone', 'nine-dragon-stack', true], ['standalone', 'sunscar-dunes', true],
     ['standalone', 'far-reach', true], ['standalone', 'brasscap-mesa', true],
   ]);
-  expect(bootCases(catalogue, 'public')).toContainEqual(['public-policy', 'nine-dragon-stack', false]);
+  // CHUNK-PARAM CP16 (J522): the public-policy case (an address link to Nine's locked card) retired with the address
+  expect(bootCases(catalogue, 'public').some(([mode]) => mode !== 'standalone')).toBe(false);
 });
 
 test('BB2: boot cases run on their own slots, the grid retires only its own slot, and --jobs is bounded', async () => {

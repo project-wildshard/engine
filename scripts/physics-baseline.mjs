@@ -36,6 +36,7 @@ import { runNativePhysicsWalk } from './physics-native.mjs';
 import { driveGridSeam, gridSeamRoute, gridDriveFailures } from './physics-grid.mjs';
 import { enterPhysicsGrid, physicsEntryInventory, physicsEntryPierReady, physicsEntryFailures, waitForPhysicsBoot } from './physics-grid-entry.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
+import { enterZone } from './zone-entry.mjs';
 import { gitCommonPath } from './git-common.mjs';
 
 const ROOT = resolvePath(new URL('..', import.meta.url).pathname);
@@ -207,7 +208,8 @@ async function openGame(shard, q, { cpu, video }) {
     result.entry = { grid, parity: 'not-sampled' };
     console.error(JSON.stringify(result.entry));
   } else {
-    await page.goto(`${BASE}/?chunk=${shard}&tier=${TIER}&skipintro=1&nolock=1&sw=0&mute=1${q ? `&${q}` : ''}${EXTRA_Q ? `&${EXTRA_Q}` : ''}`, { waitUntil: 'commit', timeout: TIMEOUT_MS });
+    // CHUNK-PARAM CP16 (J522, Q1 (a)): a measured zone boots alone, a one-cell world, never named in the URL
+    await enterZone(page, { zone: shard, base: BASE, flags: `tier=${TIER}&skipintro=1&nolock=1&sw=0&mute=1${q ? `&${q}` : ''}${EXTRA_Q ? `&${EXTRA_Q}` : ''}`, alone: true, waitUntil: 'commit', timeout: TIMEOUT_MS });
     await waitForPhysicsBoot(page, 'standalone', TIMEOUT_MS);
     if (ENTRY === 'grid') {
       const standalone = await page.evaluate(physicsEntryInventory);
