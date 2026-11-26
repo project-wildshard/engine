@@ -2042,6 +2042,7 @@
     "src/shared/game/shardfile/collisionBindings.ts": "shared",
     "src/shared/game/shardfile/contentHash.ts": "shared",
     "src/shared/game/shardfile/cookedMapPath.ts": "shared",
+    "src/shared/game/shardfile/cookedPackPaths.ts": "shared",
     "src/shared/game/shardfile/crowdRuntime.ts": "shared",
     "src/shared/game/shardfile/customSchema.ts": "shared",
     "src/shared/game/shardfile/dangerousGates.ts": "shared",
