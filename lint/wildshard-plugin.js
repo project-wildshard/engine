@@ -1009,8 +1009,10 @@ const shardfileBoundaryRule = name => ({
 // Blender target sources are offline authoring, never app runtime. Keep the
 // same exact script/source/post identities as check-model-sources; a folder
 // named blender or an unregistered sibling grants no exemption.
-const blenderTargetsFile = resolve(process.cwd(), 'scripts/blender/targets.json'); // Shard lint: blender sources left with the shards.
-const blenderTargets = existsSync(blenderTargetsFile) ? JSON.parse(readFileSync(blenderTargetsFile, 'utf8')).targets : [];
+// Shard lint: blender sources left with the shards. A shard's manifest is src/blender/targets.json (meta QA 11-25 row
+// 126, the SDK's build.sh reads it there); the old scripts/blender/targets.json still counts for one SDK minor.
+const blenderTargetsFile = ['src/blender/targets.json', 'scripts/blender/targets.json'].map(file => resolve(process.cwd(), file)).find(existsSync) ?? ''; // script-paths: the old place, read as a fallback
+const blenderTargets = blenderTargetsFile !== '' ? JSON.parse(readFileSync(blenderTargetsFile, 'utf8')).targets : [];
 const blenderSources = new Set();
 for (const target of Object.values(blenderTargets)) for (const entry of [target.script, target.post, ...(target.sources ?? [])]) {
   // SA45: an entry names the real file (`src/blender/…` in a single-shard repo) or already the source path.

@@ -60,6 +60,29 @@ test('primary authoring law refuses runtime, executable configs and runtime impo
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// Meta QA 11-25 row 126: a single-shard repo registers its Blender sources in src/blender/targets.json; the old
+// scripts/blender/targets.json still registers them for one SDK minor; an unregistered sibling stays refused.
+test('a shard repo registers Blender sources in src/blender/targets.json, or for now the old scripts/blender place', () => {
+  mkdirSync('tmp', { recursive: true });
+  const root = mkdtempSync(resolve('tmp/no-shard-runtime-blender-')), config = resolve(root, 'lint.json');
+  const manifest = JSON.stringify({ targets: { 'sample-isle/rig': { script: 'src/blender/rig.py', sources: ['src/blender/bake.mjs'] } } });
+  try {
+    writeFileSync(config, JSON.stringify({ jsPlugins: [resolve('lint/wildshard-plugin.js')],
+      categories: { correctness: 'off' }, rules: { 'wildshard/no-shard-runtime': 'error' } }));
+    for (const at of ['src/blender/targets.json', 'scripts/blender/targets.json']) {
+      const repo = resolve(root, at.split('/')[0]);
+      for (const [file, text] of Object.entries({ 'src/manifest.json': '{ "slug": "sample-isle" }', 'src/shard.config.ts': 'export {};',
+        'src/blender/bake.mjs': 'export const author = () => 1;', 'src/blender/stray.mjs': 'export const author = () => 1;', [at]: manifest })) {
+        mkdirSync(resolve(repo, file, '..'), { recursive: true }); writeFileSync(resolve(repo, file), text);
+      }
+      const result = spawnSync(process.execPath, [resolve('node_modules/oxlint/bin/oxlint'), '-c', config, '-f', 'json', '--no-ignore',
+        resolve(repo, 'src/blender/bake.mjs'), resolve(repo, 'src/blender/stray.mjs')], { cwd: repo, encoding: 'utf8' });
+      const output = v.parse(v.object({ diagnostics: v.array(v.object({ filename: v.string() })) }), JSON.parse(result.stdout));
+      expect(output.diagnostics.map(row => resolve(repo, row.filename)), at).toEqual([resolve(repo, 'src/blender/stray.mjs')]);
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('the runtime freeze is hard and neither ratchet write mode can add an allowance', () => {
   expect(hardRules(resolve('.oxlintrc.json')).has('wildshard/no-shard-runtime')).toBe(true);
   mkdirSync('tmp', { recursive: true });
