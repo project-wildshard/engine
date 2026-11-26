@@ -223,7 +223,8 @@
     "audio": 2648440,
     "loading": 66696181,
     "margin": 0
-   }
+   },
+   "declared": "QA 11-25 row 72: the control read now waits for the after-control audio decode (measure.mjs untilAfterBootAudio), so it counts the zone's settled audio"
   },
   "ledger/nalati-grasslands/peak": {
    "value": 331039574,
@@ -257,7 +258,8 @@
     "audio": 3271591,
     "loading": 9836610,
     "margin": 0
-   }
+   },
+   "declared": "QA 11-25 row 72: the control read now waits for the after-control audio decode (measure.mjs untilAfterBootAudio), so it counts the zone's settled audio"
   },
   "ledger/open-plot-alien-plain/peak": {
    "value": 48105193,
@@ -291,7 +293,8 @@
     "audio": 7003586,
     "loading": 16550268,
     "margin": 0
-   }
+   },
+   "declared": "QA 11-25 row 72: the control read now waits for the after-control audio decode (measure.mjs untilAfterBootAudio), so it counts the zone's settled audio"
   },
   "ledger/open-plot-clockwork-canyon/peak": {
    "value": 68969000,
@@ -325,7 +328,8 @@
     "audio": 3611683,
     "loading": 20885116,
     "margin": 0
-   }
+   },
+   "declared": "QA 11-25 row 72: the control read now waits for the after-control audio decode (measure.mjs untilAfterBootAudio), so it counts the zone's settled audio"
   },
   "ledger/open-plot-coral-drift/peak": {
    "value": 76200697,
@@ -359,7 +363,8 @@
     "audio": 3640452,
     "loading": 20245656,
     "margin": 0
-   }
+   },
+   "declared": "QA 11-25 row 72: the control read now waits for the after-control audio decode (measure.mjs untilAfterBootAudio), so it counts the zone's settled audio"
   },
   "ledger/open-plot-desert-ruin/peak": {
    "value": 76690626,
@@ -393,7 +398,8 @@
     "audio": 5142449,
     "loading": 14351114,
     "margin": 0
-   }
+   },
+   "declared": "QA 11-25 row 72: the control read now waits for the after-control audio decode (measure.mjs untilAfterBootAudio), so it counts the zone's settled audio"
   },
   "ledger/open-plot-ember-forge/peak": {
    "value": 66089679,
@@ -427,7 +433,8 @@
     "audio": 4566453,
     "loading": 13730236,
     "margin": 0
-   }
+   },
+   "declared": "QA 11-25 row 72: the control read now waits for the after-control audio decode (measure.mjs untilAfterBootAudio), so it counts the zone's settled audio"
   },
   "ledger/open-plot-fossil-badlands/peak": {
    "value": 59590116,
@@ -461,7 +468,8 @@
     "audio": 4996007,
     "loading": 15314774,
     "margin": 0
-   }
+   },
+   "declared": "QA 11-25 row 72: the control read now waits for the after-control audio decode (measure.mjs untilAfterBootAudio), so it counts the zone's settled audio"
   },
   "ledger/open-plot-frostline-peaks/peak": {
    "value": 71459602,
@@ -495,7 +503,8 @@
     "audio": 1658974,
     "loading": 16041144,
     "margin": 0
-   }
+   },
+   "declared": "QA 11-25 row 72: the control read now waits for the after-control audio decode (measure.mjs untilAfterBootAudio), so it counts the zone's settled audio"
   },
   "ledger/open-plot-jungle-ziggurat/peak": {
    "value": 64779819,
@@ -529,7 +538,8 @@
     "audio": 1731762,
     "loading": 20666054,
     "margin": 0
-   }
+   },
+   "declared": "QA 11-25 row 72: the control read now waits for the after-control audio decode (measure.mjs untilAfterBootAudio), so it counts the zone's settled audio"
   },
   "ledger/open-plot-lantern-bayou/peak": {
    "value": 73406459,
@@ -563,7 +573,8 @@
     "audio": 3587967,
     "loading": 21442134,
     "margin": 0
-   }
+   },
+   "declared": "QA 11-25 row 72: the control read now waits for the after-control audio decode (measure.mjs untilAfterBootAudio), so it counts the zone's settled audio"
   },
   "ledger/open-plot-mosslight-ruins/peak": {
    "value": 81451803,
@@ -597,7 +608,8 @@
     "audio": 1772981,
     "loading": 24332438,
     "margin": 0
-   }
+   },
+   "declared": "QA 11-25 row 72: the control read now waits for the after-control audio decode (measure.mjs untilAfterBootAudio), so it counts the zone's settled audio"
   },
   "ledger/open-plot-night-market/peak": {
    "value": 91355005,
@@ -631,7 +643,8 @@
     "audio": 5939071,
     "loading": 12386516,
     "margin": 0
-   }
+   },
+   "declared": "QA 11-25 row 72: the control read now waits for the after-control audio decode (measure.mjs untilAfterBootAudio), so it counts the zone's settled audio"
   },
   "ledger/open-plot-patchwork-fairground/peak": {
    "value": 57934865,
@@ -665,7 +678,8 @@
     "audio": 6487075,
     "loading": 6031094,
     "margin": 0
-   }
+   },
+   "declared": "QA 11-25 row 72: the control read now waits for the after-control audio decode (measure.mjs untilAfterBootAudio), so it counts the zone's settled audio"
   },
   "ledger/open-plot-saltwind-lighthouse/peak": {
    "value": 41630825,
@@ -699,7 +713,8 @@
     "audio": 2649123,
     "loading": 15536944,
     "margin": 0
-   }
+   },
+   "declared": "QA 11-25 row 72: the control read now waits for the after-control audio decode (measure.mjs untilAfterBootAudio), so it counts the zone's settled audio"
   },
   "ledger/open-plot-sky-harbor/peak": {
    "value": 61150071,
@@ -733,7 +748,8 @@
     "audio": 5358013,
     "loading": 15243652,
     "margin": 0
-   }
+   },
+   "declared": "QA 11-25 row 72: the control read now waits for the after-control audio decode (measure.mjs untilAfterBootAudio), so it counts the zone's settled audio"
   },
   "ledger/open-plot-sky-race/peak": {
    "value": 63373426,
@@ -767,7 +783,8 @@
     "audio": 6007986,
     "loading": 15660430,
     "margin": 0
-   }
+   },
+   "declared": "QA 11-25 row 72: the control read now waits for the after-control audio decode (measure.mjs untilAfterBootAudio), so it counts the zone's settled audio"
   },
   "ledger/open-plot-starfall-observatory/peak": {
    "value": 66242486,
@@ -801,7 +818,8 @@
     "audio": 5508991,
     "loading": 7628684,
     "margin": 0
-   }
+   },
+   "declared": "QA 11-25 row 72: the control read now waits for the after-control audio decode (measure.mjs untilAfterBootAudio), so it counts the zone's settled audio"
   },
   "ledger/open-plot-thin-ice/peak": {
    "value": 43687609,

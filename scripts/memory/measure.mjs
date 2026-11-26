@@ -575,6 +575,24 @@ function iphone13Line(model) {
 /** EM1's native-WebKit calibration. */
 export function webkitCalibration() { return JSON.parse(readFileSync(new URL('calibration.json', import.meta.url), 'utf8')).hosts.webkit; }
 
+/** QA 11-25 row 72: the boot decodes audio after control (finish.ts `afterBootAudio`: the deferred level audio, then the
+ * late title music), so a control read taken at the first draw caught it at any point: Nalati's control read 2.65 MB of
+ * audio or 23.02 MB on the same client (budgets runs 45690328000 to 45733445628), and the open plots swung 1.3 to 10.3 MB.
+ * Wait until it has settled; a page that names no such work (an older build) reads as settled. Returns a failure or null.
+ * @param {any} page @param {number} timeoutMs */
+export async function untilAfterBootAudio(page, timeoutMs) {
+  try {
+    await page.waitForFunction(() => {
+      const owner = Reflect.get(window, '__wildshard')?.world?.game?.app?.debug?.snapshot?.()?.afterBootAudio;
+      return typeof owner?.state !== 'function' || owner.state() !== 'pending';
+    }, undefined, { timeout: timeoutMs, polling: 250 });
+    return null;
+  } catch (error) {
+    if (!(error instanceof Error) || error.name !== 'TimeoutError') throw error;
+    return `The after-control audio was still decoding ${String(Math.round(timeoutMs / 1000))} s after control`;
+  }
+}
+
 /** The ledger counts a buffer until a GC clears its weak reference (memoryAttribution.ts), so a control read taken the
  * moment the card goes can still hold garbage. Nalati's array buffers read 86.3 MB at control in twelve main runs, after
  * a 22.7 MB drop whose step moved between readyFrame and audio, and 109.0 MB in v0.1.45's run 44398174924 where that
@@ -606,6 +624,7 @@ async function chromiumLedger(page, open, timeoutMs) {
     if (!(error instanceof Error) || error.name !== 'TimeoutError') throw error;
     failure = `Waiting for the completed control draw: ${error.message}`;
   }
+  if (failure === null) failure = await untilAfterBootAudio(page, timeoutMs);
   if (failure === null) await page.requestGC();
   const { steps, settled, gpuDetail } = await page.evaluate(() => {
     const memory = Reflect.get(globalThis, '__wildshardMemory');

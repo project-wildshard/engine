@@ -47,6 +47,7 @@ import { settleEntryPrograms } from './settlePrograms';
 import { prepareSpawnView } from '../shardfile/controlRefinement';
 import { settleTileDrivers, settlingTiles } from '../shardfile/tileDriver';
 import { observeTitlePreparation, prepareTitleFrame } from './titlePreparation';
+import { observeAfterBootAudio } from './afterBootAudio';
 import { installCrashCheckpoint } from './crashResume';
 import { GAME_STRINGS } from '../../../shared/game/strings';
 import { currentSpawnDownload, dropStoredSpawnMembers, heldSpawnMembers, retrySpawnDownload } from '../boot/spawnDownload';
@@ -522,6 +523,9 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     skip: () => hud.entered || exploring(), frame: () => game.frameCount, prime: () => { game.hiddenFrame(); },
   }) : Promise.resolve();
   levelScope.onDispose(app.debug.scopedExpose('titlePreparation', observeTitlePreparation(titleShaders, titleFrame)));
+  // QA 11-25 row 72: the memory meter waits for the after-control audio before its control read (measure.mjs).
+  const afterBootAudio = observeAfterBootAudio();
+  levelScope.onDispose(app.debug.scopedExpose('afterBootAudio', afterBootAudio));
   const handle = { ...world, get physics() { return world.physics; }, boundary, water, streams: edgeDressing.streams, hands, props, animals, interactables, crossbow, hud, audio, music, lockSys, lockState, weapons, get arena() { return getArena(); }, playground: getPlayground, ...boot.runtime.objects };
   // O18: what came from the world and the runtime's objects reads through, each time: a copy taken at boot kept the home's
   // first visit (on the grid, its whole world) after that visit retired. The runtime's objects still win, as spread last.
@@ -578,7 +582,7 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
       document.dispatchEvent(new Event('ws:control-ready'));
       sustainedFrames.start(diagnosticNow()); // QA row 31: the sustained fps window opens at control
       reachControl(game.levelScope);
-      if (deferredAudio || hasLateAudio(files)) void decodeAfterBoot();
+      if (deferredAudio || hasLateAudio(files)) void afterBootAudio.start(decodeAfterBoot);
       void backgroundDownloads();
     });
 

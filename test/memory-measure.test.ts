@@ -1,7 +1,7 @@
 import {readFileSync} from 'node:fs';
 import {expect,test,vi} from 'vitest';
 import {parseGridCatalogue} from '../src/shared/game/grid/catalogue';
-import {stepCheckpoints,settleControl,untilControl,refusal,ledgerByKind,stats,dumpsInOrder,bootURL,bootOf,isServerWorker,webkitLines,PROTOCOL,ladderParts,ledgerTotal,ladderLines,ledgerParity,predictFootprint,categoryRemainder,addCategories,builtGridCell,placeOffGrid,ringThree} from '../scripts/memory/measure.mjs';
+import {stepCheckpoints,settleControl,untilControl,untilAfterBootAudio,refusal,ledgerByKind,stats,dumpsInOrder,bootURL,bootOf,isServerWorker,webkitLines,PROTOCOL,ladderParts,ledgerTotal,ladderLines,ledgerParity,predictFootprint,categoryRemainder,addCategories,builtGridCell,placeOffGrid,ringThree} from '../scripts/memory/measure.mjs';
 
 const procs=[{pid:1,role:'webcontent',name:'wc'},{pid:2,role:'gpu',name:'gpu'},{pid:3,role:'networking',name:'net'}];
 const sample=(seq:number,t:number,wc:[number,number],gpu:[number,number])=>({seq,t,p:{'1':wc,'2':gpu,'3':[9e9,9e9] as [number,number]}});
@@ -135,6 +135,46 @@ test('control is the ledger after a GC; the boot checkpoints stay the peak (v0.1
   // no settled read (the page published no counters) keeps the boot's own reading
   expect(settleControl(boot, null)).toEqual(boot);
   expect(settleControl([{step: 'audio', ledger: ab(1)}], ab(0))).toEqual([{step: 'audio', ledger: ab(1)}]);
+});
+
+// QA 11-25 row 72: Nalati's control read 2.65 MB of audio or 23.02 MB on the same client, by whether the after-control
+// decode had finished. The read waits for it, and the Chromium ledger reads only after that wait.
+test('the control read waits until the after-control audio has settled', async () => {
+  let state: 'none' | 'pending' | 'done' = 'pending';
+  const owner = {state: () => state};
+  const before = Reflect.get(globalThis, 'window');
+  Reflect.set(globalThis, 'window', {__wildshard: {world: {game: {app: {debug: {snapshot: () => ({afterBootAudio: owner})}}}}}});
+  try {
+    const seen: boolean[] = [];
+    const page = {
+      waitForFunction: (ready: () => boolean) => {
+        seen.push(ready()); // an early read: the decode still runs
+        state = 'done';
+        seen.push(ready());
+        return Promise.resolve();
+      },
+    };
+    await expect(untilAfterBootAudio(page, 1_000)).resolves.toBeNull();
+    expect(seen).toEqual([false, true]);
+    const stuck = {waitForFunction: () => Promise.reject(Object.assign(new Error('Timeout 1000ms exceeded.'), {name: 'TimeoutError'}))};
+    await expect(untilAfterBootAudio(stuck, 1_000)).resolves.toMatch(/still decoding 1 s after control/u);
+  } finally {
+    Reflect.set(globalThis, 'window', before);
+  }
+  const source = readFileSync('scripts/memory/measure.mjs', 'utf8'), ledger = source.slice(source.indexOf('async function chromiumLedger'));
+  expect(ledger.indexOf('untilAfterBootAudio(page, timeoutMs)')).toBeGreaterThan(0);
+  expect(ledger.indexOf('untilAfterBootAudio(page, timeoutMs)')).toBeLessThan(ledger.indexOf('memory?.counters?.()'));
+});
+
+test('a page that names no after-control audio reads as settled', async () => {
+  const before = Reflect.get(globalThis, 'window');
+  Reflect.set(globalThis, 'window', {__wildshard: {world: {game: {app: {debug: {snapshot: () => ({})}}}}}});
+  try {
+    const page = {waitForFunction: (ready: () => boolean) => { expect(ready()).toBe(true); return Promise.resolve(); }};
+    await expect(untilAfterBootAudio(page, 1_000)).resolves.toBeNull();
+  } finally {
+    Reflect.set(globalThis, 'window', before);
+  }
 });
 
 test('Chromium control waits for a draw from the game that signalled control-ready', async () => {

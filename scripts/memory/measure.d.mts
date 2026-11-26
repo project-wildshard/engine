@@ -59,6 +59,7 @@ export function ladderLines(result:LadderParts&{rungs:Record<string,{k:Stats;wc:
 export function ledgerParity(checkpoint:{ledger?:Record<string,Record<string,number>>|null;processes:{role:string;alloc:Record<string,number>}[]}):{ledgerGpu:number;ledgerBuffers:number;angleMetal:number;webglBuffers:number}|null;
 export function phoneContext(context:unknown,options?:{route?:boolean}):Promise<void>;
 export function untilControl(page:unknown,timeoutMs:number,requireSettledFrame?:boolean):Promise<string|null>;
+export function untilAfterBootAudio(page:unknown,timeoutMs:number):Promise<string|null>;
 export interface Counters {gpu?:Record<string,number>;ram?:Record<string,number>;workers?:Record<string,number>}
 export interface CalibrationHost {baselineMB:{webcontent:number;gpu:number};kinds:Record<string,{slope:number;interceptMB:number;lands:string;roles?:Record<string,{slope:number;interceptMB:number}>}>}
 export interface ClosureTerm {process:'webcontent'|'gpu';term:string;category:string;bytes:number}
