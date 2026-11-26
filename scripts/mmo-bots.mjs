@@ -29,7 +29,7 @@
 // `replica` runs that release's exact server bundle (downloaded, SHA-256 checked) on loopback, with production's shape: its
 // channel settings, 4 workers, 32 seats, Driftwood, packs read from R2, memory saves unless --database names a disposable one,
 // and nothing sent off the Mac; each bot says its own address, as the door reads a proxy's. Its worker readings (tick p95, drops, RSS) join the bots' facts. `staging` joins the staging
-// socket within its seats (16 by staging.env), leaving room for people, and at most 4 (one address); staging's 2 workers (J202) are its own setting.
+// socket within its seats (16 by staging.env, or WILDSHARD_STAGING_SEATS), leaving room for people, and at most 4 (one address); staging's 2 workers (J202) are its own setting.
 // `--remote <ssh host>` (MMO-PLAN MP1.2, "bots on VPS cores", J202 "bots from this MacBook"): the same replica runs on that host as the
 // ssh user, pinned to `--cpus` (staging's, so production's players keep theirs), on its loopback only, and an ssh tunnel brings its
 // port to this Mac's loopback, so the bots and their forwarded addresses are exactly as on a local replica. The host's directory goes
@@ -57,7 +57,15 @@ const ROOT = absolute(import.meta.dirname, '..');
 const ORIGIN = 'https://packs.wildshard.io', BUNDLES = 'https://github.com/project-wildshard/engine/releases/download';
 // MS7.3: only rooms-staging is a live socket. D7 keeps the health read private on the tailnet.
 const STAGING_SOCKETS = ['wss://rooms-staging.wildshard.io'], STAGING_HEALTH = 'https://wildshard.tailb41b20.ts.net:8443/health';
-const STAGING_SEATS = 16, STAGING_HEADROOM = 4, REPLICA_PORT = 18796;
+// Staging's seats are staging.env's WORLD_SEATS (16); /health doesn't say them, so a run that raised them (box-load at 40,
+// meta QA 11-24 row 24) names them in WILDSHARD_STAGING_SEATS. The headroom for people stays 4 either way.
+const STAGING_SEATS = stagingSeats(process.env.WILDSHARD_STAGING_SEATS), STAGING_HEADROOM = 4, REPLICA_PORT = 18796;
+/** @param {string | undefined} named */
+function stagingSeats(named) {
+  if (named === undefined || named === '') return 16;
+  if (!/^\d{1,2}$/u.test(named) || Number(named) < 1 || Number(named) > 64) throw new Error(`WILDSHARD_STAGING_SEATS is staging's WORLD_SEATS, 1 to 64: not ${named}`);
+  return Number(named);
+}
 // `--remote`'s ssh links keep themselves alive, so a quiet half hour doesn't end a run early with every bot 'lost'.
 const ALIVE = ['-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=8', '-o', 'TCPKeepAlive=yes'];
 // The door's SOCKETS_PER_IP: through Funnel every bot is this Mac's one address, and no header pretends otherwise.

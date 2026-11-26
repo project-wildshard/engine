@@ -19,6 +19,8 @@ concurrency:
   cancel-in-progress: false
 env:
   BOT_SECONDS: '1080'
+  # mmo-bots.mjs can't read staging's seats from /health: name the 40 set above, or every leg past the third refuses.
+  WILDSHARD_STAGING_SEATS: '40'
 jobs:
   bots:
     if: github.repository == 'project-wildshard/engine'

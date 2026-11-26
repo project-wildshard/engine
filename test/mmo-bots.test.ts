@@ -90,7 +90,12 @@ test('forwarded addresses belong to a loopback replica alone; staging gets the o
 });
 
 test('staging keeps seats for people and checks its build and seats again just before a hello', () => {
-  expect(driver).toMatch(/STAGING_SEATS = 16, STAGING_HEADROOM = 4/u);
+  expect(driver).toMatch(/STAGING_SEATS = stagingSeats\(process\.env\.WILDSHARD_STAGING_SEATS\), STAGING_HEADROOM = 4/u);
+  expect(driver).toContain("if (named === undefined || named === '') return 16;");
+  // Meta QA 11-24 row 24: box-load's eight legs of 4 need staging's 40 seats named, or the fourth leg refuses.
+  const boxLoad = readFileSync('.github/workflows/box-load.yml', 'utf8');
+  expect(boxLoad).toMatch(/WILDSHARD_STAGING_SEATS: '(\d+)'/u);
+  expect(Number(/WILDSHARD_STAGING_SEATS: '(\d+)'/u.exec(boxLoad)?.[1]) - 4).toBeGreaterThanOrEqual(8 * 4);
   const seats = driver.indexOf('bots leave'), recheck = driver.indexOf("await stagingRoom('before the first hello')"), bundle = driver.indexOf("spawn(process.execPath, [join(out, 'mmoBots.mjs')");
   expect(seats).toBeGreaterThan(0); expect(seats).toBeLessThan(bundle);
   expect(recheck).toBeGreaterThan(driver.indexOf("execFileSync(process.execPath, ['scripts/build-server.mjs'")); expect(recheck).toBeLessThan(bundle);
