@@ -8,3 +8,7 @@
 - The push-input fixture's `src` inventory now holds its own `src/scripts/push-inputs.mjs`, and the commit-message
   fixture's human commit names SKIP_ATTRIB (row 51's hatch rule, which arrived with the move).
 - The guard that stops the next one is row 91's second half (repo-kit script-paths).
+
+- The static lane stayed red after e60a4cf97: ci-static.sh's `proof` imported `./scripts/$loader`, and it ran
+  `pnpm test:hooks` and `pnpm test:agent-hooks`, two scripts the lean package.json dropped. It now runs the loader
+  from src/scripts and the two node --test globs itself.

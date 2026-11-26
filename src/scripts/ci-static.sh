@@ -15,7 +15,7 @@ check() {
   if "$@"; then echo "::endgroup::"; echo "static: $name green in $((SECONDS - started))s"
   else echo "::endgroup::"; echo "::error title=static $name::red after $((SECONDS - started))s"; red=1; fi
 }
-proof() { local loader=$1; shift; node --import "./scripts/$loader" --test "$@"; }
+proof() { local loader=$1; shift; node --import "./src/scripts/$loader" --test "$@"; }
 # TC26 (J186, AD1): the fire drill soaked 414 clean ci-reports runs, 11-17 to 11-23. Static runs before `pnpm pins` and
 # gen, so it installs Nalati and publishes Rapier's binary itself, and Brasscap, whose tracked pin broken-tar reads now the
 # format ships no whole Brasscap (format 0.79, QA 11-24 row 70).
@@ -85,10 +85,10 @@ if [ "$mode" = code ]; then
   check wire pnpm check:wire
   check saves pnpm check:saves
   check kit pnpm test:kit
-  check hooks pnpm test:hooks
+  check hooks node --test '.githooks/*.test.mjs'
   # MULTI-AGENT-TOOLING MA6: one agent layout for Claude Code and Codex (repo-kit agent-sync).
   check agent-sync pnpm check:agent-sync
-  check agent-hooks pnpm test:agent-hooks
+  check agent-hooks node --test '.agents/hooks/test/*.test.mjs'
   check parity pnpm check:parity
 fi
 exit "$red"
