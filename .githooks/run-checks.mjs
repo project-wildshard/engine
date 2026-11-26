@@ -33,6 +33,15 @@ if (lane === 'push') {
     console.error(`  - delete-only push of ${lines.map(([, , remote]) => remote).join(', ')}: no commit leaves this machine; push lane skipped`);
     process.exit(0);
   }
+  // Meta QA 11-25 row 113 (J381): re-creating deleted branches at a sha the destination's main holds or the
+  // deleted-branches log recorded sends no new code (.githooks/branch-restore.mjs); ALLOW_BRANCH_RESTORE=1 is its
+  // hatch. Never a main push.
+  const { restoreVerdict } = await import('./branch-restore.mjs');
+  const restore = restoreVerdict(root, process.env.WS_PUSH_REFS ?? '');
+  if (restore.ok) {
+    console.error(`  - ${restore.reason}; push lane skipped`);
+    process.exit(0);
+  }
 }
 // A merge-back only carries the version and notes already tested on the tagged release branch.
 // The outgoing main tip must be its first parent; unrelated outgoing commits keep the normal gate.
