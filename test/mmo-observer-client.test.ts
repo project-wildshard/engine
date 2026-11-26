@@ -65,7 +65,7 @@ test('private observer identities survive bounded runs and reject exposed files'
 });
 
 // QA 11-25 row 120: staging's baseline is the build it serves, which can predate the lean layout (f928fdae2). From
-// v0.1.94 on, prepare ran src/scripts/build-server.mjs inside v0.1.93's source, which keeps it in scripts/, so the
+// v0.1.94 on, prepare ran src/scripts/build-server.mjs inside v0.1.93's source, which keeps it in the old folder, so the
 // observer refused with client-prepare and never armed. Both layouts must build a native client.
 function sourceRepo(){
  const root=folder(),git=(...args:string[])=>{const result=spawnSync('git',args,{cwd:root,encoding:'utf8'});assert.equal(result.status,0,result.stderr);return result.stdout.trim();};
@@ -79,8 +79,9 @@ function sourceRepo(){
   "mkdirSync(values.out,{recursive:true});",
   "writeFileSync(values.out+'/releaseObserverBot.mjs','export const sourceBuild='+JSON.stringify(values.build)+';export function connect(){}\\n');"].join('\n');
  const commit=(path:string)=>{write(path,builder);git('add','-A');git('commit','--quiet','--no-verify','-m',path);return git('rev-parse','HEAD');};
- const preLean=commit('scripts/build-server.mjs');
- git('rm','--quiet','scripts/build-server.mjs');
+ // script-paths: a made-up pre-lean source tree in a scratch repo
+ const preLean=commit('scripts/build-server.mjs'); // script-paths: the pre-lean builder
+ git('rm','--quiet','scripts/build-server.mjs'); // script-paths: the pre-lean builder
  const lean=commit('src/scripts/build-server.mjs');
  git('rm','--quiet','src/scripts/build-server.mjs');write('README','no builder\n');git('add','-A');git('commit','--quiet','--no-verify','-m','none');
  return {root,preLean,lean,none:git('rev-parse','HEAD')};

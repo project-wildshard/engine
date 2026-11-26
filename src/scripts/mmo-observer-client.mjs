@@ -44,11 +44,12 @@ export async function observerCommand(command,args,{cwd,signal,log,storeUse}){
 }
 
 /** The baseline is whatever staging serves, which can predate the lean layout (f928fdae2): v0.1.93 keeps its builder in
- * scripts/, so a lean-only path refused every staging observer from v0.1.94 on (QA 11-25 row 120).
+ * the old folder, so a lean-only path refused every staging observer from v0.1.94 on (QA 11-25 row 120).
  * @param {string} tree @returns {string} the builder, relative to the archived source tree */
 export function observerBuilder(tree){
+ // script-paths: a pre-lean baseline's archived source tree, not this checkout
  for(const path of ['src/scripts/build-server.mjs','scripts/build-server.mjs'])if(existsSync(join(tree,path)))return path;
- throw new Error('Observer source has no build-server.mjs in src/scripts/ or scripts/');
+ throw new Error('Observer source has no build-server.mjs in src/scripts/ or scripts/'); // script-paths: names both layouts of an archived tree
 }
 
 /** The directory is a newly created run folder, never a shared checkout or a caller's existing tree.
