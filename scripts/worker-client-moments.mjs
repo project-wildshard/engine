@@ -6,6 +6,10 @@ import { chromium, devices } from "./browser-playwright.mjs";
 import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
+import { enterZone } from './zone-entry.mjs';
+/** @typedef {NonNullable<Window['__wildshard']['world']>} PageWorld */
+/** CHUNK-PARAM CP16 (J522): the grid's debug handle: the entered cell's creatures and prompts (the grid page's own world holds none)
+ * @typedef {{ animals?: () => PageWorld['animals'] | null; interactables?: () => PageWorld['interactables'] | null } | undefined} GridHandle */
 
 const arg = (key, fallback) => process.argv.find(value => value.startsWith(`--${key}=`))?.slice(key.length + 3) ?? fallback;
 const base = arg('base', ''), only = arg('only', 'practice,pine,race,captain,god,roc,sunscar,phases,longroom,day').split(',');
@@ -20,7 +24,7 @@ async function open(slug, query = '') {
   page.on('pageerror', error => { errors.push(error.message.slice(0, 300)); });
   await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
   await saveFixture(context, { scope: 'device', key: 'debug.workerClient', data: 'on' });
-  await page.goto(new URL(`/?chunk=${slug}&mute=1&nolock=1${query}`, base).href, { waitUntil: 'load' });
+  await enterZone(page, { zone: slug, base, flags: `mute=1&nolock=1${query}`, waitUntil: 'load' });
   await page.waitForFunction(() => window.__wildshard?.world?.player !== undefined, undefined, { timeout: 150_000 });
   await page.waitForFunction(() => typeof window.__workerClient === 'function', undefined, { timeout: 150_000 });
   await page.evaluate(FLOOR_GRID_ENTER);
@@ -133,7 +137,7 @@ if (only.includes('race')) {
   await page.evaluate(() => { window.__workerClientHits(1000); window.__workerClientFlag('errand:asked'); window.__workerClientTime('night'); });
   await page.waitForTimeout(3000);
   await place(page, x, await groundAt(page, x, z) + 1, z);
-  const thralls = () => page.evaluate(([cx, cz]) => [...window.__wildshard.world.animals.animals].filter(body => body.variant === 'thrall' && body.alive && Math.hypot(body.position.x - cx, body.position.z - cz) < 140).map(body => ({ x: body.position.x, y: body.position.y, z: body.position.z })), [x, z]);
+  const thralls = () => page.evaluate(([cx, cz]) => [...((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.animals?.() ?? window.__wildshard.world.animals).animals].filter(body => body.variant === 'thrall' && body.alive && Math.hypot(body.position.x - cx, body.position.z - cz) < 140).map(body => ({ x: body.position.x, y: body.position.y, z: body.position.z })), [x, z]);
   const woke = await until(page, async () => (await thralls()).length >= 3, 30);
   const end = Date.now() + 25_000;
   while (Date.now() < end && !(await report(page)).flags.includes('errand:done')) {
@@ -166,7 +170,7 @@ if (only.includes('captain')) {
   const shard = await open('driftwood-isle', '&bossGod=1'), { page } = shard;
   await page.evaluate(() => { for (const flag of ['shard:lookout', 'shard:wreck', 'shard:cave']) window.__workerClientFlag(flag); });
   await page.waitForTimeout(2000);
-  const altar = await page.evaluate(() => { const found = window.__wildshard.world.interactables.find(row => /^Set the glyph/iu.test(row.label ?? '')); return found === undefined ? null : { x: found.position.x, y: found.position.y, z: found.position.z, label: found.label }; });
+  const altar = await page.evaluate(() => { const found = ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.interactables?.() ?? window.__wildshard.world.interactables).find(row => /^Set the glyph/iu.test(row.label ?? '')); return found === undefined ? null : { x: found.position.x, y: found.position.y, z: found.position.z, label: found.label }; });
   const pressed = altar === null ? null : await (async () => {
     for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1.2], [0, -1.2]]) {
       await place(page, altar.x + dx, altar.y - 1.2, altar.z + dz); await page.waitForTimeout(1000);
@@ -175,7 +179,7 @@ if (only.includes('captain')) {
     }
     return false;
   })();
-  const captain = () => page.evaluate(() => [...window.__wildshard.world.animals.animals].filter(body => body.kind === 'captain' && body.alive).map(body => ({ x: body.position.x, y: body.position.y, z: body.position.z, hp: body.hp / body.maxHp, st: body.mem?.st ?? null, burst: [body.mem?.['burst-x'] ?? 0, body.mem?.['burst-z'] ?? 0] }))[0] ?? null);
+  const captain = () => page.evaluate(() => [...((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.animals?.() ?? window.__wildshard.world.animals).animals].filter(body => body.kind === 'captain' && body.alive).map(body => ({ x: body.position.x, y: body.position.y, z: body.position.z, hp: body.hp / body.maxHp, st: body.mem?.st ?? null, burst: [body.mem?.['burst-x'] ?? 0, body.mem?.['burst-z'] ?? 0] }))[0] ?? null);
   const rose = await until(page, captain, 25);
   const trail = [];
   let seen = null;

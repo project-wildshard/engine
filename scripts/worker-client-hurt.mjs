@@ -1,13 +1,17 @@
 /** @typedef {import('./types/worker-page').RepairWindow} RepairWindow */
 import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
+import { enterZone } from './zone-entry.mjs';
+/** @typedef {NonNullable<Window['__wildshard']['world']>} PageWorld */
+/** CHUNK-PARAM CP16 (J522): the grid's debug handle: the entered cell's creatures and prompts (the grid page's own world holds none)
+ * @typedef {{ animals?: () => PageWorld['animals'] | null; interactables?: () => PageWorld['interactables'] | null } | undefined} GridHandle */
 
 /** @param {import('playwright').Browser} browser @param {import('playwright').BrowserContextOptions} phone @param {string} base @param {import('./types/worker-page').ProofStep} step */
 export async function hurt(browser, phone, base, step) {
   const context = await browser.newContext(phone), page = await context.newPage();
   await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
   try {
-    await page.goto(new URL('/?chunk=driftwood-isle&mute=1&nolock=1&sw=0', base).href);
+    await enterZone(page, { zone: 'driftwood-isle', base, flags: 'mute=1&nolock=1&sw=0' });
     await page.waitForFunction(() => (/** @type {RepairWindow} */ (window)).__wildshard?.world?.player !== undefined, undefined, { timeout: 150_000 });
     await page.evaluate(FLOOR_GRID_ENTER);
     await page.waitForFunction(() => (/** @type {RepairWindow} */ (window)).__workerClient?.().frames > 30, undefined, { timeout: 60_000 });
@@ -27,7 +31,7 @@ export async function hurt(browser, phone, base, step) {
       new MutationObserver(() => {
         for (const arc of document.querySelectorAll('.ws-combat-hurt-arc.show')) if (arc instanceof HTMLElement && !w.__hurtProof.arcs.includes(arc.style.transform)) {
           w.__hurtProof.arcs.push(arc.style.transform);
-          const p = world.player, bear = world.animals.animals.filter(a => a.alive && a.kind === 'bear').sort((a, b) => a.position.distanceTo(p.position) - b.position.distanceTo(p.position))[0];
+          const p = world.player, bear = ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.animals?.() ?? world.animals).animals.filter(a => a.alive && a.kind === 'bear').sort((a, b) => a.position.distanceTo(p.position) - b.position.distanceTo(p.position))[0];
           if (bear) { const dx = bear.position.x - p.position.x, dz = bear.position.z - p.position.z; w.__hurtProof.bearings.push({ shown: Number.parseFloat(arc.style.transform.slice(7)), expected: Math.atan2(dx * Math.cos(p.yaw) - dz * Math.sin(p.yaw), -dx * Math.sin(p.yaw) - dz * Math.cos(p.yaw)) * 180 / Math.PI }); }
         }
       }).observe(document.body, { attributes: true, subtree: true, attributeFilter: ['class', 'style'] });
@@ -37,7 +41,7 @@ export async function hurt(browser, phone, base, step) {
         if (await page.evaluate(() => (/** @type {RepairWindow} */ (window)).__hurtProof.hits.length > 0)) break;
         await page.evaluate(() => {
           const { world } = (/** @type {RepairWindow} */ (window)).__wildshard;
-          const bear = world.animals.animals.filter(a => a.alive && a.kind === 'bear').sort((a, b) => a.position.distanceTo(world.player.position) - b.position.distanceTo(world.player.position))[0];
+          const bear = ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.animals?.() ?? world.animals).animals.filter(a => a.alive && a.kind === 'bear').sort((a, b) => a.position.distanceTo(world.player.position) - b.position.distanceTo(world.player.position))[0];
           if (bear) world.player.link.place(bear.position.x + 1.4, bear.position.y, bear.position.z, 0);
         });
         await page.waitForTimeout(400);
@@ -52,7 +56,7 @@ export async function hurt(browser, phone, base, step) {
       await page.evaluate(() => {
         const w = /** @type {RepairWindow} */ (window), { world } = w.__wildshard;
         w.__hurtProof = { flashes: 0, grunts: 0, combat: 0, shoves: 0, arcs: [], bearings: [], hits: [], pageDamage: 0 };
-        const talk = world.interactables.find(row => row.wireId === 'castaway.talk');
+        const talk = ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.interactables?.() ?? world.interactables).find(row => row.wireId === 'castaway.talk');
         world.player.link.place(talk?.position.x ?? -24, (talk?.position.y ?? 2) + 16, talk?.position.z ?? -80, 0);
       });
       await page.waitForFunction(() => (/** @type {RepairWindow} */ (window)).__hurtProof.hits.length > 0, undefined, { timeout: 8000 }).catch(() => { /* Report the observed fall below. */ });

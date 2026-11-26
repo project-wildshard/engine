@@ -3,6 +3,10 @@
 /** @typedef {import('./types/worker-page').RepairWindow & {__partnerProof: {bot: PartnerBot, observer:NetClient, wind:number, cues:number, warnings:number, hints:number, blows:number, kills:number, deaths:number, flagWrites:number, toasts:string[], key:number[]}}} PartnerWindow */
 import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
+import { enterZone } from './zone-entry.mjs';
+/** @typedef {NonNullable<Window['__wildshard']['world']>} PageWorld */
+/** CHUNK-PARAM CP16 (J522): the grid's debug handle: the entered cell's creatures and prompts (the grid page's own world holds none)
+ * @typedef {{ animals?: () => PageWorld['animals'] | null; interactables?: () => PageWorld['interactables'] | null } | undefined} GridHandle */
 
 /** Two real NetClients share the actual worker; the partner sends normal commands, never a synthetic combat event.
  * @param {import('playwright').Browser} browser @param {import('playwright').BrowserContextOptions} phone @param {string} base @param {import('./types/worker-page').ProofStep} step */
@@ -10,7 +14,7 @@ export async function partner(browser, phone, base, step) {
   const context = await browser.newContext(phone), page = await context.newPage();
   await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
   try {
-    await page.goto(new URL('/?chunk=driftwood-isle&mute=1&nolock=1&sw=0', base).href);
+    await enterZone(page, { zone: 'driftwood-isle', base, flags: 'mute=1&nolock=1&sw=0' });
     await page.waitForFunction(() => (/** @type {PartnerWindow} */ (window)).__wildshard?.world?.player !== undefined, undefined, { timeout: 150_000 });
     await page.evaluate(FLOOR_GRID_ENTER);
     await page.waitForFunction(() => (/** @type {PartnerWindow} */ (window)).__workerClient?.().frames > 30, undefined, { timeout: 60_000 });
@@ -18,19 +22,19 @@ export async function partner(browser, phone, base, step) {
     await page.waitForTimeout(1800);
     await page.evaluate(() => {
       const w = /** @type {PartnerWindow} */ (window), { world } = w.__wildshard;
-      const bear = world.animals.animals.find(body => body.kind === 'bear' && body.alive);
+      const bear = ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.animals?.() ?? world.animals).animals.find(body => body.kind === 'bear' && body.alive);
       if (bear === undefined) throw new Error('No real bear');
       world.player.link.place(bear.position.x + 20, bear.position.y, bear.position.z, 0);
       const joined = w.__workerClientBot('proof-partner', bear.position.x + 1.4, bear.position.y, bear.position.z);
       const bot = { client: /** @type {NetClient} */ (Reflect.get(joined, 'client')), move: joined.move, end: joined.end };
       const own = /** @type {NetClient} */ (Reflect.get(world.player.link, 'client'));
       /** @type {PartnerWindow['__partnerProof']} */
-      const p = { bot, observer: own, wind: 0, cues: 0, warnings: 0, hints: 0, blows: 0, kills: 0, deaths: 0, flagWrites: 0, toasts: [], key: world.interactables.find(row => row.wireId === 'hold-key')?.position.toArray() ?? [] };
+      const p = { bot, observer: own, wind: 0, cues: 0, warnings: 0, hints: 0, blows: 0, kills: 0, deaths: 0, flagWrites: 0, toasts: [], key: ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.interactables?.() ?? world.interactables).find(row => row.wireId === 'hold-key')?.position.toArray() ?? [] };
       w.__partnerProof = p;
       bot.client.onCombat(event => { if (event.kind === 'hit' && event.target === bot.client.welcome?.handle) p.blows++; });
       own.onCombat(event => { if (event.kind === 'died' && event.by === bot.client.welcome?.handle) p.kills++; });
       world.game.app.events.on('ai.windup', () => { p.wind++; }, world.game.levelScope);
-      world.game.app.events.on('actor.died', ({ actor }) => { if (world.animals.animals.some(body => body.kind === 'sailor' && body.combatActor() === actor)) p.deaths++; }, world.game.levelScope);
+      world.game.app.events.on('actor.died', ({ actor }) => { if (((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.animals?.() ?? world.animals).animals.some(body => body.kind === 'sailor' && body.combatActor() === actor)) p.deaths++; }, world.game.levelScope);
       const act = own.act.bind(own);
       own.act = event => { if (event.kind === 'interact' && event.id === 'story:dead:sailor') p.flagWrites++; act(event); };
       const play = /** @type {{play: {audio: import('../src/client/engine/audio/Audio').Audio}}} */ (w.__wildshard.shard.driftwood).play;
@@ -46,7 +50,7 @@ export async function partner(browser, phone, base, step) {
         if (await page.evaluate(() => (/** @type {PartnerWindow} */ (window)).__partnerProof.blows > 0)) break;
         await page.evaluate(() => {
           const w = /** @type {PartnerWindow} */ (window), { world } = w.__wildshard;
-          const bear = world.animals.animals.find(body => body.kind === 'bear' && body.alive);
+          const bear = ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.animals?.() ?? world.animals).animals.find(body => body.kind === 'bear' && body.alive);
           if (bear === undefined) throw new Error('Bear disappeared');
           w.__partnerProof.bot.move(bear.position.x + 1.4, bear.position.y, bear.position.z);
           world.player.link.place(bear.position.x + 20, bear.position.y, bear.position.z, 0);
@@ -63,7 +67,7 @@ export async function partner(browser, phone, base, step) {
         if (await page.evaluate(() => (/** @type {PartnerWindow} */ (window)).__partnerProof.kills > 0)) break;
         const ready = await page.evaluate(() => {
           const w = /** @type {PartnerWindow} */ (window), { world } = w.__wildshard, { bot } = w.__partnerProof;
-          const sailor = world.animals.animals.find(body => body.kind === 'sailor' && body.alive);
+          const sailor = ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.animals?.() ?? world.animals).animals.find(body => body.kind === 'sailor' && body.alive);
           if (sailor === undefined) return false;
           world.player.link.place(sailor.position.x + 15, sailor.position.y, sailor.position.z, 0);
           bot.move(sailor.position.x + .8, sailor.position.y, sailor.position.z + .8); return true;
@@ -83,7 +87,7 @@ export async function partner(browser, phone, base, step) {
       await page.waitForTimeout(250);
       return page.evaluate(() => {
         const w = /** @type {PartnerWindow} */ (window), p = w.__partnerProof;
-        const key = w.__wildshard.world.interactables.find(row => row.wireId === 'hold-key')?.position.toArray() ?? [];
+        const key = ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.interactables?.() ?? w.__wildshard.world.interactables).find(row => row.wireId === 'hold-key')?.position.toArray() ?? [];
         const moved = p.key.length !== 3 || key.length !== 3 || key.some((value, index) => Math.abs(value - (p.key[index] ?? 0)) > .01);
         return { ok: p.kills === 1 && p.deaths === 0 && p.flagWrites === 0 && !moved && !p.toasts.some(text => text.includes('hold key clatters')),
           kills: p.kills, deaths: p.deaths, flagWrites: p.flagWrites, moved, toasts: p.toasts, key, before: p.key };

@@ -1,13 +1,17 @@
 /** @typedef {import('./types/worker-page').RepairWindow} RepairWindow */
 import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
+import { enterZone } from './zone-entry.mjs';
+/** @typedef {NonNullable<Window['__wildshard']['world']>} PageWorld */
+/** CHUNK-PARAM CP16 (J522): the grid's debug handle: the entered cell's creatures and prompts (the grid page's own world holds none)
+ * @typedef {{ animals?: () => PageWorld['animals'] | null; interactables?: () => PageWorld['interactables'] | null } | undefined} GridHandle */
 
 /** @param {import('playwright').Browser} browser @param {import('playwright').BrowserContextOptions} phone @param {string} base @param {import('./types/worker-page').ProofStep} step */
 export async function windup(browser, phone, base, step) {
   const context = await browser.newContext(phone), page = await context.newPage();
   await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
   try {
-    await page.goto(new URL('/?chunk=driftwood-isle&mute=1&nolock=1&sw=0', base).href);
+    await enterZone(page, { zone: 'driftwood-isle', base, flags: 'mute=1&nolock=1&sw=0' });
     await page.waitForFunction(() => (/** @type {RepairWindow} */ (window)).__wildshard?.world?.player !== undefined, undefined, { timeout: 150_000 });
     await page.evaluate(FLOOR_GRID_ENTER);
     await page.waitForFunction(() => (/** @type {RepairWindow} */ (window)).__workerClient?.().frames > 30, undefined, { timeout: 60_000 });
@@ -16,7 +20,7 @@ export async function windup(browser, phone, base, step) {
       w.__windupProof = { events: [], cues: [], warning: null, hints: [], hit: null };
       const client = /** @type {import('../src/client/engine/net/client').NetClient} */ (Reflect.get(world.player.link, 'client'));
       world.game.app.events.on('ai.windup', ({ actor, duration }) => {
-        const body = world.animals.animals.find(candidate => candidate.combatActor() === actor);
+        const body = ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.animals?.() ?? world.animals).animals.find(candidate => candidate.combatActor() === actor);
         let nearest = Infinity, serverDuration = 0, stamp = Number.NaN;
         if (body !== undefined && client.latest !== null) for (const [handle, info] of client.entities) {
           if (info.initial.kind !== body.kind) continue;
@@ -38,7 +42,7 @@ export async function windup(browser, phone, base, step) {
         if (await page.evaluate(() => (/** @type {RepairWindow} */ (window)).__windupProof.hit !== null)) break;
         await page.evaluate(() => {
           const { world } = (/** @type {RepairWindow} */ (window)).__wildshard;
-          const bear = world.animals.animals.filter(a => a.alive && a.kind === 'bear').sort((a, b) => a.position.distanceTo(world.player.position) - b.position.distanceTo(world.player.position))[0];
+          const bear = ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.animals?.() ?? world.animals).animals.filter(a => a.alive && a.kind === 'bear').sort((a, b) => a.position.distanceTo(world.player.position) - b.position.distanceTo(world.player.position))[0];
           if (bear) { world.player.link.place(bear.position.x + 1.4, bear.position.y, bear.position.z, 0); world.player.yaw = 0; }
         });
         await page.waitForTimeout(250);

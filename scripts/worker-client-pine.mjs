@@ -3,6 +3,10 @@
 import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
 import { execFileSync } from 'node:child_process';
+import { enterZone } from './zone-entry.mjs';
+/** @typedef {NonNullable<Window['__wildshard']['world']>} PageWorld */
+/** CHUNK-PARAM CP16 (J522): the grid's debug handle: the entered cell's creatures and prompts (the grid page's own world holds none)
+ * @typedef {{ animals?: () => PageWorld['animals'] | null; interactables?: () => PageWorld['interactables'] | null } | undefined} GridHandle */
 // The same native continuation a saved worker writes, with only the starting payment supplied by the fixture.
 export const paidSave = (variant = 'ghost') => JSON.parse(execFileSync(process.execPath, ['--import', './scripts/bake-loader.mjs', '--input-type=module', '-e', `
   import { readFileSync } from 'node:fs';
@@ -43,7 +47,7 @@ export async function pineEconomy(browser, phone, base, step) {
   /** @param {string} id */
   const buy = id => page.evaluate(wanted => { const shop = (/** @type {WorkerWindow} */ (window)).__wildshard.shard['pine.quest'].shop(); shop.open(); const good = shop.o.goods.find(row => row.id === wanted); const ok = good !== undefined && shop.onBuy(good); shop.close(); return ok; }, id);
   try {
-    await page.goto(new URL('/?chunk=pine-hollow&mute=1&nolock=1', base).href, { waitUntil: 'load' }); await enter();
+    await enterZone(page, { zone: 'pine-hollow', base, flags: 'mute=1&nolock=1', waitUntil: 'load' }); await enter();
     await step('Pine: purchase pitch, select with B on the server', async () => {
       const accepted = await buy('pitch-bolts'); await page.waitForTimeout(600); await page.keyboard.press('KeyB');
       await page.waitForFunction(() => (/** @type {WorkerWindow} */ (window)).__workerClient().owned['ammo|pitch'] === 1, undefined, { timeout: 3000 });
@@ -62,7 +66,7 @@ export async function pineEconomy(browser, phone, base, step) {
       const end = Date.now() + 8000;
       while (Date.now() < end && (await read()).kills === 0) {
         const at = await page.evaluate(() => {
-          const { world } = (/** @type {WorkerWindow} */ (window)).__wildshard, body = world.animals.animals.filter(row => row.variant === 'ghost' && row.alive).sort((a, b) => a.position.distanceTo(world.player.position) - b.position.distanceTo(world.player.position))[0];
+          const { world } = (/** @type {WorkerWindow} */ (window)).__wildshard, body = ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.animals?.() ?? world.animals).animals.filter(row => row.variant === 'ghost' && row.alive).sort((a, b) => a.position.distanceTo(world.player.position) - b.position.distanceTo(world.player.position))[0];
           if (body === undefined || !body.alive) return null;
           const { player } = world, { x, y, z } = body.position;
           player.link.place(x, y, z + 5, 0);
@@ -76,7 +80,7 @@ export async function pineEconomy(browser, phone, base, step) {
         await page.waitForTimeout(200);
       }
       await page.waitForTimeout(600);
-      const out = await page.evaluate(() => { const r = (/** @type {WorkerWindow} */ (window)).__workerClient(), doc = JSON.parse(localStorage.getItem('wildshard.save.v2@2.pine-hollow') ?? '{}'); return { kills: r.kills, hits: r.hits, held: r.held, lines: r.owned, journal: doc.keys?.compendium?.data, enabled: (/** @type {WorkerWindow} */ (window)).__wildshard.world.weapons.enabled, prompt: (/** @type {WorkerWindow} */ (window)).__wildshard.world.interactables.some(row => row.label === 'Take the Ghost Stag crossbow') }; });
+      const out = await page.evaluate(() => { const r = (/** @type {WorkerWindow} */ (window)).__workerClient(), doc = JSON.parse(localStorage.getItem('wildshard.save.v2@2.pine-hollow') ?? '{}'); return { kills: r.kills, hits: r.hits, held: r.held, lines: r.owned, journal: doc.keys?.compendium?.data, enabled: (/** @type {WorkerWindow} */ (window)).__wildshard.world.weapons.enabled, prompt: ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.interactables?.() ?? (/** @type {WorkerWindow} */ (window)).__wildshard.world.interactables).some(row => row.label === 'Take the Ghost Stag crossbow') }; });
       return { ok: out.kills === 1 && out.prompt && out.journal?.['ghost-stag']?.t === 3 && out.journal?.['ghost-stag']?.b === 271, ...out, scale: seed.target.scale };
     });
     await step('Pine: the special shot spends pitch and the crossbow reloads', async () => {
@@ -86,7 +90,7 @@ export async function pineEconomy(browser, phone, base, step) {
     });
     await step('Pine: saves retain the unclaimed drop, journal and finish purchases', async () => {
       await page.evaluate(() => (/** @type {WorkerWindow} */ (window)).__workerClientSave()); await page.reload({ waitUntil: 'load' }); await enter();
-      await page.waitForFunction(() => (/** @type {WorkerWindow} */ (window)).__wildshard.world.interactables.some(row => row.label === 'Take the Ghost Stag crossbow' && row.radius > 0), undefined, { timeout: 4000 });
+      await page.waitForFunction(() => ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.interactables?.() ?? (/** @type {WorkerWindow} */ (window)).__wildshard.world.interactables).some(row => row.label === 'Take the Ghost Stag crossbow' && row.radius > 0), undefined, { timeout: 4000 });
       const r = await read(), out = await page.evaluate(() => ({ journal: JSON.parse(localStorage.getItem('wildshard.save.v2@2.pine-hollow') ?? '{}').keys?.compendium?.data, legacy: (/** @type {WorkerWindow} */ (window)).__wildshard.shard.play.skins.has('scarback-furnace') }));
       return { ok: r.finish && r.pitch === 9 && r.selected === 'pitch' && r.owned['finish-drop.ghost-stag'] === 1 && out.journal?.['ghost-stag']?.t === 3 && out.legacy, ...r, ...out };
     });
@@ -96,7 +100,7 @@ export async function pineEconomy(browser, phone, base, step) {
       return page.evaluate(() => ({ ok: !(/** @type {WorkerWindow} */ (window)).__wildshard.shard.play.skins.has('ghost-stag') && (/** @type {WorkerWindow} */ (window)).__workerClient().owned['finish-drop.ghost-stag'] === 1 }));
     });
     await step('Pine: take the finish pickup, once, on server confirmation', async () => {
-      const at = await page.evaluate(() => { const prompt = (/** @type {WorkerWindow} */ (window)).__wildshard.world.interactables.find(row => row.label === 'Take the Ghost Stag crossbow' && row.radius > 0); return prompt === undefined ? null : { x: prompt.position.x, y: prompt.position.y, z: prompt.position.z }; });
+      const at = await page.evaluate(() => { const prompt = ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.interactables?.() ?? (/** @type {WorkerWindow} */ (window)).__wildshard.world.interactables).find(row => row.label === 'Take the Ghost Stag crossbow' && row.radius > 0); return prompt === undefined ? null : { x: prompt.position.x, y: prompt.position.y, z: prompt.position.z }; });
       if (at === null) return { ok: false, why: 'no pickup' };
       await page.evaluate(({ x, y, z }) => { (/** @type {WorkerWindow} */ (window)).__wildshard.world.player.link.place(x, y, z + 0.5, 0); }, at); await page.waitForTimeout(350); await page.keyboard.press('KeyE');
       await page.waitForFunction(() => (/** @type {WorkerWindow} */ (window)).__wildshard.shard.play.skins.has('ghost-stag'), undefined, { timeout: 3000 });

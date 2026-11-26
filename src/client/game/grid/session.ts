@@ -1013,6 +1013,10 @@ export class GridSession {
       }),
       // the live cell alone, for a sampler that must not build the whole readout four times a second (state() allocates it)
       current: () => (this.live === null ? null : this.live.live.current()),
+      // CHUNK-PARAM CP16 (J522): the entered cell's creature manager, where the worker draws its rows, and its prompts (the
+      // one-shard page's `world.animals` and `world.interactables`), for the worker-client proofs on the grid
+      animals: () => this.live?.enteredAnimals() ?? null,
+      interactables: () => this.live?.interactables() ?? null,
       // ZE2d: the road's prelink on demand, and the exterior lighting the page scene declares, for the road-lag proof
       prelink: () => { this.prelinkViews(); },
       exterior: () => exteriorLightingState(host.scene),

@@ -3,6 +3,10 @@
 /** @typedef {import('./types/worker-page').RepairWindow & {__deathOrder:{client:NetClient, body:import('../src/client/engine/entities/AnimalView').Animal, bots:Bot[], handle:number, id:string, killed:number, died:number, shown:number, order:string[], frozenFrames:number, tick:number}}} OrderWindow */
 import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
+import { enterZone } from './zone-entry.mjs';
+/** @typedef {NonNullable<Window['__wildshard']['world']>} PageWorld */
+/** CHUNK-PARAM CP16 (J522): the grid's debug handle: the entered cell's creatures and prompts (the grid page's own world holds none)
+ * @typedef {{ animals?: () => PageWorld['animals'] | null; interactables?: () => PageWorld['interactables'] | null } | undefined} GridHandle */
 
 /** Real partner commands kill a boar. J109's real nearby players advance its authored return, then leave its sight radius.
  * @param {import('playwright').Browser} browser @param {import('playwright').BrowserContextOptions} phone @param {string} base @param {import('./types/worker-page').ProofStep} step */
@@ -11,12 +15,12 @@ export async function deathOrder(browser, phone, base, step) {
   page.on('pageerror', error => errors.push(error.message));
   await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
   try {
-    await page.goto(new URL('/?chunk=driftwood-isle&mute=1&nolock=1&sw=0', base).href);
+    await enterZone(page, { zone: 'driftwood-isle', base, flags: 'mute=1&nolock=1&sw=0' });
     await page.waitForFunction(() => (/** @type {OrderWindow} */ (window)).__wildshard?.world?.player !== undefined, undefined, { timeout: 150_000 });
     await page.evaluate(FLOOR_GRID_ENTER);
     await page.waitForFunction(() => (/** @type {OrderWindow} */ (window)).__workerClient?.().frames > 30, undefined, { timeout: 60_000 });
     await page.evaluate(() => {
-      const w = /** @type {OrderWindow} */ (window), { world } = w.__wildshard, manager = world.animals;
+      const w = /** @type {OrderWindow} */ (window), { world } = w.__wildshard, manager = ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.animals?.() ?? world.animals);
       const client = /** @type {NetClient} */ (Reflect.get(world.player.link, 'client'));
       const body = manager.animals.find(row => row.alive && row.kind === 'boar');
       if (body === undefined || client.latest === null) throw new Error('No actual boar');
@@ -88,7 +92,7 @@ export async function deathOrder(browser, phone, base, step) {
       await page.evaluate(() => { (/** @type {OrderWindow} */ (window)).__wildshard.world.hud.setPaused(false); });
       await page.waitForTimeout(1200);
       return page.evaluate(() => {
-        const w = /** @type {OrderWindow} */ (window), p = w.__deathOrder, retired = !w.__wildshard.world.animals.animals.includes(p.body);
+        const w = /** @type {OrderWindow} */ (window), p = w.__deathOrder, retired = !((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.animals?.() ?? w.__wildshard.world.animals).animals.includes(p.body);
         return { ok: p.died === 1 && p.shown === 1 && p.order.join(',') === 'death-before-retire' && retired, died: p.died, shown: p.shown, order: p.order, retired };
       });
     });

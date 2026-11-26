@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // J130: the Developer row on a built page. Turns Worker client on, enters Infinite Wildshard, walks off the home cell's south entry onto
 // the road and back in, and fails unless the page followed `--crossings=` of the server's crossings.
-// Then it reloads on the cache that walk left (Chromium refuses a whole-cache query that size), and with the link cut. --chunk= proves a one-shard page.
+// Then it reloads on the cache that walk left (Chromium refuses a whole-cache query that size), and with the link cut. --chunk= enters one
+// zone by its tap (CHUNK-PARAM CP16, J522) and walks to its wall.
 // --play is the flip's checklist: one playthrough on the row, a line for every step, and it fails on any step that didn't work.
 // --hook on a chunk with a grapple proves the claw: LOCK and JUMP pressed on the page, and the server's bite and zip carrying the body.
 //   scripts/browser-lane.sh node scripts/worker-client-proof.mjs --base=http://127.0.0.1:4401/ [--seconds=150] [--crossings=2] [--route=x,z;x,z] [--chunk=slug] [--play [--only=slug [--slug=<slug>]|driftwood|nalati|riding|nine|shards|grid|fights|roc|rocfall|rooms|elite|sky|sunscar|farreach|isle|pine|lantern|rig|sweep]] [--hook]
@@ -9,6 +10,7 @@ import { chromium, webkit, devices } from "./browser-playwright.mjs";
 import { saveFixture } from './debug-settings.mjs';
 import { floorGridBenchmarkUrl, FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
+import { enterZone } from './zone-entry.mjs';
 
 const arg = (key, fallback) => process.argv.find(value => value.startsWith(`--${key}=`))?.slice(key.length + 3) ?? fallback;
 const chunk = arg('chunk', ''), base = arg('base', ''), seconds = Number(arg('seconds', '150')), crossings = Number(arg('crossings', '2')), route = arg('route', '0,-285;0,-235').split(';').map(leg => { const [x, z] = leg.split(',').map(Number); return { x, z }; });
@@ -100,9 +102,9 @@ try {
   page.on('pageerror', error => { errors.push(error.message); console.log('[error]', (error.stack ?? error.message).slice(0, 400)); });
   page.on('console', line => { if (line.type() === 'error' || /worker client|Standalone|save refused/iu.test(line.text())) console.log('[page]', line.text().slice(0, 240)); });
   await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
-  // A one-shard page: its player walks to the wall and stays on the wire, and the world never changes.
+  // One zone, entered by its tap: its player walks to the cell's wall and stays on the wire, and the world never changes.
   if (chunk !== '') {
-    await page.goto(new URL(`/?chunk=${chunk}`, base).href, { waitUntil: 'load' });
+    await enterZone(page, { zone: chunk, base });
     await page.waitForFunction(() => window.__wildshard?.world?.player !== undefined, undefined, { timeout: 90_000 });
     await page.waitForFunction(() => window.__workerClient !== undefined, undefined, { timeout: 60_000 }).catch(() => { failures.push('the row did not start'); });
     await page.evaluate(FLOOR_GRID_ENTER);
@@ -115,11 +117,12 @@ try {
       await browser.close();
       process.exit(failures.length === 0 ? 0 : 1);
     }
-    let report = null, last = Number.NaN, still = 0;
+    let report = null, last = Number.NaN, still = 0, startCell = /** @type {number | null} */ (null);
     const started = Date.now();
     while (failures.length === 0 && Date.now() - started < seconds * 1000) {
       await page.waitForTimeout(2000);
       report = await page.evaluate(() => { const { player, game } = window.__wildshard.world; player.yaw = Math.PI / 2; game.app.input.setHeld('move.forward', true); return window.__workerClient(); });
+      startCell ??= report.cell;
       console.log(JSON.stringify({ at: Math.round((Date.now() - started) / 1000), server: [report.cell, Math.round(report.serverX), Math.round(report.serverZ)], page: [Math.round(report.x), Math.round(report.z)], rows: report.rows, corrections: report.corrections, closed: report.closed }));
       still = Math.abs(report.serverX - last) < 0.05 ? still + 1 : 0; last = report.serverX;
       if (report.closed !== null || still >= 3) break;
@@ -127,7 +130,8 @@ try {
     if (report === null) failures.push('no report');
     else {
       if (report.closed !== null) failures.push(`the wire closed: ${report.closed}`);
-      if (report.cell !== 1) failures.push(`the server left the cell: ${report.cell}`);
+      // CP16 (J522): the zone's page is a grid page at its cell (a tap), so the cell is the one it started in, not the one-shard 1
+      if (report.cell !== startCell) failures.push(`the server left the cell: ${report.cell} (from ${String(startCell)})`);
       if (still < 3) failures.push('the player never reached a wall');
       if (Math.hypot(report.x - report.serverX, report.z - report.serverZ) > 3) failures.push('the page and the server parted');
     }

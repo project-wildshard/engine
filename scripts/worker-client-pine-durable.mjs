@@ -5,6 +5,10 @@ import { saveFixture } from './debug-settings.mjs';
 import { paidSave } from './worker-client-pine.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
+import { enterZone } from './zone-entry.mjs';
+/** @typedef {NonNullable<Window['__wildshard']['world']>} PageWorld */
+/** CHUNK-PARAM CP16 (J522): the grid's debug handle: the entered cell's creatures and prompts (the grid page's own world holds none)
+ * @typedef {{ animals?: () => PageWorld['animals'] | null; interactables?: () => PageWorld['interactables'] | null } | undefined} GridHandle */
 
 const base = process.argv.find(arg => arg.startsWith('--base='))?.slice(7);
 if (!base) throw new Error('Requires --base');
@@ -24,7 +28,7 @@ async function scenario(claim) {
   await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
   await saveFixture(context, { scope: 'standalone-lone-pine-hollow', key: 'continuation', once: 'pine-durable-world', data: seed.save });
   await saveFixture(context, { scope: 'pine-hollow', key: 'compendium', once: 'pine-durable-journal', data: { 'ghost-stag': { s: 3, n: 7, t: 1, b: 200 } } });
-  const url = new URL('/?chunk=pine-hollow&mute=1&nolock=1&sw=0', base).href;
+  const pine = { zone: 'pine-hollow', base, flags: 'mute=1&nolock=1&sw=0' }; // CP16 (J522): entered by the tap
   const enter = async () => {
     await page.waitForFunction(() => (/** @type {WorkerWindow} */ (window)).__wildshard?.world?.player !== undefined, undefined, { timeout: 150_000 });
     await page.evaluate(FLOOR_GRID_ENTER);
@@ -48,7 +52,7 @@ async function scenario(claim) {
     } finally { database.close(); }
   });
   try {
-    await page.goto(url, { waitUntil: 'load' }); await enter();
+    await enterZone(page, pine); await enter();
     await page.evaluate(() => (/** @type {WorkerWindow} */ (window)).__workerClientSave());
     const checkpoint = await stores();
     await step(`${label}: a real kill writes through before the next checkpoint`, async () => {
@@ -56,7 +60,7 @@ async function scenario(claim) {
       const end = Date.now() + 8000;
       while (Date.now() < end && (await page.evaluate(() => (/** @type {WorkerWindow} */ (window)).__workerClient().kills)) === 0) {
         const at = await page.evaluate(() => {
-          const { world } = (/** @type {WorkerWindow} */ (window)).__wildshard, body = world.animals.animals.filter(row => row.variant === 'ghost' && row.alive).sort((a, b) => a.position.distanceTo(world.player.position) - b.position.distanceTo(world.player.position))[0];
+          const { world } = (/** @type {WorkerWindow} */ (window)).__wildshard, body = ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.animals?.() ?? world.animals).animals.filter(row => row.variant === 'ghost' && row.alive).sort((a, b) => a.position.distanceTo(world.player.position) - b.position.distanceTo(world.player.position))[0];
           if (!body) return null;
           const { x, y, z } = body.position; world.player.link.place(x, y, z + 5, 0); return { x, y, z };
         });
@@ -88,7 +92,7 @@ async function scenario(claim) {
       if (!worker) return { ok: false, why: 'No server worker' };
       await worker.evaluate(() => { setTimeout(() => { self.close(); }, 0); });
       await page.waitForTimeout(150);
-      await page.goto(url, { waitUntil: 'load' }); await enter();
+      await enterZone(page, pine); await enter();
       const shown = await page.evaluate(() => ({ owned: (/** @type {WorkerWindow} */ (window)).__workerClient().owned, finish: (/** @type {WorkerWindow} */ (window)).__wildshard.shard.play.skins.has('ghost-stag'), taken: JSON.parse(localStorage.getItem('wildshard.save.v2@2.pine-hollow') ?? '{}').keys?.compendium?.data?.['ghost-stag']?.t }));
       return { ok: shown.taken === 2 && shown.owned['journal.ghost-stag.taken'] === 3 && (claim ? shown.finish && shown.owned['finish-drop.ghost-stag'] === undefined : shown.owned['finish-drop.ghost-stag'] === 1), ...shown };
     });

@@ -2,9 +2,14 @@
 // Driftwood's opening quest, a fight and its coins; a ride on Nalati; a grapple; the other shards; a crossing; save, reload, resume.
 import { NAME_ASKED, saveFixture } from './debug-settings.mjs';
 import { floorGridBenchmarkUrl, FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
+import { enterZone } from './zone-entry.mjs';
+/** @typedef {NonNullable<Window['__wildshard']['world']>} PageWorld */
+/** CHUNK-PARAM CP16 (J522): the grid's debug handle: the entered cell's creatures and prompts (the grid page's own world holds none)
+ * @typedef {{ animals?: () => PageWorld['animals'] | null; interactables?: () => PageWorld['interactables'] | null } | undefined} GridHandle */
 
 /** Open one page with the row on. */
-async function open(browser, phone, base, path) {
+/** @param {string | { zone: string, flags?: string }} to a page path that names no zone, or a zone entered by its tap (CP16, J522) */
+async function open(browser, phone, base, to) {
   const context = await browser.newContext(phone), page = await context.newPage(), errors = [];
   page.on('pageerror', error => { errors.push(error.message.slice(0, 300)); });
   page.on('console', line => { if (line.type() === 'error') errors.push(line.text().slice(0, 300)); });
@@ -12,7 +17,7 @@ async function open(browser, phone, base, path) {
   // MP2.4: a device's first world entry asks for the Name, and on a world build (staging) nothing here answers it; mark it
   // asked, as scripts/goldens/capture.mjs does
   await saveFixture(context, NAME_ASKED);
-  await page.goto(new URL(path, base).href, { waitUntil: 'load' });
+  await (typeof to === 'string' ? page.goto(new URL(to, base).href, { waitUntil: 'load' }) : enterZone(page, { base, flags: 'mute=1&nolock=1', ...to }));
   return { context, page, errors };
 }
 const started = page => page.evaluate(() => typeof window.__workerClient === 'function');
@@ -46,7 +51,7 @@ async function walk(page, x, z, near, seconds) {
 }
 /** The nearest living row body, by kind if named. */
 const nearestBody = (page, kinds) => page.evaluate(wanted => {
-  const { world } = window.__wildshard, { player } = world, list = world.animals?.animals ?? [];
+  const { world } = window.__wildshard, { player } = world, list = ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.animals?.() ?? world.animals)?.animals ?? [];
   const live = list.filter(body => body.alive && body.rowDriven && (wanted.length === 0 || wanted.includes(body.kind)));
   live.sort((a, b) => a.position.distanceTo(player.position) - b.position.distanceTo(player.position));
   const body = live[0];
@@ -90,7 +95,8 @@ export async function play(browser, phone, base, only = '') {
   if (runs('windup')) { const { windup } = await import('./worker-client-windup.mjs'); await windup(browser, phone, base, step); }
   if (runs('grid-entry')) { const { gridEntry } = await import('./worker-client-grid-entry.mjs'); await gridEntry(browser, phone, base, step); }
   if (runs('slug')) { const { slugEntry } = await import('./worker-client-slug.mjs'); await slugEntry(browser, phone, base, step, process.argv.find(value => value.startsWith('--slug='))?.slice(7)); }
-  if (runs('recovery-menu')) { const { recoveryMenu } = await import('./worker-client-grid-entry.mjs'); await recoveryMenu(browser, phone, base, step); }
+  // CHUNK-PARAM CP16 (J522): recovery-menu retired; it opened the one-shard page's `glreload` address, and a grid page's
+  // graphics recovery comes back through its recovery record (CP4)
   if (runs('death-order')) { const { deathOrder } = await import('./worker-client-death-return.mjs'); await deathOrder(browser, phone, base, step); }
   if (runs('death')) { const { driftwoodDeath } = await import('./worker-client-death.mjs'); await driftwoodDeath(browser, phone, base, step); }
   if (runs('partner')) { const { partner } = await import('./worker-client-partner.mjs'); await partner(browser, phone, base, step); }
@@ -98,7 +104,7 @@ export async function play(browser, phone, base, only = '') {
   if (runs('creature-hit') || runs('creature-returns')) { const { creatureReturns } = await import('./worker-client-returns.mjs'); await creatureReturns(browser, phone, base, step); }
 
   // Traversal: the page asks, and the server carries. Each stands at its prompt by the harness's move, presses, and reads the owner block's lead.
-  const prompted = (page, id) => page.evaluate(wanted => { const near = window.__wildshard.world.interactables.find(prompt => prompt.wireId === wanted); return near === undefined ? null : { x: near.position.x, y: near.position.y, z: near.position.z }; }, id);
+  const prompted = (page, id) => page.evaluate(wanted => { const near = ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.interactables?.() ?? window.__wildshard.world.interactables).find(prompt => prompt.wireId === wanted); return near === undefined ? null : { x: near.position.x, y: near.position.y, z: near.position.z }; }, id);
   const pressAt = async (page, id) => {
     const at = await prompted(page, id);
     if (at === null) return { ok: false, why: 'no prompt', id };
@@ -114,7 +120,7 @@ export async function play(browser, phone, base, only = '') {
   };
 
   // Driftwood, one shard: the opening quest
-  if (runs('driftwood')) { const drift = await open(browser, phone, base, '/?chunk=driftwood-isle&mute=1&nolock=1');
+  if (runs('driftwood')) { const drift = await open(browser, phone, base, { zone: 'driftwood-isle' });
   await step('driftwood boots on the row', async () => { await entered(drift.page); return started(drift.page); });
   await step('the page draws the server creatures', async () => { const r = await report(drift.page); return { ok: r.rows > 0, rows: r.rows, closed: r.closed }; });
   await step('walk to Wendell', async () => {
@@ -196,27 +202,27 @@ export async function play(browser, phone, base, only = '') {
     await drift.page.waitForTimeout(500);
     await drift.page.evaluate(() => { document.querySelector('.ws-saves-btn.confirm')?.click(); });
     await drift.page.waitForTimeout(4000);
-    await drift.page.goto(new URL('/?chunk=driftwood-isle&mute=1&nolock=1', base).href, { waitUntil: 'load' }); await entered(drift.page); await drift.page.waitForTimeout(2500);
+    await enterZone(drift.page, { zone: 'driftwood-isle', base, flags: 'mute=1&nolock=1', waitUntil: 'load' }); await entered(drift.page); await drift.page.waitForTimeout(2500);
     const r = await report(drift.page); return { ok: !r.restored && (r.quests['sealed-ring'] === undefined || r.quests['sealed-ring'] === 'unstarted'), restored: r.restored, quests: r.quests };
   });
   await step('driftwood raises no page error', () => ({ ok: drift.errors.length === 0, errors: [...new Set(drift.errors)].slice(0, 6) }));
   await drift.context.close(); }
 
   if (runs('traverse')) {
-    const drift = await open(browser, phone, base, '/?chunk=driftwood-isle&mute=1&nolock=1');
+    const drift = await open(browser, phone, base, { zone: 'driftwood-isle' });
     await step('zipline: the driftwood cable is the server\'s ride', async () => { await entered(drift.page); return pressAt(drift.page, 'driftwood.zipline'); });
     await step('driftwood rides without a page error', () => ({ ok: drift.errors.length === 0, errors: [...new Set(drift.errors)].slice(0, 6) }));
     await drift.context.close();
-    const pine = await open(browser, phone, base, '/?chunk=pine-hollow&mute=1&nolock=1');
+    const pine = await open(browser, phone, base, { zone: 'pine-hollow' });
     await step('zipline: the pine cable is the server\'s ride', async () => { await entered(pine.page); return pressAt(pine.page, 'pine.zipline'); });
     await step('the cable sets its rider down', async () => { await pine.page.waitForFunction(() => !window.__wildshard.world.player.link.predictor.leading, undefined, { timeout: 40_000 }); return true; });
     await step('carry: the pine canoe takes a press', () => pressAt(pine.page, 'pine.canoe.ride.0'));
     await step('pine rides without a page error', () => ({ ok: pine.errors.length === 0, errors: [...new Set(pine.errors)].slice(0, 6) }));
     await pine.context.close();
-    const far = await open(browser, phone, base, '/?chunk=far-reach&mute=1&nolock=1');
+    const far = await open(browser, phone, base, { zone: 'far-reach' });
     await step('lift: a far reach islet comes to a call, and carries its rider down', async () => {
       await entered(far.page);
-      const deckPrompts = label => far.page.evaluate(wanted => window.__wildshard.world.interactables.filter(prompt => prompt.label === wanted && prompt.position.y > 10).map(prompt => ({ x: prompt.position.x, y: prompt.position.y, z: prompt.position.z })), label), height = () => far.page.evaluate(() => window.__wildshard.world.player.position.y);
+      const deckPrompts = label => far.page.evaluate(wanted => ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.interactables?.() ?? window.__wildshard.world.interactables).filter(prompt => prompt.label === wanted && prompt.position.y > 10).map(prompt => ({ x: prompt.position.x, y: prompt.position.y, z: prompt.position.z })), label), height = () => far.page.evaluate(() => window.__wildshard.world.player.position.y);
       const [call] = await deckPrompts('Call the islet');
       if (call === undefined) return { ok: false, why: 'no call prompt' };
       await far.page.evaluate(({ x, y, z }) => { window.__wildshard.world.player.link.place(x, y + 0.2, z, 0); }, call);
@@ -241,7 +247,7 @@ export async function play(browser, phone, base, only = '') {
   // Ring 2: earning a bond needs the unchanged trust clock and five bucking rounds.
   // The pilot uses only the page's prompt, gauge and input; no trust/bond assignment.
   if (only === 'riding') {
-    const nalati = await open(browser, phone, base, '/?chunk=nalati-grasslands&mute=1&nolock=1');
+    const nalati = await open(browser, phone, base, { zone: 'nalati-grasslands' });
     try {
       await entered(nalati.page);
       await step('riding: crouch-walk into OFFER range (Ring 2)', async () => {
@@ -256,7 +262,7 @@ export async function play(browser, phone, base, only = '') {
           window.__approachPilot = pilot;
           const run = () => {
             if (!pilot.active) return;
-            const horse = world.animals.animals.find(a => a.rowDriven && a.variant === 'stallion' && a.kind === 'horse');
+            const horse = ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.animals?.() ?? world.animals).animals.find(a => a.rowDriven && a.variant === 'stallion' && a.kind === 'horse');
             const { player } = world;
             if (horse !== undefined) {
               const dx = horse.position.x - player.position.x, dz = horse.position.z - player.position.z, distance = Math.hypot(dx, dz);
@@ -374,7 +380,7 @@ export async function play(browser, phone, base, only = '') {
   }
 
   // Nalati: a ride
-  if (runs('nalati')) { const nalati = await open(browser, phone, base, '/?chunk=nalati-grasslands&mute=1&nolock=1');
+  if (runs('nalati')) { const nalati = await open(browser, phone, base, { zone: 'nalati-grasslands' });
   await step('nalati boots on the row', async () => { await entered(nalati.page); return started(nalati.page); });
   await step('ride a horse', async () => {
     for (let i = 0; i < 240; i++) {
@@ -390,7 +396,7 @@ export async function play(browser, phone, base, only = '') {
   await nalati.context.close(); }
 
   // The grapple's shard
-  if (runs('nine')) { const nine = await open(browser, phone, base, '/?chunk=nine-dragon-stack&mute=1&nolock=1');
+  if (runs('nine')) { const nine = await open(browser, phone, base, { zone: 'nine-dragon-stack' });
   await step('nine dragon boots on the row', async () => { await entered(nine.page); return started(nine.page); });
   await step('grapple: the claw is on the wire and answers', async () => {
     const claw = () => nine.page.evaluate(() => { const tool = window.__wildshard.world.game.app.equipment?.tools.find(item => 'guardOpen' in item); return tool === undefined ? null : { sim: tool.sim?.constructor?.name, phase: tool.sim?.phase, hooks: tool.sim?.course?.hooks?.length }; });
@@ -441,8 +447,8 @@ export async function play(browser, phone, base, only = '') {
 
   // Every other shard boots on the row, its sky and fights on rows, with no page error
   if (runs('shards')) for (const slug of ['pine-hollow', 'sunscar-dunes', 'far-reach', 'driftwood-isle', 'nalati-grasslands', 'nine-dragon-stack']) {
-    // a world build (staging) sends a bare `?chunk=` link to the title first (bootRoute.ts onlineTitleFirst); `skipintro` enters
-    const shard = await open(browser, phone, base, `/?chunk=${slug}&mute=1&nolock=1&skipintro`);
+    // a world build (staging) sends a page with no skipintro to the title first (bootRoute.ts onlineTitleFirst); `skipintro` enters
+    const shard = await open(browser, phone, base, { zone: slug, flags: 'mute=1&nolock=1&skipintro' });
     await step(`${slug} plays on the row`, async () => {
       await entered(shard.page);
       await shard.page.evaluate(() => { const { player } = window.__wildshard.world; player.touchMove.y = 1; });
@@ -455,7 +461,7 @@ export async function play(browser, phone, base, only = '') {
 
   // A data shard: the page is the data client's alone. Brasscap Mesa since Pastel Plain left the grid (ZONE-SNAPSHOTS ZS7);
   // lint/page-events.json's declared-death rows name this flow, and their debt line says what it does not prove yet.
-  if (runs('data')) { const data = await open(browser, phone, base, '/?chunk=brasscap-mesa&mute=1&nolock=1');
+  if (runs('data')) { const data = await open(browser, phone, base, { zone: 'brasscap-mesa' });
   await step('brasscap boots on the row', async () => { await entered(data.page); return started(data.page); });
   await step('brasscap raises no page error', () => ({ ok: data.errors.length === 0, errors: [...new Set(data.errors)].slice(0, 6) }));
   await data.context.close(); }

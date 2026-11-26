@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
+import { enterZone } from './zone-entry.mjs';
 
 /** Terminate only the browser launched on this proof's unique fresh profile. No pagehide or fake lifecycle record.
  * @param {string} profile */
@@ -211,29 +212,4 @@ export async function gridEntry(_browser, phone, base, step) {
         try { const keys = JSON.parse(localStorage.getItem(key) ?? 'null')?.keys; return { end: keys?.['life.lastEnd']?.data, place: keys?.['grid.last-played']?.data }; } catch { return null; }
       }).filter(row => row !== null && (row.end !== undefined || row.place !== undefined))) }));
   } finally { await context.close().catch(() => { /* Already dead only when the proof itself terminated it. */ }); await rm(profile, { recursive: true }); }
-}
-
-/** The real recovery URL enters paused; RESUME must restore play rather than the completed loader.
- * @param {import('playwright').Browser} browser @param {import('playwright').BrowserContextOptions} phone @param {string} base @param {import('./types/worker-page').ProofStep} step */
-export async function recoveryMenu(browser, phone, base, step) {
-  const context = await browser.newContext(phone), page = await context.newPage();
-  await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
-  try {
-    await page.goto(new URL('/?chunk=driftwood-isle&mute=1&nolock=1&sw=0&glreload=1', base).href);
-    await page.waitForFunction(() => (/** @type {WorkerWindow} */ (window)).__wildshard?.world?.hud !== undefined
-      && typeof (/** @type {WorkerWindow} */ (window)).__workerClient === 'function', undefined, { timeout: 150_000 });
-    await page.waitForFunction(() => document.querySelector('.ws-load') === null || document.querySelector('.ws-load')?.classList.contains('hide'), undefined, { timeout: 150_000 });
-    await step('recovery-menu: RESUME restores play and the real fixed clock', async () => {
-      const state = await page.evaluate(() => {
-        const { world } = (/** @type {WorkerWindow} */ (window)).__wildshard;
-        const before = { state: world.game.app.state, paused: world.hud.paused, clock: world.game.app.clock.paused };
-        world.hud.setPaused(false);
-        return { before, after: { state: world.game.app.state, paused: world.hud.paused, clock: world.game.app.clock.paused } };
-      });
-      await page.waitForTimeout(1200);
-      const frames = await page.evaluate(() => (/** @type {WorkerWindow} */ (window)).__workerClient().frames);
-      return { ok: state.before.state === 'paused' && state.before.paused && state.before.clock && state.after.state === 'play'
-        && !state.after.paused && !state.after.clock && frames > 10, ...state, frames };
-    });
-  } finally { await context.close(); }
 }

@@ -7,6 +7,10 @@ import { saveFixture } from './debug-settings.mjs';
 import { paidSave } from './worker-client-pine.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
+import { enterZone } from './zone-entry.mjs';
+/** @typedef {NonNullable<Window['__wildshard']['world']>} PageWorld */
+/** CHUNK-PARAM CP16 (J522): the grid's debug handle: the entered cell's creatures and prompts (the grid page's own world holds none)
+ * @typedef {{ animals?: () => PageWorld['animals'] | null; interactables?: () => PageWorld['interactables'] | null } | undefined} GridHandle */
 
 const base = process.argv.find(arg => arg.startsWith('--base='))?.slice(7);
 if (!base) throw new Error('Requires --base');
@@ -20,7 +24,7 @@ for (const context of [source, target]) await saveFixture(context, { scope: 'dev
 await saveFixture(source, { scope: 'standalone-lone-pine-hollow', key: 'continuation', once: 'pine-import-seed', data: paidSave().save });
 const from = await source.newPage(), to = await target.newPage();
 for (const page of [from, to]) page.on('pageerror', error => errors.push(error.message));
-const url = new URL('/?chunk=pine-hollow&mute=1&nolock=1&sw=0', base).href;
+const pine = { zone: 'pine-hollow', base, flags: 'mute=1&nolock=1&sw=0' }; // CP16 (J522): entered by the tap
 /** @param {import('playwright').Page} page */
 const enter = async page => {
   await page.waitForFunction(() => (/** @type {WorkerWindow} */ (window)).__wildshard?.world?.player !== undefined, undefined, { timeout: 150_000 });
@@ -42,12 +46,12 @@ const identity = page => page.evaluate(async () => {
   }); } finally { db.close(); }
 });
 try {
-  await from.goto(url, { waitUntil: 'load' }); await enter(from);
+  await enterZone(from, pine); await enter(from);
   await from.evaluate(() => { (/** @type {WorkerWindow} */ (window)).__workerClientHits(60); });
   const end = Date.now() + 8000;
   while (Date.now() < end && (await from.evaluate(() => (/** @type {WorkerWindow} */ (window)).__workerClient().kills)) === 0) {
     const at = await from.evaluate(() => {
-      const { world } = (/** @type {WorkerWindow} */ (window)).__wildshard, body = world.animals.animals.filter(row => row.variant === 'ghost' && row.alive).sort((a, b) => a.position.distanceTo(world.player.position) - b.position.distanceTo(world.player.position))[0];
+      const { world } = (/** @type {WorkerWindow} */ (window)).__wildshard, body = ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.animals?.() ?? world.animals).animals.filter(row => row.variant === 'ghost' && row.alive).sort((a, b) => a.position.distanceTo(world.player.position) - b.position.distanceTo(world.player.position))[0];
       if (!body) return null;
       const { x, y, z } = body.position; world.player.link.place(x, y, z + 5, 0); return { x, y, z };
     });
@@ -73,7 +77,7 @@ try {
   const exported = JSON.parse(readFileSync(file, 'utf8')), owner = exported.docs['pine-hollow'].keys['creature-rewards'].data;
   if (owner.legacyOwner !== original || !owner.players[original].finishes.includes('ghost-stag')) throw new Error('Export omitted the earned reward');
   console.log('PASS real Settings export contains the earned finish and journal');
-  await to.goto(url, { waitUntil: 'load' }); await enter(to);
+  await enterZone(to, pine); await enter(to);
   const destination = await identity(to);
   if (destination === original) throw new Error('The destination must be a new browser identity');
   await settings(to);
@@ -84,7 +88,7 @@ try {
   await Promise.all([to.waitForEvent('load'), reload.evaluate(button => { if (!(button instanceof HTMLButtonElement)) throw new Error('Reload must be a button'); button.click(); })]);
   // An explicit reload returns to the title. Re-enter Pine through its normal direct entry after that boundary.
   await to.locator('.ws-main-select').waitFor({ state: 'visible', timeout: 60_000 });
-  await to.goto(url, { waitUntil: 'load' }); await enter(to);
+  await enterZone(to, pine); await enter(to);
   const out = await to.evaluate(() => ({ restored: (/** @type {WorkerWindow} */ (window)).__workerClient().restored, finish: (/** @type {WorkerWindow} */ (window)).__wildshard.shard.play.skins.has('ghost-stag'), owned: (/** @type {WorkerWindow} */ (window)).__workerClient().owned,
     taken: JSON.parse(localStorage.getItem('wildshard.save.v2@2.pine-hollow') ?? '{}').keys?.compendium?.data?.['ghost-stag']?.t }));
   const ok = out.restored && out.finish && out.owned['finish.ghost-stag'] === 1 && out.owned['journal.ghost-stag.taken'] === 2 && out.taken === 1 && await identity(to) === destination && errors.length === 0;

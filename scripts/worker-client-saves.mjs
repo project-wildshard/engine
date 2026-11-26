@@ -16,11 +16,12 @@ import { chromium } from "./browser-playwright.mjs";
 import { saveFixture } from './debug-settings.mjs';
 import { floorGridBenchmarkUrl, FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
+import { enterZone } from './zone-entry.mjs';
 
 const arg = (key, fallback) => process.argv.find(value => value.startsWith(`--${key}=`))?.slice(key.length + 3) ?? fallback;
 const base = arg('base', ''), chunk = arg('chunk', 'driftwood-isle'), delays = arg('delays', '0,20,50,100,200,500,1000').split(',').map(Number), only = arg('only', 'kill,timer,exit,travel,import').split(',');
 if (base === '') throw new Error('Requires --base');
-const url = (slug = chunk, query = '') => process.argv.includes('--grid') ? floorGridBenchmarkUrl(base) : new URL(`/?chunk=${slug}&mute=1&nolock=1${query}`, base).href;
+const url = (slug = chunk, query = '') => process.argv.includes('--grid') ? floorGridBenchmarkUrl(base) : { zone: slug, base, flags: `mute=1&nolock=1${query}` };
 
 /** A real browser on a profile that outlives it, its whole process tree ours to kill. */
 async function launch(profile) {
@@ -34,7 +35,7 @@ const seed = async context => {
   await saveFixture(context, { scope: 'device', key: 'debug.workerClient', data: 'on' });
 };
 async function enter(page, at = url()) {
-  await page.goto(at, { waitUntil: 'load' });
+  await (typeof at === 'string' ? page.goto(at, { waitUntil: 'load' }) : enterZone(page, at));
   if (process.argv.includes('--grid')) { // a grid page stops at its title until the card is pressed
     await page.locator('.ws-main-grid').click({ timeout: 60_000 });
     await page.waitForFunction(() => window.__wildshard?.shard?.grid?.state().live?.live?.gameplayReady, undefined, { timeout: 90_000 });

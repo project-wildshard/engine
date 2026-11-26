@@ -2,6 +2,10 @@
 // A real creature kills the worker's player. Observe the existing page event and death overlay, never set health or emit death.
 import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
+import { enterZone } from './zone-entry.mjs';
+/** @typedef {NonNullable<Window['__wildshard']['world']>} PageWorld */
+/** CHUNK-PARAM CP16 (J522): the grid's debug handle: the entered cell's creatures and prompts (the grid page's own world holds none)
+ * @typedef {{ animals?: () => PageWorld['animals'] | null; interactables?: () => PageWorld['interactables'] | null } | undefined} GridHandle */
 
 /** @param {import('playwright').Browser} browser @param {import('playwright').BrowserContextOptions} phone @param {string} base @param {(name: string, run: () => boolean | import('./types/worker-page').ProofResult | Promise<boolean | import('./types/worker-page').ProofResult>) => Promise<unknown>} step */
 export async function driftwoodDeath(browser, phone, base, step) {
@@ -10,7 +14,7 @@ export async function driftwoodDeath(browser, phone, base, step) {
   await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
   try {
     await step('death: Driftwood boots with a worker', async () => {
-      await page.goto(new URL('/?chunk=driftwood-isle&mute=1&nolock=1&sw=0', base).href, { waitUntil: 'load' });
+      await enterZone(page, { zone: 'driftwood-isle', base, flags: 'mute=1&nolock=1&sw=0', waitUntil: 'load' });
       await page.waitForFunction(() => (/** @type {WorkerWindow} */ (window)).__wildshard?.world?.player !== undefined, undefined, { timeout: 150_000 });
       await page.evaluate(FLOOR_GRID_ENTER);
       await page.waitForFunction(() => (/** @type {WorkerWindow} */ (window)).__workerClient?.().frames > 30, undefined, { timeout: 60_000 });
@@ -40,7 +44,7 @@ export async function driftwoodDeath(browser, phone, base, step) {
       const until = Date.now() + 60_000, hp = /** @type {number[]} */ ([]);
       while (Date.now() < until && await page.evaluate(() => (/** @type {WorkerWindow} */ (window)).__workerClient().falls) === before) {
         const at = await page.evaluate(() => {
-          const { world } = (/** @type {WorkerWindow} */ (window)).__wildshard, bears = world.animals.animals.filter(body => body.alive && body.kind === 'bear');
+          const { world } = (/** @type {WorkerWindow} */ (window)).__wildshard, bears = ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.animals?.() ?? world.animals).animals.filter(body => body.alive && body.kind === 'bear');
           bears.sort((a, b) => a.position.distanceTo(world.player.position) - b.position.distanceTo(world.player.position));
           const bear = bears[0];
           if (bear === undefined) return null;

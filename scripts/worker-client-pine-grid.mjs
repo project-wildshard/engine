@@ -5,6 +5,7 @@ import { saveFixture } from './debug-settings.mjs';
 import { paidSave } from './worker-client-pine.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
+import { enterZone } from './zone-entry.mjs';
 
 const base = process.argv.find(arg => arg.startsWith('--base='))?.slice(7);
 if (!base) throw new Error('Requires --base');
@@ -36,7 +37,7 @@ const enter = async () => {
   });
 };
 try {
-  await page.goto(new URL('/?chunk=pine-hollow&mute=1&nolock=1&sw=0', base).href, { waitUntil: 'load' });
+  await enterZone(page, { zone: 'pine-hollow', base, flags: 'mute=1&nolock=1&sw=0', waitUntil: 'load' });
   await enter();
   await step('grid: restore a legacy pending finish', async () => {
     await page.waitForFunction(() => (/** @type {WorkerWindow} */ (window)).__workerClient().owned['finish-drop.ghost-stag'] === 1, undefined, { timeout: 3000 });
@@ -68,7 +69,7 @@ try {
   await step('grid: the saved claim and ownership survive a reload', async () => {
     await page.evaluate(() => { (/** @type {WorkerWindow} */ (window)).__pineBot.end(); });
     await page.evaluate(() => (/** @type {WorkerWindow} */ (window)).__workerClientSave());
-    await page.goto(new URL('/?chunk=pine-hollow&mute=1&nolock=1&sw=0', base).href, { waitUntil: 'load' }); await enter();
+    await enterZone(page, { zone: 'pine-hollow', base, flags: 'mute=1&nolock=1&sw=0', waitUntil: 'load' }); await enter();
     return page.evaluate(() => ({ ok: (/** @type {WorkerWindow} */ (window)).__pineGrid.play.skins.has('ghost-stag') && (/** @type {WorkerWindow} */ (window)).__workerClient().owned['finish-drop.ghost-stag'] === undefined, owned: (/** @type {WorkerWindow} */ (window)).__workerClient().owned }));
   });
   await step('grid: no page errors', () => ({ ok: errors.length === 0, errors }));

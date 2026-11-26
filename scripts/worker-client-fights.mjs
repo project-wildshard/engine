@@ -3,6 +3,10 @@
 // them and hardens their blows (`__workerClientHits`), so a long fight ends inside a proof; the hits, the fight and the reward are real.
 import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
+import { enterZone } from './zone-entry.mjs';
+/** @typedef {NonNullable<Window['__wildshard']['world']>} PageWorld */
+/** CHUNK-PARAM CP16 (J522): the grid's debug handle: the entered cell's creatures and prompts (the grid page's own world holds none)
+ * @typedef {{ animals?: () => PageWorld['animals'] | null; interactables?: () => PageWorld['interactables'] | null } | undefined} GridHandle */
 
 /** What the game asks of the score from here on: `heardOf` reads it. A proof's own record: no step's `ok` needs it. Never wrap `hud.killFeed` here:
  *  a lair's runtime pins that method's identity, and on Nalati a wrapped one faults `shard.nalati.elites` every frame, and presses and blows die with it. */
@@ -21,7 +25,7 @@ async function open(browser, phone, base, slug, query = '') {
   page.on('pageerror', error => { errors.push(error.message.slice(0, 300)); });
   page.on('console', line => { if (line.type() === 'error') errors.push(line.text().slice(0, 300)); });
   await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
-  await page.goto(new URL(`/?chunk=${slug}&mute=1&nolock=1${query}`, base).href, { waitUntil: 'load' });
+  await enterZone(page, { zone: slug, base, flags: `mute=1&nolock=1${query}`, waitUntil: 'load' });
   await page.waitForFunction(() => window.__wildshard?.world?.player !== undefined, undefined, { timeout: 150_000 });
   await page.waitForFunction(() => typeof window.__workerClient === 'function', undefined, { timeout: 150_000 });
   await page.evaluate(FLOOR_GRID_ENTER);
@@ -30,7 +34,7 @@ async function open(browser, phone, base, slug, query = '') {
   return { context, page, errors };
 }
 /** A fresh boot of the same shard by its own URL, as a player reopens it. A reload can't: a started page drops its query, so it lands on the title. */
-const reboot = (page, base, slug, query = '') => page.goto(new URL(`/?chunk=${slug}&mute=1&nolock=1${query}`, base).href, { waitUntil: 'load' });
+const reboot = (page, base, slug, query = '') => enterZone(page, { zone: slug, base, flags: `mute=1&nolock=1${query}`, waitUntil: 'load' });
 const report = page => page.evaluate(() => window.__workerClient());
 /** Sky Reach's Roc fight: the declared `boss` encounter's id since ONE-FORMAT OF20c, the held fight's before it (staging may serve either). */
 const FAR_ROC = ['far.roc.fight', 'far.roc.encounter'];
@@ -55,7 +59,7 @@ const strike = (page, at, chase) => page.evaluate(([x, y, z, run]) => {
 const stand = page => page.evaluate(() => { const { player } = window.__wildshard.world; player.touchMove.y = 0; player.touchSprint = false; });
 /** The boss bar's words as a player reads them. */
 const bossBar = page => page.evaluate(() => { const shown = selector => [...document.querySelectorAll(selector)].filter(node => node.classList.contains('show')).map(node => (node.textContent ?? '').trim().slice(0, 60)); return { bar: shown('[class*="ws-boss"]').slice(0, 4), elite: shown('[class*="ws-elite"]').slice(0, 4) }; });
-const prompt = (page, match) => page.evaluate(source => { const pattern = new RegExp(source, 'iu'), found = window.__wildshard.world.interactables.find(row => (pattern.test(row.label) || pattern.test(row.wireId ?? '')) && row.radius > 0); return found === undefined ? null : { label: found.label, x: found.position.x, y: found.position.y, z: found.position.z, id: found.wireId ?? null }; }, match);
+const prompt = (page, match) => page.evaluate(source => { const pattern = new RegExp(source, 'iu'), found = ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.interactables?.() ?? window.__wildshard.world.interactables).find(row => (pattern.test(row.label) || pattern.test(row.wireId ?? '')) && row.radius > 0); return found === undefined ? null : { label: found.label, x: found.position.x, y: found.position.y, z: found.position.z, id: found.wireId ?? null }; }, match);
 /** A press of whatever stands nearest, as a player's E. */
 const press = page => page.keyboard.press('KeyE');
 
@@ -154,7 +158,7 @@ export async function sunscarJourney(browser, phone, base, step, prepare = () =>
   });
   // Each waymark from where a player stands to pour: 2.5 m south of the bowl, on the ground. The server picks the prompt it sees from there.
   for (const index of [0, 1, 2]) await step(`sunscar: waymark ${index} takes oil and a light crack`, async () => {
-    const crack = [{ x: 58, y: 26.6, z: -34 }, { x: -44, y: 19.41, z: -22 }, { x: 34, y: 10.37, z: -102 }][index], on = flagged(`sunscar.brazier.${index}`), label = () => page.evaluate(wanted => window.__wildshard.world.interactables.find(row => row.wireId === wanted)?.label ?? null, `pour.${index}`);
+    const crack = [{ x: 58, y: 26.6, z: -34 }, { x: -44, y: 19.41, z: -22 }, { x: 34, y: 10.37, z: -102 }][index], on = flagged(`sunscar.brazier.${index}`), label = () => page.evaluate(wanted => ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.interactables?.() ?? window.__wildshard.world.interactables).find(row => row.wireId === wanted)?.label ?? null, `pour.${index}`);
     await place(page, crack.x, crack.y - 1.3, crack.z + 2.5);
     await page.waitForTimeout(1600);
     await press(page); await page.waitForTimeout(900);
@@ -188,10 +192,10 @@ export async function sunscarJourney(browser, phone, base, step, prepare = () =>
 }
 
 /** The nearest living row body of a kind. */
-const bodyOf = (page, kind) => page.evaluate(want => { const { world } = window.__wildshard, live = (world.animals?.animals ?? []).filter(body => body.alive && body.rowDriven && body.kind === want); live.sort((a, b) => a.position.distanceTo(world.player.position) - b.position.distanceTo(world.player.position)); const body = live[0]; return body === undefined ? null : { x: body.position.x, y: body.position.y, z: body.position.z, count: live.length }; }, kind);
+const bodyOf = (page, kind) => page.evaluate(want => { const { world } = window.__wildshard, live = (((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.animals?.() ?? world.animals)?.animals ?? []).filter(body => body.alive && body.rowDriven && body.kind === want); live.sort((a, b) => a.position.distanceTo(world.player.position) - b.position.distanceTo(world.player.position)); const body = live[0]; return body === undefined ? null : { x: body.position.x, y: body.position.y, z: body.position.z, count: live.length }; }, kind);
 /** What a page bound on a row's body as its fight began, nearest `at`: read off the mesh the page draws. */
 const rowLook = (page, at) => page.evaluate(({ x, z }) => {
-  const live = (window.__wildshard.world.animals?.animals ?? []).filter(body => body.rowDriven), away = body => Math.hypot(body.position.x - x, body.position.z - z);
+  const live = (((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.animals?.() ?? window.__wildshard.world.animals)?.animals ?? []).filter(body => body.rowDriven), away = body => Math.hypot(body.position.x - x, body.position.z - z);
   live.sort((one, other) => away(one) - away(other));
   const body = live[0]; if (body === undefined) return null;
   const materials = new Set(); body.mesh.traverse(mesh => { for (const material of [mesh.material].flat()) if (material !== undefined) materials.add(material); });
@@ -448,7 +452,7 @@ export async function nalatiJourney(browser, phone, base, step, prepare = () => 
     const { reward } = await fight(page, KING);
     await place(page, reward.x + 6, reward.y - 0.8, reward.z + 8);
     await page.waitForTimeout(1200);
-    await page.evaluate(() => { window.__wildshard.world.interactables.find(entry => /take|claim|bow|gold|reward/iu.test(entry.label) && entry.radius > 0)?.onInteract(); });
+    await page.evaluate(() => { ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.interactables?.() ?? window.__wildshard.world.interactables).find(entry => /take|claim|bow|gold|reward/iu.test(entry.label) && entry.radius > 0)?.onInteract(); });
     await page.waitForTimeout(2600);
     const held = (await report(page)).owned;
     return { ok: (await fight(page, KING)).reward !== null && held['item.goldenBow'] === undefined, reward: (await fight(page, KING)).reward, held };
@@ -536,8 +540,8 @@ async function stormJourney(browser, phone, base, step) {
       await press(sky); await sky.waitForTimeout(900);
       mounted = await sky.evaluate(() => window.__wildshard.world.player.ride !== null);
     }
-    const cairn = await sky.evaluate(() => { const found = window.__wildshard.world.interactables.find(row => /tie/iu.test(row.label ?? '')); return found === undefined ? null : { x: found.position.x, y: found.position.y, z: found.position.z, label: found.label, radius: found.radius }; });
-    if (cairn === null) return { ok: false, mounted, why: 'no tie prompt', prompts: await sky.evaluate(() => window.__wildshard.world.interactables.map(row => row.label).slice(0, 12)) };
+    const cairn = await sky.evaluate(() => { const found = ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.interactables?.() ?? window.__wildshard.world.interactables).find(row => /tie/iu.test(row.label ?? '')); return found === undefined ? null : { x: found.position.x, y: found.position.y, z: found.position.z, label: found.label, radius: found.radius }; });
+    if (cairn === null) return { ok: false, mounted, why: 'no tie prompt', prompts: await sky.evaluate(() => ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.interactables?.() ?? window.__wildshard.world.interactables).map(row => row.label).slice(0, 12)) };
     await place(sky, cairn.x + 1.2, await groundAt(sky, cairn.x, cairn.z) + 0.5, cairn.z); await sky.waitForTimeout(1500);
     await sky.evaluate(() => { window.__workerClientSky('storm'); }); await sky.waitForTimeout(2500); // a long ride over, the sky's still up
     for (let i = 0; i < 8; i++) { await press(sky); await sky.waitForTimeout(700); if ((await report(sky)).flags.includes('lit:cairn')) break; }
@@ -621,7 +625,7 @@ async function stormJourney(browser, phone, base, step) {
       await bow(page, false); await page.waitForTimeout(350);
       await away(page); await page.waitForTimeout(300);
     };
-    const riders = page => page.evaluate(() => window.__wildshard.world.animals.animals.filter(body => body.rowDriven && body.alive && body.kind === 'ghost-rider').map(({ position: { x, y, z } }) => ({ x, y, z })));
+    const riders = page => page.evaluate(() => ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.animals?.() ?? window.__wildshard.world.animals).animals.filter(body => body.rowDriven && body.alive && body.kind === 'ghost-rider').map(({ position: { x, y, z } }) => ({ x, y, z })));
     await step('chapters: the Titan falls to real blows, and his score plays', async () => {
       const { page: sky } = storm, up = await until(sky, async () => (await fight(sky, 'storm-titan'))?.state === 'fight', 30);
       const log = [], end = Date.now() + 420_000, say = async note => { const row = await fight(sky, 'storm-titan'), seen = await titan(sky); log.push(`${note} ${row?.state} p${row?.phase} hp${row?.hp.toFixed(2)} hot${seen.hot.length} scorch${seen.scorch}`); };
@@ -669,7 +673,7 @@ async function stormJourney(browser, phone, base, step) {
 /** Qara Batyr on a server: a night's patrol thinned by real kills brings him, his lane, his fall and his orb are the server's, and a save keeps him fallen. */
 async function qaraJourney(browser, phone, base, step) {
   const steppe = await open(browser, phone, base, 'nalati-grasslands', '&bossGod'), { page } = steppe, id = 'qara-batyr';
-  const riders = () => page.evaluate(() => window.__wildshard.world.animals.animals.filter(body => body.rowDriven && body.alive && body.kind === 'ghost-rider').map(({ variant, position: { x, y, z } }) => ({ variant, x, y, z })));
+  const riders = () => page.evaluate(() => ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.animals?.() ?? window.__wildshard.world.animals).animals.filter(body => body.rowDriven && body.alive && body.kind === 'ghost-rider').map(({ variant, position: { x, y, z } }) => ({ variant, x, y, z })));
   const bow = on => page.evaluate(held => { window.__wildshard.world.game.app.equipment.altHeld = held; }, on);
   const shoot = async at => {
     await bow(true); await page.waitForTimeout(1150);
@@ -747,7 +751,7 @@ async function qaraJourney(browser, phone, base, step) {
  *  he lands where a player was and real arrows from the ground end him, and a save keeps him fallen. No god mode: his stoop is dodged as a player does. */
 async function qyranJourney(browser, phone, base, step) {
   const steppe = await open(browser, phone, base, 'nalati-grasslands'), { page } = steppe, id = 'qyran', rock = { x: 180, z: 85 };
-  const bird = () => page.evaluate(() => { const body = window.__wildshard.world.animals.animals.find(row => row.rowDriven && row.kind === 'eagle'); if (body === undefined) return null; const { x, y, z } = body.position, { mem, alive, hp } = body; return { x, y, z, alive, hp, ground: mem.ground ?? 0, fold: mem.fold ?? 0, flap: mem.flap ?? 0, altY: mem.altY ?? null }; });
+  const bird = () => page.evaluate(() => { const body = ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.animals?.() ?? window.__wildshard.world.animals).animals.find(row => row.rowDriven && row.kind === 'eagle'); if (body === undefined) return null; const { x, y, z } = body.position, { mem, alive, hp } = body; return { x, y, z, alive, hp, ground: mem.ground ?? 0, fold: mem.fold ?? 0, flap: mem.flap ?? 0, altY: mem.altY ?? null }; });
   const bow = on => page.evaluate(held => { window.__wildshard.world.game.app.equipment.altHeld = held; }, on);
   const feet = async (x, z) => { await place(page, x, await groundAt(page, x, z) + 0.6, z); };
   const drew = async name => (await report(page)).drawn[name] ?? 0;
@@ -808,7 +812,7 @@ async function qyranJourney(browser, phone, base, step) {
     if (reward !== null && reward !== undefined) { // he can fall in the river: stand on the ground beside his orb
       for (const off of [0.6, -0.7, 1.1]) {
         await feet(reward.x + off, reward.z + off); await page.waitForTimeout(1200); await faceAt(page, reward);
-        prompts = await page.evaluate(() => { const { world } = window.__wildshard, { position: p } = world.player; return { at: [p.x, p.y, p.z], near: world.interactables.filter(item => item.radius > 0 && item.position.distanceTo(p) < 8).map(item => `${item.label} ${item.position.distanceTo(p).toFixed(1)}/${item.radius}`).slice(0, 5) }; });
+        prompts = await page.evaluate(() => { const { world } = window.__wildshard, { position: p } = world.player; return { at: [p.x, p.y, p.z], near: ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.interactables?.() ?? world.interactables).filter(item => item.radius > 0 && item.position.distanceTo(p) < 8).map(item => `${item.label} ${item.position.distanceTo(p).toFixed(1)}/${item.radius}`).slice(0, 5) }; });
         for (let i = 0; i < 3 && (await fight(page, id))?.reward !== null; i++) { await press(page); await page.waitForTimeout(500); }
         if ((await fight(page, id))?.reward === null) break;
       }
@@ -923,7 +927,7 @@ async function nightJourney(browser, phone, base, step) {
     const riders = await until(page, async () => (await page.evaluate(() => window.__workerClientRows('ghost-rider')))[0] ?? null, 45, 1000);
     if (riders === null) return { ok: false, why: 'no rider came round the bowl' };
     await place(page, riders.x + 14, riders.y + 2, riders.z);
-    const drawn = await until(page, () => page.evaluate(() => { const body = window.__wildshard.world.animals?.animals.find(row => row.kind === 'ghost-rider' && row.rowDriven); return body === undefined ? null : { material: body.mesh.material.name, scale: body.scale }; }), 12);
+    const drawn = await until(page, () => page.evaluate(() => { const body = ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.animals?.() ?? window.__wildshard.world.animals)?.animals.find(row => row.kind === 'ghost-rider' && row.rowDriven); return body === undefined ? null : { material: body.mesh.material.name, scale: body.scale }; }), 12);
     return { ok: drawn !== null && drawn.material.startsWith('nalati-ghost'), drawn, retired: (await report(page)).retired };
   });
   await step('night: a rider looses, and its arrow flies on the page', async () => {
@@ -967,7 +971,7 @@ async function secondClientJourney(browser, phone, base, step) {
   const hasDoor = flag => async () => (await report(page)).flags.includes(flag) === true;
   const stood = (x, z) => groundAt(page, x, z).then(y => place(page, x, y + 0.4, z));
   const reopen = async () => { await page.reload({ waitUntil: 'load' }); await page.waitForFunction(() => typeof window.__workerClient === 'function' && window.__wildshard?.world?.player !== undefined, undefined, { timeout: 150_000 }); await page.evaluate(FLOOR_GRID_ENTER); await page.waitForFunction(() => window.__workerClient().frames > 30, undefined, { timeout: 60_000 }); };
-  const free = await page.evaluate(wanted => { const row = window.__wildshard.world.interactables.find(entry => entry.wireId?.includes('door') && entry.wireId !== wanted); return row === undefined ? null : { id: row.wireId, x: row.position.x, y: row.position.y, z: row.position.z }; }, millWire);
+  const free = await page.evaluate(wanted => { const row = ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.interactables?.() ?? window.__wildshard.world.interactables).find(entry => entry.wireId?.includes('door') && entry.wireId !== wanted); return row === undefined ? null : { id: row.wireId, x: row.position.x, y: row.position.y, z: row.position.z }; }, millWire);
   await step('second client: its press swings a door, and this page sees it', async () => {
     if (free === null) return { ok: false, why: 'no free door' };
     await page.evaluate(({ x, y, z }) => { window.__secondClient = window.__workerClientBot('bot:2', x + 0.8, y - 1, z + 0.8); }, free);
@@ -1044,11 +1048,11 @@ async function wordsJourney(browser, phone, base, step) {
     return { ok: labels !== null && !labels.some(row => row.includes('creature:')), labels: labels?.slice(0, 4) };
   });
   await step('a tie\'s press gets its line on the page', async () => {
-    const tie = await page.evaluate(() => { const row = window.__wildshard.world.interactables.find(entry => entry.wireId?.endsWith('.tie')); return row === undefined ? null : { x: row.position.x, z: row.position.z, id: row.wireId, radius: row.radius, label: row.label }; });
+    const tie = await page.evaluate(() => { const row = ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.interactables?.() ?? window.__wildshard.world.interactables).find(entry => entry.wireId?.endsWith('.tie')); return row === undefined ? null : { x: row.position.x, z: row.position.z, id: row.wireId, radius: row.radius, label: row.label }; });
     if (tie === null) return { ok: false, why: 'no tie prompt' };
     await place(page, tie.x + 1.2, await groundAt(page, tie.x + 1.2, tie.z) + 0.5, tie.z);
     await page.waitForTimeout(2000);
-    const label = await page.evaluate(() => window.__wildshard.world.interactables.find(entry => entry.wireId?.endsWith('.tie'))?.label ?? null);
+    const label = await page.evaluate(() => ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.interactables?.() ?? window.__wildshard.world.interactables).find(entry => entry.wireId?.endsWith('.tie'))?.label ?? null);
     await page.evaluate(() => { window.__toasts.length = 0; });
     await press(page);
     const line = await until(page, () => page.evaluate(() => window.__toasts.find(row => !row.startsWith('Discovered')) ?? null), 6);
@@ -1121,7 +1125,7 @@ async function pageRigJourney(browser, phone, base, step, [x, z]) {
   page.on('pageerror', error => { errors.push(error.message.slice(0, 300)); });
   await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
   await saveFixture(context, { scope: 'global', key: 'settings', data: { time: 'night' }, merge: true });
-  await page.goto(new URL('/?chunk=pine-hollow&mute=1&nolock=1&bossGod', base).href, { waitUntil: 'load' });
+  await enterZone(page, { zone: 'pine-hollow', base, flags: 'mute=1&nolock=1&bossGod', waitUntil: 'load' });
   await page.waitForFunction(() => window.__wildshard?.world?.player !== undefined, undefined, { timeout: 150_000 });
   await page.evaluate(FLOOR_GRID_ENTER);
   await page.waitForTimeout(4000);
@@ -1389,7 +1393,7 @@ export async function fights(browser, phone, base, only, step) {
       const row = await fight(pine.page, id), { reward } = row;
       await place(pine.page, reward.x + 30, reward.y + 8, reward.z + 30);
       await pine.page.waitForTimeout(1500);
-      await pine.page.evaluate(() => { window.__wildshard.world.interactables.find(entry => /skin/iu.test(entry.label) && entry.radius > 0)?.onInteract(); });
+      await pine.page.evaluate(() => { ((/** @type {GridHandle} */ (Reflect.get(window.__wildshard.shard, 'grid')))?.interactables?.() ?? window.__wildshard.world.interactables).find(entry => /skin/iu.test(entry.label) && entry.radius > 0)?.onInteract(); });
       await pine.page.waitForTimeout(400);
       const gone = await prompt(pine.page, 'skin');
       await pine.page.waitForTimeout(2200);

@@ -1,5 +1,5 @@
 // SA37 (meta SHARD-AUTHORING-PLAN): the `/slug/<slug>` link an author shares, on a world build. The page is the shard's one card;
-// its PLAY leaves for `/?chunk=<slug>`, and that page enters the world's grid at the shard's cell, as a Shard select tap does.
+// its PLAY taps the zone into the tab and leaves for a bare `/`, and that page enters the world's grid at the shard's cell, as a Shard select tap does.
 // Passes when the server seats the body in that cell, the page stands inside it and plays, with no page error.
 //   scripts/browser-lane.sh node scripts/worker-client-proof.mjs --base=<a world build> --play --only=slug [--slug=driftwood-isle]
 /** @typedef {import('./types/worker-page').WorkerWindow} WorkerWindow */
