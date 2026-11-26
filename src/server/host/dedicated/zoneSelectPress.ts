@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The MMO door's public HTTP route.
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import * as v from 'valibot';
-import { actorTags, AGENT_HEADER, classifyActor, type ActorTags } from '@wildshard/engine/app/actor';
+import { actorTags, AGENT_HEADER, AGENTS_REFUSED, carriesAgentMarker, classifyActor, type ActorTags } from '@wildshard/engine/app/actor';
 import { ZONE_SELECT_PRESS_PATH, type ZoneSelectDocument } from '@wildshard/engine/game/grid/zoneSelectRows';
 import { clientAddress, originAllowed, type DoorTrust } from './doorTrust';
 
@@ -16,6 +16,8 @@ interface PressOptions extends DoorTrust {
   readonly channel: ZoneSelectDocument['channel'];
   readonly enterable: (slug: string) => boolean;
   readonly press: (slug: string, actor: ActorTags) => void;
+  /** J205 (QA 11-25 row 124): production answers a marked agent's press 403 and counts nothing. */
+  readonly refuseAgents?: boolean;
   readonly now?: () => number;
 }
 
@@ -53,6 +55,10 @@ export function zoneSelectPressRoute(options: PressOptions): (request: IncomingM
       const header = request.headers[AGENT_HEADER];
       const actor = classifyActor({ userAgent: request.headers['user-agent'], header: typeof header === 'string' ? header : null,
         query: at.searchParams.get('agent'), harness: row.audience === 'automation' });
+      if (options.refuseAgents === true && carriesAgentMarker(actor)) {
+        response.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' }).end(AGENTS_REFUSED);
+        return;
+      }
       options.press(row.slug, actorTags(actor));
     }
     response.writeHead(204).end();

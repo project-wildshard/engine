@@ -40,6 +40,15 @@ export function classifyActor(facts: ActorFacts): ActorMark {
   return { actor: 'human', why: 'unmarked' };
 }
 
+/** J205/J209: production is humans only. A channel that refuses a marked agent at its door: production. */
+export const agentsRefusedOn = (channel: string): boolean => channel === 'production';
+/** What a refused agent reads: plain words, no code. */
+export const AGENTS_REFUSED = 'Wildshard agents never join production (J205); use staging.';
+const CARRIERS: ReadonlySet<ActorMark['why']> = new Set(['door-pass', 'header', 'query', 'user-agent', 'stored']);
+/** QA 11-25 row 124: the mark an agent sets on purpose (a door pass, the header, `?agent=`, the user agent's token or the
+ *  page's stored word). A guess from a headless, webdriver or harness browser is never enough to turn a player away. */
+export const carriesAgentMarker = (mark: ActorMark): boolean => mark.actor === 'agent' && CARRIERS.has(mark.why);
+
 export function actorTags({ actor, lane }: ActorTags): ActorTags {
   return lane === undefined ? { actor } : { actor, lane };
 }

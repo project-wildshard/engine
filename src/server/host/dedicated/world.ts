@@ -19,7 +19,7 @@ import { decodeFirstMessage, encodeHello, type Hello } from '@wildshard/wire/han
 import { WIRE_MINOR } from '@wildshard/wire/major';
 import { decodeEnter, decodeGoto, decodeSavesAsk, decodeWhereAsk, encodeArrive, encodeCountdown, encodeEnter, encodeSaves, encodeWhere, type RoomSave, type WorldWord } from '@wildshard/engine/net/socketFrames';
 import { deviceLine, readDeviceWord, type DeviceSnapshot, type DeviceWho } from '@wildshard/engine/net/deviceWord';
-import { AGENT_HEADER, classifyActor, type ActorMark, type ActorTags } from '@wildshard/engine/app/actor';
+import { AGENT_HEADER, AGENTS_REFUSED, carriesAgentMarker, classifyActor, type ActorMark, type ActorTags } from '@wildshard/engine/app/actor';
 import {CorrectionSchema} from '@wildshard/engine/net/measurements';
 import type {PlaytestRow} from './playtest';
 import type { ChatReport } from '@wildshard/engine/net/chat';
@@ -188,6 +188,9 @@ export interface WorldOptions {
   readonly ticketKey?: string;
   /** VH10: the pages a browser may open a socket from; `null` is any. The game's own hosts when absent. */
   readonly allowedOrigins?: readonly string[] | null;
+  /** J205 (QA 11-25 row 124): production turns away a socket carrying the agent marker (`carriesAgentMarker`), at the
+   *  upgrade with a plain 403 and again if its device word says agent. Staging and local leave it out. */
+  readonly refuseAgents?: boolean;
   /**
    * J353: each worker hosts a road. SA34a: a placed cell then opens on the worker of its nearest open cell, whose
    * road hands a seat into it, and every worker's road is told of it; without roads it boots on a worker of its own (SA33).
@@ -532,6 +535,11 @@ export class World {
       header: (Array.isArray(header) ? header[0] : header) ?? null,
       query: queryAt < 0 ? null : new URLSearchParams(request.url?.slice(queryAt + 1)).get('agent'),
       doorPass: passed ? passText(request.headers['sec-websocket-protocol']) : undefined });
+    if (this.options.refuseAgents === true && carriesAgentMarker(actor)) {
+      this.refund(key, attempt); this.refuse('agent');
+      socket.end(`HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: ${String(new TextEncoder().encode(AGENTS_REFUSED).byteLength)}\r\n\r\n${AGENTS_REFUSED}`);
+      return;
+    }
     this.server.handleUpgrade(request, socket, head, ws => { this.opened(ws, key, attempt, actor); });
   }
   /** SB42: the budget a live proof pass draws on (`pass:<lane>`), or null: no pass, a bad one, or an address past its bad passes. */
@@ -664,6 +672,7 @@ export class World {
       if (actor.mark.actor === 'human') actor.mark = classifyActor({
         userAgent: said.ua, stored: said.actor === 'agent' ? said.lane ?? '1' : null,
       });
+      if (this.options.refuseAgents === true && carriesAgentMarker(actor.mark)) { this.refuse('agent'); end.close('refused'); return; }
       this.markLeak(actor);
     }
     seen.said = said; this.devices.set(end, seen); this.deviceSeen(end);

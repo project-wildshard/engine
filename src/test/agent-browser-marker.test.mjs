@@ -8,6 +8,7 @@ import { test } from 'vitest';
 import { agentHeaders, agentUrl, agentUserAgent } from '../scripts/agent-marker.mjs';
 import { installBrowserActorMarker } from '../scripts/browser-actor-marker.mjs';
 import { mutedLaunch, silencePage } from '../scripts/browser-silence.mjs';
+import { PROD_ROOMS_BLOCK } from '../scripts/browser-prod-guard.mjs';
 import { chromium, devices } from '../scripts/browser-playwright.mjs';
 import { KEYCHAIN_ARGS } from '../scripts/.kit/chromium-keychain.mjs';
 
@@ -71,7 +72,7 @@ test('a started Chromium takes its own UA, never a context default (engine red 4
   try {
     installBrowserActorMarker({ chromium: engine });
     await engine.launch({ args: [...KEYCHAIN_ARGS] });
-    assert.deepEqual(started.at(-1), [...KEYCHAIN_ARGS, `--user-agent=${agentUserAgent(own)}`]);
+    assert.deepEqual(started.at(-1), [...KEYCHAIN_ARGS, `--user-agent=${agentUserAgent(own)}`, PROD_ROOMS_BLOCK]);
   } finally {
     if (before === undefined) delete process.env.HOME; else process.env.HOME = before;
     rmSync(home, { recursive: true, force: true });

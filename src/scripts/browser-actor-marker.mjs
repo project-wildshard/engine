@@ -4,6 +4,7 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { agentUserAgent } from './agent-marker.mjs';
 import { mutedLaunch, silenced } from './browser-silence.mjs';
+import { prodBlockedLaunch, prodGuarded } from './browser-prod-guard.mjs';
 import markers from '../shared/engine/app/actorMarkers.json' with { type: 'json' };
 
 const browsers = new WeakSet();
@@ -63,8 +64,9 @@ function markedBrowser(browser) {
   /** @param {import('playwright').BrowserContextOptions | undefined} options */
   const device = async options => options?.userAgent === undefined ? { ...options, userAgent: await defaultUserAgent(browser, context) } : options;
   // Every page an agent opens is silent too (meta QA-FEEDBACK-2026-11-24 row 49): browser-silence.mjs.
-  browser.newContext = async options => silenced(await context(markedContext(await device(options))));
-  browser.newPage = async options => silenced(await page(markedContext(await device(options))));
+  // Production is humans only (J205, meta QA 11-25 row 124): every page stops at prod's title (browser-prod-guard.mjs).
+  browser.newContext = async options => prodGuarded(await silenced(await context(markedContext(await device(options)))));
+  browser.newPage = async options => prodGuarded(await silenced(await page(markedContext(await device(options)))));
   return browser;
 }
 
@@ -102,9 +104,10 @@ async function chromiumDefaultUA(open, engine, options) {
  * @param {import('playwright').BrowserType} engine @param {Options | undefined} options @returns {Promise<Options | undefined>} */
 async function markedStart(open, engine, options) {
   const args = options?.args ?? [];
-  if (args.some(arg => arg.startsWith('--user-agent='))) return options;
+  if (args.some(arg => arg.startsWith('--user-agent='))) return prodBlockedLaunch(options);
   const ua = await chromiumDefaultUA(open, engine, options);
-  return /** @type {Options} */ ({ ...options, args: [...args, `--user-agent=${agentUserAgent(ua)}`] });
+  // The rooms host goes unresolvable after the UA probe, which never opens a page (J205, browser-prod-guard.mjs).
+  return prodBlockedLaunch(/** @type {Options} */ ({ ...options, args: [...args, `--user-agent=${agentUserAgent(ua)}`] }));
 }
 
 /** @param {object} playwright */
@@ -127,9 +130,9 @@ export function installBrowserActorMarker(playwright) {
     }
     if (typeof engine.launchPersistentContext === 'function') {
       const persistent = engine.launchPersistentContext.bind(engine);
-      engine.launchPersistentContext = async (dir, options) => silenced(await markDefaultUA(await persistent(dir, markedContext(
-        own ? options?.userAgent === undefined ? await markedStart(start, engine, mutedLaunch(options)) : mutedLaunch(options) : options)),
-      options?.userAgent));
+      engine.launchPersistentContext = async (dir, options) => prodGuarded(await silenced(await markDefaultUA(await persistent(dir, markedContext(
+        own ? options?.userAgent === undefined ? await markedStart(start, engine, mutedLaunch(options)) : prodBlockedLaunch(mutedLaunch(options)) : options)),
+      options?.userAgent)));
     }
   }
 }

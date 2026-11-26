@@ -1,5 +1,6 @@
 // Admission spans a complete task, its CLI daemon and physical browser drain.
-// KEYCHAIN_ARGS supplies --use-mock-keychain, --password-store=basic and --mute-audio.
+// KEYCHAIN_ARGS supplies --use-mock-keychain, --password-store=basic and --mute-audio; withProdBlock makes the
+// production rooms host unresolvable, so agent-browser over CDP stops at prod's title too (J205, QA 11-25 row 124).
 import {spawnSync} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
 import {mkdirSync,mkdtempSync,readFileSync,readdirSync,rmSync} from 'node:fs';
@@ -9,6 +10,7 @@ import {pathToFileURL} from 'node:url';
 import {setTimeout as delay} from 'node:timers/promises';
 import {chromium} from './browser-playwright.mjs';
 import {KEYCHAIN_ARGS} from './.kit/chromium-keychain.mjs';
+import {withProdBlock} from './browser-prod-guard.mjs';
 import {runT1Child} from './t1-runner.mjs';
 import {nativeSocketTemporary} from '../../test/fixtures/native-socket-temp.mjs';
 
@@ -65,7 +67,7 @@ export async function runAgentBrowserTask(command){
  let browser,daemonDrained=true;
  try{
   process.env.TMPDIR=temporary.path;
-  try{browser=await chromium.launchServer({headless:true,args:[...KEYCHAIN_ARGS,'--remote-debugging-port=0'],downloadsPath:join(scratch,'downloads')});}
+  try{browser=await chromium.launchServer({headless:true,args:withProdBlock([...KEYCHAIN_ARGS,'--remote-debugging-port=0']),downloadsPath:join(scratch,'downloads')});}
   finally{if(previous===undefined)delete process.env.TMPDIR;else process.env.TMPDIR=previous;}
   const native=browser.process();
   const profile=native.spawnargs.find(arg=>arg.startsWith('--user-data-dir='))?.slice('--user-data-dir='.length);
