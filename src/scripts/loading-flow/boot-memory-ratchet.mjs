@@ -49,6 +49,36 @@ export function retainedGeometryBytes(scene = window.__wildshard?.world?.game.ro
   return buffers.size === 0 ? null : [...buffers].reduce((bytes, buffer) => bytes + buffer.byteLength, 0);
 }
 
+/** Browser-side, self-contained (it runs alone in the page): QA 11-25 row 122. Let every drawn, unchanged geometry's
+ * CPU copy go now (the probe's `releaseDrawn`, what play does after 240 renders), then read the CPU geometry still
+ * reachable from the scene: the copies play keeps, whatever the page's frame rate. Null before the world exists or on a
+ * build whose probe has no release.
+ * @returns {{released: number, retained: number | null} | null} */
+export function releaseDrawnThenRead() {
+  const probe = window.__wildshard, scene = probe?.world?.game.rootScene;
+  if (scene === undefined || scene === null || typeof probe.releaseDrawn !== 'function') return null;
+  const released = probe.releaseDrawn();
+  /** @type {Set<ArrayBufferLike>} */ const buffers = new Set();
+  /** @param {object | null | undefined} attribute */
+  const add = (attribute) => {
+    if (attribute === undefined || attribute === null) return;
+    const storage = Object.getOwnPropertyDescriptor(attribute, 'data')?.value ?? attribute;
+    const array = Object.getOwnPropertyDescriptor(storage, 'array')?.value;
+    if (ArrayBuffer.isView(array) && array.buffer.byteLength > 0) buffers.add(array.buffer);
+  };
+  scene.traverse((node) => {
+    const {geometry, instanceMatrix, instanceColor} = /** @type {Partial<import('three').InstancedMesh>} */ (node);
+    if (geometry !== undefined) {
+      Object.values(geometry.attributes).forEach(add);
+      for (const attributes of Object.values(geometry.morphAttributes)) attributes.forEach(add);
+      add(geometry.index);
+    }
+    add(instanceMatrix);
+    add(instanceColor);
+  });
+  return { released, retained: buffers.size === 0 ? null : [...buffers].reduce((bytes, buffer) => bytes + buffer.byteLength, 0) };
+}
+
 /**
  * The boot's faults and its two budget rows. Held parts and a missing measurement are faults (they fail the load); a
  * measurement's verdict is a row (`over-hard` is a fault too, `regressed` is the budgets job's).

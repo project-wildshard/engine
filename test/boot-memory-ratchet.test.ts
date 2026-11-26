@@ -1,6 +1,6 @@
 import {expect,test} from 'vitest';
 import {BufferAttribute,BufferGeometry,InstancedMesh,InterleavedBuffer,InterleavedBufferAttribute,Mesh,MeshBasicMaterial,Scene} from 'three';
-import {bootMemoryVerdict,retainedGeometryBytes} from '../src/scripts/loading-flow/boot-memory-ratchet.mjs';
+import {bootMemoryVerdict,releaseDrawnThenRead,retainedGeometryBytes} from '../src/scripts/loading-flow/boot-memory-ratchet.mjs';
 
 import {readCaps} from '../src/scripts/budgets/files.mjs';
 
@@ -33,11 +33,14 @@ test('held parts or a missing measurement fail the load; high geometry is report
   expect(bootMemoryVerdict(marks(2),53e6,300e6,judging()).faults).toEqual(['boot memory: 2 spawn parts still held past the download step']);
   expect(bootMemoryVerdict(marks(0),null,300e6,judging()).faults).toEqual(['boot memory: no retained CPU geometry measurement at control']);
   expect(bootMemoryVerdict(marks(0),53e6,Number.NaN,judging()).faults).toEqual(['boot memory: no live heap measurement at control']);
-  // the 5 MB memory floor: hosted retained geometry moves ~2 MB with upload timing (13.3 -> 15.25 MB, QA 2026-11-19 row 4)
+  // QA 11-25 row 122: the settled read (drawn copies let go first) no longer moves with upload timing, so retained
+  // geometry has its own 1.5 MB floor (the deck's tile backing, a hidden prop skipped by the warm draws): growing back the 3 MB row 102
+  // recorded is a regression, the deck's swap is not
   const hosted={contentKey:'nine-dragon-stack@3',budgets:{caps:readCaps(),baselines:{schema:1,about:'',baselines:{
-    'nine/boot/retained-geometry':{value:13_309_155,contentKey:'nine-dragon-stack@3'},'nine/boot/live-heap':{value:216_970_560,contentKey:'nine-dragon-stack@3'}}}}};
-  expect(statuses(bootMemoryVerdict(marks(0),15_249_927,216_259_359,hosted))).toEqual(['ok','ok']);
-  expect(statuses(bootMemoryVerdict(marks(0),18_309_155,216_259_359,hosted))).toEqual(['regressed','ok']);
+    'nine/boot/retained-geometry':{value:6_820_000,contentKey:'nine-dragon-stack@3'},'nine/boot/live-heap':{value:216_970_560,contentKey:'nine-dragon-stack@3'}}}}};
+  expect(statuses(bootMemoryVerdict(marks(0),6_060_000,216_259_359,hosted))).toEqual(['ok','ok']);
+  expect(statuses(bootMemoryVerdict(marks(0),7_720_000,216_259_359,hosted))).toEqual(['ok','ok']);
+  expect(statuses(bootMemoryVerdict(marks(0),9_820_000,216_259_359,hosted))).toEqual(['regressed','ok']);
   // a new Nine revision is new content: only the hard cap (none on record, D3) is checked
   expect(statuses(bootMemoryVerdict(marks(0),117e6,367e6,judging('nine-dragon-stack@4')))).toEqual(['raised','raised']);
 });
@@ -56,4 +59,30 @@ test('the scene census counts complete shared backing stores without restoring r
   const instances=new InstancedMesh(geometry,material,1);
   scene.add(new Mesh(geometry,material),instances);
   expect(retainedGeometryBytes(scene)).toBe(shared.byteLength+12+instances.instanceMatrix.array.buffer.byteLength);
+});
+
+// QA 11-25 row 122: hosted SwiftShader draws a frame every few seconds, so a read 3 s after control caught the
+// after-control build's CPU copies still waiting on play's 240 renders (12.06 to 15.38 MB across one run's boots,
+// retained plus released constant). The read lets every drawn, unchanged copy go first, so it measures what play keeps.
+test('the boot read lets drawn copies go first, then counts only what play keeps',()=>{
+  const scene=new Scene(), material=new MeshBasicMaterial();
+  const drawn=new BufferGeometry(), held=new BufferGeometry();
+  drawn.setAttribute('normal',new BufferAttribute(new Float32Array(300),3));
+  held.setAttribute('normal',new BufferAttribute(new Float32Array(30),3));
+  scene.add(new Mesh(drawn,material),new Mesh(held,material));
+  const release=()=>{
+    const attribute=drawn.getAttribute('normal'), bytes=(attribute.array as Float32Array).byteLength;
+    Object.defineProperty(attribute,'array',{configurable:true,get:()=>{throw new Error('must never read a released array');}});
+    return bytes;
+  };
+  const host=globalThis as {window?:unknown};
+  const before=host.window;
+  try {
+    host.window={__wildshard:{world:{game:{rootScene:scene}}}};
+    // a build whose probe has no release gives no read, never a timing-dependent one
+    expect(releaseDrawnThenRead()).toBeNull();
+    host.window={__wildshard:{world:{game:{rootScene:scene}},releaseDrawn:release}};
+    expect(releaseDrawnThenRead()).toEqual({released:1200,retained:120});
+    expect(retainedGeometryBytes(scene)).toBe(120);
+  } finally {host.window=before;}
 });

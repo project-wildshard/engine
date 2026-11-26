@@ -979,10 +979,10 @@
    "why": "STR22: first hosted memory-footprint run on main to judge the walk (44468967622 at 41d629f2), median of 3 (3.44-3.83 MB/s); the mini's 7.30 pin is not comparable"
   },
   "nine/boot/retained-geometry": {
-   "value": 8927535,
+   "value": 6821545,
    "contentKey": "nine-dragon-stack@11",
-   "commit": "ac477377dd086b67de75059a52b52d87b0439436",
-   "why": "QA 11-25 row 122: the old 8.03 MB plus the one-cell grid page's deck (0.90 MB, b732d1199); the rest of row 102's 14.15 MB read has no content behind it (J439)"
+   "commit": "c6818e75b9d66f4b284da998cd4be293513f292a",
+   "why": "QA 11-25 row 122: the settled read (nine-load lets drawn copies go first), three local SwiftShader boots of the one-cell page at 6.82 MB; 1.5 MB floor in caps.json"
   },
   "nine/boot/live-heap": {
    "value": 215556042,

@@ -3,7 +3,7 @@ import {join} from 'node:path';
 import {devices} from "../browser-playwright.mjs";
 import {developerSettings,saveFixture,NAME_ASKED} from '../debug-settings.mjs';
 import {startStallProfile,finishStallProfile,bootTimelineEntries} from './stalls.mjs';
-import {bootMemoryMarks,bootMemoryVerdict,liveHeapBytes,retainedGeometryBytes} from './boot-memory-ratchet.mjs';
+import {bootMemoryMarks,bootMemoryVerdict,liveHeapBytes,releaseDrawnThenRead} from './boot-memory-ratchet.mjs';
 import {readBaselines,readCaps} from '../budgets/files.mjs';
 import {reportLedger,zoneContentKey} from '../memory/ledgerVerdict.mjs';
 import {pinnedContentKeys} from '../shard-size-gate.mjs';
@@ -124,24 +124,31 @@ export async function assertNineLoad(browser,base,out,/** @type {Parameters<type
       faults.push(...read.faults);
       if(!read.stalls.some(row=>row.stage==='props'))faults.push('Nine load has no completed props stage');
       const state=await page.evaluate(()=>{const world=window.__wildshard.requireWorld();return {shard:world.game.level.id,frames:world.game.frameCount,entered:world.hud.entered};});
-      // QA 11-25 row 115: the boot's memory is read once its after-control build has settled, not mid-way through it
-      const readRetained=()=>Promise.race([page.evaluate(retainedGeometryBytes).catch(()=>null),
+      // QA 11-25 row 115: the boot's memory is read once its after-control build has settled, not mid-way through it.
+      // QA 11-25 row 122: each read first lets every drawn, unchanged geometry's CPU copy go (`releaseDrawn`, what play
+      // does after 240 renders): a hosted SwiftShader page draws a frame every few seconds, so its read caught the
+      // after-control build's copies still waiting on those renders (12.06 to 15.38 MB, retained plus released constant)
+      let releasedAfter=0;
+      const readRetained=()=>Promise.race([page.evaluate(releaseDrawnThenRead).then(got=>{
+        if(got===null)return null;releasedAfter+=got.released;return got.retained;}).catch(()=>null),
         new Promise(resolve=>{setTimeout(()=>{resolve(null);},NINE_READ_MS);})]);
       const settle=await waitNineSettled(/** @type {()=>Promise<number|null>} */ (readRetained));
-      console.log(`nine-load memory read ${settle.settled?'settled':'not settled'} ${Math.round(settle.waitedMs/1000)} s after readiness`);
+      console.log(`nine-load memory read ${settle.settled?'settled':'not settled'} ${Math.round(settle.waitedMs/1000)} s after readiness; ${(releasedAfter/1e6).toFixed(2)} MB of drawn CPU copies let go before it`);
       // mini QA 2026-11-17 row 19: the boot's memory cuts hold (boot-memory-ratchet.mjs)
       const heap=await page.context().newCDPSession(page);
       let memory;
       try {
         const marks=await page.evaluate(bootMemoryMarks);
-        const retained=await page.evaluate(retainedGeometryBytes);
+        const got=await page.evaluate(releaseDrawnThenRead);
+        if(got!==null)releasedAfter+=got.released;
+        const retained=got?.retained??null;
         const judging={contentKey:zoneContentKey('nine-dragon-stack',pinnedContentKeys()),budgets:{caps:readCaps(),baselines:readBaselines()}};
         memory=bootMemoryVerdict(marks,retained,await liveHeapBytes(heap),judging);
       } finally {await heap.detach().catch(()=>undefined);}
       faults.push(...memory.faults);
       // BUDGET-CAPS BC11: the two boot budgets in one table and budget-measures.json; the budgets workflow judges them
       reportLedger({rows:memory.rows,mode:'nine-boot',directory:out,commit:process.env.GITHUB_SHA,summaryFile:process.env.GITHUB_STEP_SUMMARY});
-      const receipt={...state,elapsedMs:Date.now()-started,readinessMs,stagesMs,stalls:read.stalls,settle,memory,faults};
+      const receipt={...state,elapsedMs:Date.now()-started,readinessMs,stagesMs,stalls:read.stalls,settle,releasedAfter,memory,faults};
       writeFileSync(join(out,'load.json'),`${JSON.stringify(receipt,null,2)}\n`);
       console.log(JSON.stringify(receipt));
       if(faults.length>0)throw new Error(faults.join('; '));

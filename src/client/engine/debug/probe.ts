@@ -27,6 +27,7 @@ import { placementCensus, type PlacementCensus } from '../models/place';
 import { ownerCensus } from '../../../shared/engine/app/ownership';
 import { textureReport } from '../boot/gpuFiles';
 import { frameCost } from '../../../shared/engine/core/frameCost';
+import { releaseDrawnGeometry } from '../render/memorySaver';
 
 declare const __BUILD_ID__: string;
 export interface Vec3 { x: number; y: number; z: number }
@@ -166,6 +167,10 @@ export interface EngineProbe<W extends ProbeWorld = ProbeWorld> {
   /** The frame-cost collector (core/frameCost.ts): a bench switches it on to split a long update by system, event delivery
    *  and phase scheduling, frame by frame (DF8, route-bench `--frames`). */
   frameCost?: typeof frameCost;
+  /** QA 11-25 row 122: let every drawn, unchanged geometry's CPU copy go now, as play does after 240 renders (the boot's
+   *  own `releaseDrawnGeometry`): a boot-memory read then measures the copies play keeps, not how far a slow page got
+   *  toward its settle. Returns the bytes let go. */
+  releaseDrawn?: () => number;
   version: 1; world: W | undefined; shard: { slug: string } & Record<string, unknown>;
   /** Pinned harness: immutable boot snapshot. Otherwise captured lazily on its first explicit read. */
   readonly boot: Fingerprint;
@@ -461,6 +466,7 @@ export function installProbe<W extends ProbeWorld>(world: W, deps: ProbeDeps): E
       get owners() { return ownerCensus(); },
     }),
     debugSettings: () => levelDebugRows().filter(row => row.choices().length > 0).map(row => ({ id: row.id, value: row.get() })),
+    releaseDrawn: () => releaseDrawnGeometry(game.renderer),
     version: 1, world, requireWorld: () => world, memory: () => memoryAttribution.snapshot(), scriptMemory: fixedMemoryCensus, textures: textureReport, frameCost, get shard() { return { ...handles, ...app.debug.scopedSnapshot(), slug: world.game.level.id }; },
     colliderTag: (handle) => world.physics.world.colliders.contains(handle) ? tagOf(world.physics.world.getCollider(handle)) : undefined,
     get boot() { boot ??= fingerprint(world, saves); return boot; }, fingerprint: () => fingerprint(world, saves), pose, nav,
@@ -526,6 +532,7 @@ function scopedProbe<W extends ProbeWorld>(source: EngineProbe<W>, scope: Scope)
     version: 1, get boot() { boot ??= structuredClone(read().boot); return boot; }, memory: () => memoryAttribution.snapshot(), scriptMemory: fixedMemoryCensus, textures: textureReport, frameCost,
     get world() { return live?.world; },
     requireWorld: () => read().requireWorld(),
+    releaseDrawn: () => read().releaseDrawn?.() ?? 0,
     colliderTag: (handle) => read().colliderTag(handle),
     get shard() { return live?.shard ?? { slug }; },
     get combat() { return read().combat; },

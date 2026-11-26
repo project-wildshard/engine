@@ -108,6 +108,14 @@
    "decision": null,
    "why": "Nine's boot at control in ci's nine-ring1 load (BC11): CPU geometry still reachable from the scene, and the live JS heap after a full collection. No hard cap on record (D3); held spawn parts fail the load on their own. Floor 5 MB like every memory total: retained geometry at control moves ~2 MB with when uploads release (retained plus released is constant)."
   },
+  "nine/boot/retained-geometry": {
+   "hard": null,
+   "unit": "bytes",
+   "kind": "noisy",
+   "floor": 1500000,
+   "decision": null,
+   "why": "Nine's CPU geometry still reachable from the scene once settled (BC11; QA 11-25 row 122): nine-load lets every drawn, unchanged copy go first (what play does after 240 renders), so the read no longer moves with how far a slow page got toward its settle (hosted SwiftShader read 12.06 to 15.38 MB of one 57.9 MB total). The 1.5 MB floor covers what still moves from boot to boot: the grid deck's tile backing swaps its 0.90 MB cull index for 0.14 MB some seconds after control, and a hidden prop (Nine's dragon hooks, 1.03 MB) keeps its copies when the boot's warm draws skipped it. No hard cap on record (D3)."
+  },
   "nine/boot/live-heap": {
    "hard": null,
    "unit": "bytes",
