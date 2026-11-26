@@ -10,6 +10,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { git } from './lib.mjs';
 
 const lane = process.argv[2];
@@ -168,6 +169,18 @@ if (!jobs.length) process.exit(0); // no toolchain yet
 if (!existsSync(join(pkgDir, 'node_modules'))) {
   console.error(`\n  X ${lane} blocked: node_modules is missing. Run pnpm install (or SKIP_CHECK=1).\n`);
   process.exit(1);
+}
+// QA 11-25 row 92: after a pull moved the lockfile, the commit lane ran the old npm-bin-deps runner, which rewrote the
+// tracked .bin-deps files from the repo's pnpm settings. A lane never runs tools older than the lockfile.
+const lagModule = join(pkgDir, 'src/scripts/install-lag.mjs');
+if (existsSync(lagModule)) {
+  const { installLag } = await import(pathToFileURL(lagModule).href);
+  const lag = installLag(pkgDir);
+  if (lag !== '') {
+    console.error(`\n  X ${lane} blocked: node_modules is behind (${lag}), and its old tools can rewrite tracked files` +
+      ' such as .bin-deps. Run pnpm install (or SKIP_CHECK=1).\n');
+    process.exit(1);
+  }
 }
 
 // Hooks export GIT_INDEX_FILE and friends; tools that shell out to git

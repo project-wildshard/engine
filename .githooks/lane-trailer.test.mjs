@@ -26,7 +26,8 @@ const root = mkdtempSync(join(tmpdir(), 'lane-trailer-'));
 after(() => rmSync(root, { recursive: true, force: true }));
 
 test('the commit-msg hook writes the lane of a commit made by hand, and the message still passes its rules', () => {
-  const env = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))), GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' };
+  // A lane's own SKIP_ or ALLOW_ hatch would otherwise refuse this unnamed sandbox commit (test-helpers ENV does the same).
+  const env = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_') && !/^(?:SKIP|ALLOW)_/u.test(key))), GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' };
   const git = (...args) => spawnSync('git', args, { cwd: root, encoding: 'utf8', env: { ...env, WS_LANE_NAME: 'opus-guard' } });
   git('init', '-q', '-b', 'main');
   cpSync(fileURLToPath(new URL('.', import.meta.url)), join(root, '.githooks'), { recursive: true, filter: path => !path.endsWith('.test.mjs') });

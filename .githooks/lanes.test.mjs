@@ -2,7 +2,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ENV, ok, roots, sandbox } from './test-helpers.mjs';
@@ -81,5 +81,22 @@ describe('check lanes', () => {
     const result = box.git(['push', '-q', 'origin', 'main']);
     assert.notEqual(result.status, 0, 'push should have been blocked');
     assert.match(result.stderr, /push lane: pnpm check[\s\S]*knip: unused export/);
+  });
+  // QA 11-25 row 92: the stale npm-bin-deps runner rewrote tracked .bin-deps files after a pull moved the lockfile.
+  test('a lane refuses an install behind the lockfile before any tool runs, and leaves the tree as it was', () => {
+    const box = sandbox();
+    toolchain(box, { ...pass, typecheck: record('ran.args') });
+    const lagSource = readFileSync(join(import.meta.dirname, '../src/scripts/install-lag.mjs'), 'utf8');
+    box.write('node_modules/.pnpm/lock.yaml', "lockfileVersion: '9.0'\n");
+    box.commit({ 'src/scripts/install-lag.mjs': lagSource, 'pnpm-lock.yaml': "lockfileVersion: '9.0'\n" }, MSG, { env: { SKIP_CHECK: '1' } });
+    box.commit({ 'pnpm-lock.yaml': "lockfileVersion: '9.0'\n# moved\n" }, MSG, { env: { SKIP_CHECK: '1' } });
+    const result = box.commit({ 'src/a.ts': 'export {};\n' }, MSG);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /commit blocked: node_modules is behind \(pnpm-lock.yaml moved since the last install\)/);
+    assert.equal(existsSync(join(box.root, 'ran.args')), false);
+    assert.equal(box.git(['diff', '--name-only']).stdout, '');
+    box.write('node_modules/.pnpm/lock.yaml', "lockfileVersion: '9.0'\n# moved\n");
+    const fresh = box.commit({ 'src/b.ts': 'export {};\n' }, MSG);
+    assert.equal(fresh.status, 0, fresh.stderr);
   });
 });
