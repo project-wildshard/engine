@@ -966,6 +966,7 @@
     "./game/devGameplay": "./src/shared/game/devGameplay.ts",
     "./game/grid/catalogueSlot": "./src/shared/game/grid/catalogueSlot.ts",
     "./game/grid/placedCells": "./src/client/game/grid/placedCells.ts",
+    "./game/grid/cookedZones": "./src/client/game/grid/cookedZones.ts",
     "./game/grid/roomsRevision": "./src/client/game/grid/roomsRevision.ts",
     "./game/grid/placedCards": "./src/client/game/grid/placedCards.ts",
     "./game/grid/placementRows": "./src/shared/game/grid/placementRows.ts",

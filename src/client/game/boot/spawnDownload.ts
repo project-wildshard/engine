@@ -6,7 +6,7 @@ import { beginLoadingWait, finishLoadingWait } from '@wildshard/engine/boot/load
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { Scope } from '@wildshard/engine/app/scope';
 import { clearFailure, showFailure } from '@wildshard/engine/telemetry/runtime';
-import {bootBankText, contentBase, contentURL, isContentOrigin, pageURL} from '@wildshard/engine/boot/contentBase';
+import {bootBankText, contentBase, contentURL, cookedObjectURL, isContentOrigin, pageURL} from '@wildshard/engine/boot/contentBase';
 import { clearDownloadGiveUp, noteDownloadGiveUp } from '@wildshard/engine/boot/downloadGiveUp';
 import { readByDefault, scratchReader } from '@wildshard/engine/boot/scratchReader';
 import { lentResponse, loadGc } from '@wildshard/engine/boot/lentBody';
@@ -668,7 +668,7 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
                 // PZ3: on the content base only content moves; code and rapier stay with the page (a J138 home holds all of it).
                 const source = new URL(url), page = new URL(base);
                 // SA48: a slug placed after the build reads its loose files from its upload's own folder in the store
-                const target = source.origin !== page.origin ? url : manifestLoose(source.pathname, source.search, manifest.shard) ?? (packs === contentBase() ? contentURL(url)
+                const target = source.origin !== page.origin ? url : cookedObjectURL(source.pathname, source.search) ?? manifestLoose(source.pathname, source.search, manifest.shard) ?? (packs === contentBase() ? contentURL(url)
                   : new URL(source.pathname + source.search, packs).href);
                 return ports.fetch(target, signal, init);
               },
@@ -931,6 +931,9 @@ function packsSelection(book: unknown, slug: string, flow: 'client' | 'grid', ti
 /** A book's page path (`/assets/spawn/…`) on the packs base. The content base mirrors page paths under its own folder (PZ13:
  * `content/<set>/`), so a path keeps that folder; a J138 home or the page resolves it as a URL path, as it always did. */
 function onPacks(path: string, packs: string): string {
+  // PV4: a cooked zone's manifest or part is read at its object key
+  const object = path.startsWith('/') && !path.startsWith('//') ? cookedObjectURL(path) : undefined;
+  if (object !== undefined) return object;
   const base = contentBase();
   return base !== '' && packs === base && path.startsWith('/') && !path.startsWith('//') ? new URL(`.${path}`, base).href : new URL(path, packs).href;
 }
@@ -972,7 +975,7 @@ function manifestLoose(pathname: string, search: string, shard: string): string 
   return owner !== undefined && owner !== bareSlug(shard) ? bakedLoose(pathname, search) : storedLoose(pathname, search);
 }
 /** Where a loose page path is read: a placed slug's upload folder, a baked stored cook's, or undefined (this page or the base). */
-function storedLoose(pathname: string, search = ''): string | undefined { return placedLoose(pathname, search) ?? bakedLoose(pathname, search); }
+function storedLoose(pathname: string, search = ''): string | undefined { return cookedObjectURL(pathname, search) ?? placedLoose(pathname, search) ?? bakedLoose(pathname, search); }
 /** Optional recorded programs use the cook's actual inventory. Null means the cook published no such file. */
 export function shardPackBase(slug: string): string | null {
   const text = document.getElementById('boot-module-files')?.textContent;
@@ -989,6 +992,9 @@ export function shardPackBase(slug: string): string | null {
 /** DL10: a shard's recorded entry programs, or null when its cook published none. The file carries the product slug: a
  *  placement's authored `_proto` reads `/programs/proto.json` (an authored-name read 404s, TEMPLATE-E2E TE13). */
 export function entryProgramsURL(slug: string): string | null {
+  // PV5: a cooked zone's programs are wherever its index maps them (`common/` when the shardfile carries them, else its cook)
+  const cooked = placedSpawn(slug)?.programs === true ? cookedObjectURL(`/programs/${bareSlug(slug)}.json`) : undefined;
+  if (cooked !== undefined) return cooked;
   const base = shardPackBase(slug);
   return base === null ? null : new URL(`programs/${bareSlug(slug)}.json`, base).href;
 }

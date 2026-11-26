@@ -70,6 +70,30 @@ export function contentCacheOrigins(): readonly string[] {
   return base === '' ? [...cacheOrigins] : [...new Set([new URL(base).origin, ...cacheOrigins])];
 }
 
+/**
+ * Fix preview PV4: a zone read from the cook (`cooked.wildshard.io`, through its index under the zone table's key) keeps its page
+ * paths, as J138 wants, but each path is stored at its own object key (`shards/<slug>/<shardVersion>/common/…` or `…/cooks/<v>/…`).
+ * Its index's `objects` table is installed here, page path to absolute URL, so every content read below resolves through it first.
+ */
+const cooked = new Map<string, string>(), cookedBack = new Map<string, string>(), cookedOrigins = new Set<string>();
+/** Install page paths (with or without the leading `/`) and the absolute URLs that hold their bytes. A path already installed keeps
+ *  its first URL: parts and blobs are content-named, so any zone's copy is the same bytes. */
+export function installCookedObjects(objects: Iterable<readonly [string, string]>): void {
+  for (const [path, url] of objects) {
+    const page = path.startsWith('/') ? path : `/${path}`;
+    if (cooked.has(page)) continue;
+    const at = new URL(url);
+    if (at.search !== '' || at.hash !== '' || (at.protocol !== 'https:' && at.protocol !== 'http:')) throw new Error(`Invalid cooked object URL: ${url}`);
+    cooked.set(page, at.href); cookedBack.set(at.href, page); cookedOrigins.add(at.origin);
+  }
+}
+export function clearCookedObjects(): void { cooked.clear(); cookedBack.clear(); cookedOrigins.clear(); }
+/** Where the cook stores a page path (`/assets/spawn/parts/…`), with `search` kept; undefined for a path no installed zone maps. */
+export function cookedObjectURL(pathname: string, search = ''): string | undefined {
+  const url = cooked.size === 0 ? undefined : cooked.get(pathname);
+  return url === undefined ? undefined : `${url}${search}`;
+}
+
 /** A path the content base serves: shard products, programs, and `/assets/` art and books, not code or physics. */
 export function isContentPath(path: string): boolean {
   if (/\.(?:js|mjs|css|map)$/u.test(path)) return false;
@@ -79,9 +103,14 @@ export function isContentPath(path: string): boolean {
 /** Where to read `url` (relative to the page, or a page URL): the same path and query on the content base when it is
  *  content on the page's origin and the bank names a base. Anything else, and every URL with no base, comes back as is. */
 export function contentURL(url: string, base: string = contentBase()): string {
-  if (base === '') return url;
-  const page = new URL(pageBase()), address = new URL(url, page), root = new URL(base);
+  if (base === '' && cooked.size === 0) return url;
+  const page = new URL(pageBase()), address = new URL(url, page);
   if (address.origin !== page.origin || !isContentPath(address.pathname)) return url;
+  // PV4: a path a cooked zone maps is read from its object, whatever the base
+  const object = cookedObjectURL(address.pathname, address.search);
+  if (object !== undefined) return object;
+  if (base === '') return url;
+  const root = new URL(base);
   // a base on the page's own origin under a content path: a URL already in its folder is not moved again (review)
   if (root.origin === page.origin && root.pathname !== '/' && address.pathname.startsWith(root.pathname)) return url;
   return new URL(`.${address.pathname}${address.search}`, base).href;
@@ -89,8 +118,12 @@ export function contentURL(url: string, base: string = contentBase()): string {
 
 /** The page URL a content URL stands for (J138: the member store keys level files by page URL). Others: as is. */
 export function pageURL(url: string, base: string = contentBase()): string {
+  if (base === '' && cooked.size === 0) return url;
+  const address = new URL(url, pageBase());
+  const back = cooked.size === 0 ? undefined : cookedBack.get(address.origin + address.pathname);
+  if (back !== undefined) return new URL(back + address.search, pageBase()).href;
   if (base === '') return url;
-  const address = new URL(url, pageBase()), root = new URL(base);
+  const root = new URL(base);
   if (address.origin !== root.origin || !address.pathname.startsWith(root.pathname)) return url;
   const path = address.pathname.slice(root.pathname.length - 1);
   if (!isContentPath(path)) return url;
@@ -99,5 +132,5 @@ export function pageURL(url: string, base: string = contentBase()): string {
 
 /** True for the page's own origin and, when the bank names one, the content origin. */
 export function isContentOrigin(origin: string, base: string = contentBase()): boolean {
-  return origin === new URL(pageBase()).origin || (base !== '' && origin === new URL(base).origin);
+  return origin === new URL(pageBase()).origin || (base !== '' && origin === new URL(base).origin) || cookedOrigins.has(origin);
 }

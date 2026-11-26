@@ -92,7 +92,9 @@ const titleRows = withCatalogueHeads(readTitleRows(document));
 installTitleManifests(titleRows);
 // SA33 to SA35, the page half: a released page adds the cells the API placed after its build (its channel's signed placement file) to the
 // catalogue before anything reads the grid; `enterPage` waits for it (3 s at most), and any failure keeps the build's grid.
-const placedCells = learnPlacedCellsOnce();
+// Fix preview PV4: a page that bakes a zone table (preview) loads every zone from the cook, beside the placement read and on its deadline;
+// a late answer still installs (it only adds the zones' spawn rows and object table).
+const placedCells = Promise.all([learnPlacedCellsOnce(), learnCookedZonesOnce()]).then(() => undefined);
 // G727 / I9: Settings' "Download everything"; the prefetch loads only when the player opens or presses it
 installOfflineDownload({
   size: async owner => (await import('@wildshard/engine/game/grid/prefetch')).remainingDownloadBytes(owner),
@@ -152,6 +154,23 @@ function learnPlacedCellsOnce(): Promise<void> {
     } catch (error) { console.warn('[grid] placement file not read:', error); }
   })();
   const deadline = new Promise<void>(resolve => { entryScope.timeout(PLACED_DEADLINE_MS, () => { late.abort(); resolve(); }); });
+  return Promise.race([read, deadline]);
+}
+/** PV4: every zone of the page's baked zone table, read from the cooked bucket; a page with none reads nothing and imports nothing. */
+function learnCookedZonesOnce(): Promise<void> {
+  if (document.getElementById('ws-zone-table') === null) return Promise.resolve();
+  const read = (async (): Promise<void> => {
+    try {
+      const { bakedZoneTable, learnCookedZones } = await import('@wildshard/engine/game/grid/cookedZones');
+      const table = bakedZoneTable();
+      if (table === undefined) return;
+      const validator: unknown = Reflect.get(globalThis, '__WS_SHARDFILE_VALIDATOR__');
+      const answer = await bootTask('app:cooked-zones', () => learnCookedZones(table, { fetch, signal: new AbortController().signal,
+        validator: typeof validator === 'string' ? validator : null }));
+      console.info(`[grid] cooked zones from ${table.from.channel} serial ${String(table.from.serial)}, cook ${table.cookVersion}: ${String(answer.installed.length)} installed${answer.missing.length === 0 ? '' : `, missing ${answer.missing.join(', ')}`}`);
+    } catch (error) { console.warn('[grid] cooked zones not read:', error); }
+  })();
+  const deadline = new Promise<void>(resolve => { entryScope.timeout(PLACED_DEADLINE_MS, resolve); });
   return Promise.race([read, deadline]);
 }
 async function enterPage(): Promise<unknown> {

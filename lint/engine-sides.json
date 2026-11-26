@@ -1921,6 +1921,7 @@
     "src/shared/game/grid/catalogueDocument.ts": "shared",
     "src/shared/game/grid/catalogueSlot.ts": "shared",
     "src/shared/game/grid/zoneTable.ts": "shared",
+    "src/client/game/grid/cookedZones.ts": "client",
     "src/shared/game/grid/cellEvents.ts": "shared",
     "src/shared/game/grid/collisionStrips.ts": "shared",
     "src/shared/game/grid/compiledStrips.ts": "shared",
