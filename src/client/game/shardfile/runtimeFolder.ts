@@ -279,10 +279,29 @@ export async function loadShardFolder(expectedIdentity: string, options: FolderO
 const manifestAdmissions = new WeakMap<ShardManifest, { readonly admitted: AdmittedFolder; readonly options: FolderOptions; readonly reader?: ClientAssets }>();
 // QA 11-25 row 109: the admitted maps a page's manifests hold, weakly (a replaced manifest's admission is not kept alive here)
 const heldAdmissions = new Set<WeakRef<ReadonlyMap<string, Uint8Array>>>();
+// QA 11-25 row 116: the admitted sources a page's manifests hold, weakly, for their verified index and parsed sections
+const heldSources = new Set<WeakRef<Shardfile>>();
 /** An installed data-client manifest already owns an admission (and its client's asset reader); its context reuses it. */
 export function provideManifestAdmission(manifest: ShardManifest, admitted: AdmittedFolder, options: FolderOptions, reader?: ClientAssets): void {
   manifestAdmissions.set(manifest, { admitted, options, ...(reader === undefined ? {} : { reader }) });
   heldAdmissions.add(new WeakRef(admitted.assets));
+  heldSources.add(new WeakRef(admitted.source));
+}
+/**
+ * QA 11-25 row 116: the built index a manifest's admission read and verified under `indexHash`, with every section it parsed,
+ * else undefined. A grid page's home is admitted under its catalogue manifest before the grid opens, and the grid's
+ * descriptor helpers (far bytes, kept rows, far and near views, edges, look) each read that same `shard.json` and some of
+ * its sections again (Nine's one-cell boot read its 749 KB index four times). They take these instead. The admission keeps
+ * its source (and so these) for the page, after `releaseBootTransport` too: nothing here holds more than it does.
+ */
+export function heldAdmissionIndex(indexHash: string): Pick<NonNullable<ReturnType<typeof outputDescriptor>>, 'index' | 'sections'> | undefined {
+  for (const ref of heldSources) {
+    const source = ref.deref();
+    if (source === undefined) { heldSources.delete(ref); continue; }
+    const descriptor = outputDescriptor(source);
+    if (descriptor?.built === true && descriptor.indexHash === indexHash) return descriptor;
+  }
+  return undefined;
 }
 /**
  * QA 11-25 row 109: the bytes a manifest's admission still holds for `hash` (a file, or a `commons:` wire), else undefined.

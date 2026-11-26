@@ -335,7 +335,8 @@ test('OF8: a first-party section URL carries ?v= from the hash its index declare
     return bytes;
   } };
   const both = Promise.all([readGridFolderEdges(f.url, f.source.identity.slug, options), readGridFolderEdges(f.url, f.source.identity.slug, options)]);
-  await vi.waitFor(() => { expect(reads.filter(url => new URL(url).pathname === new URL(f.url).pathname)).toHaveLength(2); });
+  // QA 11-25 row 116: the two readers share one read of the index too
+  await vi.waitFor(() => { expect(reads.filter(url => new URL(url).pathname === new URL(f.url).pathname)).toHaveLength(1); });
   await new Promise<void>(resolve => { setImmediate(resolve); });
   open();
   await both;

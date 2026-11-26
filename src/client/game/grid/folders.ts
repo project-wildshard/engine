@@ -7,7 +7,7 @@ import { graphFileCandidate } from '../shardfile/graphFileCandidate';
 import { findShard } from '../shard/registry';
 import { findTitleManifest } from '../shard/titleList';
 import { admitFolder, boundedResponse, checkBuiltIndex, readIndexBytes, readFolderDescriptor, type AdmittedFolder, type FolderOptions } from '../shardfile/folder';
-import { browserShardfileOptions, manifestAdmittedSource } from '../shardfile/runtimeFolder';
+import { browserShardfileOptions, heldAdmissionIndex, manifestAdmittedSource } from '../shardfile/runtimeFolder';
 import { SHARDFILE_ADMISSION_LIMITS as limits } from '@wildshard/format/admissionLimits';
 import {builtIndexHash} from '@wildshard/format/builtIndexes';
 import { FolderLeases } from './folderLeases';
@@ -55,11 +55,13 @@ const edges = new WeakMap<ResidencyAllocator, {
   reads: Map<string, Promise<GridEdges>>;
 }>();
 
-/** A product's bounded index, read once for several section or file reads (no runtime or asset is admitted). */
-interface GridFolderIndex { readonly index: OutputIndex; readonly url: string; readonly options: FolderOptions; readonly packed: PackReads }
+/** A product's bounded index, read once for several section or file reads (no runtime or asset is admitted). `admitted`: the
+ *  sections a manifest's admission already parsed from this exact index (QA 11-25 row 116), read from nowhere again. */
+interface GridFolderIndex { readonly index: OutputIndex; readonly url: string; readonly options: FolderOptions; readonly packed: PackReads; readonly admitted?: ReadonlyMap<string, unknown> }
 /** each index's parse by its bytes' hash: a cell's far, near and edge reads each parsed the same index (G639: ~0.9 ms a
- *  frame over a Sky Reach drive at phone 4x). The index is still read and its stale-client check still runs every time;
- *  only the parse of the same bytes is kept, under an estimated heap byte limit. */
+ *  frame over a Sky Reach drive at phone 4x). A checked (network) index is still read and its stale-client check still
+ *  runs every time; only the parse of the same bytes is kept, under an estimated heap byte limit. A build-owned index is
+ *  kept by its versioned address and not read again while kept (QA 11-25 row 116). */
 const parsedIndexes = new ResidentByteCache<string, OutputIndex>(CACHE_BYTE_LIMITS.gridIndexes);
 function keepGridDocument<T extends object>(cache: ResidentByteCache<string, T>, key: string, document: T, bytes: number): void {
   if (!cache.set(key, document, bytes)) return;
@@ -71,25 +73,56 @@ function keepGridDocument<T extends object>(cache: ResidentByteCache<string, T>,
 function builtGridIndex(input: unknown, hash: string, options: FolderOptions): input is OutputIndex {
   return typeof input === 'object' && input !== null && (options.buildRead!==undefined||options.built?.indexes.has(hash) === true);
 }
+/** QA 11-25 row 116: one build-owned index read per address in flight; the far bytes, kept rows, far view and edges of one
+ *  cell each asked for it at once (Nine's one-cell boot read its index three times in 300 ms besides its admission's). */
+const nativeIndexReads = new Map<string, Promise<OutputIndex>>();
+async function readNativeGridIndex(native: NonNullable<FolderOptions['buildRead']>, address: string, declared: string | undefined, options: FolderOptions): Promise<OutputIndex> {
+  const bytes = await native(address, undefined, undefined, declared);
+  const input = await readIndexBytes(bytes, options);
+  const validated = builtGridIndex(input, address, options) ? input : await readCheckedOutputIndex(input);
+  const index = parsedIndexes.get(address);
+  if (index !== undefined) return index;
+  // The validated wire size weights object fields, strings and array entries.
+  keepGridDocument(parsedIndexes, address, validated, bytes.byteLength * 4);
+  return validated;
+}
 async function readGridFolderIndex(url: string, identity: string, options: FolderOptions): Promise<GridFolderIndex> {
   const native=options.buildRead,address=new URL(url);
   const declared=options.descriptorHash??builtIndexHash(address.pathname)??undefined;
   if(native!==undefined&&declared!==undefined)address.searchParams.set('v',declared.slice(0,8));
-  const bytes = native===undefined?await boundedResponse(await options.fetch(url), limits.sourceBytes):await native(address.href,undefined,undefined,declared);
-  const key = native===undefined?await options.hash(bytes):address.href;
-
-  let index = parsedIndexes.get(key);
-  if (index !== undefined) {if(native===undefined)await checkBuiltIndex(key, options);}
-  else {
-    const input = await readIndexBytes(bytes, options);
-    const validated = builtGridIndex(input, key, options) ? input : await readCheckedOutputIndex(input);
-    // Far, near and edge readers can validate the same immutable bytes together.
-    // Share the first published document so their file readers retain one copy.
+  // QA 11-25 row 116: the build-owned bytes of this exact index were read and verified by a manifest's admission (a grid
+  // page's home), or by an earlier helper here (its parse is kept by address, and a build-owned read is never checked
+  // again): neither is read a second time
+  const admitted = native === undefined || declared === undefined ? undefined : heldAdmissionIndex(declared);
+  let index: OutputIndex | undefined = admitted?.index;
+  if (index === undefined && native !== undefined) {
+    const key = address.href;
     index = parsedIndexes.get(key);
     if (index === undefined) {
-      index = validated;
-      // The validated wire size weights object fields, strings and array entries.
-      keepGridDocument(parsedIndexes, key, index, bytes.byteLength * 4);
+      let reading = nativeIndexReads.get(key);
+      if (reading === undefined) {
+        const read = readNativeGridIndex(native, key, declared, options);
+        reading = read; nativeIndexReads.set(key, read);
+        const forget = (): void => { if (nativeIndexReads.get(key) === read) nativeIndexReads.delete(key); };
+        void read.then(forget, forget);
+      }
+      index = await reading;
+    }
+  } else if (index === undefined) {
+    const bytes = await boundedResponse(await options.fetch(url), limits.sourceBytes);
+    const key = await options.hash(bytes);
+    index = parsedIndexes.get(key);
+    if (index !== undefined) await checkBuiltIndex(key, options);
+    else {
+      const input = await readIndexBytes(bytes, options);
+      const validated = builtGridIndex(input, key, options) ? input : await readCheckedOutputIndex(input);
+      // Far, near and edge readers can validate the same immutable bytes together.
+      // Share the first published document so their file readers retain one copy.
+      index = parsedIndexes.get(key);
+      if (index === undefined) {
+        index = validated;
+        keepGridDocument(parsedIndexes, key, index, bytes.byteLength * 4);
+      }
     }
   }
   const { slug: declaredIdentity } = index.identity;
@@ -101,7 +134,7 @@ async function readGridFolderIndex(url: string, identity: string, options: Folde
     const packBytes = await boundedResponse(response, maximum);
      return packBytes;
   }, options.hash);
-  return { index, url, options, packed };
+  return { index, url, options, packed, ...(admitted === undefined ? {} : { admitted: admitted.sections }) };
 }
 /** One immutable file the index declares (a section or a blob), from the content cache or the product URL, size and hash
  * checked; a network read is kept in the content cache like an admission's. `address` is the file's URL (a versioned
@@ -152,6 +185,8 @@ function nativeRead(options: FolderOptions): FolderOptions['buildRead'] {
 async function readGridSection(at: GridFolderIndex, name: string): Promise<unknown> {
   const section = at.index.sections.find(row => row.name === name);
   if (section === undefined) return null;
+  // QA 11-25 row 116: the admission parsed this section from the same verified index; each caller still owns its copy
+  if (at.admitted?.has(name) === true) return structuredClone(at.admitted.get(name));
   const address = gridSectionAddress(at, section.path, section.hash), versioned = nativeRead(at.options) !== undefined;
   const decode = (bytes: Uint8Array): unknown => JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
   // Only a built-in section is kept once settled: the checked path has its own content cache and revalidation.
