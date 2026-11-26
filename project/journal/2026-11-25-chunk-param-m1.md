@@ -61,3 +61,12 @@
 - CP8: the registry's running zone is the one the entry set (`setPageZone`); `shardSlugFromUrl` and its address read went, and
   `prepareSelectedShard` takes the boot's zone. The standalone app's strip keeps dropping `v` only. Comments that described the
   param say what is true now.
+
+## CP9: the journey proves no address names a zone
+
+The Zone Select journey used to wait for `?chunk=<slug>` after PLAY. It now waits for a new document at `/` that
+started with a tap record naming the picked zone (an init script, `journey.ts` `startTapScript`, copies the save blob's
+`titleArrival` before the boot claims it), asserts each address has no `chunk`, and records every main-frame navigation and socket URL, failing if any
+carries `chunk=`. On a working-tree preview the FEATURED and POPULAR entries pass the new wait; the NEW tab has no
+enterable card in that build (its zones are not in the local pins), an assertion that runs before PLAY and is
+unrelated to the param.

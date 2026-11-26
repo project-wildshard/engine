@@ -11,7 +11,7 @@ import {
 } from '../../../scripts/journey-proof.mjs'
 
 import type { JourneyPath, Sample } from '../../../scripts/journey-proof.mjs'
-import type { Browser, Page } from '@playwright/test'
+import type { Browser, Frame, Locator, Page, WebSocket } from '@playwright/test'
 
 // MAIN-SCREEN MS5 (J399): the same judge on all three ways in: ZONE SELECT and a card, ENTER THE MMO, and the one-zone deep
 // link; each must reach the zone's detailed full-screen loading card and play.
@@ -149,4 +149,66 @@ async function markedZoneSelectPress(
   }
 }
 
-export { journey, markedZoneSelectPress, phoneJourneys }
+// CHUNK-PARAM CP9 (J522): the tap names the zone in the tab, never the address. The page-side code is a string: this
+// build has no DOM types.
+/** An init script: copies the tap record each document starts with (the save blob's `titleArrival` or its device copy)
+ *  to `globalThis.__wsStartTap`, before the boot claims it. */
+const startTapScript = `(() => {
+  const taps = [];
+  const read = (store) => {
+    for (const name of Object.keys(store)) {
+      if (!name.startsWith('wildshard.save')) continue;
+      const keys = JSON.parse(store.getItem(name) || '{}').keys || {};
+      for (const key of ['titleArrival', 'titleArrival.once']) {
+        const data = keys[key] && keys[key].data;
+        if (data !== undefined && data !== null) taps.push(JSON.stringify(data));
+      }
+    }
+  };
+  try { read(sessionStorage); read(localStorage); } catch { /* blocked storage: the wait names it */ }
+  globalThis.__wsStartTap = taps.join(' ');
+})()`
+
+/** Taps `play` and waits for the new document at `/` that started with a tap naming `zone`; its address names none. */
+async function tapIntoZone(
+  page: Page,
+  play: Locator,
+  zone: string,
+): Promise<void> {
+  const was = await page.evaluate<number>('performance.timeOrigin')
+  await play.tap({ timeout: 5000 })
+  await page.waitForFunction(
+    `performance.timeOrigin !== ${String(was)} && location.pathname === '/' && String(globalThis.__wsStartTap ?? '').includes(${JSON.stringify(zone)})`,
+    undefined,
+    { timeout: 30_000 },
+  )
+  expect(new URL(page.url()).searchParams.has('chunk')).toBe(false)
+}
+
+/** Every main-frame navigation and socket URL on `page` that names a zone (`chunk=`), as it happens. */
+function zoneAddresses(page: Page): readonly string[] {
+  const named: string[] = []
+  const watch = (url: string): void => {
+    if (/[?&]chunk=/u.test(url)) {
+      named.push(url)
+    }
+  }
+  page.on('framenavigated', (frame: Readonly<Frame>): void => {
+    if (frame === page.mainFrame()) {
+      watch(frame.url())
+    }
+  })
+  page.on('websocket', (socket: Readonly<WebSocket>): void => {
+    watch(socket.url())
+  })
+  return named
+}
+
+export {
+  journey,
+  markedZoneSelectPress,
+  phoneJourneys,
+  startTapScript,
+  tapIntoZone,
+  zoneAddresses,
+}

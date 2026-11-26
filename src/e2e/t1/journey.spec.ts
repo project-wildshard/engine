@@ -14,7 +14,14 @@ import {
 } from '../../../scripts/bugbash-probes.mjs'
 import { harnessPins, saveFixture } from '../../../scripts/debug-settings.mjs'
 import { PHONE } from '../../../scripts/journey-proof.mjs'
-import { journey, markedZoneSelectPress, phoneJourneys } from './journey.ts'
+import {
+  journey,
+  markedZoneSelectPress,
+  phoneJourneys,
+  startTapScript,
+  tapIntoZone,
+  zoneAddresses,
+} from './journey.ts'
 
 import type { Page } from '@playwright/test'
 
@@ -199,11 +206,7 @@ async function enterFromTab(
   const slug = (await lit.getAttribute('data-slug')) ?? ''
   await page.waitForTimeout(500)
   await page.screenshot({ path: test.info().outputPath(`zs10-${tab}.png`) })
-  await page.locator('.ws-menu-play').tap({ timeout: 5000 })
-  await page.waitForURL(
-    (url: Readonly<URL>): boolean => url.searchParams.get('chunk') === slug,
-    { timeout: 15_000 },
-  )
+  await tapIntoZone(page, page.locator('.ws-menu-play'), slug)
   return slug
 }
 
@@ -231,7 +234,9 @@ test('Zone Select switches FEATURED, POPULAR, NEW and ALL, and enters a zone fro
       )
       await route.fulfill({ response: reply, body: html })
     })
+    await context.addInitScript(startTapScript)
     const page = await context.newPage()
+    const named = zoneAddresses(page)
     const errors: string[] = []
     page.on('pageerror', (error: Readonly<Error>): void => {
       errors.push(error.message)
@@ -246,6 +251,7 @@ test('Zone Select switches FEATURED, POPULAR, NEW and ALL, and enters a zone fro
     expect(served.featured).not.toContain(fresh)
     expect(all).not.toBe('')
     expect(errors).toEqual([])
+    expect(named, 'no address names a zone (J522)').toEqual([])
   } finally {
     await context.close()
   }
