@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, test } from 'vitest';
-import { attributionGap, cutTree, fullCommitArgs, writeHold, gateInputsMoved, localAttemptDir, nextAdmission, provesNpmNext, releaseCiAdmission, provesReleaseReuse, provesTrainCi, retryRead, watchTrainRun } from '../src/scripts/release-train-proof.mjs';
+import { attributionGap, cutTree, fullCommitArgs, treeDirt, writeHold, gateInputsMoved, localAttemptDir, nextAdmission, provesNpmNext, releaseCiAdmission, provesReleaseReuse, provesTrainCi, retryRead, watchTrainRun } from '../src/scripts/release-train-proof.mjs';
 import { createTempRepo } from '../src/test/helpers/git';
 
 const build = 'a'.repeat(40);
@@ -237,4 +237,32 @@ test('a HOLD writes its reason and the failed leg log into the folder it names, 
   }
   const train = readFileSync(join(import.meta.dirname, '../src/scripts/release-train.ts'), 'utf8');
   expect(train).toMatch(/if \(evidence !== undefined\) writeHold\(evidence, [^\n]+\n\s+receipt\(lane, `HOLD/u);
+});
+
+// v0.1.94's 08:09 HOLD: staging refused a dirty clone and nothing named the file or the leg that wrote it.
+test('a leg that dirties the train clone is named with its files, and a clean clone passes', () => {
+  const work = mkdtempSync(join(tmpdir(), 'train-dirt-'));
+  const repo = createTempRepo();
+  try {
+    repo.git(['remote', 'add', 'origin', 'https://github.com/project-wildshard/engine.git']);
+    const cut = repo.commit({ 'src/leg.sh': 'echo cut\n', '.gitignore': 'tmp/\n' }, 'cut');
+    const dir = cutTree(repo.dir, cut, join(work, 'cut-tree'));
+    writeFileSync(join(dir, '.gitignore'), 'tmp/\n');
+    execFileSync('mkdir', ['-p', join(dir, 'tmp')]);
+    writeFileSync(join(dir, 'tmp/scratch.log'), 'ignored\n');
+    expect(treeDirt(dir, 'Local QA')).toBeUndefined();
+    writeFileSync(join(dir, 'src/leg.sh'), 'echo edited\n');
+    writeFileSync(join(dir, 'stray.json'), '{}\n');
+    const dirt = treeDirt(dir, 'Local QA') ?? '';
+    expect(dirt).toContain("Local QA left the train's clone");
+    expect(dirt).toContain('M src/leg.sh');
+    expect(dirt).toContain('?? stray.json');
+  } finally {
+    repo.cleanup();
+    rmSync(work, { recursive: true, force: true });
+  }
+  const train = readFileSync(join(import.meta.dirname, '../src/scripts/release-train.ts'), 'utf8');
+  expect(train).toContain("treeDirt(cut, 'Local QA')");
+  expect(train).toContain("treeDirt(stageTree, 'The staging build')");
+  expect(train).toContain("treeDirt(stageTree, 'Staging go-live')");
 });

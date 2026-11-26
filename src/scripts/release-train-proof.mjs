@@ -161,3 +161,13 @@ export function writeHold(dir, reason) {
   writeFileSync(file, text, { mode: 0o600 });
   return file;
 }
+
+/** v0.1.94's 08:09 HOLD (QA 11-25 row 88): staging refused its upload because the train's own clone was dirty, and
+ * nothing said which file or which leg. A leg that dirties its clone now holds the train there, naming both.
+ * @param {string} tree @param {string} step @returns {string|undefined} why the clone is no longer clean */
+export function treeDirt(tree, step) {
+  const lines = execFileSync('git', ['status', '--porcelain'], { cwd: tree, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    .split('\n').filter(line => line !== '');
+  if (lines.length === 0) return undefined;
+  return `${step} left the train's clone at ${tree} dirty (${String(lines.length)}): ${lines.slice(0, 20).join('; ')}`;
+}

@@ -22,3 +22,4 @@ export function releaseCiAdmission(build: string, ci: number): { staging_build: 
 export function gateInputsMoved(log: string): boolean;
 export function cutTree(root: string, sha: string, dir: string): string;
 export function writeHold(dir: string, reason: string): string;
+export function treeDirt(tree: string, step: string): string | undefined;

@@ -9,7 +9,7 @@ import { dirname, join, resolve as absolute } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
-import { attributionGap, cutTree, fullCommitArgs, writeHold, gateInputsMoved, localAttemptDir, nextAdmission, releaseCiAdmission, provesNpmNext, provesReleaseReuse, provesTrainCi, retryRead, trainSha as sha, trainTag as tagPattern, watchTrainRun,
+import { attributionGap, cutTree, fullCommitArgs, treeDirt, writeHold, gateInputsMoved, localAttemptDir, nextAdmission, releaseCiAdmission, provesNpmNext, provesReleaseReuse, provesTrainCi, retryRead, trainSha as sha, trainTag as tagPattern, watchTrainRun,
   type Alias, type Leg, type Run } from './release-train-proof.mjs';
 import { CHANNELS, localQaGap, RELEASE_PUBLIC_KEY, type QaVerdict } from './page-release/flow.mjs';
 import { pidLock } from './.kit/pid-lock.mjs';
@@ -216,10 +216,15 @@ async function main(args: string[]) {
       && localQaGap(read(join(dir, 'verdict.json')) as QaVerdict | undefined, source.headSha, tag) !== undefined);
     const local = join(localDir, 'verdict.json');
     // QA 11-25 row 88: local QA runs from the train's own clone at the cut, never the canonical checkout.
-    if (!existsSync(local)) await runLogged(await legTree(source.headSha, 'cut-tree'), join(out, 'local.log'), 'bash', [
-      'src/scripts/browser-lane.sh', '--max', '20', process.execPath, 'src/scripts/staging-qa.mjs',
-      '--local', '--release', tag, '--build', source.headSha, '--out', localDir,
-    ], { ...process.env, BROWSER: 'none' });
+    if (!existsSync(local)) {
+      const cut = await legTree(source.headSha, 'cut-tree');
+      await runLogged(cut, join(out, 'local.log'), 'bash', [
+        'src/scripts/browser-lane.sh', '--max', '20', process.execPath, 'src/scripts/staging-qa.mjs',
+        '--local', '--release', tag, '--build', source.headSha, '--out', localDir,
+      ], { ...process.env, BROWSER: 'none' });
+      const dirt = treeDirt(cut, 'Local QA');
+      if (dirt !== undefined) throw new Error(dirt);
+    }
     const gap = localQaGap(read(local) as QaVerdict | undefined, source.headSha, tag);
     if (gap !== undefined) throw new Error(`Local QA refused the cut: ${gap}`);
     if (!prepared) {
@@ -344,11 +349,16 @@ async function main(args: string[]) {
     let pageDone = existsSync(stageVerdict);
     if (!pageDone && state()?.build?.build !== build) await runLogged(stageTree, join(out, 'staging-build.log'), process.execPath,
       [...pageArgs, 'build', '--content'], env);
+    const builtDirt = treeDirt(stageTree, 'The staging build');
+    if (builtDirt !== undefined) throw new Error(builtDirt);
     const runPage = async () => {
       if (pageDone) return;
       try {
         await runLogged(stageTree, join(out, 'staging.log'), process.execPath,
           [...pageArgs, 'go-live', '--content', `--local-qa=${local}`, `--qa-out=${deployRoot}`, '--wait=60', ...resume], env);
+      } catch (error) {
+        const dirt = treeDirt(stageTree, 'Staging go-live');
+        throw dirt === undefined ? error : new Error(`${error instanceof Error ? error.message : String(error)}\n${dirt}`);
       } finally {
         pageDone = true;
         keepReleaseProof(deployRoot, deployEvidence, ['verdict.json', 'qualification/leg.json', 'zone-entry/zone-entry.json', 'mmo-observer.json']);
