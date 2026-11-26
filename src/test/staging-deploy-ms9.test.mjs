@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import { expect, test, vi } from 'vitest';
 import { CHANNELS, QA_LEGS } from '../scripts/page-release/flow.mjs';
-import { deployStaging } from '../scripts/page-release/staging-deploy.mjs';
+import { deployStaging, toolsRoot } from '../scripts/page-release/staging-deploy.mjs';
 import { LEGS } from '../scripts/staging-qa-budget.mjs';
 
 const { spawn } = vi.hoisted(() => ({ spawn: vi.fn() }));
@@ -64,4 +64,12 @@ test('staging moves a qualified alias when rooms have switched and MS9 has no wi
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+// v0.1.94: after the lean move the deploy's scratch, observer and QA jobs ran from src/, and its src/tmp/ dirtied the
+// release clone mid go-live, so the page upload refused it.
+test('the staging deploy runs its jobs and scratch from the repository root, whose tmp/ git ignores', () => {
+  expect(existsSync(join(toolsRoot, 'package.json'))).toBe(true);
+  expect(existsSync(join(toolsRoot, 'src', 'scripts', 'page-release', 'staging-deploy.mjs'))).toBe(true);
+  expect(readFileSync(join(toolsRoot, '.gitignore'), 'utf8')).toMatch(/^\/?tmp\/?$/mu);
 });

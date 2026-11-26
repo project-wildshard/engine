@@ -12,7 +12,9 @@ import { keepReleaseProof, openReleaseRun } from '../release-run.mjs';
 
 const stage = CHANNELS.staging;
 const scripts = absolute(import.meta.dirname, '..');
-const toolsRoot = absolute(scripts, '..');
+// The repository root: the lean move (f928fdae2) put scripts in src/scripts, and `scripts/..` became src/, so v0.1.94's
+// deploy scratch landed in an unignored src/tmp/ and staging refused its dirty release clone (QA 11-25 row 88).
+export const toolsRoot = absolute(scripts, '..', '..');
 const observerFile = 'mmo-observer.json';
 /** @typedef {import('./flow.mjs').QaVerdict & {findings?: readonly import('../staging-smoke/checks.mjs').Finding[]}} DeploymentQa */
 /** @typedef {{status?:string,reason?:string,continuity?:string,to?:{build?:string,serial?:number}}} Observation */
