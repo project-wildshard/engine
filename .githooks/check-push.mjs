@@ -41,10 +41,15 @@ for (const commit of commits) {
 const restoreOnly = refs.length > 0 && refLines(refs.map((row) => row.join(' ')).join('\n')).every(branchCreate);
 const hatches = hatchesSet().filter((name) => !(restoreOnly && name === 'ALLOW_BRANCH_RESTORE'));
 if (hatches.length && commits.size) {
-  const messages = [...commits].map((sha) => git(['log', '-1', '--format=%B', sha]));
+  // A version tag's own message counts too (opus-rel97, engine v0.1.97): the commits a tag push sends are already
+  // published on its release branch and cannot be amended, so the annotated tag's body names the hatch.
+  const tagMessages = refs
+    .filter(([, local, remoteRef]) => local && !ZERO.test(local) && /^refs\/tags\//u.test(remoteRef ?? '') && git(['cat-file', '-t', local]).trim() === 'tag')
+    .map(([, local]) => git(['cat-file', 'tag', local]).split('\n\n').slice(1).join('\n\n'));
+  const messages = [...[...commits].map((sha) => git(['log', '-1', '--format=%B', sha])), ...tagMessages];
   const unnamed = hatches.filter((name) => messages.every((message) => unnamedHatches(message, [name]).length));
   if (unnamed.length) {
-    console.error(`\n  X push blocked: no outgoing commit names its escape hatch. ${hatchRefusal(unnamed)}\n    Amend the commit's body, then push again.\n`);
+    console.error(`\n  X push blocked: no outgoing commit names its escape hatch. ${hatchRefusal(unnamed)}\n    Amend the commit's body (or, for a tag, the annotated tag's message), then push again.\n`);
     process.exit(1);
   }
 }

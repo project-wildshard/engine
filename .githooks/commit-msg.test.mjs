@@ -145,4 +145,19 @@ describe('escape hatches at push (check-push.mjs)', () => {
     const named = push({ SKIP_CHECK: '1' });
     assert.equal(named.status, 0, named.stderr);
   });
+  test('a tag push names its hatch in the annotated tag, since its commits are already published', () => {
+    const { commit, git, root } = sandbox();
+    const first = commit({ 'a.txt': 'a\n' }, ok('feat: add a'));
+    assert.equal(first.status, 0, first.stderr);
+    const tag = (name, ...body) => {
+      git(['tag', '-a', name, 'HEAD', '-m', `repo ${name}`, ...body.flatMap((line) => ['-m', line])]);
+      return `refs/tags/${name} ${git(['rev-parse', `refs/tags/${name}`]).stdout.trim()} refs/tags/${name} ${'0'.repeat(40)}\n`;
+    };
+    const push = (input) => spawnSync('node', [join(root, '.githooks/check-push.mjs')], { cwd: root, encoding: 'utf8', input, env: { ...ENV, SKIP_PEERS: '1', ALLOW_NIGHTLY_FAILURES: 'abc1234' } });
+    const bare = push(tag('v1.0.0'));
+    assert.notEqual(bare.status, 0);
+    assert.match(bare.stderr, /no outgoing commit names its escape hatch\. ALLOW_NIGHTLY_FAILURES is set/u);
+    const named = push(tag('v1.0.1', 'Pushed with ALLOW_NIGHTLY_FAILURES=abc1234 (J381), the fix that names every failure.'));
+    assert.equal(named.status, 0, named.stderr);
+  });
 });
