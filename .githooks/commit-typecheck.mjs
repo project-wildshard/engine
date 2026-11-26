@@ -10,6 +10,17 @@
 // real outDir and tsBuildInfoFile, so the incremental build stays warm.
 // Committed code importing an untracked file still fails in a composite
 // project (TS6307: not listed in the project).
+//
+// Same files, same config as CI (meta QA 11-25 row 104): CI's types check is
+// `pnpm typecheck` from cold (src/scripts/ci-static.sh code); this is the same
+// script over a warm `.tsc-layers` cache. A warm `tsc -b` replays the semantic
+// errors its buildinfo holds for every file whose hash did not change, and
+// row 99's worktree cache held 17 such errors in four test files that a cold
+// build of the same tree does not report. So a red `tsc -b` segment is
+// confirmed from cold (`--force`, about a minute) before it refuses the
+// commit: the hook refuses only what CI would, and the rebuild heals the
+// cache. .githooks/commit-typecheck.test.mjs fails if the hook, the push gate
+// and CI stop naming the same configs.
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -48,6 +59,14 @@ export function tscConfig(segment) {
   if (at < 0) return null;
   const flag = words.findIndex((word, index) => index > at && CONFIG_FLAG.has(word));
   return flag < 0 || words[flag + 1] === undefined ? null : [flag + 1, words[flag + 1]];
+}
+
+/** The same segment rebuilt from cold (`tsc -b … --force`), or null for a segment with no build cache to distrust. */
+export function coldSegment(segment) {
+  const words = segment.split(/\s+/u);
+  const at = words.findIndex((word) => TSC.test(word));
+  if (at < 0 || !words.some((word, index) => index > at && (word === '-b' || word === '--build'))) return null;
+  return words.includes('--force') || words.includes('-f') ? null : `${segment} --force`;
 }
 
 const configFile = (path) => (existsSync(path) && statSync(path).isDirectory() ? join(path, 'tsconfig.json') : path);
@@ -91,8 +110,23 @@ export function commitTypecheck(root, { env = process.env, stdio = 'inherit' } =
   const segments = typecheckSegments(scripts);
   // pnpm run put node_modules/.bin on PATH (npr lives there); a plain shell does not.
   const PATH = [join(root, 'node_modules', '.bin'), env.PATH].filter(Boolean).join(delimiter);
-  const run = (command) => spawnSync(command, { cwd: root, env: { ...env, PATH }, stdio, shell: true }).status ?? 1;
-  if (untracked.size === 0) return run(segments.join(' && '));
+  const shell = (command) => spawnSync(command, { cwd: root, env: { ...env, PATH }, stdio, shell: true }).status ?? 1;
+  const run = (command) => {
+    const code = shell(command);
+    const cold = code === 0 ? null : coldSegment(command);
+    if (cold === null) return code;
+    console.error('  - typecheck: the warm build cache reported errors; confirming from cold (--force), as CI builds');
+    const confirmed = shell(cold);
+    if (confirmed === 0) console.error('  - typecheck: the cold build is clean; the warm cache held stale errors (now rebuilt)');
+    return confirmed;
+  };
+  if (untracked.size === 0) {
+    for (const segment of segments) {
+      const code = run(segment);
+      if (code !== 0) return code;
+    }
+    return 0;
+  }
   // Config parsing only, so the JS API of TS 6 serves the native tsc 7 too.
   const require = createRequire(join(root, 'package.json'));
   let ts;
