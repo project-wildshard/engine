@@ -22,6 +22,4 @@ export const FRAME_MS: number;
 export function slowFrame(slug: string, name: string, ms: number): string | undefined;
 export function expectPinnedZones(pins: Record<string, string>, built: readonly string[]): string[];
 export function phoneFrameMeasures(pins: Record<string, string>, readings: readonly ZoneFrames[], commit?: string): BudgetMeasures;
-export function readPhoneFrames(browser: Browser, base: string, slug: string): Promise<ZoneFrames>;
-/** A pinned zone with no placement or cell gets a measuring cell in the page's inlined catalogue (meta MZ26). */
-export function measuringCatalogue(html: string, slug: string): string;
+export function readPhoneFrames(browser: Browser, base: string, slug: string, graphics?: 'low' | 'high'): Promise<ZoneFrames>;

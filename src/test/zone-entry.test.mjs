@@ -63,6 +63,16 @@ test('alone cuts the inline catalogue to the zone\'s one cell, at the origin as 
   assert.throws(() => oneCellPage('<html></html>', 'pine-hollow'), /inlines no ws-catalogue/u);
 });
 
+// QA 11-25 row 99 (meta MZ26): budgets' phone frames measure every pinned zone, and a staging-only shard's first pin has no cell
+test('unplaced seats a built zone the grid doesn\'t place at the origin; without it, no cell still refuses', () => {
+  const catalogue = { placements: [{ slug: 'pine-hollow' }], grid: { cells: [{ instance: 'a', slug: 'pine-hollow', cell: [2, 0] }] } };
+  assert.deepEqual(oneCellCatalogue(catalogue, 'glowfen', { unplaced: true }).grid.cells, [{ instance: 'glowfen', slug: 'glowfen', cell: [0, 0] }]);
+  assert.deepEqual(oneCellCatalogue(catalogue, 'pine-hollow', { unplaced: true }).grid.cells, [{ instance: 'a', slug: 'pine-hollow', cell: [0, 0] }]);
+  assert.throws(() => oneCellCatalogue(catalogue, 'glowfen'), /0 cells for glowfen/u);
+  const html = `<script type="application/json" id="ws-catalogue">${JSON.stringify(catalogue)}</script>`;
+  assert.match(oneCellPage(html, 'glowfen', { unplaced: true }), /"cells":\[\{"instance":"glowfen","slug":"glowfen","cell":\[0,0\]\}\]/u);
+});
+
 test('the address enterZone opens carries the run\'s flags and never a zone (CP16)', () => {
   assert.equal(zoneHome('http://127.0.0.1:4401'), 'http://127.0.0.1:4401/');
   assert.equal(zoneHome('http://127.0.0.1:4401', 'mute=1&nolock=1&skipintro=1'), 'http://127.0.0.1:4401/?mute=1&nolock=1&skipintro=1');

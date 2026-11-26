@@ -75,6 +75,54 @@ export function oneShardBranches(read){
   },0);
 }
 
+// J522 (4), QA 11-25 row 99: a measuring tool (budgets, memory, goldens) enters its zone alone, a one-cell world
+// (zone-entry's `enterZone` with `alone:`), never through the title: CP17's phone frames tapped into the zone's grid cell
+// with its neighbours, and budgets run 45755470720 never settled. These are the Playwright measuring tools; the Simulator
+// and inspector tools can't route a page, so they write the tap (J522 (7)).
+export const MEASURING=['scripts/budgets/','scripts/goldens/','scripts/gpu-gate/','scripts/memory/measure.mjs','scripts/memory/heapReader.mjs', // script-paths: guardKey's keys keep the old spelling
+  'scripts/memory/ci.mjs','scripts/frame-floor.mjs','scripts/bench-load.mjs','scripts/boot-memory-peak.mjs','scripts/shard-phone-memory.mjs', // script-paths: guardKey's keys
+  'scripts/crossroads-rig/desktop-probe.mjs']; // script-paths: guardKey's keys
+/** A line that measures the grid on purpose (frame-floor's grid arm) carries this mark. */
+export const GRID_ARM='chunk-param-guard: grid arm';
+const TAP=/\b(?:initScript|tapDocument|tapSessionDocument|setTitleArrival)\(|['"`]titleArrival['"`]/gu;
+/** Each `enterZone(` call's argument text, to its balanced close, and its line. @param {string} text */
+function enterZoneCalls(text){
+  /** @type {{ args: string, line: string }[]} */
+  const calls=[];
+  for(const found of text.matchAll(/\benterZone\(/gu)){
+    const open=found.index+found[0].length;
+    let depth=1,at=open;
+    for(;at<text.length&&depth>0;at++){const c=text[at];if(c==='('||c==='{'||c==='[')depth++;else if(c===')'||c==='}'||c===']')depth--;}
+    const start=text.lastIndexOf('\n',found.index)+1,end=text.indexOf('\n',found.index);
+    calls.push({args:text.slice(open,at-1),line:text.slice(start,end===-1?undefined:end)});
+  }
+  return calls;
+}
+/** How often a measuring tool's text enters a zone other than alone: an `enterZone` call with no `alone:` (or `alone: false`:
+ *  the title's path, into the zone's grid cell with its neighbours) and a tap written by hand. A declaration
+ *  (`function enterZone(`), a comment and a line marked GRID_ARM are not counted. @param {string} text */
+export function titleEntries(text){
+  const comment=(/** @type {string} */ line)=>/^\s*(?:\/\/|\*|\/\*)/u.test(line);
+  const calls=enterZoneCalls(text).filter(call=>!/function\s+enterZone\(/u.test(call.line)&&!call.line.includes(GRID_ARM)&&!comment(call.line)
+    &&(!/\balone\s*:/u.test(call.args)||/\balone\s*:\s*false\b/u.test(call.args))).length;
+  const taps=text.split('\n').filter(line=>!line.includes(GRID_ARM)&&!comment(line)).reduce((sum,line)=>sum+(line.match(TAP)?.length??0),0);
+  return calls+taps;
+}
+/** Every measuring tool that enters a zone through the title, with its count. @param {{ paths: string[], read: (path: string) => string }} input */
+export function measuringEntryOffenders({paths,read}){
+  /** @type {Record<string, number>} */
+  const found={};
+  for(const path of [...paths].sort()){
+    const key=guardKey(path);
+    if(!MEASURING.some(prefix=>prefix.endsWith('/')?key.startsWith(prefix):key===prefix)||!/\.m?[jt]s$/u.test(path)||/\.d\.m?ts$/u.test(path))continue;
+    let text;
+    try{text=read(path);}catch{continue;}
+    const count=titleEntries(text);
+    if(count>0)found[key]=count;
+  }
+  return found;
+}
+
 if(process.argv[1]!==undefined&&import.meta.filename===process.argv[1]){
   const paths=execFileSync('git',['ls-files','-z','--',...SCOPE],{cwd:ROOT,encoding:'utf8',maxBuffer:64<<20}).split('\0').filter(Boolean);
   const read=(/** @type {string} */ path)=>readFileSync(join(ROOT,path),'utf8');
@@ -95,6 +143,11 @@ if(process.argv[1]!==undefined&&import.meta.filename===process.argv[1]){
   }
   if(added.length>0&&!process.argv.includes('--write')){
     console.error(`chunk-param-guard (J522): \`?chunk=\` is deleted; a page enters a zone by its tap, its tab's handoff or a record, never its address (harness: enterZone). New reads or writes:\n${added.map(line=>`  ${line}`).join('\n')}`);
+    process.exitCode=1;
+  }
+  const title=measuringEntryOffenders({paths,read});
+  if(Object.keys(title).length>0){
+    console.error(`chunk-param-guard (J522 (4)): a measuring tool enters its zone alone (enterZone with alone: true), never by the title's tap, whose grid cell runs the grid's level (QA 11-25 row 99). Title entries:\n${Object.entries(title).map(([path,count])=>`  ${path} (${count})`).join('\n')}`);
     process.exitCode=1;
   }
   if(process.exitCode!==1)console.log(`chunk-param-guard: ${total} in ${Object.keys(found).length} baselined file(s), none new; one-shard page mode branches left: ${branches}`);

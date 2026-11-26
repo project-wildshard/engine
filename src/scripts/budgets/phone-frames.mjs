@@ -48,23 +48,6 @@ export function expectPinnedZones(pins, built) {
   return expected;
 }
 
-/** A pinned zone with no placement or cell (a staging-only shard's first pin, meta MZ26) boots only from a cell, so the
- * page's inlined catalogue gets a measuring cell (the nearest free one within the grid's bound of 3), as `wildshard dev` gives its one shard; a placed zone's
- * page is unchanged. @param {string} html @param {string} slug */
-export function measuringCatalogue(html, slug) {
-  return html.replace(/(<script type="application\/json" id="ws-catalogue">)([^<]*)(<\/script>)/u, (all, open, json, close) => {
-    const catalogue = JSON.parse(json), bare = (/** @type {{slug:string}} */ row) => row.slug.replace(/^_/u, '');
-    if ([...catalogue.placements, ...catalogue.grid.cells].some(row => bare(row) === slug)) return all;
-    // the grid admits cells within 3 of the centre: the nearest free one, east first
-    const taken = new Set(catalogue.grid.cells.map((/** @type {{cell:number[]}} */ row) => row.cell.join(',')));
-    const free = [0, 1, 2, 3].flatMap(r => [-3, -2, -1, 0, 1, 2, 3].flatMap(z => [3, 2, 1, 0, -1, -2, -3].map(x => [x, z])
-      .filter(cell => Math.max(...cell.map(Math.abs)) === r))).find(cell => !taken.has(cell.join(',')));
-    if (free === undefined) throw new Error(`No free grid cell to measure ${slug} in`);
-    catalogue.grid.cells.push({ instance: slug, slug, cell: free });
-    return open + JSON.stringify(catalogue).replaceAll('<', String.raw`<`) + close;
-  });
-}
-
 /** Median frames at each fixed view, then the heaviest view for each counter. Low readings must cover every pin; High
  * readings, when there are any, must too.
  * @param {Record<string,string>} pins @param {readonly ZoneFrames[]} readings @param {string} [commit] */
@@ -125,17 +108,18 @@ export async function readPhoneFrames(browser, base, slug, graphics = 'low') {
     const url = new URL(bootURL(base));
     url.searchParams.set('tier', 'phone');
     url.searchParams.set('touch', '1');
-    await page.route(target => target.origin === url.origin && target.pathname === url.pathname, async route => {
-      const response = await route.fetch();
-      await route.fulfill({ response, body: measuringCatalogue(await response.text(), slug) });
-    });
-    // CHUNK-PARAM CP17 (J522): enter the zone's cell by the title's tap and a bare `/`, as a player does
-    await enterZone(page, { zone: slug, base: url.origin, flags: url.searchParams.toString(), waitUntil: 'domcontentloaded', timeout: READY_MS });
+    // J522 (4), QA 11-25 row 99: a measuring tool enters its zone alone, as a one-cell world. CP17's tap entered the zone's
+    // grid cell with its neighbours, where the running level is the grid's (`platform.grid`), never the zone, so this wait
+    // never settled and budgets run 45755470720 timed out every capture. A pinned zone with no cell (MZ26) is seated.
+    await enterZone(page, { zone: slug, base: url.origin, flags: url.searchParams.toString(), alone: true, unplaced: true, waitUntil: 'domcontentloaded', timeout: READY_MS });
     const ready = await page.waitForFunction(zone => {
       const error = document.querySelector('.ws-load-error, #wserr');
       if (error !== null) return error.textContent?.trim() || 'Load error';
-      const world = window.__wildshard?.world;
-      return world?.game.level.id === zone && world.game.frameCount > 0
+      const shard = window.__wildshard, world = shard?.world;
+      // A one-cell world plays the grid's level (`platform.grid`): its zone is the cell the grid stands in (seat-hold-proof's read)
+      const grid = /** @type {{ state?: () => { inside: string | null; cells: { instance: string; slug: string }[] } } | undefined} */ (Reflect.get(Reflect.get(shard ?? {}, 'shard') ?? {}, 'grid'))?.state?.();
+      const here = world?.game.level.id === zone || grid?.cells.some(cell => cell.instance === grid.inside && cell.slug.replace(/^_/u, '') === zone) === true;
+      return here && world !== undefined && world.game.frameCount > 0
         && world.hud.entered && !world.hud.paused && world.game.frameGate() && !document.querySelector('.ws-load');
     }, slug, { timeout: READY_MS, polling: 200 });
     const result = await ready.jsonValue();
@@ -164,8 +148,10 @@ export async function readPhoneFrames(browser, base, slug, graphics = 'low') {
       for (let sample = 0; sample < SAMPLE_COUNT; sample++) {
         const started = Date.now();
         const handle = await page.waitForFunction(({ zone, frame }) => {
-          const world = window.__wildshard?.world;
-          if (!world || world.game.level.id !== zone || world.hud.paused || !world.game.frameGate()) return false;
+          const shard = window.__wildshard, world = shard?.world;
+          const grid = /** @type {{ state?: () => { inside: string | null; cells: { instance: string; slug: string }[] } } | undefined} */ (Reflect.get(Reflect.get(shard ?? {}, 'shard') ?? {}, 'grid'))?.state?.();
+          const here = world?.game.level.id === zone || grid?.cells.some(cell => cell.instance === grid.inside && cell.slug.replace(/^_/u, '') === zone) === true;
+          if (!world || !here || world.hud.paused || !world.game.frameGate()) return false;
           const game = world.game;
           if (game.frameCount <= frame) return false;
           return { frame: game.frameCount, triangles: game.lastFrame.triangles, draws: game.lastFrame.calls, programs: game.renderer.info.programs?.length ?? 0 };

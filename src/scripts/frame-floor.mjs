@@ -1118,7 +1118,7 @@ async function worker() {
           // The helper sets live pose pins before the clean build's modules boot.
           const gameUrl = agentUrl(`${base}${safariHelper(shard)}${query(shard)}`);
           // the public grid row taps into Driftwood's cell: the tap goes into the tab before the navigation, as a title tap does
-          const navigate = shard === 'grid' && publicGrid ? `(() => { ${initScript('driftwood-isle')} return ${frameFloorGameNavigationCode(gameUrl)}; })()` : frameFloorGameNavigationCode(gameUrl);
+          const navigate = shard === 'grid' && publicGrid ? `(() => { ${initScript('driftwood-isle')} return ${frameFloorGameNavigationCode(gameUrl)}; })()` : frameFloorGameNavigationCode(gameUrl); // chunk-param-guard: grid arm (it measures the grid)
           // Intentional preparation navigation has no measurement envelope to
           // preserve. Read its acknowledgement directly before reconnecting.
           if (!wasmMemoryProbe && await inspector.raw(navigate) !== true)

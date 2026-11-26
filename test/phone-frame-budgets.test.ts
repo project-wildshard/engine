@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { failed, judgeAll, recordAll } from '../src/scripts/budgets/cli.mjs';
 import { readCaps } from '../src/scripts/budgets/files.mjs';
 import { budgetReport, budgetResultLine, parseBudgetResults } from '../src/scripts/budgets/watch.mjs';
-import { FRAME_MS, PHONE_LOW, expectPinnedZones, measuringCatalogue, phoneFrameMeasures, slowFrame } from '../src/scripts/budgets/phone-frames.mjs';
+import { FRAME_MS, PHONE_LOW, expectPinnedZones, phoneFrameMeasures, readPhoneFrames, slowFrame } from '../src/scripts/budgets/phone-frames.mjs';
 
 const slug = 'driftwood-isle', key = `render/phone-low/triangles/${slug}`;
 const pin = (revision: number) => ({ [slug]: `${slug}@${revision}` });
@@ -96,19 +96,82 @@ describe('phone Low frame budgets', () => {
     expect(judge(102)).toMatchObject({ status: 'regressed', value: 110, line: 110, hard: null });
   });
 
-  test('gives a pinned zone with no cell a measuring cell in the page catalogue (meta MZ26)', () => {
-    const catalogue = { placements: [{ instance: 'driftwood-isle', slug: 'driftwood-isle', cell: [0, 0] }],
-      grid: { cells: [{ instance: 'driftwood-isle', slug: 'driftwood-isle', cell: [0, 0] }, { instance: 'x', slug: '_pine-hollow', cell: [3, -1] }] } };
-    const page = (doc: object) => `<head><script type="application/json" id="ws-catalogue">${JSON.stringify(doc)}</script></head>`;
-    const read = (html: string): typeof catalogue => JSON.parse(/id="ws-catalogue">([^<]*)</u.exec(html)?.[1] ?? 'null');
-    expect(measuringCatalogue(page(catalogue), 'driftwood-isle')).toBe(page(catalogue));
-    expect(measuringCatalogue(page(catalogue), 'pine-hollow')).toBe(page(catalogue));
-    expect(read(measuringCatalogue(page(catalogue), 'mossgate')).grid.cells.at(-1)).toEqual({ instance: 'mossgate', slug: 'mossgate', cell: [1, -1] });
-    // the grid admits |x| and |z| up to 3 (budgets run 44955536233: "Expected <=3 but received 4"): a full inner grid uses ring 3
-    const full = { placements: [], grid: { cells: [-2, -1, 0, 1, 2].flatMap(x => [-2, -1, 0, 1, 2].map(z => ({ instance: `${x}${z}`, slug: `${x}${z}`, cell: [x, z] }))) } };
-    const cell = read(measuringCatalogue(page(full), 'mossgate')).grid.cells.at(-1)?.cell ?? [];
-    expect(Math.max(...cell.map(Math.abs))).toBe(3);
-    expect(read(measuringCatalogue(page(catalogue), 'mossgate')).placements).toEqual(catalogue.placements);
+});
+
+// Meta QA 11-25 row 99: CP17 entered each zone by the title's tap, into its grid cell with neighbours; a grid page runs the
+// grid's level (`platform.grid`), so the wait for the zone's level never settled and budgets run 45755470720 timed out every
+// capture. J522 (4): a measuring tool enters its zone alone, a one-cell world. This page stand-in boots what a real page
+// boots from what it was served: a tap in the tab enters the grid with every cell, else its catalogue's one cell.
+describe('phone frames enter a zone alone (J522 (4), QA 11-25 row 99)', () => {
+  type Cell = { instance: string; slug: string; cell: number[] };
+  const CATALOGUE = { placements: [{ slug: 'brasscap-mesa' }, { slug: 'pine-hollow' }],
+    grid: { cells: [{ instance: 'brasscap-mesa', slug: 'brasscap-mesa', cell: [0, 0] }, { instance: 'pine-hollow', slug: 'pine-hollow', cell: [1, 0] }] } };
+  const HTML = `<html><head><script type="application/json" id="ws-catalogue">${JSON.stringify(CATALOGUE)}</script></head></html>`;
+
+  function fakeBrowser() {
+    const seen = { addresses: [] as string[], served: [] as Cell[][], tapped: false };
+    const session = new Map<string, string>();
+    let frame = 0, cells: Cell[] = [], inside = '';
+    const game = {
+      tier: 'phone', qualityLow: true, frameCount: 0, level: { id: 'platform.grid', spawn: { x: 0, z: 0, yaw: 0 } },
+      lastFrame: { triangles: 1000, calls: 20 }, frameGate: () => true, applyQuality() { game.qualityLow = !game.qualityLow; },
+      renderer: { info: { programs: [1, 2, 3] }, getPixelRatio: () => (game.qualityLow ? 1 : 2) }, app: { clock: { setCapture() { /* no clock */ } } },
+    };
+    const shard = { world: { game, hud: { entered: true, paused: false } }, pose: async () => { /* stands still */ },
+      shard: { grid: { state: () => ({ inside, cells }) } } };
+    const globals = { window: { __wildshard: shard }, document: { querySelector: () => null }, devicePixelRatio: 3,
+      sessionStorage: { getItem: (key: string) => session.get(key) ?? null, setItem: (key: string, value: string) => { session.set(key, value); seen.tapped = true; } } };
+    /** Run a page function as the page would, one frame later. */
+    const inPage = <T,>(fn: (arg: never) => T, arg: unknown): T => {
+      game.frameCount = ++frame;
+      const held = Object.fromEntries(Object.keys(globals).map(key => [key, Reflect.get(globalThis, key)]));
+      for (const [key, value] of Object.entries(globals)) Object.defineProperty(globalThis, key, { value, configurable: true, writable: true });
+      try { return fn(arg as never); } finally { for (const [key, value] of Object.entries(held)) Object.defineProperty(globalThis, key, { value, configurable: true, writable: true }); }
+    };
+    const routes: { match: string | ((url: URL) => boolean); handler: (route: unknown) => Promise<void> }[] = [];
+    let address = 'about:blank';
+    const page = {
+      on() { /* no page errors */ }, url: () => address,
+      async route(match: string | ((url: URL) => boolean), handler: (route: unknown) => Promise<void>) { routes.unshift({ match, handler }); },
+      async unroute(match: unknown) { routes.splice(routes.findIndex(row => row.match === match), 1); },
+      async goto(url: string) {
+        address = url; seen.addresses.push(url);
+        if (new URL(url).pathname !== '/') return null;
+        let body = HTML;
+        const route = routes.find(row => (typeof row.match === 'string' ? row.match === url : row.match(new URL(url))));
+        if (route !== undefined) {
+          await route.handler({ fetch: async () => ({ text: async () => HTML }), fulfill: async (reply: { body: string }) => { body = reply.body; } });
+        }
+        const served: Cell[] = JSON.parse(/id="ws-catalogue">([^<]*)</u.exec(body)?.[1] ?? 'null').grid.cells;
+        seen.served.push(served);
+        const tap = JSON.parse(session.get('wildshard.save.v2@2.session') ?? '{"keys":{}}').keys.titleArrival?.data?.slug as string | undefined;
+        // a tap enters the grid with its neighbours; a page with no tap boots its one-cell world (CP10)
+        cells = tap === undefined ? served : CATALOGUE.grid.cells;
+        inside = (tap === undefined ? served[0] : cells.find(row => row.slug === tap))?.instance ?? '';
+        return null;
+      },
+      evaluate: async (fn: (arg: never) => unknown, arg?: unknown) => inPage(fn, arg),
+      async waitForFunction(fn: (arg: never) => unknown, arg: unknown) {
+        for (let poll = 0; poll < 20; poll++) {
+          const value = inPage(fn, arg);
+          if (value) return { jsonValue: async () => value, dispose: async () => { /* nothing held */ } };
+        }
+        throw new Error('page.waitForFunction: never settled (the 235 s timeout of budgets run 45755470720)');
+      },
+    };
+    const context = { addInitScript: async () => { /* fixtures */ }, newPage: async () => page, close: async () => { /* closed */ } };
+    return { seen, browser: { newContext: async () => context } as unknown as Parameters<typeof readPhoneFrames>[0] };
+  }
+
+  test.each(['pine-hollow', 'glowfen'])('%s: a one-cell world of the zone, no tap, no zone in the address, and it settles', async slug => {
+    const { seen, browser } = fakeBrowser();
+    const reading = await readPhoneFrames(browser, 'http://127.0.0.1:4401/', slug, 'low');
+    expect(reading).toMatchObject({ slug, tier: 'phone', low: true, deviceDpr: 3, renderDpr: 1 });
+    expect(reading.views).toHaveLength(3);
+    // glowfen has no cell in the build (meta MZ26), so it is seated at the origin
+    expect(seen.served).toEqual([[{ instance: slug, slug, cell: [0, 0] }]]);
+    expect(seen.tapped).toBe(false);
+    expect(seen.addresses.every(url => new URL(url).pathname === '/' && !url.includes(slug))).toBe(true);
   });
 });
 

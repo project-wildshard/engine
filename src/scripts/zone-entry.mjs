@@ -40,24 +40,28 @@ export function initScript(zone, mode = 'enter', prefix = SAVE_PREFIX) {
   sessionStorage.setItem(key, JSON.stringify(doc)); })();`;
 }
 
-/** The build's catalogue with only `zone`'s cell and placement: a one-cell world (CP10).
- *  @param {{ placements?: { slug: string }[]; grid?: { cells?: { slug: string; instance?: string }[] } }} catalogue @param {string} zone */
-export function oneCellCatalogue(catalogue, zone) {
+/** The build's catalogue with only `zone`'s cell and placement: a one-cell world (CP10). A built zone the grid doesn't place
+ *  (meta MZ26: a staging-only shard's first pin) has no cell to keep; `unplaced: true` seats it at the origin, as `wildshard
+ *  dev` gives its one shard, for a tool that measures every pinned zone (QA 11-25 row 99: budgets' phone frames).
+ *  @param {{ placements?: { slug: string }[]; grid?: { cells?: { slug: string; instance?: string }[] } }} catalogue @param {string} zone
+ *  @param {{ unplaced?: boolean }} [options] */
+export function oneCellCatalogue(catalogue, zone, { unplaced = false } = {}) {
   const bare = (/** @type {string} */ slug) => slug.replace(/^_/u, '');
   const cells = (catalogue.grid?.cells ?? []).filter(cell => bare(cell.slug) === zone);
   // a world may show one zone in several cells (cook-to-play's fills its grid with the zone it cooked): its own instance's
   // cell first, else the catalogue's first; the bytes are the zone's either way
-  const cell = cells.find(row => 'instance' in row && row.instance === zone) ?? cells[0];
+  const cell = cells.find(row => 'instance' in row && row.instance === zone) ?? cells[0] ?? (unplaced ? { instance: zone, slug: zone } : undefined);
   if (cell === undefined) throw new Error(`zone-entry: the build's catalogue has 0 cells for ${zone}, not one`);
   return { ...catalogue, grid: { ...catalogue.grid, cells: [{ ...cell, cell: [0, 0] }] } };
 }
 
 const INLINE = /<script type="application\/json" id="ws-catalogue">([^<]*)<\/script>/u;
-/** `/`'s HTML with its inline catalogue cut to `zone`'s one cell. @param {string} html @param {string} zone */
-export function oneCellPage(html, zone) {
+/** `/`'s HTML with its inline catalogue cut to `zone`'s one cell. @param {string} html @param {string} zone
+ *  @param {{ unplaced?: boolean }} [options] */
+export function oneCellPage(html, zone, options) {
   const found = INLINE.exec(html);
   if (found?.[1] === undefined) throw new Error('zone-entry: this build inlines no ws-catalogue, so it has no world to cut to one cell');
-  const text = JSON.stringify(oneCellCatalogue(JSON.parse(found[1]), zone)).replaceAll('<', String.raw`\u003c`);
+  const text = JSON.stringify(oneCellCatalogue(JSON.parse(found[1]), zone, options)).replaceAll('<', String.raw`\u003c`);
   return html.replace(INLINE, () => `<script type="application/json" id="ws-catalogue">${text}</script>`);
 }
 
@@ -74,8 +78,8 @@ export function zoneHome(origin, flags = '') {
  *  `flags` are the run's own params (`mute=1&nolock=1&skipintro=1`), which name no zone.
  *  @param {import('playwright').Page} page
  *  @param {{ zone: string; base?: string; flags?: string | Record<string, string>; mode?: 'enter' | 'explore' | 'arena'; name?: string;
- *    alone?: boolean; prefix?: string; waitUntil?: 'load' | 'domcontentloaded' | 'commit'; timeout?: number }} options */
-export async function enterZone(page, { zone, base, flags, mode = 'enter', name, alone = false, prefix = SAVE_PREFIX, waitUntil = 'load', timeout }) {
+ *    alone?: boolean; unplaced?: boolean; prefix?: string; waitUntil?: 'load' | 'domcontentloaded' | 'commit'; timeout?: number }} options */
+export async function enterZone(page, { zone, base, flags, mode = 'enter', name, alone = false, unplaced = false, prefix = SAVE_PREFIX, waitUntil = 'load', timeout }) {
   checked(zone, mode);
   const origin = new URL(base ?? page.url()).origin;
   if (origin === 'null') throw new Error('zone-entry: give a base URL, the page is on no origin yet');
@@ -89,7 +93,7 @@ export async function enterZone(page, { zone, base, flags, mode = 'enter', name,
   } else {
     await page.route(home, async route => {
       const response = await route.fetch();
-      await route.fulfill({ response, body: oneCellPage(await response.text(), zone) });
+      await route.fulfill({ response, body: oneCellPage(await response.text(), zone, { unplaced }) });
     });
   }
   await page.goto(home, { waitUntil, ...(timeout === undefined ? {} : { timeout }) });
