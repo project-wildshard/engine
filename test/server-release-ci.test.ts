@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- Real local publication boundary.
 import { createServer } from 'node:http';
 // oxlint-disable-next-line import/no-nodejs-modules -- Test-owned bundle bytes and the workflow file.
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Vitest owns this temporary root.
 import { tmpdir } from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- Paths belong to this test run.
@@ -267,17 +267,25 @@ test('J234: every run signs with main\'s publisher and builds in the source\'s o
   expect(sign).toContain('node src/scripts/server-release/publish.mjs');
 });
 
-test('meta QA 11-25 row 127: production moves the API pointers right after it signs, with the admin token', () => {
+test('meta QA 11-25 row 127: only the production-pointers job reads ADMIN_TOKEN, from the production environment', () => {
   const workflow = readFileSync('.github/workflows/server-release.yml', 'utf8');
-  const publish = workflow.slice(workflow.indexOf('\n  publish:'), workflow.indexOf('\n  devserver-client:'));
-  const sign = publish.indexOf('- name: Sign and advance the channel release file'), move = publish.indexOf("- name: Move the API's production pointers to the signed file");
-  expect(sign).toBeGreaterThan(0);
-  expect(move).toBeGreaterThan(sign);
-  const step = publish.slice(move).split('\n      - ')[0] ?? '';
-  expect(step).toContain("if: env.RELEASE_CHANNEL == 'production'");
-  expect(step).toContain('ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}');
-  expect(step).toContain('run: node src/scripts/server-release/production-pointers.mjs');
-  expect(step).not.toMatch(/working-directory|continue-on-error/u);
+  const start = workflow.indexOf('\n  production-pointers:'), end = workflow.indexOf('\n  devserver-client:');
+  expect(start).toBeGreaterThan(workflow.indexOf('\n  publish:'));
+  const job = workflow.slice(start, end);
+  expect(job).toContain('needs: [source, publish]');
+  expect(job).toContain("needs.publish.result == 'success' && needs.source.outputs.channel == 'production'");
+  expect(job).toMatch(/\n {4}environment: production\n/u);
+  expect(job).toContain('ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}');
+  expect(job).toContain('run: node src/scripts/server-release/production-pointers.mjs');
+  expect(job).not.toMatch(/continue-on-error/u);
+  // Any other reader, in this workflow or another, is a leak of a repo-wide admin token on a public repo.
+  const readers = readdirSync('.github/workflows').filter(name => /\.ya?ml$/u.test(name)).flatMap(name => {
+    const text = readFileSync(join('.github/workflows', name), 'utf8');
+    return [...text.matchAll(/secrets\.ADMIN_TOKEN/gu)].map(match => ({ name, at: match.index }));
+  });
+  expect(readers).toEqual([{ name: 'server-release.yml', at: workflow.indexOf('secrets.ADMIN_TOKEN') }]);
+  expect(readers[0]?.at).toBeGreaterThan(start);
+  expect(readers[0]?.at).toBeLessThan(end);
 });
 
 test('FS28: signing and client archives queue independently for the exact release', () => {

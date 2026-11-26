@@ -172,12 +172,28 @@ jobs:
           node src/scripts/server-release/publish.mjs
           --channel "$RELEASE_CHANNEL" --build "$SOURCE_SHA" --tag "$RELEASE_TAG"
           --bundle "$RUNNER_TEMP/engine-server-$SOURCE_SHA.tar.gz" --out "$RUNNER_TEMP/release.json" ${ALIGN_FLAG:+"$ALIGN_FLAG"}
-      # Meta QA 11-25 row 127: the API's production pointers follow the file just signed, in the same job, or the
-      # daily prune keeps three dead revisions behind each stale pointer (v0.1.92 left six behind). It reads the
-      # signed file players load, so a held publish moves nothing; it fails red, after the release, when a pointer
-      # stays off the file.
+  # Meta QA 11-25 row 127: the API's production pointers follow the file publish just signed, or the daily prune keeps
+  # three dead revisions behind each stale pointer (v0.1.92 left six behind). Its own job, because it is the only reader
+  # of ADMIN_TOKEN, which lives in the `production` environment (deployments from main and v* tags only), never at repo
+  # level. It reads the signed file players load, so a held publish moves nothing; it fails red, after the release, when
+  # a pointer stays off the file.
+  production-pointers:
+    needs: [source, publish]
+    if: ${{ !cancelled() && needs.publish.result == 'success' && needs.source.outputs.channel == 'production' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
       - name: Move the API's production pointers to the signed file
-        if: env.RELEASE_CHANNEL == 'production'
         env:
           ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
           WS_LANE_NAME: server-release

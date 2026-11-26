@@ -11,3 +11,8 @@
 - The workflow needs the `ADMIN_TOKEN` repo secret (the API's admin bearer, same as `admin.mjs format`).
 - Tests: `src/test/production-pointers.test.mjs` on v0.1.92's shape (made-up hashes), and the workflow wiring in
   `test/server-release-ci.test.ts`.
+- Narrowed (the planner, same day): a repo-level `ADMIN_TOKEN` on a public repo is readable by any workflow on main. The
+  step is now its own `production-pointers` job with `environment: production`; that environment deploys only from main
+  and `v*.*.*` tags, holds the secret, and the repo-level secret is deleted. The API has no scoped token (one bearer,
+  `http/admin.ts`, guards every catalogue write), so the job still carries the full admin token; a flip-only token is a
+  QA 11-25 row. `test/server-release-ci.test.ts` now fails when any workflow but that job reads `secrets.ADMIN_TOKEN`.
