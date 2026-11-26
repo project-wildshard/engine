@@ -18,7 +18,8 @@ import { webkit } from './browser-playwright.mjs';
 import { PHONE } from './journey-proof.mjs';
 import { saveFixture } from './debug-settings.mjs';
 
-process.env.WS_RIG_PORTS ??= '19636';
+// A free rig block locked for this run (QA 11-25 row 130), or the one WS_RIG_PORTS names; the lock goes when the process exits.
+process.env.WS_RIG_PORTS = String((await (await import('./rig-ports.mjs')).reserveRigPorts()).base);
 const { RELEASE_PORT, enterPage, intoWorld, openRig } = await import('./online-rig.mjs');
 const ROOT = absolute(import.meta.dirname, '..', '..');
 const workArg = process.argv.slice(2).find(value => !value.startsWith('--')) ?? '';

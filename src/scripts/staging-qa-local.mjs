@@ -5,6 +5,7 @@ import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } f
 import { basename, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { makeGateCopy } from './push-gate-copy.mjs';
+import { importRigAt, reserveRigPorts } from './rig-ports.mjs';
 import { TOUR_FEATURED } from './zone-entry-featured.mjs';
 
 /** @param {string} root @param {string} file @param {string[]} args @param {NodeJS.ProcessEnv} env @param {string} log */
@@ -70,11 +71,12 @@ export async function openQaRig({ root, build, out, tourSeed }) {
   const pair = generateKeyPairSync('ed25519');
   const key = pair.publicKey.export({ type: 'spki', format: 'der' }).toString('hex');
   const placementFile = join(work, 'fixture-placements.json');
+  // QA 11-25 row 130: a free block per run (two lanes' rigs held one fixed 19476 block); an explicit WS_RIG_PORTS still wins
+  const ports = await reserveRigPorts().catch((/** @type {unknown} */ error) => { source.remove(); throw error; });
   try {
     writeFileSync(keyFile, JSON.stringify({ private: pair.privateKey.export({ type: 'pkcs8', format: 'pem' }), public: key }), { mode: 0o600, flag: 'wx' });
     // Both the app and server are built using this source checkout's tools.
-    process.env.WS_RIG_PORTS ??= '19476';
-    const { RELEASE_PORT, WORLD_PORT, openRig } = await import(pathToFileURL(join(checkout, 'src', 'scripts', 'online-rig.mjs')).href);
+    const { RELEASE_PORT, WORLD_PORT, openRig } = await importRigAt(checkout, ports.base);
     const tour = await tourFixture(checkout, tourSeed);
     const catalogueFile = join(work, 'fixture-catalogue.json');
     {
@@ -94,11 +96,13 @@ export async function openQaRig({ root, build, out, tourSeed }) {
       try { await rig.close(); } finally {
         rmSync(placementFile, { force: true });
         source.remove();
+        ports.release();
       }
     } };
   } catch (error) {
     rmSync(placementFile, { force: true });
     source.remove();
+    ports.release();
     throw error;
   } finally { rmSync(keyFile, { force: true }); }
 }

@@ -15,8 +15,9 @@ import { join, resolve as absolute } from 'node:path';
 import { chromium, devices } from './browser-playwright.mjs';
 import { KEYCHAIN_ARGS } from './.kit/chromium-keychain.mjs';
 
-// The rig's ports come from WS_RIG_PORTS when online-rig.mjs loads: this proof's own block, clear of other lanes' rigs.
-process.env.WS_RIG_PORTS ??= '19576';
+// The rig's ports come from WS_RIG_PORTS when online-rig.mjs loads: a free block locked for this run (QA 11-25 row 130), or the
+// one WS_RIG_PORTS names. The lock goes when the process exits.
+process.env.WS_RIG_PORTS = String((await (await import('./rig-ports.mjs')).reserveRigPorts()).base);
 const { PLAY_FLAGS, RELEASE_PORT, enterPage, intoWorld, openRig } = await import('./online-rig.mjs');
 const { enterZone } = await import('./zone-entry.mjs');
 const ROOT = absolute(import.meta.dirname, '..', '..');
