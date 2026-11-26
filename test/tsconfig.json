@@ -64,7 +64,6 @@
     "fixtures/phone-loading-a6701db71.json",
     "fixtures/quest-step-legacy-saves.json",
     "fixtures/approved-model-geometry-roots.json",
-    "../scripts/ci-native-fixtures.mjs",
     "boot-audio-packs.test.ts",
     "fingerprints.test.ts",
     "committed-fast-checks.test.ts",

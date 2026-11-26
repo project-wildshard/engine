@@ -1,6 +1,6 @@
 // Production entry: no query parameters or configuration controls. Caps come from the build's shared cost model.
 import { runRig } from './core.js';
-import { API_ORIGIN, BUILD, CFG } from './config.js';
+import { API_ORIGIN, BUILD, CFG } from './config.js'; // script-paths: scripts/app-build/crossroadsRig.ts writes config.js beside phone.js
 
 const status = document.getElementById('status'), back = document.getElementById('return');
 const series = crypto.randomUUID();

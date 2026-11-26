@@ -44,7 +44,6 @@
     "types/*.d.ts"
   ],
   "exclude": [
-    "ci-native-fixtures.mjs",
     "agent-parity.mjs",
     "agent-sync.mjs",
     "scratch-dir.mjs",

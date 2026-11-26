@@ -26,6 +26,10 @@ if(asked.length===0){
  // CHUNK-PARAM-REMOVAL CP23 (J522): no new chunk param read or write beyond the shrink-only baseline.
  const chunkGuard=spawnSync(process.execPath,['scripts/chunk-param-guard.mjs'],{stdio:'inherit'});
  if(chunkGuard.status!==0)process.exit(chunkGuard.status??1);
+ // Meta QA 11-25 rows 82 and 84 (J505): no script pointing where nothing is (the kit's .githooks/script-paths.mjs, an
+ // empty baseline: enforced).
+ const scriptPaths=spawnSync(process.execPath,['.githooks/script-paths.mjs'],{stdio:'inherit'});
+ if(scriptPaths.status!==0)process.exit(scriptPaths.status??1);
 }
 const threads = process.env.WS_PUSH_LINT_THREADS;
 if (threads !== undefined && !/^[1-9]\d*$/u.test(threads)) throw new Error('Invalid push lint worker limit');

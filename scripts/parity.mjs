@@ -243,8 +243,8 @@ async function main(opts) {
     if(opts.plant){const plant=plants.find((p)=>p.id===opts.plant);if(!plant)throw new Error('usage: unknown plant');if(plant.kind==='patch')execFileSync('git',['apply',join(fixtureRoot,'test/parity/plants',string(plant.patch))],{cwd:root});else if(plant.kind==='flag')opts.angle=string(plant.flag).split('=')[1]??'metal';else throw new Error('usage: nightly/linux plants use their own runner');}
     if(exported)preview=await serve(root,sha,'hit' in exported);
     const url=preview?.url??opts.url??'';
-    const pendingPath=resolve(opts.pending??join(ROOT,'project/archive/game-normalization/reviews/pending.json'));
-    const pending=array(opts.pending?readJson(pendingPath):opts.export?gitJson(`${sha}:project/archive/game-normalization/reviews/pending.json`):readJson(pendingPath)).map(object);
+    const pendingPath=resolve(opts.pending??join(ROOT,'test/parity/pending.json'));
+    const pending=array(opts.pending?readJson(pendingPath):opts.export?gitJson(`${sha}:test/parity/pending.json`):readJson(pendingPath)).map(object);
     const quarantine=array(readJson(join(fixtureRoot,'test/parity/quarantine.json'))).map(object),renameDir=join(fixtureRoot,'test/parity/renames');
     const renames=existsSync(renameDir)?readdirSync(renameDir).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true})).map((p)=>object(readJson(join(renameDir,p)))):[];
     const ambientInfo=array(readJson(join(fixtureRoot,'test/parity/ambient-info.json'))).map(string);
