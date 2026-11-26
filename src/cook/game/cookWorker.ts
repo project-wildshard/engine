@@ -306,6 +306,18 @@ const COOK_INDEX = /^index\/[\w.-]{1,64}\/([a-f0-9]{64})\.json$/u;
 const COOK_LOOSE = /^loose\/[a-f0-9]{64}\/(?:shardfiles|programs)\//u;
 const PACKS = 'assets/spawn/';
 const cookStoreKey = (key: string): boolean => COOK_INDEX.test(key) || COOK_LOOSE.test(key) || key.startsWith(PACKS);
+/** Meta Cloudflare audit CF4: every key the cook writes, measures or sweeps lives under these prefixes (its indexes, its
+ *  loose folders, and `assets/` for the shared parts a publish measures). The bucket's other ~2.4 M objects are page
+ *  content sets (`content/`): listing them cost ~2,400 R2 Class A calls and 10+ minutes a listing (most of the bucket's
+ *  ~69 k ListObjects a day on 11-26) to measure a 4 GB store of ~10 k objects. Never list the bucket root. */
+export const COOK_PREFIXES: readonly string[] = ['assets/', 'index/', 'loose/'];
+
+/** CF4: every object under the cook's own prefixes, one listing per prefix. */
+export async function listCookStore(store: PackStore): Promise<StoredObject[]> {
+  const rows: StoredObject[] = [];
+  for (const prefix of COOK_PREFIXES) for (const row of await store.list(prefix)) rows.push(row);
+  return rows;
+}
 const looseCookOutput = (key: string): boolean => key.startsWith('shardfiles/') || key.startsWith('programs/');
 
 /** Authored loose mounts cannot publish to a release or catalogue publication key. */
@@ -329,7 +341,7 @@ export async function inParallel<T>(items: readonly T[], limit: number, work: (i
 export const cookOutputKey = (key: string): boolean =>
   looseCookOutput(key) || (key.startsWith('assets/') && !key.startsWith('assets/catalogue/'));
 
-/** Budget counts only the rebuildable store. The prefix report still names every bucket owner. */
+/** Budget counts only the rebuildable store. The prefix report covers the cook's own prefixes (CF4). */
 function usageOf(rows: readonly StoredObject[], budget: number): StoreUsage {
   const byPrefix: Record<string, {count: number; bytes: number}> = {};
   let objects = 0, bytes = 0;
@@ -348,7 +360,7 @@ function cookBytes(rows: Iterable<StoredObject>): number {
   return bytes;
 }
 
-export async function storeUsage(store: PackStore, budget: number): Promise<StoreUsage> { return usageOf(await store.list(''), budget); }
+export async function storeUsage(store: PackStore, budget: number): Promise<StoreUsage> { return usageOf(await listCookStore(store), budget); }
 
 /** What one kept index names: the index itself and every key it lists. @returns false when the index vanished mid-read. */
 async function keepIndex(store: PackStore, key: string, kept: Set<string>): Promise<boolean> {
@@ -378,7 +390,7 @@ async function keptOf(store: PackStore, builds: readonly string[]): Promise<Set<
 /** Delete unreferenced cook keys after the grace window. Other bucket owners are read-only. */
 async function sweepUnkept(store: PackStore, kept: ReadonlySet<string>, budget: number, now: number, grace: number): Promise<GcReport> {
   let deleted = 0, freedBytes = 0;
-  for (const row of await store.list('')) {
+  for (const row of await listCookStore(store)) {
     if (!cookStoreKey(row.key) || kept.has(row.key) || now - row.modified < grace) continue;
     await store.remove(row.key); deleted++; freedBytes += row.bytes;
   }
@@ -523,7 +535,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     listingNext ??= (async () => {
       const at = clock();
       try {
-        const rows = await store.list('');
+        const rows = await listCookStore(store);
         listing = {rows: new Map(rows.map(row => [row.key, row])), at};
         if (listingFile !== undefined) {
           const {rows: kept} = listing, began = clock();

@@ -9,7 +9,7 @@ import {tmpdir} from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- This test runs the worker in a folder of its own.
 import {join, resolve} from 'node:path';
 import {afterAll, beforeAll, expect, test} from 'vitest';
-import {createCookWorker, type JobLauncher} from '../src/cook/game/cookWorker';
+import {COOK_PREFIXES, createCookWorker, type JobLauncher} from '../src/cook/game/cookWorker';
 import {appendPut, loadListing, saveListing} from '../src/cook/game/keptListing';
 import {folderStore, type PackStore} from '../src/cook/game/packStore';
 
@@ -71,7 +71,8 @@ test('FR-A21: a restarted worker publishes on its saved listing without waiting 
   const held = new Promise<void>(resolve => { release = resolve; });
   const puts: string[] = [], lines: string[] = [];
   const store: PackStore = {...inner,
-    list: async prefix => { if (prefix === '') { listings++; await held; } return inner.list(prefix); },
+    // CF4: a refresh lists the cook prefixes one by one, starting with COOK_PREFIXES[0]; holding that one holds it all
+    list: async prefix => { if (prefix === COOK_PREFIXES[0]) { listings++; await held; } return inner.list(prefix); },
     put: async (key, body, headers) => { puts.push(key); await inner.put(key, body, headers); }};
   const worker = createCookWorker({build: 'b-resume', store, launcher, serverPacks: join(scratch, 'server-resume'), scratch: join(scratch, 'work-resume'),
     now: () => now, listingFile: file, log: line => { lines.push(line); }, source: {heads: () => Promise.resolve([]), download: () => Promise.resolve(tar)}});

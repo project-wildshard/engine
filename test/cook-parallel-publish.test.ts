@@ -7,7 +7,7 @@ import {tmpdir} from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- This test runs the worker in a folder of its own.
 import {join} from 'node:path';
 import {afterAll, beforeAll, expect, test} from 'vitest';
-import {createCookWorker, indexKey, inParallel, PUT_PARALLEL, type JobLauncher} from '../src/cook/game/cookWorker';
+import {COOK_PREFIXES, createCookWorker, indexKey, inParallel, PUT_PARALLEL, type JobLauncher} from '../src/cook/game/cookWorker';
 import {folderStore, type PackStore} from '../src/cook/game/packStore';
 
 // FAST-RELEASE FR-A2 (meta FAST-RELEASE-PLAN; J505; Jake, 2026-11-24 ~18:20 Cancún: "Do the same audit & review ... of
@@ -110,7 +110,7 @@ test('FR-A2: the bucket listing runs while the job cooks, not after it', async (
   const done = (): boolean => existsSync(work) && readdirSync(work, {recursive: true}).some(name => String(name).endsWith('job-done'));
   const inner = folderStore(join(scratch, 'store-listing')), listed: boolean[] = [];
   const store: PackStore = {...inner, list: async prefix => {
-    if (prefix === '') listed.push(done());
+    if (prefix === COOK_PREFIXES[0]) listed.push(done());
     return inner.list(prefix);
   }};
   const hash = createHash('sha256').update('listing').digest('hex');
@@ -131,7 +131,7 @@ test('FR-A2: a publish uses a kept listing still young enough while a prefetch r
   let now = 0, listings = 0, release = (): void => undefined;
   const held = new Promise<void>(resolve => { release = resolve; });
   const store: PackStore = {...inner, list: async prefix => {
-    if (prefix === '' && ++listings === 2) await held;
+    if (prefix === COOK_PREFIXES[0] && ++listings === 2) await held;
     return inner.list(prefix);
   }};
   const tars = new Map(['one', 'two'].map(word => [createHash('sha256').update(`kept-${word}`).digest('hex'), new TextEncoder().encode(`kept-${word}`)]));
@@ -154,7 +154,7 @@ test('FR-A2: while a refresh runs, a kept listing past its age still serves, up 
   let now = 0, listings = 0, release = (): void => undefined;
   const held = new Promise<void>(resolve => { release = resolve; });
   const store: PackStore = {...inner, list: async prefix => {
-    if (prefix === '' && ++listings === 2) await held;
+    if (prefix === COOK_PREFIXES[0] && ++listings === 2) await held;
     return inner.list(prefix);
   }};
   const tars = new Map(['one', 'two'].map(word => [createHash('sha256').update(`aged-${word}`).digest('hex'), new TextEncoder().encode(`aged-${word}`)]));

@@ -5,7 +5,7 @@ import {type Server} from 'node:http';
 // oxlint-disable-next-line import/no-nodejs-modules -- This test runs the worker in folders of its own.
 import {join} from 'node:path';
 import {describe, expect, it} from 'vitest';
-import {createCookWorker, notifyServer} from '../src/cook/game/cookWorker';
+import {COOK_PREFIXES, createCookWorker, notifyServer} from '../src/cook/game/cookWorker';
 import {folderStore} from '../src/cook/game/packStore';
 import {hashOf, slug, sparse, useCookHarness} from './fixtures/cookWorkerHarness';
 
@@ -21,7 +21,7 @@ describe('the cook worker', () => {
     // The page's content sets exceed the whole default cook budget by themselves.
     sparse(folder, 'content/set-a/blob.bin', 8_000_000_000);
     let whole = 0;
-    const cook = createCookWorker({build: 'b4', store: {...inner, list: prefix => { if (prefix === '') whole++; return inner.list(prefix); }},
+    const cook = createCookWorker({build: 'b4', store: {...inner, list: prefix => { if (prefix === COOK_PREFIXES[0]) whole++; return inner.list(prefix); }},
       source: h.source(new Map([[hash, h.real]])), launcher: h.launcher(), serverPacks: join(h.scratch, 'server'), scratch: join(h.scratch, 'work')});
     const server: Server = notifyServer(cook, 'a-long-enough-test-token');
     await new Promise<void>(resolve => { server.listen(0, '127.0.0.1', resolve); });
