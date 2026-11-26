@@ -1,7 +1,17 @@
 // @vitest-environment node
 import {expect, test} from 'vitest';
 import {readFileSync} from 'node:fs';
-import {cookUnitGap, expectedCookUnit, hardenDue, selectCookRelease} from '../src/scripts/release-cook.mjs';
+import {cookUnitGap, expectedCookUnit, hardenDue, hardenGateOf, selectCookRelease} from '../src/scripts/release-cook.mjs';
+
+// v0.1.95: a pending reboot (VH5) held the harden that refreshes the box's rebuild.sh, so the cook move ran the pre-lean
+// copy and rolled back. Only rows whose fix could touch sshd, ufw or Tailscale hold an unattended apply.
+test('a pending reboot does not hold the release harden; an ssh row still does', () => {
+  const reboot = ['fail    VH5   running kernel 6.8.0-149-generic; 6.8.0-151-generic is installed (reboot)',
+    'fail    VH5   a reboot has been required since 2026-11-26', 'ok      VH6   fail2ban jail sshd', 'summary       2 fail, 1 unknown'].join('\n');
+  expect(hardenGateOf(reboot)).toBeNull();
+  expect(hardenGateOf(`fail    VH3   sshd PasswordAuthentication yes\n${reboot}`)).toBe('harden --check has 1 fail row(s) (VH3)');
+  expect(hardenGateOf('fail    VH5   a reboot has been required')).toBe('harden --check did not finish');
+});
 
 const build = 'a'.repeat(40), staging = {tag: `server-staging-${build}`, build};
 

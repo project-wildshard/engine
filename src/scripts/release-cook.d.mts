@@ -4,3 +4,4 @@ export function hardenDue(applied: string | undefined, build: string, changed: (
 export interface CookUnit { AllowedCPUs: string; CPUWeight: string; MemoryMax: string }
 export function expectedCookUnit(rebuild: string): CookUnit;
 export function cookUnitGap(expected: CookUnit, shown: string): string | null;
+export function hardenGateOf(out: string): string | null;

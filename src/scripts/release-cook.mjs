@@ -33,8 +33,10 @@ const RELEASES = 'https://packs.wildshard.io/releases';
 const TAG = /^v\d{1,4}\.\d{1,4}\.\d{1,4}$/u;
 const SIGNED_TAG = /^(?:v\d{1,4}\.\d{1,4}\.\d{1,4}|server-(?:staging|production)-[0-9a-f]{40})$/u, COMMIT = /^[0-9a-f]{40}$/u;
 const MARK = 'cook <tag>';
-// harden --check rows whose fix never touches sshd, ufw or Tailscale: SC2 is the box-local Prometheus on loopback.
-const OFF_SSH_ROWS = new Set(['SC2']);
+// harden --check rows whose fix never touches sshd, ufw or Tailscale: SC2 is the box-local Prometheus on loopback. VH5 is
+// unattended upgrades and the reboot they ask for, which no apply fixes. v0.1.95's staging move ran the box's pre-lean
+// rebuild.sh because a pending reboot held the harden that refreshes it, so the cook rolled back (QA 11-25 row 88).
+const OFF_SSH_ROWS = new Set(['SC2', 'VH5']);
 // wildshard-apply writes `<commit> <tag>` here after a harden that exits 0 (FR-A11): root-written, world-readable.
 const HARDEN_STAMP = '/var/lib/wildshard-harden-applied';
 const VPS = 'src/scripts/vps/';
@@ -170,10 +172,12 @@ export function cookUnitGap(expected, shown) {
 }
 
 /** The --check rows that make an unattended apply unsafe, or null when it may run. @returns {string | null} */
-function hardenGate() {
-  const check = box('sudo -n /usr/local/sbin/wildshard-harden --check');
-  if (!check.out.includes('summary')) return 'harden --check did not finish';
-  const fails = check.out.split('\n').filter(line => line.startsWith('fail') && !OFF_SSH_ROWS.has(line.split(/\s+/u)[1] ?? ''));
+function hardenGate() { return hardenGateOf(box('sudo -n /usr/local/sbin/wildshard-harden --check').out); }
+
+/** The same gate on a `wildshard-harden --check` output. @param {string} out @returns {string | null} */
+export function hardenGateOf(out) {
+  if (!out.includes('summary')) return 'harden --check did not finish';
+  const fails = out.split('\n').filter(line => line.startsWith('fail') && !OFF_SSH_ROWS.has(line.split(/\s+/u)[1] ?? ''));
   return fails.length > 0 ? `harden --check has ${String(fails.length)} fail row(s) (${fails.map(line => line.split(/\s+/u)[1]).join(', ')})` : null;
 }
 
