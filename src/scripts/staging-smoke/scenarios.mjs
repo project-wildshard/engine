@@ -552,7 +552,11 @@ export async function runScenario(scenario, { url, out, card, deepLink, oldProfi
         if (cells.includes(zone) || (only !== undefined && !only.includes(zone))) continue;
         let leg;
         try {
-          leg = await observe({ name: zone, tap: async () => { await enterZone(page, { zone, base: url, flags: 'mute=1' }); }, budgetMs: CELL_BUDGET_MS, holdMs: 1500 });
+          leg = await observe({ name: zone, tap: async () => {
+            await enterZone(page, { zone, base: url, flags: 'mute=1' });
+            // a profile that has entered no card yet is asked for a name first: skip it, as toShardSelect does
+            if (await page.locator(SEL.skip).waitFor({ state: 'visible', timeout: 5000 }).then(() => true, () => false)) await page.locator(SEL.skip).tap();
+          }, budgetMs: CELL_BUDGET_MS, holdMs: 1500 });
         } catch (error) {
           const why = error instanceof Error ? error.message.split('\n')[0] ?? '' : String(error);
           say(`${zone}: ${why}`);
