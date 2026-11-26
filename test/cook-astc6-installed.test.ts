@@ -53,11 +53,14 @@ function installedCommands(root: string, signal: AbortSignal) {
   };
 }
 
+// The cases run concurrently, each in its own root (QA 11-25 row 83): the registry case idles about 15 s on npm's real
+// --fetch-timeout, which the package cook's pack, install and two cooks overlap instead of queueing behind.
+
 // Mini QA 2026-11-16 row 41 (NB18): a shard repo cooking with the npm engine died in the 6x6 encoder's flush. Its worker
 // threads import astc6Wasm.ts, Node strips types under node_modules only through scripts/format-hook.mjs, and module
 // hooks are per thread, so every worker refused with ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING.
 
-test('the cook\'s ASTC 6x6 flush runs its worker lanes from an installed engine', async ({signal, onTestFinished}) => {
+test.concurrent('the cook\'s ASTC 6x6 flush runs its worker lanes from an installed engine', async ({signal, onTestFinished}) => {
   mkdirSync('tmp', { recursive: true });
   const root = mkdtempSync(resolve('tmp/cook-astc6-installed-'));
   const commands = installedCommands(root, signal); onTestFinished(commands.close);
@@ -85,7 +88,7 @@ test('the cook\'s ASTC 6x6 flush runs its worker lanes from an installed engine'
 
 // QA41's remaining package boundary: npm packs the real candidate and installs it with its declared dependencies.
 // The full cook uses a valid UASTC master and the default tiers, so an invalid input cannot hide encoder failures.
-test('a freshly installed engine tarball completes a full ASTC phone cook', async ({signal, onTestFinished}) => {
+test.concurrent('a freshly installed engine tarball completes a full ASTC phone cook', async ({signal, onTestFinished}) => {
   mkdirSync('tmp/codex-shards', { recursive: true });
   const root = mkdtempSync(resolve('tmp/codex-shards/cook-package-'));
   const commands = installedCommands(root, signal); onTestFinished(commands.close);
@@ -117,7 +120,7 @@ test('a freshly installed engine tarball completes a full ASTC phone cook', asyn
   } finally { await commands.close(); }
 }, 120_000);
 
-test('a stalled registry request retries inside the installed cook command budget', async ({signal, onTestFinished}) => {
+test.concurrent('a stalled registry request retries inside the installed cook command budget', async ({signal, onTestFinished}) => {
   const root = mkdtempSync(resolve('tmp/cook-astc6-registry-'));
   const commands = installedCommands(root, signal); onTestFinished(commands.close);
   const name = 'installed-cook-network-fixture', version = '1.0.0';
@@ -158,7 +161,7 @@ test('a stalled registry request retries inside the installed cook command budge
   }
 });
 
-for (const mode of ['timeout', 'abort']) test(`installed commands ${mode} a TERM-resistant child without blocking the case clock`, async ({signal, onTestFinished}) => {
+for (const mode of ['timeout', 'abort']) test.concurrent(`installed commands ${mode} a TERM-resistant child without blocking the case clock`, async ({signal, onTestFinished}) => {
   const root = mkdtempSync(resolve('tmp/cook-astc6-timeout-'));
   const controller = new AbortController();
   const commands = installedCommands(root, AbortSignal.any([signal, controller.signal])); onTestFinished(commands.close);
