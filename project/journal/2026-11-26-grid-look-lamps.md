@@ -16,3 +16,6 @@ sixteen. Raising the reserve costs every lit fragment on every grid page a loop 
 Guards: `cell-look-lamps.test.ts` (declared lamps light, at their place and strength, never move the light count), K6 in
 staging live QA names a card zone whose declared lamps light none, and sharddev's watch parity again requires the built
 page's lamps.
+
+Row 154: K6's lamp check reached only Shard Select cards, and Mossgate and Glowfen have none. K6 now enters both by the
+tap (zone-entry.mjs) after the cards, past its card budget, and runs the same dark-lamps check on each.

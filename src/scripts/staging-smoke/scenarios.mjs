@@ -9,6 +9,7 @@ import { KEYCHAIN_ARGS } from '../.kit/chromium-keychain.mjs';
 import { modalKind } from './checks.mjs';
 import { judgeFrame } from './worldFrame.mjs';
 import { saveFixture } from '../debug-settings.mjs';
+import { enterZone } from '../zone-entry.mjs';
 
 /** @typedef {import('playwright').Page} Page */
 /** @typedef {import('playwright').BrowserContext} BrowserContext */
@@ -300,6 +301,10 @@ export async function judgeWorldFrames(frames) {
   return world;
 }
 
+/** QA 11-25 row 154: the grid zones whose look declares lamps (Mossgate 16, Glowfen 14) that the title offers no card for:
+ *  K6 enters them by the tap after the cards. A zone that gains a card is entered once, as a card. */
+export const LAMP_TAP_ZONES = Object.freeze(['mossgate', 'glowfen']);
+
 /**
  * QA 11-25 row 138: the grid page drew none of a data zone's declared look lamps (Brasscap Mesa's 8, Mossgate's 16, Glowfen's
  * 14) and no check saw it. A K6 cell whose look declares lamps must light some: the page's grid readout (`sceneLife`, engine
@@ -539,6 +544,30 @@ export async function runScenario(scenario, { url, out, card, deepLink, oldProfi
         // back to the title the player's way; a cell that never played reopens the page
         const back = leg.playAt !== null && await page.locator(SEL.pause).tap({ timeout: 5000 }).then(() => page.locator(SEL.exit).tap({ timeout: 5000 })).then(() => page.locator(SEL.titleSelect).waitFor({ state: 'visible', timeout: 30_000 })).then(() => true, () => false);
         if (!back) { await open('/'); await page.locator(SEL.titleSelect).waitFor({ state: 'visible', timeout: 60_000 }).catch(() => undefined); }
+      }
+      // QA 11-25 row 154: grid zones whose look declares lamps but whose cell has no Shard Select card, entered by the tap (a
+      // tool's player path, zone-entry.mjs), so a train refuses when their lamps go dark too. They run past K6's card budget (each
+      // leg is held to CELL_BUDGET_MS), so a slow card can't skip the lamp check
+      for (const zone of LAMP_TAP_ZONES) {
+        if (cells.includes(zone) || (only !== undefined && !only.includes(zone))) continue;
+        let leg;
+        try {
+          leg = await observe({ name: zone, tap: async () => { await enterZone(page, { zone, base: url, flags: 'mute=1' }); }, budgetMs: CELL_BUDGET_MS, holdMs: 1500 });
+        } catch (error) {
+          const why = error instanceof Error ? error.message.split('\n')[0] ?? '' : String(error);
+          say(`${zone}: ${why}`);
+          if (deploy) result.legs.push({ name: zone, at: Date.now(), samples: [], problems: [{ at: 0, text: `never reached play: could not enter by the tap (${why.slice(0, 80)})` }], path: '', tapAt: Date.now(), playAt: null });
+          await open('/'); continue;
+        }
+        result.legs.push(leg);
+        say(`${zone} (by the tap): ${leg.path}`);
+        if (leg.playAt !== null) {
+          if (!deploy) await page.waitForTimeout(CELL_SETTLE_MS);
+          const grid = await page.evaluate(() => { try { return /** @type {any} */ (window).__wildshard?.shard?.grid?.state?.() ?? null; } catch { return null; } }).catch(() => null);
+          const dark = darkLampsProblem(grid);
+          if (dark !== null) { leg.problems.push({ at: Date.now() - leg.tapAt, text: dark }); say(`${zone}: ${dark}`); }
+        }
+        await open('/'); await page.locator(SEL.titleSelect).waitFor({ state: 'visible', timeout: 60_000 }).catch(() => undefined);
       }
     } else {
       await open('/');

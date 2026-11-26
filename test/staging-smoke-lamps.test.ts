@@ -13,3 +13,15 @@ test('a zone whose declared lamps light none is a K6 problem; one that lights th
   expect(darkLampsProblem(null)).toBeNull();
   expect(darkLampsProblem({ inside: 'mossgate' })).toBeNull();
 });
+
+// QA 11-25 row 154: Mossgate and Glowfen declare lamps but have no Shard Select card; K6 enters them by the tap after the cards
+test('K6 enters the lamp zones that have no card by the tap, past its card budget, and checks their lamps', async () => {
+  const { LAMP_TAP_ZONES } = await import('../src/scripts/staging-smoke/scenarios.mjs');
+  expect(LAMP_TAP_ZONES).toEqual(['mossgate', 'glowfen']);
+  const { readFileSync } = await import('node:fs');
+  const source = readFileSync(new URL('../src/scripts/staging-smoke/scenarios.mjs', import.meta.url), 'utf8');
+  const loop = source.slice(source.indexOf('for (const zone of LAMP_TAP_ZONES)'));
+  expect(loop.slice(0, 1600)).toMatch(/enterZone\(page, \{ zone, base: url/u);
+  expect(loop.slice(0, 1600)).toMatch(/darkLampsProblem\(grid\)/u);
+  expect(loop.slice(0, 1600)).not.toMatch(/K6_BUDGET_MS/u);
+});
