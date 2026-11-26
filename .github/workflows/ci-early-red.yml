@@ -28,7 +28,7 @@ jobs:
             package.json
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version-file: package.json
+          node-version-file: .node-version
       - name: Cancel a running main run that is already red behind this push
         env:
           GH_TOKEN: ${{ github.token }}

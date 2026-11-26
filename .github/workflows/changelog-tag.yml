@@ -19,6 +19,6 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
-          node-version-file: package.json
+          node-version-file: .node-version
       - name: Require the tag's changelog section at its commit
         run: node src/scripts/changelog.mjs check "$GITHUB_REF_NAME" --at="$GITHUB_SHA"

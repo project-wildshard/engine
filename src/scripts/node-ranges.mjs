@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Meta QA 11-25 row 42 (J505): every org package an engine install pulls admits every Node the workflows may run.
-// CI's setup-node reads engine's `engines.node` (`node-version-file: package.json`) and takes the newest cached Node in it,
-// and `.npmrc` has engine-strict, so `pnpm install` refuses a dependency whose own range leaves that Node out. Format 0.79.2
+// CI's setup-node read engine's `engines.node` (`node-version-file: package.json`) and took the newest cached Node in it
+// (now `.node-version`, Node 26: QA 11-25 row 95; laptops and the box run 24), and `.npmrc` has engine-strict, so
+// `pnpm install` refuses a dependency whose own range leaves out any Node engine admits. Format 0.79.2
 // said `>=24.18.0 <25` under engine's `<27`: server-release 45703635653 ran Node 26.13.1 and died at install
 // (ERR_PNPM_UNSUPPORTED_ENGINE). A laptop on Node 24 never sees it, so this reads the ranges instead of the running Node.
 //

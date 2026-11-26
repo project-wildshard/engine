@@ -39,7 +39,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version-file: package.json
+          node-version-file: .node-version
       - run: node --test src/scripts/ring3.proof.ts
       - run: node src/scripts/ring3.ts prepare
       # QA-FEEDBACK-2026-11-23-b row 40 (J505): a Git source archive lacks the ignored *.generated.* build outputs (Dunes and

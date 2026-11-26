@@ -87,7 +87,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
-          node-version-file: package.json
+          node-version-file: .node-version
       # EV3c: the checks below run only in job 1 (the history scan alone is ~100 s), so its shards are not charged them;
       # ci-pack.mjs takes WS_CI_JOB_OWN_MS off the job clock. They took tests (1)'s shards to 300 s on 132-142 s of tests.
       - name: Start job 1's own-checks clock (not charged to its shards)
@@ -443,7 +443,7 @@ jobs:
       # Retain the docs-only proof policy.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
-          node-version-file: package.json
+          node-version-file: .node-version
       - id: paths
         env:
           GH_TOKEN: ${{ github.token }}
@@ -679,7 +679,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
-          node-version-file: package.json
+          node-version-file: .node-version
       - name: Classify from an actually green code-proving ancestor
         id: paths
         env:
