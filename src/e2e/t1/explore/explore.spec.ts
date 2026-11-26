@@ -91,3 +91,23 @@ test('Explore browses, flies and inspects without a socket or durable saves', as
   await expect(list.getByRole('link', { name: 'Signal Dunes' })).toBeVisible()
   expect(sockets).toEqual([])
 })
+
+// Meta CHUNK-PARAM-REMOVAL CP6 (J522, J463): a zone's own Explore link opens its hub with no zone in the query
+// (WS_T1_EXPLORE_ZONE picks another pinned zone; ring 1 pins Brasscap Mesa)
+const ZONE = `/${process.env['WS_T1_EXPLORE_ZONE'] ?? 'brasscap-mesa'}`
+test('An Explore zone link opens its hub and never writes a chunk address', async ({
+  page,
+}): Promise<void> => {
+  const addresses: string[] = []
+  page.on('framenavigated', (): void => {
+    addresses.push(page.url())
+  })
+  await page.goto(ZONE)
+  const viewer = page.locator('.ws-x.show')
+  await expect(viewer).toHaveAttribute('data-mode', 'hub', { timeout: 65_000 })
+  addresses.push(page.url())
+  expect(new URL(page.url()).pathname).toBe(ZONE)
+  expect(addresses.filter((url): boolean => /[?&]chunk=/u.test(url))).toEqual(
+    [],
+  )
+})
