@@ -12,7 +12,7 @@ const tracked = execFileSync('git', ['ls-files', '-z'], {encoding: 'utf8'}).spli
 // The box hardened from v0.1.96's lean tag on 2026-11-26 (its stamp names 48084eb2), so the bridge an old apply ran
 // (scripts/vps/harden.sh, d14a43d7d) is gone and the pre-lean scripts/ folder holds nothing tracked again.
 test('nothing is tracked under the pre-lean scripts/', () => {
-  expect(tracked.filter(path => path.startsWith('scripts/'))).toEqual([]);
+  expect(tracked.filter(path => path.startsWith('scripts/'))).toEqual([]); // script-paths: proves the pre-lean folder stays empty
 });
 
 test('the lean wildshard-apply unpacks src/scripts/vps, which holds every script it runs', () => {
@@ -34,7 +34,7 @@ test('every repo path a box script names exists at this tree, and none is pre-le
   expect(named.length).toBeGreaterThan(5);
   const at = (row: string) => row.split(' ')[1] ?? '';
   const missing = named.filter(row => !existsSync(at(row)));
-  const preLean = named.filter(row => at(row).startsWith('scripts/'));
+  const preLean = named.filter(row => at(row).startsWith('scripts/')); // script-paths: finds pre-lean paths the box would run
   expect(missing).toEqual([]);
   expect(preLean).toEqual([]);
   expect(named).toContain('src/scripts/vps/rebuild.sh src/scripts/.kit/assert-store-layout.mjs');
