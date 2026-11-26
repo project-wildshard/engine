@@ -27,8 +27,8 @@ export function botCells(url: string, bots: number, cells: string): readonly { u
   const targets = Array.from({ length: bots }, (_, index) => names[index % names.length]);
   return targets.map(cell => {
     if (cell === undefined) throw new Error('Missing spread cell');
-    const at = new URL(url); at.searchParams.set('chunk', cell);
-    return { url: at.href, cell, peers: targets.filter(target => target === cell).length - 1 };
+    // CHUNK-PARAM CP5 (J522): the socket address stays bare; each bot asks for its cell in its goto word (RoomBot)
+    return { url, cell, peers: targets.filter(target => target === cell).length - 1 };
   });
 }
 

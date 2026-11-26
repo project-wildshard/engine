@@ -14,7 +14,7 @@ afterEach(close);
 test('two others see the entry: B on the road sees A frozen then go, C in Nalati sees A arrive', { timeout: 180_000 }, async () => {
   const bench = await entryBench({ cells: CELLS, workers: 2, crossing: true });
   const page = await seated(), road = bench.road(roadName(HOME));
-  const b = new RoomBot(bench.url, 'bench', 'device:b', 'B'), c = new RoomBot(`${bench.url}${bench.url.includes('?') ? '&' : '?'}chunk=${EAST}`, 'bench', 'device:c', 'C');
+  const b = new RoomBot(bench.url, 'bench', 'device:b', 'B'), c = new RoomBot(bench.url, 'bench', 'device:c', 'C', 0, 0, { cell: EAST, spawn: false });
   observers.push(b, c);
   expect(await b.arrived()).toBe(true); expect(await c.arrived()).toBe(true);
   await vi.waitFor(() => { expect(bench?.room(EAST)?.holds('device:c'), 'C stands in Nalati').toBe(true); }, { timeout: 20_000, interval: 50 });

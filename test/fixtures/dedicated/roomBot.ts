@@ -23,6 +23,9 @@ export class RoomBot {
   private tick = 0;
   /** `goto`: the cell it asks for before its hello, as a page Shard select sent there does (CHUNK-PARAM CP5, `gotoFirst`). */
   constructor(url: string, build: string, device: string, name = 'Bot', ledger = 0, loadMs = 0, goto?: GotoWord) {
+    // The door reads no `chunk` (CP5): a bot that named its cell in the address was seated wherever, and the seating tests
+    // went red on main (run 45731753083). Refuse it here, so the cell can only ride the goto word.
+    if (new URL(url).searchParams.has('chunk')) throw new Error(`RoomBot: no cell in the socket address (${url}); pass goto { cell, spawn }`);
     this.transport = new WebSocketTransport(url); this.client = new NetClient(this.transport);
     this.transport.onClose((reason, info) => { this.closed = reason; this.closedWith = info ?? null; this.stop(); });
     this.transport.onControl((control, bytes) => {

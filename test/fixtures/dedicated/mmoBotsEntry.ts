@@ -66,7 +66,7 @@ for (const [signal, code] of [['SIGINT', 130], ['SIGHUP', 129], ['SIGTERM', 143]
 let playingFrom: number | null = null, playingTo: number | null = null;
 for (let index = 0; index < bots; index++) {
   const destination = destinations[index]; if (destination === undefined) throw new Error('Missing bot destination');
-  const bot = withAddress(index, () => new RoomBot(destination.url, build, `device:${tag}-${String(index)}`, `Bot ${tag} ${String(index)}`)), walker: Walker = { bot, index, cursor: null, last: null, frames: 0, frameAt: null, gaps: [], moved: 0, laps: 0, visitedBefore: 0, seenMax: 0, seenSamples: 0, samples: 0, stuck: 0, joinedMs: null, reason: null };
+  const bot = withAddress(index, () => new RoomBot(destination.url, build, `device:${tag}-${String(index)}`, `Bot ${tag} ${String(index)}`, 0, 0, destination.cell === null ? undefined : { cell: destination.cell, spawn: false })), walker: Walker = { bot, index, cursor: null, last: null, frames: 0, frameAt: null, gaps: [], moved: 0, laps: 0, visitedBefore: 0, seenMax: 0, seenSamples: 0, samples: 0, stuck: 0, joinedMs: null, reason: null };
   bot.client.onFrame(() => {
     const now = performance.now();
     walker.frames++; if (walker.joinedMs === null) walker.joinedMs = Math.round(now - started);

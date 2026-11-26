@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { expect, test } from 'vitest';
 import { botCells, botTarget, BOX_REPLICA_SOCKET, SOCKETS_PER_ADDRESS, STAGING_SOCKET, STAGING_SOCKETS, TAILNET_SOCKET } from './fixtures/dedicated/mmoBotsGuard';
 import { interArrival } from './fixtures/dedicated/mmoBotsStats';
+import { RoomBot } from './fixtures/dedicated/roomBot';
 
 const entry = readFileSync('test/fixtures/dedicated/mmoBotsEntry.ts', 'utf8'), driver = readFileSync('scripts/mmo-bots.mjs', 'utf8');
 const proofDrivers = ['scripts/e7-doctor-proof.mjs', 'scripts/e7-live-staging-proof.mjs', 'scripts/e7-voice-staging-proof.mjs'].map(file => readFileSync(file, 'utf8'));
@@ -14,7 +15,7 @@ const proofDrivers = ['scripts/e7-doctor-proof.mjs', 'scripts/e7-live-staging-pr
 test('replica cells distribute uneven counts with cell-local peers and refuse unsafe targets', () => {
   const targets = botCells('ws://127.0.0.1:18796/', 5, 'driftwood-isle,nalati-grasslands');
   expect(targets.map(row => [row.cell, row.peers])).toEqual([['driftwood-isle',2],['nalati-grasslands',1],['driftwood-isle',2],['nalati-grasslands',1],['driftwood-isle',2]]);
-  expect(targets.map(row => new URL(row.url).searchParams.get('chunk'))).toEqual(targets.map(row => row.cell));
+  expect(targets.map(row => row.url), 'the address stays bare: the cell rides the goto word (CP5)').toEqual(Array(5).fill('ws://127.0.0.1:18796/'));
   expect(botCells('ws://127.0.0.1:18796/', 2, '').map(row => row.peers)).toEqual([1,1]);
   for (const cells of ['only-one','a,a','a,b,c,d,e,f','a,b;run','a,']) expect(() => botCells('ws://127.0.0.1:18796/',5,cells)).toThrow(/Spread needs/u);
   expect(() => botCells(STAGING_SOCKET,2,'a,b')).toThrow(/loopback replica only/u);
@@ -230,4 +231,11 @@ test('release-proof riders leave the release observer its two sockets', () => {
   expect(run.status).not.toBe(0);
   expect(run.stderr).toContain('--release-proof needs at most 2 bots (the release\'s observer takes 2 of the door\'s 4 per address)');
   expect(driver).toContain("releaseProof ? 2 : mode === 'replica'");
+});
+
+// CHUNK-PARAM CP5 (J522): main run 45731753083 went red when seating tests still named their cell in the socket address,
+// which the door no longer reads; the bot refuses such an address before it dials, so the cell rides the goto word only
+test('a bot never names its cell in the socket address', () => {
+  for (const url of ['ws://127.0.0.1:9/?chunk=nalati-grasslands', 'ws://127.0.0.1:9/?x=1&chunk=a'])
+    expect(() => new RoomBot(url, 'bench', 'device:guard')).toThrow(/no cell in the socket address/u);
 });
