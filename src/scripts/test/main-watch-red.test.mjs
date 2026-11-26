@@ -2,7 +2,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { expect, test } from 'vitest';
-import { attribute, failurePaths, KEEPER_MS, landers, readState, redMessage, redRecipients, redSuspect, shouldPromptRed, sweep } from '../main-watch.mjs';
+import { attribute, failurePaths, KEEPER_MS, landers, memoryQaCall, readState, redMessage, redRecipients, redSuspect, shouldPromptRed, sweep } from '../main-watch.mjs';
 
 const older = 'a'.repeat(40), newer = 'b'.repeat(40), other = 'c'.repeat(40);
 const testFile = 'test/host-ruler-roots.test.ts', sourceFile = 'src/scripts/host-ruler/roots.mjs';
@@ -235,6 +235,30 @@ test('MD9 sweep persists observations, processes newest-first API runs in order,
   expect(qa.map(row=>row.id)).toEqual([103,108,111]);
   expect(receipts.filter(entry=>entry.startsWith('main BUDGET regressed'))).toHaveLength(2);
   expect(receipts.some(entry=>entry.startsWith('main budget observation'))).toBe(true);
+}));
+
+// Meta QA 11-26: the QA writer takes its author only from --agent; main-watch passes WS_AGENT and never a default.
+test('memoryQaCall passes WS_AGENT as --agent, and with none set skips the QA row with a receipt line', () => {
+  const rows=[{id:45837215166,sha:newer,created:'2026-11-26T14:15:46Z',results:[]}];
+  expect(memoryQaCall('codex:gpt-6.2-sol',rows)).toEqual({args:['--agent','codex:gpt-6.2-sol',JSON.stringify(rows)]});
+  for(const agent of [undefined,'','  ']){
+    const call=memoryQaCall(agent,rows);
+    expect(call).toEqual({skipped:expect.stringMatching(/^memory QA skipped for run\(s\) 45837215166: no WS_AGENT/u)});
+  }
+});
+
+test('a skipped QA write leaves its receipt and clears the queue', () => withRedSpan(({io,receipts})=>{
+  const line='BUDGET over-hard key=ledger/made-up-valley/control measured=41767511 baseline=34715334 line=38186867 contentKey=ink@7';
+  const calls=[];
+  io.budgetRuns=()=>[{status:'completed',event:'push',conclusion:'failure',id:201,head_sha:older,created_at:'2026-11-21T19:01:00Z'}];
+  io.budgetAnnotations=()=>line;
+  io.memoryQa=(rows)=>{calls.push(rows.length);return memoryQaCall(undefined,rows).skipped;};
+  sweep(io);
+  expect(calls).toEqual([1]);
+  expect(receipts.filter(entry=>entry.startsWith('memory QA skipped for run(s) 201'))).toHaveLength(1);
+  expect(readState(io.state)?.memoryQa).toBeUndefined();
+  sweep(io);
+  expect(calls).toEqual([1]);
 }));
 
 // Meta QA 11-25 row 54: engine run 45662209325 named only opus-fr13, whose main-push carried opus-trailer's red commit.

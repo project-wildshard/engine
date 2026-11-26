@@ -448,6 +448,16 @@ export function sharedRuns(cache,fetch,now=Date.now(),freshMs=45_000){
 
 /** The real world: GitHub through gh, git, the receipts log and herdr. Tests pass their own.
  * @param {NodeJS.ProcessEnv} env */
+/** Meta QA 11-26 (Jake: "make the agent a mandatory parameter", "dont hardcode opus"): meta's QA writer names its
+ * author only from --agent, so main-watch passes the runner's own WS_AGENT (`claude:<model>` or `codex:<model>`) and
+ * never a default. With none set it writes no QA row, only a receipt saying so.
+ * @param {string|undefined} agent @param {readonly MemoryQa[]} rows @returns {{args:string[]}|{skipped:string}} */
+export function memoryQaCall(agent,rows){
+  const named=agent?.trim()??'';
+  if(named==='')return {skipped:`memory QA skipped for run(s) ${rows.map(row=>row.id).join(', ')}: no WS_AGENT names the agent, so no QA row is written (meta QA 11-26)`};
+  return {args:['--agent',named,JSON.stringify(rows)]};
+}
+
 export function liveIo(env=process.env){
   // The canonical checkout: land's follow outlives the worktree that started it.
   const here=resolve(import.meta.dirname,'..', '..');
@@ -521,11 +531,14 @@ export function liveIo(env=process.env){
     nativeRuns:()=>sharedRuns(`${runsCache}.memory-footprint`,()=>/** @type {Run[]} */(
       JSON.parse(read(['api',`repos/${repo}/actions/workflows/memory-footprint.yml/runs?branch=main&per_page=15`])).workflow_runs)),
     memoryQa:(/** @type {MemoryQa[]} */rows)=>{
+      const call=memoryQaCall(env.WS_AGENT,rows);
+      if('skipped' in call)return call.skipped;
       const meta=env.WS_META_ROOT??join(homedir(),'projects/games/project-wildshard-meta');
       const script=join(meta,'scripts/memory-gate-qa.mjs');
       if(!existsSync(script))throw new Error('meta memory-gate QA writer is unavailable');
-      execFileSync(process.execPath,[script,JSON.stringify(rows)],{cwd:meta,encoding:'utf8',
+      execFileSync(process.execPath,[script,...call.args],{cwd:meta,encoding:'utf8',
         stdio:['ignore','pipe','pipe'],timeout:60_000,maxBuffer:1<<20});
+      return undefined;
     },
     tip:()=>{run('git',['fetch','--quiet','origin','main']);return run('git',['rev-parse','origin/main']).trim();},
     commits:(/** @type {string|null} */from,/** @type {string} */to)=>{
@@ -828,7 +841,7 @@ export function sweep(io,hint={}){
       catch(error){io.receipt(`nightly status unavailable: ${error instanceof Error?error.message.split('\n')[0]:String(error)}`);}
     }
     if(state.memoryQa.length>0&&io.memoryQa!==undefined){
-      try{io.memoryQa(state.memoryQa);state.memoryQa=[];writeState(io.state,state);}catch(error){
+      try{const skipped=io.memoryQa(state.memoryQa);state.memoryQa=[];writeState(io.state,state);if(typeof skipped==='string')io.receipt(skipped);}catch(error){
         io.receipt(`memory QA deferred: ${error instanceof Error?error.message.split('\n')[0]:String(error)}`);
       }
     }

@@ -26,7 +26,8 @@ export interface Io {
   /** Meta QA 11-25 row 142: nightly.yml's main runs, for the 26 h freshness alarm. */
   nightlyRuns?:()=>Run[];
   budgetAnnotations?:(id:number)=>string;
-  memoryQa?:(rows:MemoryQa[])=>void;
+  /** Returns a receipt line when it wrote no QA row (no WS_AGENT, meta QA 11-26). */
+  memoryQa?:(rows:MemoryQa[])=>string|void;
   quotaReset?:()=>number;
   now?:()=>number;
   /** Meta QA 11-25 row 67: rerun a red run's failed jobs once. */
@@ -44,6 +45,7 @@ export function cancelledJobs(jobs:readonly Job[]):{started:boolean,blockingFail
 export function fpsNight(run:{display_title?:string}):{build:string;since:string|null}|null;
 export const RERUN_STALE_MS: number;
 export function pendingReruns(state:State|null,runs:readonly Run[],now?:number):Set<number>;
+export function memoryQaCall(agent:string|undefined,rows:readonly MemoryQa[]):{args:string[]}|{skipped:string};
 export function judge(runs:readonly Run[],state:State,tip:string|null,now?:number):Verdict[];
 export function verdictFor(runs:readonly Run[],sha:string,contains:(ancestor:string,descendant:string)=>boolean):{state:'green'|'red';run:Run}|null;
 export function landers(text:string):Map<string,{lane:string;slug:string;pane?:string;count?:number}>;
