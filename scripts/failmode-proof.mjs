@@ -1233,7 +1233,7 @@ try {
           if (!quota.overrideActive || quota.quota !== 1) return { outcome: 'harness-fail', reason: 'native origin quota was not actually applied', injection: quota };
           injection = { kind: 'native Chromium origin quota', bytes: quota.quota, overrideActive: quota.overrideActive };
         }
-        const started = Date.now(); await page.goto(URL_PLAY, { waitUntil: 'domcontentloaded' });
+        const started = Date.now(); await enterZone(page, { zone: SHARD, base: PAGE_ORIGIN, flags: 'mute=1&nolock=1&skipintro=1', waitUntil: 'domcontentloaded' });
         // The line exists while downloading. Waiting for control before observing it misses a truthful transient screen.
         const seen = await (async () => {
           const until = Date.now() + 60_000;
