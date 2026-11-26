@@ -20,7 +20,7 @@ const broadcast: MakeChannel | null = typeof BroadcastChannel === 'function' ? (
 /** In a worker: report this isolate's RAM ledger until the returned stop is called. */
 export function reportWorkerMemory(purpose: string, make: MakeChannel | null = broadcast, read: () => Record<string, number> = () => memoryAttribution.kinds('ram')): () => void {
   if (make === null) return () => undefined;
-  // the census (scripts/memory/census.mjs) asks each isolate's ledger who owns a buffer, as it asks the page's
+  // a probe can ask each isolate's ledger who owns a buffer, as it asks the page's (glCounters.ts)
   if (Reflect.get(globalThis, '__wildshardMemory') === undefined) Reflect.set(globalThis, '__wildshardMemory', Object.freeze({ owner: (buffer: object) => memoryAttribution.ownerOf(buffer, 'ram') }));
   const channel = make(WORKER_MEMORY_CHANNEL);
   const named: unknown = Reflect.get(globalThis, 'name');

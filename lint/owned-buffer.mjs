@@ -2,8 +2,8 @@
 // helper `src/shared/engine/core/ownedBuffer.ts`, against a shrink-only per-file allowance (lint/owned-buffer-debt.json).
 // Syntax only, no types: `new ArrayBuffer(...)` / `new SharedArrayBuffer(...)`; a typed-array constructor with one
 // argument that is not an array literal and not a literal length under 64 KB (a sized array, or a copy of another);
-// and `<x>.buffer.slice(...)`. A typed array's own `.slice()` cannot be told from an Array's without types, so the
-// ArrayBuffer census (scripts/memory/census.mjs) is what finds those.
+// and `<x>.buffer.slice(...)`. A typed array's own `.slice()` cannot be told from an Array's without types, so this
+// lint does not count it (the ArrayBuffer census that found those is retired: its wrapped constructors broke three.js).
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 

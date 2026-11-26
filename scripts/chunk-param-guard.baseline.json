@@ -1,11 +1,6 @@
 {
  "about": "CHUNK-PARAM-REMOVAL CP23: files that still read or write ?chunk=, with counts; shrink only (node scripts/chunk-param-guard.mjs --prune). CP22 takes it to zero.",
  "files": {
-  ".agents/skills/drain-inbox/SKILL.md": 1,
-  ".agents/skills/look-loop/SKILL.md": 1,
-  ".agents/skills/mockup-to-model/SKILL.md": 2,
-  "docs/look-loop.md": 1,
-  "docs/trailer.md": 1,
   "index.html": 8,
   "scripts/audio-download-proof.mjs": 2,
   "scripts/chaos-proxy-core.mjs": 3,
@@ -39,7 +34,6 @@
   "scripts/scorecard.mjs": 1,
   "scripts/side-parity.mjs": 2,
   "scripts/sign-in-proof.mjs": 1,
-  "scripts/split-repair-guardian.mjs": 1,
   "scripts/split-repair-hare.mjs": 1,
   "scripts/split-repair-held-melee.mjs": 1,
   "scripts/split-repair-horse-panic.mjs": 1,
@@ -48,18 +42,12 @@
   "scripts/split-repair-perks.mjs": 1,
   "scripts/split-repair-pine-writes.mjs": 1,
   "scripts/split-repair-sky-trails.mjs": 1,
-  "scripts/split-repair-stun.mjs": 1,
-  "scripts/split-repair-wake-loss.mjs": 1,
   "scripts/split-repair-whip.mjs": 1,
   "scripts/staging-phones-proof.mjs": 1,
   "scripts/staging-proof-lines.mjs": 1,
   "scripts/test-facade-instancing.mjs": 1,
   "scripts/tier-textures-proof.mjs": 1,
   "scripts/title-update-proof.mjs": 1,
-  "scripts/trailer/capture.mjs": 1,
-  "scripts/trailer/grid.mjs": 1,
-  "scripts/trailer/party.mjs": 1,
-  "scripts/trailer/shots/lib.mjs": 3,
   "scripts/uncatalogued-shard-proof.mjs": 1,
   "scripts/worker-client-death-return.mjs": 1,
   "scripts/worker-client-death.mjs": 1,
@@ -130,7 +118,6 @@
   "test/session-title-exit.test.ts": 5,
   "test/staging-proof-lines.test.ts": 25,
   "test/title-worker-navigation.test.ts": 1,
-  "test/tooling/trailer.test.mjs": 1,
   "test/tooling/zone-entry.test.mjs": 1
  }
 }
