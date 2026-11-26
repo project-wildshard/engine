@@ -5,7 +5,7 @@ import {mkdtempSync,readFileSync,rmSync} from 'node:fs';
 import {resolve,join} from 'node:path';
 import type {Browser} from 'playwright';
 import {expect,test} from 'vitest';
-import {assertNineLoad,NINE_READY_CAP_MS,NINE_SETTLE_CAP_MS,NINE_SETTLE_MS,NINE_STALL_MS,readNineState,waitNineReady,waitNineSettled} from '../src/scripts/loading-flow/nine-load.mjs';
+import {assertNineLoad,NINE_READY_CAP_MS,NINE_SETTLE_CAP_MS,NINE_SETTLE_FRAMES,NINE_SETTLE_MS,NINE_STALL_MS,readNineState,waitNineReady,waitNineSettled} from '../src/scripts/loading-flow/nine-load.mjs';
 
 /** A clock that only moves when the wait sleeps. */
 function fakeClock() {
@@ -78,16 +78,32 @@ test('engine red 44847945386: a slow boot that keeps moving passes 235 s; a stal
 
 test('QA 11-25 row 115: the boot memory read waits for the after-control build to settle, bounded', async()=>{
   // Metal's after-control build: CPU geometry climbs and falls for about 6 s, then holds; the read comes 3 s into the hold
+  // (a fast page: a frame every 50 ms, so the frames come long before the time)
   let clock=fakeClock();
+  const frames=()=>Math.floor(clock.now()/50);
   const ramp=[21,24,28,33,42,37,29,29,26,26,20,15,9,8,7,6.4];
-  const climbing=()=>Promise.resolve(ramp[Math.min(Math.floor(clock.now()/500),ramp.length-1)]??null);
-  await expect(waitNineSettled(climbing,clock)).resolves.toEqual({settled:true,waitedMs:(ramp.length-1)*500+NINE_SETTLE_MS,retained:6.4});
-  // already still (hosted SwiftShader before its slow build): one window
-  clock=fakeClock();
-  await expect(waitNineSettled(()=>Promise.resolve(6.8),clock)).resolves.toEqual({settled:true,waitedMs:NINE_SETTLE_MS,retained:6.8});
+  const climbing=()=>Promise.resolve({retained:ramp[Math.min(Math.floor(clock.now()/500),ramp.length-1)]??null,frames:frames()});
+  await expect(waitNineSettled(climbing,clock)).resolves.toEqual({settled:true,waitedMs:(ramp.length-1)*500+NINE_SETTLE_MS,frames:((ramp.length-1)*500+NINE_SETTLE_MS)/50,retained:6.4});
   // a page that never holds still, or never answers, is read at the cap and says so
   clock=fakeClock();
-  await expect(waitNineSettled(()=>Promise.resolve(clock.now()),clock)).resolves.toMatchObject({settled:false,waitedMs:NINE_SETTLE_CAP_MS});
+  await expect(waitNineSettled(()=>Promise.resolve({retained:clock.now(),frames:frames()}),clock)).resolves.toMatchObject({settled:false,waitedMs:NINE_SETTLE_CAP_MS});
   clock=fakeClock();
-  await expect(waitNineSettled(()=>Promise.resolve(null),clock)).resolves.toEqual({settled:false,waitedMs:NINE_SETTLE_CAP_MS,retained:null});
+  await expect(waitNineSettled(()=>Promise.resolve(null),clock)).resolves.toEqual({settled:false,waitedMs:NINE_SETTLE_CAP_MS,frames:0,retained:null});
+});
+
+// QA 11-25 row 150: hosted SwiftShader draws a frame every few seconds, so 3 s with no new frame read as still, and every
+// hosted read came before the copies drawn later let go (12.1 to 17.1 MB, where the same client reads 6.8 locally)
+test('QA 11-25 row 150: the boot memory read is still only once the page has drawn its frames', async()=>{
+  // a frame every 3.5 s; the after-control build's copies go as they draw, 17 MB down to 6.8 MB by the 3rd frame
+  const hosted=(clock:ReturnType<typeof fakeClock>)=>()=>{
+    const frames=Math.floor(clock.now()/3500);
+    return Promise.resolve({retained:Math.max(6.8,17-frames*3.4),frames});
+  };
+  let clock=fakeClock();
+  const got=await waitNineSettled(hosted(clock),clock);
+  expect(got).toMatchObject({settled:true,retained:6.8});
+  expect(got.frames).toBeGreaterThanOrEqual(NINE_SETTLE_FRAMES);
+  // what the time-only settle read: still 3 s after control, before a single frame
+  clock=fakeClock();
+  expect(await waitNineSettled(hosted(clock),{...clock,settleFrames:0})).toMatchObject({settled:true,retained:17});
 });

@@ -1,6 +1,6 @@
 import {expect,test} from 'vitest';
-import {BufferAttribute,BufferGeometry,InstancedMesh,InterleavedBuffer,InterleavedBufferAttribute,Mesh,MeshBasicMaterial,Scene} from 'three';
-import {bootMemoryVerdict,releaseDrawnThenRead,retainedGeometryBytes} from '../src/scripts/loading-flow/boot-memory-ratchet.mjs';
+import {BufferAttribute,BufferGeometry,Group,InstancedMesh,InterleavedBuffer,InterleavedBufferAttribute,Mesh,MeshBasicMaterial,Scene} from 'three';
+import {bootMemoryVerdict,releaseDrawnThenRead,retainedGeometryBytes,retainedGeometryOwners} from '../src/scripts/loading-flow/boot-memory-ratchet.mjs';
 
 import {readCaps} from '../src/scripts/budgets/files.mjs';
 
@@ -81,8 +81,30 @@ test('the boot read lets drawn copies go first, then counts only what play keeps
     host.window={__wildshard:{world:{game:{rootScene:scene}}}};
     // a build whose probe has no release gives no read, never a timing-dependent one
     expect(releaseDrawnThenRead()).toBeNull();
-    host.window={__wildshard:{world:{game:{rootScene:scene}},releaseDrawn:release}};
-    expect(releaseDrawnThenRead()).toEqual({released:1200,retained:120});
+    host.window={__wildshard:{world:{game:{rootScene:scene,frameCount:42}},releaseDrawn:release}};
+    expect(releaseDrawnThenRead()).toEqual({released:1200,retained:120,frames:42});
     expect(retainedGeometryBytes(scene)).toBe(120);
+  } finally {host.window=before;}
+});
+
+// QA 11-25 row 150: a moved read names who holds it. Owners are the first two named ancestors under the scene, a hidden
+// subtree (never drawn, so never let go) is marked, and a backing store shared by two owners counts once.
+test('the retained geometry reads by owner, largest first, hidden subtrees marked, shared stores once',()=>{
+  const scene=new Scene(), material=new MeshBasicMaterial();
+  const shard=new Group(); shard.name='nine-dragon-stack';
+  const fabric=new Group(); fabric.name='fabric';
+  const booth=new Group(); booth.name='set:booth'; booth.visible=false;
+  const big=new BufferGeometry(), small=new BufferGeometry(), shared=new Float32Array(30);
+  big.setAttribute('position',new BufferAttribute(new Float32Array(300),3));
+  small.setAttribute('position',new BufferAttribute(new Float32Array(60),3));
+  small.setAttribute('normal',new BufferAttribute(shared,3));
+  const twin=new BufferGeometry(); twin.setAttribute('normal',new BufferAttribute(shared,3));
+  fabric.add(new Mesh(big,material)); booth.add(new Mesh(small,material)); fabric.add(new Mesh(twin,material));
+  shard.add(fabric,booth); scene.add(shard);
+  const host=globalThis as {window?:unknown};
+  const before=host.window;
+  try {
+    host.window={__wildshard:{world:{game:{rootScene:scene}}}};
+    expect(retainedGeometryOwners()).toEqual([['nine-dragon-stack / fabric',1200+120],['nine-dragon-stack / set:booth [hidden]',240]]);
   } finally {host.window=before;}
 });

@@ -53,7 +53,8 @@ export function retainedGeometryBytes(scene = window.__wildshard?.world?.game.ro
  * CPU copy go now (the probe's `releaseDrawn`, what play does after 240 renders), then read the CPU geometry still
  * reachable from the scene: the copies play keeps, whatever the page's frame rate. Null before the world exists or on a
  * build whose probe has no release.
- * @returns {{released: number, retained: number | null} | null} */
+ * QA 11-25 row 150: with the frames the page has drawn, so a settle can count them.
+ * @returns {{released: number, retained: number | null, frames: number} | null} */
 export function releaseDrawnThenRead() {
   const probe = window.__wildshard, scene = probe?.world?.game.rootScene;
   if (scene === undefined || scene === null || typeof probe.releaseDrawn !== 'function') return null;
@@ -76,7 +77,49 @@ export function releaseDrawnThenRead() {
     add(instanceMatrix);
     add(instanceColor);
   });
-  return { released, retained: buffers.size === 0 ? null : [...buffers].reduce((bytes, buffer) => bytes + buffer.byteLength, 0) };
+  return { released, retained: buffers.size === 0 ? null : [...buffers].reduce((bytes, buffer) => bytes + buffer.byteLength, 0),
+    frames: probe.world.game.frameCount ?? 0 };
+}
+
+/** Browser-side, self-contained: QA 11-25 row 150. The retained CPU geometry by owner, largest first (at most 16): an
+ * owner is a node's first two named ancestors under the scene, `[hidden]` when it or an ancestor is not visible (never
+ * drawn, so never let go). Each backing store counts once, for the first owner met.
+ * @returns {[string, number][]} */
+export function retainedGeometryOwners() {
+  const scene = window.__wildshard?.world?.game.rootScene;
+  if (scene === undefined || scene === null) return [];
+  /** @type {Set<ArrayBufferLike>} */ const counted = new Set();
+  /** @type {Map<string, number>} */ const owners = new Map();
+  /** @param {import('three').Object3D} node */
+  const shown = (node) => { for (let at = /** @type {import('three').Object3D | null} */ (node); at !== null; at = at.parent) if (!at.visible) return false; return true; };
+  /** @param {import('three').Object3D} node */
+  const owner = (node) => {
+    /** @type {string[]} */ const names = [];
+    for (let at = /** @type {import('three').Object3D | null} */ (node); at !== null && at !== scene; at = at.parent) if (at.name !== '') names.unshift(at.name);
+    return `${names.slice(0, 2).join(' / ') || node.type}${shown(node) ? '' : ' [hidden]'}`;
+  };
+  /** @param {object | null | undefined} attribute @param {string} name */
+  const add = (attribute, name) => {
+    if (attribute === undefined || attribute === null) return;
+    const storage = Object.getOwnPropertyDescriptor(attribute, 'data')?.value ?? attribute;
+    const array = Object.getOwnPropertyDescriptor(storage, 'array')?.value;
+    if (!ArrayBuffer.isView(array) || array.buffer.byteLength === 0 || counted.has(array.buffer)) return;
+    counted.add(array.buffer);
+    owners.set(name, (owners.get(name) ?? 0) + array.buffer.byteLength);
+  };
+  scene.traverse((node) => {
+    const {geometry, instanceMatrix, instanceColor} = /** @type {Partial<import('three').InstancedMesh>} */ (node);
+    if (geometry === undefined && instanceMatrix === undefined) return;
+    const name = owner(node);
+    if (geometry !== undefined) {
+      Object.values(geometry.attributes).forEach((attribute) => { add(attribute, name); });
+      for (const attributes of Object.values(geometry.morphAttributes)) attributes.forEach((attribute) => { add(attribute, name); });
+      add(geometry.index, name);
+    }
+    add(instanceMatrix, name);
+    add(instanceColor, name);
+  });
+  return [...owners].sort((a, b) => b[1] - a[1]).slice(0, 16);
 }
 
 /**

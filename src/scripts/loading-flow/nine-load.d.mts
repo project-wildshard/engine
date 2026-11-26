@@ -13,5 +13,6 @@ export function assertNineLoad(browser:Browser,base:string,out:string,wait?:Nine
 /** QA 11-25 row 115: the boot memory read waits until the scene's CPU geometry holds still. */
 export const NINE_SETTLE_MS:number;
 export const NINE_SETTLE_CAP_MS:number;
-export interface NineSettle {now?:()=>number;sleep?:(ms:number)=>Promise<void>;settleMs?:number;capMs?:number;pollMs?:number}
-export function waitNineSettled(read:()=>Promise<number|null>,options?:NineSettle):Promise<{settled:boolean;waitedMs:number;retained:number|null}>;
+export const NINE_SETTLE_FRAMES:number;
+export interface NineSettle {now?:()=>number;sleep?:(ms:number)=>Promise<void>;settleMs?:number;settleFrames?:number;capMs?:number;pollMs?:number}
+export function waitNineSettled(read:()=>Promise<{retained:number|null;frames:number}|null>,options?:NineSettle):Promise<{settled:boolean;waitedMs:number;frames:number;retained:number|null}>;

@@ -7,6 +7,7 @@ export interface BootMemoryMark {operation:string;detail:Record<string,unknown>}
 export interface BootMemoryVerdict {held:number|null;released:number;retained:number|null;live:number;faults:string[];rows:LedgerRow[]}
 export function bootMemoryMarks():BootMemoryMark[];
 export function retainedGeometryBytes(scene?:Object3D|null):number|null;
-export function releaseDrawnThenRead():{released:number;retained:number|null}|null;
+export function releaseDrawnThenRead():{released:number;retained:number|null;frames:number}|null;
+export function retainedGeometryOwners():[string,number][];
 export function bootMemoryVerdict(marks:readonly BootMemoryMark[],retained:number|null,liveBytes:number,judging:{contentKey:string;budgets:{caps:BudgetCaps;baselines:BudgetBaselines}}):BootMemoryVerdict;
 export function liveHeapBytes(session:{send:(method:string,params?:object)=>Promise<unknown>}):Promise<number>;
