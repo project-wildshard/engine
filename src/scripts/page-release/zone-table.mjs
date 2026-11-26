@@ -12,8 +12,10 @@
 //
 //   node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/zone-table.mjs build <out.json> [--release=<url>] [--placements=<url>] [--cook-version=<x.y.z>]
 //   node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/zone-table.mjs check <table.json> [--origin=<url>] [--page=<origin>]
-import {mkdirSync, readFileSync, writeFileSync} from 'node:fs';
-import {dirname, resolve} from 'node:path';
+import {execFileSync} from 'node:child_process';
+import {appendFileSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
+import {homedir} from 'node:os';
+import {dirname, join, resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import * as v from 'valibot';
 import {agentFetch} from '../agent-requests.mjs';
@@ -38,9 +40,11 @@ export const STAGING_PLACEMENTS = `${RELEASES_ORIGIN}staging-placements.json`;
 export const COOK_VERSION_FILE = 'src/cook/game/cook-version.json';
 
 export class ZoneTableRefusal extends Error {
-  /** @param {string} message */
-  constructor(message) { super(message); this.name = 'ZoneTableRefusal'; }
+  /** @param {string} message @param {{main: string, table: ZoneTable}} [skew] the cook versions of a skew refusal */
+  constructor(message, skew) { super(message); this.name = 'ZoneTableRefusal'; this.skew = skew; }
 }
+/** The lanes' receipts log (AGENTS.md), where a skew refusal says preview is waiting. */
+export const RECEIPTS_LOG = join(homedir(), '.cache/wildshard/lane-receipts.log');
 const bare = (/** @type {string} */ slug) => slug.replace(/^_/u, '');
 
 /**
@@ -153,8 +157,40 @@ export async function borrowZoneTable({release = STAGING_RELEASE, placements = S
   }
   const table = zoneTableOf(signed, placed);
   const skew = cookSkew(cookVersion, table);
-  if (skew !== undefined) throw new ZoneTableRefusal(skew);
+  if (skew !== undefined) throw new ZoneTableRefusal(skew, {main: cookVersion, table});
   return table;
+}
+
+/** The cook's own files that changed between `build` (staging's engine commit) and HEAD, or why they can't be named.
+ * @param {string} root @param {string} build @returns {string[]} */
+export function cookFilesSince(root, build) {
+  try {
+    return execFileSync('git', ['diff', '--name-only', build, 'HEAD', '--', 'src/cook'], {cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore']})
+      .split('\n').filter(line => line !== '');
+  } catch { return [`(build ${build.slice(0, 10)} is not in this clone)`]; }
+}
+
+/** PV18: one receipt line for a skew refusal: both cook versions, staging's release, and the cook files that differ, so a release
+ * lane sees preview waiting on it. @param {{main: string, table: ZoneTable}} skew @param {readonly string[]} files @param {Date} [now] */
+export function skewReceipt(skew, files, now = new Date()) {
+  const {main, table} = skew, time = now.toISOString().slice(11, 16), lane = process.env.WS_LANE_NAME ?? 'preview-deploy';
+  const named = files.length === 0 ? 'none under src/cook' : `${files.slice(0, 12).join(', ')}${files.length > 12 ? `, and ${files.length - 12} more` : ''}`;
+  return `${time} UTC ${lane} BLOCKED preview: cook version skew, main cooks ${main} and ${table.from.channel} (serial ${table.from.serial}, build ${table.from.engineBuild.slice(0, 10)}) cooked ${table.cookVersion}; preview waits for a ${table.from.channel} release; cook files that differ (${files.length}): ${named}`;
+}
+
+/**
+ * The deploy's `build` step: the borrowed table, or on a skew refusal one receipt line in `receipts` before the refusal stands.
+ * @param {Parameters<typeof borrowZoneTable>[0] & {root?: string, receipts?: string, files?: (build: string) => string[]}} options
+ */
+export async function buildZoneTable({root = process.cwd(), receipts = process.env.WS_RECEIPTS_LOG ?? RECEIPTS_LOG, files, ...options}) {
+  try { return await borrowZoneTable(options); }
+  catch (error) {
+    if (error instanceof ZoneTableRefusal && error.skew !== undefined) {
+      mkdirSync(dirname(receipts), {recursive: true});
+      appendFileSync(receipts, `${skewReceipt(error.skew, (files ?? (build => cookFilesSince(root, build)))(error.skew.table.from.engineBuild))}\n`);
+    }
+    throw error;
+  }
 }
 
 /** @param {readonly string[]} argv */
@@ -163,7 +199,7 @@ async function main(argv) {
   const [verb, file] = argv.filter(arg => !arg.startsWith('--'));
   if ((verb !== 'build' && verb !== 'check') || file === undefined) throw new Error('usage: zone-table.mjs build <out.json> [--release=<url>] [--placements=<url>] [--cook-version=<x.y.z>] | check <table.json> [--origin=<url>] [--page=<origin>]');
   if (verb === 'build') {
-    const table = await borrowZoneTable({release: flag('release') ?? STAGING_RELEASE, placements: flag('placements') ?? STAGING_PLACEMENTS, cookVersion: flag('cook-version') ?? mainCookVersion(process.cwd())});
+    const table = await buildZoneTable({release: flag('release') ?? STAGING_RELEASE, placements: flag('placements') ?? STAGING_PLACEMENTS, cookVersion: flag('cook-version') ?? mainCookVersion(process.cwd())});
     for (const row of table.zones) console.log(`zone ${row.slug} ${row.shardVersion} ${row.index}`);
     mkdirSync(dirname(resolve(file)), {recursive: true});
     writeFileSync(resolve(file), `${JSON.stringify(table)}\n`);

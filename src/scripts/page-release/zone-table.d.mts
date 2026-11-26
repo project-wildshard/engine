@@ -7,7 +7,11 @@ export const RELEASES_ORIGIN: string;
 export const STAGING_RELEASE: string;
 export const STAGING_PLACEMENTS: string;
 export const COOK_VERSION_FILE: string;
-export class ZoneTableRefusal extends Error {}
+export class ZoneTableRefusal extends Error { readonly skew?: { main: string; table: ZoneTable } }
+export const RECEIPTS_LOG: string;
+export function cookFilesSince(root: string, build: string): string[];
+export function skewReceipt(skew: { main: string; table: ZoneTable }, files: readonly string[], now?: Date): string;
+export function buildZoneTable(options: Parameters<typeof borrowZoneTable>[0] & { root?: string; receipts?: string; files?: (build: string) => string[] }): Promise<ZoneTable>;
 export function zoneTableOf(release: ReleaseFile, placements: PlacementFile | null): ZoneTable;
 export function cookSkew(mainCookVersion: string, table: Pick<ZoneTable, 'cookVersion' | 'from'>): string | undefined;
 export function mainCookVersion(root: string): string;
