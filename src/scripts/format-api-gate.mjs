@@ -2,10 +2,13 @@
 // serves is refused, naming both versions; the API is released and deployed on a format before engine pins it.
 // The API is read once per pin move (GET /api/format, then /api/health until that route deploys). An unreachable API
 // warns and passes: an offline lane is never blocked. Escape hatch (J381): ALLOW_FORMAT_AHEAD=1.
+// Meta QA 11-25 row 143: the same pin move is refused while any production, staging or preview pointer the API names sits
+// below the new pin's floor, listing each (format-floor-pointers.mjs). Escape hatch: ALLOW_FLOOR_POINTERS=1.
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { lockedFormatVersion } from './format-lock.mjs';
 import { markedFetch } from './agent-requests.mjs';
+import { belowLines, floorPointers } from './format-floor-pointers.mjs';
 
 export const FORMAT_API = 'https://api.wildshard.io';
 const FETCH_MS = 10_000;
@@ -43,13 +46,39 @@ function locked(text) {
   try { return lockedFormatVersion(text); } catch { return undefined; }
 }
 
-/** Refuse a pin move above the API. A lock whose format didn't move is never refused for the state it inherited.
+/** @typedef {{observe?: () => Promise<string>, floor?: (pin: string) => Promise<{floor: string, below: import('./format-floor-pointers.mjs').BelowFloor[]}>,
+ *  warn?: (line: string) => void, env?: Record<string, string | undefined>}} GateOptions */
+
+/** Refuse a pin move above the API, or one whose floor sits above an API pointer. A lock whose format didn't move is never
+ * refused for the state it inherited.
  * @param {string | undefined} before the lock at the push's base @param {string | undefined} after the lock at its tip
- * @param {{observe?: () => Promise<string>, warn?: (line: string) => void, env?: Record<string, string | undefined>}} options */
-export async function formatApiFailures(before, after, { observe = () => observeApiPackage(), warn = line => console.error(line), env = process.env } = {}) {
+ * @param {GateOptions} options */
+export async function formatApiFailures(before, after, options = {}) {
   const next = locked(after);
   // formatLockFailures names a lock with no exact format row; nothing to compare here.
   if (next === undefined || locked(before) === next) return [];
+  return [...await apiAheadFailures(next, options), ...await floorPointerFailures(next, options)];
+}
+
+/** Meta QA 11-25 row 143: the new pin's floor against every production, staging and preview pointer the API names.
+ * @param {string} next @param {GateOptions} options */
+async function floorPointerFailures(next, { floor = pin => floorPointers(pin), warn = line => console.error(line), env = process.env }) {
+  if (env.ALLOW_FLOOR_POINTERS === '1') {
+    warn(`  - ALLOW_FLOOR_POINTERS=1: shard-format ${next}'s floor not compared with the API's pointers (name it in the commit body)`);
+    return [];
+  }
+  let judged;
+  try { judged = await floor(next); } catch (error) {
+    warn(`  - shard-format ${next}: the API's pointers could not be judged against its floor (${error instanceof Error ? error.message : String(error)}); not refused`);
+    return [];
+  }
+  return judged.below.length === 0 ? [] : [`pnpm-lock.yaml: shard-format ${next}'s floor ${judged.floor} is above ${judged.below.length} API pointers: `
+    + `${belowLines(judged.below).join(', ')}. Move them past the floor first (the API's format move, or a flip), then the pin (meta QA 11-25 row 143). `
+    + 'Escape hatch: ALLOW_FLOOR_POINTERS=1'];
+}
+
+/** SHARD-COMPAT CP3: refuse a pin above the API's. @param {string} next @param {GateOptions} options */
+async function apiAheadFailures(next, { observe = () => observeApiPackage(), warn = line => console.error(line), env = process.env }) {
   if (env.ALLOW_FORMAT_AHEAD === '1') {
     warn(`  - ALLOW_FORMAT_AHEAD=1: shard-format ${next} not compared with the API (name it in the commit body)`);
     return [];

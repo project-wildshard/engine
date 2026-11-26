@@ -25,7 +25,9 @@ packages:
 snapshots:
 `;
 const api = (version: string) => (): Promise<string> => Promise.resolve(version);
-const quiet = { warn: (): void => undefined, env: {} };
+// Row 143's floor check reads the API's pointers on a pin move; these cases judge CP3 alone.
+const noFloor = () => Promise.resolve({ floor: '0.1.0.1', below: [] });
+const quiet = { warn: (): void => undefined, env: {}, floor: noFloor };
 
 test('a pin bump above the API is refused, naming both versions', async () => {
   const failures = await formatApiFailures(lock('0.65.0'), lock('0.66.0'), { ...quiet, observe: api('0.65.0') });
@@ -46,7 +48,7 @@ test('a lock whose format did not move is never refused for the state it inherit
 test('an unreachable API warns and passes', async () => {
   const lines: string[] = [];
   const failures = await formatApiFailures(lock('0.65.0'), lock('0.66.0'), {
-    env: {}, warn: line => { lines.push(line); }, observe: () => Promise.reject(new Error('offline')),
+    env: {}, warn: line => { lines.push(line); }, observe: () => Promise.reject(new Error('offline')), floor: noFloor,
   });
   expect(failures).toEqual([]);
   expect(lines.join('\n')).toContain('offline');
@@ -55,7 +57,7 @@ test('an unreachable API warns and passes', async () => {
 test('ALLOW_FORMAT_AHEAD=1 is the named escape hatch', async () => {
   const lines: string[] = [];
   const failures = await formatApiFailures(lock('0.65.0'), lock('0.66.0'), {
-    env: { ALLOW_FORMAT_AHEAD: '1' }, warn: line => { lines.push(line); }, observe: api('0.65.0'),
+    env: { ALLOW_FORMAT_AHEAD: '1' }, warn: line => { lines.push(line); }, observe: api('0.65.0'), floor: noFloor,
   });
   expect(failures).toEqual([]);
   expect(lines.join('\n')).toContain('ALLOW_FORMAT_AHEAD=1');
