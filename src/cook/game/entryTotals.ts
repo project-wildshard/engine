@@ -139,7 +139,7 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
     wireSizes.set(key, length); return length;
   };
   const bytesFor = (url: string): Uint8Array => {
-    if (!/^\/(?:assets|b|basis|fonts)\/(?:[a-zA-Z0-9_.-]+\/)*[a-zA-Z0-9_.-]+$/u.test(url) || url.split('/').includes('..')) throw new Error('Unsafe spawn asset URL');
+    if (!/^\/(?:assets|builds|b|basis|fonts)\/(?:[a-zA-Z0-9_.-]+\/)*[a-zA-Z0-9_.-]+$/u.test(url) || url.split('/').includes('..')) throw new Error('Unsafe spawn asset URL');
     const emitted = join(output, url.slice(1)), authored = join(publicRoot, url.slice(1));
     return readFileSync(existsSync(emitted) ? emitted : authored);
   };

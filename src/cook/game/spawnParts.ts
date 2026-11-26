@@ -136,7 +136,7 @@ export function placeByKey(urls: readonly string[], size: (url: string) => numbe
  *  the phone link), and every rebuild's restamped sections rewrote that audio part too (DL18). */
 export function placementKey(url: string, stable: string | undefined): string {
   // Build keys carry the product prefix (`/shardfiles/<shard>/section:world/scenes`).
-  const code = /^\/b\/[\w.-]+\//u.exec(url)?.[0]; // a build's folder is no part of a file's stable place
+  const code = /^\/(?:builds\/shared|builds\/[\w.-]+\/[\w.-]+|b\/[\w.-]+)\//u.exec(url)?.[0]; // a build's folder (PV9: `/builds/<engineVersion>/<build>/`, was `/b/<build>/`) is no part of a file's stable place
   const kind = stable !== undefined && /(?:^|\/)(?:section|schema):/u.test(stable) ? 'section' : url.startsWith('/assets/') || code !== undefined ? 'volatile' : 'content';
   return `${kind}|${stable ?? (code === undefined ? url : `/assets/${url.slice(code.length)}`).replaceAll(/[a-f0-9]{8,}/gu, '').replace(/\?v=$/u, '')}`;
 }

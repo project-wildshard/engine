@@ -4,6 +4,7 @@
 import { installedCatalogue } from '@wildshard/engine/game/grid/catalogueSlot';
 import { bootMark } from '@wildshard/engine/boot/timing';
 import { cookedObjects } from '@wildshard/engine/boot/contentBase';
+import { codeFolderBuildOf } from '@wildshard/engine/boot/codeFolder';
 import * as v from 'valibot';
 import { Scope } from '@wildshard/engine/app/scope';
 import { NetClient } from '@wildshard/engine/net/client';
@@ -246,8 +247,8 @@ export function startStandalone(config: StandaloneConfig): StandaloneShell {
   worker.postMessage({ rapier: compiledRapier(), catalogue: installedCatalogue() ?? null, validator: Reflect.get(globalThis, '__WS_SHARDFILE_VALIDATOR__') ?? null, verdicts: Reflect.get(globalThis, '__WS_SHARDFILE_VERDICTS__') ?? null, goto: config.goto ?? null, enter: config.enter ?? null, ownServer: config.ownServer === true ? config.slug : null, backgroundSaves: config.backgroundSaves === true, cooked: cookedObjects() } satisfies ServerWorkerStart,
     [control.port2, game.port2, harness.port2, ...reads === undefined ? [] : [reads.port2]]);
   if (reads !== undefined && config.held !== undefined) answerHeldReads(reads.port1, config.held, config.listed);
-  // The worker sits beside this module, so an emitted module's `/b/<build>/` folder is the server's real build (J57).
-  const served = /^\/b\/([\w.-]+)\//u.exec(new URL(import.meta.url).pathname)?.[1];
+  // The worker sits beside this module, so an emitted module's `/builds/<engineVersion>/<build>/` folder is the server's real build (J57, PV9).
+  const served = codeFolderBuildOf(new URL(import.meta.url).pathname);
   const refused = (): void => { void import('@wildshard/engine/boot/browserChunkRecovery').then(recovery => recovery.reloadRefusedBuild()); };
   const shell = connectStandalone({ refused, ...served === undefined ? {} : { serverBuild: served }, ...config }, control.port1, game.port1, () => { bootstrapScope.dispose(); reads?.port1.close(); harness.port1.close(); worker.terminate(); }, harness.port1);
   return { ...shell, booted: Promise.race([shell.booted, nativeFailure]) };

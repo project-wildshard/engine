@@ -9,9 +9,17 @@ export function buildLabelOf(build: string, release: { readonly version: string;
 export function newBuildId(): string;
 /** A known source's build id: short sha + build time (for exported trees, passed as WS_BUILD_ID). */
 export function sourceBuildId(sha: string, now?: number): string;
-/** A web build's own folder for code, CSS and wasm (J57, J131). */
-export function codeDirectory(build: string): string;
-export const SHARED_CODE_DIRECTORY: 'b/c';
+/** The build root's package.json version, which names its code folder (PV9). */
+export function engineVersionOf(root?: string): string;
+/** The folder every build's code sits under (PV9). */
+export const CODE_ROOT: 'builds';
+/** The new code root and the legacy `b/` (PV9). */
+export const CODE_ROOTS: readonly ['builds', 'b'];
+/** A web build's own folder for code, CSS and wasm (J57, J131): `builds/<engineVersion>/<build>` (PV9). */
+export function codeDirectory(build: string, engineVersion?: string): string;
+export const SHARED_CODE_DIRECTORY: 'builds/shared';
+/** The build whose own code folder holds `path`, either layout (`builds/<v>/<build>/` or legacy `b/<build>/`). */
+export function codeFolderBuild(path: string): string | undefined;
 /** QA-FEEDBACK 11-19 row 46: the offset after index.html's first-paint block (or `headEnd` when it has none), where the
  * build injects its head-start tags. */
 export function afterFirstPaint(html: string, headEnd: number): number;

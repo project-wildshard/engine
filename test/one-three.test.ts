@@ -5,6 +5,10 @@ import { dirname, join, resolve } from 'node:path';
 import { expect, test } from 'vitest';
 import { checkOneThree, pageScripts, threeCopies } from '../src/scripts/app-build/oneThree.mjs';
 import { writeStandaloneOutput } from '../src/scripts/app-build/standaloneOutput.mjs';
+import { codeDirectory } from '../src/scripts/app-build/buildIdentity.mjs';
+
+/** PV9: a build's own code folder, `builds/<engineVersion>/1`. */
+const own = codeDirectory('1');
 
 const THREE = 'if(window.__THREE__)console.warn("Multiple instances");else window.__THREE__="186";';
 
@@ -17,19 +21,19 @@ async function outDir(prefix: string, body: (root: string, put: (file: string, t
 
 test('QA 11-25 row 137: a second three.js among a page\'s scripts fails the build, a worker\'s copy does not count', async () => {
   await outDir('one-three', (root, put) => {
-    put('.vite/manifest.json', JSON.stringify({ 'index.html': { file: 'b/1/main.js', isEntry: true }, '_s': { file: 'b/c/session-real.js' } }));
-    put('index.html', '<html><head><script type="importmap">{"imports":{"/b/c/session-key.js":"/b/c/session-real.js"}}</script>'
-      + '<script type="module" src="/b/1/main.js"></script></head></html>');
-    put('b/1/main.js', 'import("../c/session-key.js");');
-    put('b/c/session-real.js', THREE);
+    put('.vite/manifest.json', JSON.stringify({ 'index.html': { file: `${own}/main.js`, isEntry: true }, '_s': { file: 'builds/shared/session-real.js' } }));
+    put('index.html', '<html><head><script type="importmap">{"imports":{"/builds/shared/session-key.js":"/builds/shared/session-real.js"}}</script>'
+      + `<script type="module" src="/${own}/main.js"></script></head></html>`);
+    put(`${own}/main.js`, 'import("../../shared/session-key.js");');
+    put('builds/shared/session-real.js', THREE);
     // the online shell, loaded by URL at runtime, with its own copy in a shared chunk (v0.1.92's standalone/config-*.js)
-    put('b/1/standalone/online.js', 'import "./config-x.js";');
-    put('b/1/standalone/config-x.js', THREE);
+    put(`${own}/standalone/online.js`, 'import "./config-x.js";');
+    put(`${own}/standalone/config-x.js`, THREE);
     // a worker the shell starts by URL runs apart from the page: never followed, never counted
-    put('b/1/standalone/serverWorker-x.js', THREE);
-    expect(pageScripts(root, '1')).toEqual(['b/1/main.js', 'b/1/standalone/config-x.js', 'b/1/standalone/online.js', 'b/c/session-real.js']);
-    expect(() => checkOneThree(root, '1')).toThrow('A page loads 2 copies of three.js (QA 11-25 row 137): b/1/standalone/config-x.js, b/c/session-real.js');
-    put('b/1/standalone/config-x.js', 'export const config = 1;');
+    put(`${own}/standalone/serverWorker-x.js`, THREE);
+    expect(pageScripts(root, '1')).toEqual([`${own}/main.js`, `${own}/standalone/config-x.js`, `${own}/standalone/online.js`, 'builds/shared/session-real.js']);
+    expect(() => checkOneThree(root, '1')).toThrow(`A page loads 2 copies of three.js (QA 11-25 row 137): ${own}/standalone/config-x.js, builds/shared/session-real.js`);
+    put(`${own}/standalone/config-x.js`, 'export const config = 1;');
     expect(checkOneThree(root, '1')).toEqual({ copies: 1 });
   });
 });
@@ -38,7 +42,7 @@ test('QA 11-25 row 137: the online shell\'s real bundle holds no three.js, so th
   await outDir('one-three-shell', async (root, put) => {
     put('.vite/manifest.json', '{}');
     await writeStandaloneOutput(root, 'shell', process.cwd());
-    expect(pageScripts(root, 'shell')).toContain('b/shell/standalone/online.js');
+    expect(pageScripts(root, 'shell')).toContain(`${codeDirectory('shell')}/standalone/online.js`);
     expect(threeCopies(root, 'shell')).toEqual([]);
   });
 }, 60_000);

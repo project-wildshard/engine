@@ -5,7 +5,7 @@
 //
 //   node src/scripts/page-size.mjs <dist> [--json] [--gate]
 //
-// Kinds: code (`b/`), shell (the documents, worker, root JSON, fonts, icons), runtime (what boot needs from the engine:
+// Kinds: code (`builds/`, PV9; `b/` before), shell (the documents, worker, root JSON, fonts, icons), runtime (what boot needs from the engine:
 // `assets/physics/`, `basis/`), engine art (every other `assets/` file), shard content
 // (S1 to S7 below; S7 is every `assets/` folder or file named for a shard) and maps (`*.map`, `.map.br`, `.map.gz`, wherever they sit). MB is 10^6 bytes.
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
@@ -60,7 +60,7 @@ function namesShard(segment, shards) {
 export function classify(path, shards) {
   const parts = path.split('/'), [top = '', second = '', third] = parts;
   if (MAP.test(path)) return { kind: 'maps' };
-  if (top === 'b') return { kind: 'code' };
+  if (top === 'builds' || top === 'b') return { kind: 'code' }; // PV9: builds/<engineVersion>/<build>/, b/ before
   if (top === 'shardfiles') return { kind: 'shard content', part: 'S1' };
   if (top === 'programs') return { kind: 'shard content', part: 'S5' };
   if (top === 'basis') return { kind: 'runtime' };

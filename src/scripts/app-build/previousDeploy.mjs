@@ -19,10 +19,10 @@ export const KEEP_PROMOTED = 5;
 
 const MANIFEST = 'deploy-chunks.json', LANES = 16;
 /** A row an older manifest may name: code, and the content-named content the carry took before PZ5. */
-const ROW = /^(?:assets\/(?:[\w.-]+\/)*[\w.-]+-[\w-]{8,64}\.(?:js|css|wasm|json|bin|woff2?|png|webp|jpg|svg)|b\/[\w.-]+\/(?:[\w.-]+\/)*[\w.-]+\.(?:js|css|wasm|html|json))$/u;
-/** PZ5: what a carried build carries once its content is on R2. A build's code and its per-build JSON under `b/`, and the
+const ROW = /^(?:assets\/(?:[\w.-]+\/)*[\w.-]+-[\w-]{8,64}\.(?:js|css|wasm|json|bin|woff2?|png|webp|jpg|svg)|(?:builds|b)\/[\w.-]+\/(?:[\w.-]+\/)*[\w.-]+\.(?:js|css|wasm|html|json))$/u;
+/** PZ5: what a carried build carries once its content is on R2. A build's code and its per-build JSON under `builds/` (PV9; `b/` before it), and the
  * content-named code an older build left at the top of `assets/` (format 1). Never `assets/spawn/`, a grid file or other content. */
-export const CHUNK = /^(?:b\/[\w.-]+\/(?:[\w.-]+\/)*[\w.-]+\.(?:js|css|wasm|html|json)|assets\/[\w.-]+-[\w-]{8,64}\.(?:js|css|wasm))$/u;
+export const CHUNK = /^(?:(?:builds|b)\/[\w.-]+\/(?:[\w.-]+\/)*[\w.-]+\.(?:js|css|wasm|html|json)|assets\/[\w.-]+-[\w-]{8,64}\.(?:js|css|wasm))$/u;
 /** What a graph names and carries: code only for a build that reads its content from a content base, else content too.
  * @param {boolean | undefined} contentBase */
 const carryOf = contentBase => (contentBase === true ? CHUNK : ROW);
@@ -57,8 +57,11 @@ function currentManifest(directory, contentBase) {
   const version = JSON.parse(readFileSync(join(directory, 'version.json'), 'utf8'));
   if (typeof version.build !== 'string') throw new Error('Missing deploy build identity');
   const files = [];
-  // J217: the shared folder holds this build's content-named code next to the graphs it carries in below
-  for (const folder of new Set(['assets', codeDirectory(version.build), SHARED_CODE_DIRECTORY])) {
+  // J217: the shared folder holds this build's content-named code next to the graphs it carries in below. PV9: the build's
+  // folder is `builds/<clientVersion>/<build>/`; an output from before PV9 (a local --rev proof of an old commit) has the
+  // legacy `b/<build>/` and `b/c/`, read the same way.
+  const own = codeDirectory(version.build, typeof version.clientVersion === 'string' ? version.clientVersion : undefined);
+  for (const folder of new Set(['assets', own, SHARED_CODE_DIRECTORY, `b/${version.build}`, 'b/c'])) {
     const root = join(directory, folder);
     if (!existsSync(root)) continue;
     for (const entry of readdirSync(root, {recursive: true, withFileTypes: true})) {

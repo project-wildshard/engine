@@ -141,7 +141,7 @@ test('PZ10: a stamped content base bakes its origin, and both books and the titl
   const base = 'https://packs.wildshard.io/content/0123456789abcdef/';
   const server = { url: '/assets/spawn/server-fixture.json', bytes: new TextEncoder().encode('{"book":"server"}') };
   const packs = { url: '/assets/spawn/packs-fixture.json', bytes: new TextEncoder().encode('{"book":"packs"}') };
-  const bundle = { 'index.html': page({ contentBase: base }), 'b/c/app-aaaaaaaa.js': { type: 'chunk' as const, code: 'export const value=1;' } };
+  const bundle = { 'index.html': page({ contentBase: base }), 'builds/shared/app-aaaaaaaa.js': { type: 'chunk' as const, code: 'export const value=1;' } };
   const { core, build } = await serviceWorkerCore(bundle, process.cwd(), 'fixture', server, packs);
   const content = bakedContent(core);
   expect(content.base).toBe(base);
@@ -152,7 +152,7 @@ test('PZ10: a stamped content base bakes its origin, and both books and the titl
   const lists = [...core.matchAll(/(?:const|var) (?:FILES|SHELL_FILES) = JSON\.parse\(("(?:[^"\\]|\\.)*")\);/gu)].map(match => JSON.parse(JSON.parse(match[1] ?? '""') as string) as string[]);
   expect(lists).toHaveLength(2);
   for (const list of lists) for (const path of list) expect(path.startsWith('/assets/') && !path.startsWith('/assets/physics/') && !/\.(?:js|css)$/u.test(path)).toBe(false);
-  expect(lists[0]).toContain('/b/c/app-aaaaaaaa.js');
+  expect(lists[0]).toContain('/builds/shared/app-aaaaaaaa.js');
   expect(content.files.some(file => file.includes('/assets/title/'))).toBe(true);
   // another base or another packs book is another worker
   expect((await serviceWorkerCore({ ...bundle, 'index.html': page({ contentBase: `${base}x/` }) }, process.cwd(), 'fixture', server, packs)).build).not.toBe(build);

@@ -7,6 +7,7 @@
 // for a tap, so a harness's zone (enterZone) or an author's embedded product still opens the shard alone; no address names a zone, J522).
 import { pageScope } from '@wildshard/engine/app/resources';
 import { jsonSlot, type Json } from '@wildshard/engine/saves/slots';
+import { buildCodeFolder } from '@wildshard/engine/boot/codeFolder';
 import { GridAssembly, type GridCell } from '../../../shared/game/grid/assembly';
 import { hostsGrid } from '../shardfile/serverRoute';
 import { pageGridIntents } from './intent';
@@ -152,8 +153,7 @@ export async function worldHosted(world: unknown, waitMs: number = HOSTED_MS, me
 }
 /** This build's `online.js`, a bundle of its own. */
 async function onlineGate(): Promise<OnlineGate> {
-  const build = (globalThis as { __WS_BUILD_ID__?: string }).__WS_BUILD_ID__ ?? '';
-  return await import(/* @vite-ignore */ `/b/${build}/standalone/online.js`) as OnlineGate;
+  return await import(/* @vite-ignore */ `${buildCodeFolder()}/standalone/online.js`) as OnlineGate;
 }
 /** FM4 9b/10b: the title's Enter world on a world build asks the world first (online.js `titleEnter`): a restart this tab heard and a
  *  quiet world, or a move due in the last 15 s, holds the tap on a card that joins by itself. No world (preview, solo): no gate. */

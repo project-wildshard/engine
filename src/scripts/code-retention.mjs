@@ -18,7 +18,7 @@ export function signCodeRetention({ directory, channel, privateKey, publicKey, n
   for (const graph of manifest.builds) {
     if (!Array.isArray(graph.files) || graph.files.length === 0) throw new Error('An empty code graph is not kept code');
     for (const file of graph.files) {
-      if (typeof file.path !== 'string' || !/^(?:assets|b)\/[a-zA-Z0-9_./-]+$/u.test(file.path) || file.path.split('/').some((/** @type {string} */ part) => part === '.' || part === '..' || part === '')) throw new Error('Invalid retained-code path');
+      if (typeof file.path !== 'string' || !/^(?:assets|builds|b)\/[a-zA-Z0-9_./-]+$/u.test(file.path) || file.path.split('/').some((/** @type {string} */ part) => part === '.' || part === '..' || part === '')) throw new Error('Invalid retained-code path');
       if (!Number.isSafeInteger(file.bytes) || file.bytes < 0 || statSync(join(directory, file.path)).size !== file.bytes) throw new Error('A retained-code file is missing or changed');
     }
   }

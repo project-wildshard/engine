@@ -40,7 +40,7 @@ export function sweepMapBinding(dist, build, revision, files) {
       )
       .map(([chunk]) => {
         if (
-          !/^(?:b\/[a-zA-Z0-9._-]+|assets)\/[a-zA-Z0-9._-]+\.js$/u.test(chunk) ||
+          !/^(?:builds\/shared|builds\/[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+|b\/[a-zA-Z0-9._-]+|assets)\/[a-zA-Z0-9._-]+\.js$/u.test(chunk) ||
           chunk.split("/").includes("..")
         )
           throw new Error("Invalid sweep chunk identity");

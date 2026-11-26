@@ -15,6 +15,7 @@ import { checkNoTopLevelAwait } from "./app-build/noTopLevelAwait.mjs";
 import { checkImportMaps } from "./app-build/importMap.mjs";
 import { checkOneThree } from "./app-build/oneThree.mjs";
 import { checkNoJunk } from "./app-build/noJunk.mjs";
+import { checkCodeLayout } from "./app-build/codeLayout.mjs";
 import { nameChunksByFinalBytes } from "./app-build/finalChunkNames.mjs";
 import { writeTitleAssets } from "./title-assets.mjs";
 import {
@@ -323,6 +324,9 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
   if (zoneless) checkZoneless(outDir);
   // QA 11-26 row 14: no video and no measuring rig in a page build
   checkNoJunk(outDir);
+  // fix-preview PV9: code under builds/<engineVersion>/<build>/ and builds/shared/, the page under 20,000 files
+  const layout = checkCodeLayout(outDir);
+  console.log(`Code layout: ${layout.own}/, ${layout.files} files`);
 
   // OFF-VERCEL OV3: dist/ is the Workers asset directory. Refuse what Workers static assets would refuse.
   if (outDir === resolve("dist")) console.log(`Asset limits: ${describeAssetLimits(assertAssetLimits(outDir))}`);

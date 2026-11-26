@@ -28,14 +28,42 @@ export function newBuildId() {
   return sha === '' ? sourceBuildId('') : `${sha}-${Date.now().toString(36)}`;
 }
 
+/** The engine version a build's code folder is named for: the build root's package.json `version` (version.json's
+ * `clientVersion` reads the same field).
+ * @param {string} [root] */
+export function engineVersionOf(root = process.cwd()) {
+  /** @type {unknown} */
+  const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
+  const version = typeof pkg === 'object' && pkg !== null && 'version' in pkg ? pkg.version : undefined;
+  if (typeof version !== 'string') throw new Error('Missing engine version in package.json');
+  return version;
+}
+
+/** Every build's code sits under this one folder (fix-preview PV9). */
+export const CODE_ROOT = 'builds';
+/** PV9: the code roots a page may hold, the new one and the legacy `b/` of a carried build from before PV9. The output
+ * checks walk both, so they read a carried old build as before. */
+export const CODE_ROOTS = /** @type {const} */ ([CODE_ROOT, 'b']);
 /** J57, J131: a web build's own folder for code, CSS and wasm, immutable for good. Assets stay under /assets/, and only
- * this name in an uncached document points a tab at a build.
- * @param {string} build */
-export const codeDirectory = (build) => `b/${build}`;
+ * this name in an uncached document points a tab at a build. Fix-preview PV9 (Jake, 2026-11-26: "folder per build but
+ * human readable `builds/[engineVersion]/[build]/*`"): `builds/0.1.97/2476a98-mabc123/`, was `b/<build>/`.
+ * @param {string} build @param {string} [engineVersion] this checkout's, unless the caller names a build's own */
+export const codeDirectory = (build, engineVersion = engineVersionOf()) => {
+  if (!/^\w[\w.-]*$/u.test(engineVersion) || engineVersion === 'shared') throw new Error(`Invalid engine version for a code folder: ${engineVersion}`);
+  return `${CODE_ROOT}/${engineVersion}/${build}`;
+};
 /** J217 (Jake, 2026-11-09), LD6: a chunk or stylesheet a deploy did not change keeps its URL. Content-named code that is not
  * an entry lives in one folder every build shares, so a phone holds it across deploys; each build's entry and document stay
- * in its own folder, and the deploy carries the old builds' graphs (MF2, J79) as before. */
-export const SHARED_CODE_DIRECTORY = 'b/c';
+ * in its own folder, and the deploy carries the old builds' graphs (MF2, J79) as before. PV9: `builds/shared/`, was `b/c/`. */
+export const SHARED_CODE_DIRECTORY = 'builds/shared';
+/** PV9: a path (no leading slash) inside one build's own code folder, either layout, gives that build: the new
+ * `builds/<engineVersion>/<build>/…` or the legacy `b/<build>/…` a carried build from before PV9 still sits in. The shared
+ * folder (`builds/shared/`, legacy `b/c/`) and every other path give undefined.
+ * @param {string} path */
+export function codeFolderBuild(path) {
+  const match = /^(?:builds\/(?!shared\/)[\w.-]+|b)\/([\w.-]+)\//u.exec(path);
+  return match === null || match[0] === 'b/c/' ? undefined : match[1];
+}
 
 /** QA-FEEDBACK 11-19 row 46: index.html opens its head with a first-paint block (charset, colour scheme and the dark
  * page background, ending at `<style data-first-paint>`). What the build injects at the head's start goes after it,
@@ -56,7 +84,7 @@ export function buildLabelOf(build, { version, describe = '' }) {
   return [version === '' ? '' : `v${version}`, short].filter(part => part !== '').join(' · ');
 }
 
-const BUNDLE_TAG = /<script\b[^>]*\btype="module"[^>]*\bsrc="\/b\/[^"]*"[^>]*><\/script>|<link\b[^>]*\brel="(?:modulepreload|stylesheet)"[^>]*\bhref="\/b\/[^"]*"[^>]*>/gu;
+const BUNDLE_TAG = /<script\b[^>]*\btype="module"[^>]*\bsrc="\/(?:builds|b)\/[^"]*"[^>]*><\/script>|<link\b[^>]*\brel="(?:modulepreload|stylesheet)"[^>]*\bhref="\/(?:builds|b)\/[^"]*"[^>]*>/gu;
 /** FIRST-OPEN-PROGRESS (QA 11-16 row 17): iOS keeps a Home Screen app's still launch image (generate-title-launch.mjs: the
  * hero and wordmark, no bar) up until the document's `load`, and every bundle tag holds `load` back: the module graph and
  * the 280 kB stylesheet. Jake's cold open of v0.1.29 showed that still image for 10 s and the live shell's moving bar for

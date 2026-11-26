@@ -122,7 +122,7 @@ export function lapPops(at, lap, homeRegion) {
 /** DL17, after the flip: what only the server worker reads, and so no part of what a page must hold at control: its code and
  *  the server class of a product (`serverFolder.ts`, J91). Listed apart, as the precache is. Any other file a worker
  *  fetches is a file the page could have lent it, and stays level content: `spawnRereads` counts those. */
-export const isServerRead = path => /^\/(?:b\/[^/]+\/standalone\/|assets\/spawn\/server[-/])/u.test(path);
+export const isServerRead = path => /^\/(?:(?:builds\/[^/]+|b)\/[^/]+\/standalone\/|assets\/spawn\/server[-/])/u.test(path);
 
 /** DL17's request rule (root's ruling, G872 (a)): of one visit's requests (`{ url, by: 'page' | 'service-worker', start,
  *  end }`, end null while open), the level's are every level-content URL (`isLevelContent`) except the worker's offline

@@ -5,6 +5,7 @@ import { saveEnvironment } from '@wildshard/engine/saves/environment';
 import type { ActorTags } from '@wildshard/engine/app/actor';
 import { ZONE_SELECT_PRESS_PATH, ZoneSelectSchema, type ZoneSelectDocument } from '@wildshard/engine/game/grid/zoneSelectRows';
 import { pageActor } from '@wildshard/engine/telemetry/pageActor';
+import { buildCodeFolder } from '@wildshard/engine/boot/codeFolder';
 import { WILDSHARD_IDENTITY } from '../identity';
 
 const DEADLINE_MS = 1500;
@@ -31,8 +32,7 @@ function parse(text: string | null | undefined): ZoneSelectDocument | null {
 }
 
 async function locate(world: WorldStamp, deadline: number): Promise<ZoneSelectLocation | null> {
-  const build = (globalThis as { __WS_BUILD_ID__?: string }).__WS_BUILD_ID__ ?? '';
-  const door = await import(/* @vite-ignore */ `/b/${build}/standalone/online.js`) as {
+  const door = await import(/* @vite-ignore */ `${buildCodeFolder()}/standalone/online.js`) as {
     readonly zoneSelectLocation?: SourcePorts['locate'];
   };
   return await door.zoneSelectLocation?.(world, deadline) ?? null;

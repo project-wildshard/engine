@@ -247,6 +247,8 @@
     "./ai/eliteLifecycle": "./src/server/engine/ai/eliteLifecycle.ts",
     "./ai/eliteContinuation": "./src/server/engine/ai/eliteContinuation.ts",
     "./boot/shell": "./src/client/engine/boot/shell.ts",
+    "./boot/codeFolder": "./src/client/engine/boot/codeFolder.ts",
+    "./boot/oldTab": "./src/client/engine/boot/oldTab.ts",
     "./fx/groundTell": "./src/client/engine/fx/groundTell.ts",
     "./ai/eliteKernels": "./src/server/engine/ai/eliteKernels.ts",
     "./ai/view/eliteController": "./src/client/engine/ai/view/eliteController.ts",

@@ -32,6 +32,7 @@ import {readFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {isContent} from '../app-build/splitOutput.mjs';
+import {codeFolderBuild} from '../app-build/buildIdentity.mjs';
 
 /** The page documents that name content, besides the code index.html loads. */
 export const PAGE_DOCUMENTS = Object.freeze(['index.html', 'sw.js']);
@@ -60,11 +61,11 @@ export function namedPaths(text) {
   return found;
 }
 
-/** The code files index.html loads from this build: its `<script src>` and modulepreload links under `/b/<build>/` (the
+/** The code files index.html loads from this build: its `<script src>` and modulepreload links under the build's own code folder (`/builds/<engineVersion>/<build>/`, PV9; `/b/<build>/` before; the
  * boot bank also maps old code names to new ones, and an old name is never served). @param {string} html @param {string} build */
 export function pageScripts(html, build) {
   const tags = [...html.matchAll(/<script\b[^>]*\ssrc="([^"]+)"|<link\b[^>]*rel="modulepreload"[^>]*\shref="([^"]+)"/gu)];
-  return [...new Set(tags.map(match => match[1] ?? match[2] ?? '').filter(src => src.startsWith(`/b/${build}/`) && src.endsWith('.js'))
+  return [...new Set(tags.map(match => match[1] ?? match[2] ?? '').filter(src => src.startsWith('/') && codeFolderBuild(src.slice(1)) === build && src.endsWith('.js'))
     .map(src => src.slice(1)))].sort();
 }
 

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, posix, relative, resolve } from 'node:path';
 import { parseSync } from 'vite';
+import { CODE_ROOTS } from './buildIdentity.mjs';
 
 /** J217 (LD6b): page chunks name each other through the document's import map (Vite's `build.chunkImportMap`), by keys
  * that never hold an importee's content hash, so a changed module renames only its own chunk and the build's entries.
@@ -63,7 +64,7 @@ export function documentImportMap(name, html) {
 
 /** After the documents are final: every document that loads page chunks holds one import map first; every row names a
  * file this build wrote, and no key shadows a different written file; every literal request in every page chunk
- * reaches a written file, directly or through that map. A worker or shell bundle under /b/ has no map: its own requests
+ * reaches a written file, directly or through that map. A worker or shell bundle under /builds/ has no map: its own requests
  * must reach files directly. Run it after every document and bundle is written, before the service worker reads them.
  * @param {string} outDir @returns {{documents: number, rows: number, chunks: number, mapped: number}} */
 export function checkImportMaps(outDir) {
@@ -86,8 +87,10 @@ export function checkImportMaps(outDir) {
   }
   const map = shared ?? {}, page = new Set(Object.values(manifest).map(row => row.file).filter(name => name.endsWith('.js')));
   let chunks = 0, mapped = 0;
-  // Page chunks resolve through the map; a worker or shell bundle under /b/ runs without one, so only direct files count.
-  for (const entry of readdirSync(resolve(root, 'b'), { recursive: true, withFileTypes: true })) {
+  // Page chunks resolve through the map; a worker or shell bundle under /builds/ runs without one, so only direct files count.
+  // PV9: the new `builds/` and a carried build's legacy `b/`
+  const walked = CODE_ROOTS.filter(name => existsSync(resolve(root, name))).flatMap(name => readdirSync(resolve(root, name), { recursive: true, withFileTypes: true }));
+  for (const entry of walked) {
     if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
     const name = relative(root, join(entry.parentPath, entry.name)).replaceAll('\\', '/'), url = `/${name}`, own = page.has(name) ? map : NONE;
     chunks++;

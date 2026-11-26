@@ -38,7 +38,7 @@ export function mapRoots(dir) {
 
 /**
  * The sentry-cli calls for one build, in order: the release, one upload per folder that holds maps (each under its own
- * URL prefix, so `~/b/c/entry-x.js` matches the page's `/b/c/entry-x.js`), then a deploy for the environment.
+ * URL prefix, so `~/builds/shared/entry-x.js` matches the page's `/builds/shared/entry-x.js`), then a deploy for the environment.
  * @param {{dir: string, version: string, build: string, environment: string, roots: readonly string[]}} input
  * @returns {{release: string, dist: string | undefined, commands: string[][]}}
  */

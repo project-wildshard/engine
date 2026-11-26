@@ -49,7 +49,7 @@ const HASH = /\/([a-f0-9]{64})\.[a-z0-9]+$/;
  *  update's first offline launch still reads the route's code list. */
 const OWN_NAMED = /^\/assets\/spawn\/code\/[a-f0-9]{16}\.json$/;
 /** @param {URL} url */
-const immutable = url => NAMED.has(url.pathname) || url.pathname.startsWith('/b/') || CONTENT.test(url.pathname) || OWN_NAMED.test(url.pathname)
+const immutable = url => NAMED.has(url.pathname) || url.pathname.startsWith('/builds/') || url.pathname.startsWith('/b/') || CONTENT.test(url.pathname) || OWN_NAMED.test(url.pathname)
   || /^[a-f0-9]{8,64}$/.test(url.searchParams.get('v') ?? '');
 const isHtml = response => /\btext\/html\b/i.test(response.headers.get('content-type') ?? '');
 /* PAGE-SIZE PZ10 (J276): content on the content base (`https://packs.wildshard.io/content/<set>/`, baked from the boot

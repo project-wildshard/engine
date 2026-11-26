@@ -78,7 +78,7 @@ export function rows({ gates, flows, titled, untitled, gridWarm, tasks, programs
     `server reads listed apart: ${seven.reduce((sum, [, gate]) => sum + (requestsOf(gate)?.serverReads?.beforeControl ?? 0) + (requestsOf(gate)?.serverReads?.afterControl ?? 0), 0)} requests`));
 
   const warmParts = runs.flatMap(([name, { warmPerf }]) => (warmPerf === null ? [] : [[name, warmPerf.res.filter(file => file.n.includes('/assets/spawn/parts/') && file.b > 0).length]]));
-  const warmCode = runs.reduce((sum, [, { warmPerf }]) => sum + (warmPerf?.res ?? []).filter(file => file.n.startsWith('/b/')).reduce((bytes, file) => bytes + file.b, 0), 0);
+  const warmCode = runs.reduce((sum, [, { warmPerf }]) => sum + (warmPerf?.res ?? []).filter(file => (file.n.startsWith('/builds/') || file.n.startsWith('/b/'))).reduce((bytes, file) => bytes + file.b, 0), 0);
   const refetched = warmParts.filter(([, count]) => count > 0).map(([name, count]) => `${name} ${count}`);
   out.push(row('DL18', warmParts.length === 0 ? null : refetched.length === 0, `warm parts ${refetched.length === 0 ? `0 on ${warmParts.length} runs` : list(refetched)} · code ${(warmCode / 1e6).toFixed(2)} MB beside them (J139); a deploy's cost is the upgrade run's`));
 

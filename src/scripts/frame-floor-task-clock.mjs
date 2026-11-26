@@ -188,7 +188,7 @@ export function installTaskClock(minMs = 4, cap = 20000) {
       measure(target, name, `BufferGeometry.${name}`);
     }
     for (const resource of performance.getEntriesByType('resource')) {
-      if (!/\/(?:assets|b\/[\w.-]+)\/(?:place|weld|plan|audio|hybrid|runtimePage)-[^/]+\.js$/u.test(resource.name) || moduleCalls.has(resource.name)) continue;
+      if (!/\/(?:assets|builds\/shared|builds\/[\w.-]+\/[\w.-]+|b\/[\w.-]+)\/(?:place|weld|plan|audio|hybrid|runtimePage)-[^/]+\.js$/u.test(resource.name) || moduleCalls.has(resource.name)) continue;
       moduleCalls.add(resource.name);
       void (async () => { try {
         const exports = await import(resource.name);
@@ -223,7 +223,7 @@ export function installTaskClock(minMs = 4, cap = 20000) {
   // Observe only relevant module completions, so its first compile/draw is traced.
   if (typeof PerformanceObserver === 'function') {
     const observer = new PerformanceObserver(list => {
-      if (list.getEntries().some(resource => /\/(?:assets|b\/[\w.-]+)\/(?:place|weld|plan|audio|hybrid|runtimePage)-[^/]+\.js$/u.test(resource.name))) prepareWorldCalls();
+      if (list.getEntries().some(resource => /\/(?:assets|builds\/shared|builds\/[\w.-]+\/[\w.-]+|b\/[\w.-]+)\/(?:place|weld|plan|audio|hybrid|runtimePage)-[^/]+\.js$/u.test(resource.name))) prepareWorldCalls();
     });
     observer.observe({ entryTypes: ['resource'] });
   }

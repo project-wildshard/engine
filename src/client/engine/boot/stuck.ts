@@ -40,7 +40,7 @@ function store(kind: 'session' | 'local'): ReturnType<typeof saveStorage> { retu
 
 function report(error: unknown): void {
   try {
-    const entry = document.querySelector<HTMLScriptElement>('script[type="module"][src*="/b/"],script[type="module"][src*="/assets/"]')?.src ?? '';
+    const entry = document.querySelector<HTMLScriptElement>('script[type="module"][src*="/builds/"],script[type="module"][src*="/b/"],script[type="module"][src*="/assets/"]')?.src ?? '';
     const reporter = new ErrorReporter({
       send: sendReport,
       context: () => ({ build: __BUILD_ID__, shard: '', url: safeUrl(location.href), loop: 'boot', entry: entry.split('/').pop() ?? '', online: navigator.onLine, controlled: (nav.serviceWorker?.controller ?? null) !== null }),

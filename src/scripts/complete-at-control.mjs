@@ -162,7 +162,7 @@ const distBinding = () => sweepMapBinding(values.dist, sweepTarget.build, source
 const sourceOf = (frame) => {
   if (values.dist === undefined) return null;
   const require = createRequire(resolve('package.json')), { TraceMap, originalPositionFor } = require('@jridgewell/trace-mapping');
-  const file = /\/((?:assets|b\/[\w.-]+)\/[^?#]+\.js)/u.exec(frame.url)?.[1];
+  const file = /\/((?:assets|builds\/shared|builds\/[\w.-]+\/[\w.-]+|b\/[\w.-]+)\/[^?#]+\.js)/u.exec(frame.url)?.[1];
   if (file === undefined) return null;
   const path = resolve(values.dist, file);
   if (!sourceMaps.has(path)) sourceMaps.set(path, existsSync(`${path}.map`) ? new TraceMap(readFileSync(`${path}.map`, 'utf8')) : null);
@@ -428,7 +428,7 @@ try {
       precacheAfterControl: precache.filter(r => r.start >= c).length, precacheOpenAtControl: precache.filter(r => r.start < c && (r.end === null || r.end > c)).length,
       // DL1: what the service worker fetched for itself before control: shell files only (the code waits for control)
       precacheBeforeControl: precache.filter(r => r.start < c).map(path), spawnRereads: rereads,
-      codeBeforeControl: precache.filter(r => r.start < c).map(path).filter(file => file.startsWith('/b/') && !shellDocument.includes(file)),
+      codeBeforeControl: precache.filter(r => r.start < c).map(path).filter(file => (file.startsWith('/builds/') || file.startsWith('/b/')) && !shellDocument.includes(file)),
       serverReads: { beforeControl: server.filter(r => r.start < c).length, afterControl: server.filter(r => r.start >= c).length, bytes: server.reduce((sum, r) => sum + (r.bytes ?? 0), 0) },
       neighbour: { pendingAtControl: nPending.length, afterControl: nAfter.length, readsAfterControl: nReads.length },
       otherAfterControl: mine.filter(r => r.start >= c && !isLevelContent(r.url) && !isNeighbour(r.url)).map(r => ({ url: r.url, by: r.by })) };

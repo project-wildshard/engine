@@ -72,7 +72,7 @@ const summary = () => {
   const sum = list => list.reduce((n, r) => n + r.wire, 0), byStage = {}, byClass = {};
   const klass = u => u.startsWith('/assets/spawn/parts/') ? 'spawn-parts' : /\/shardfiles\/[^/]+\/blobs\/pack\//.test(u) ? 'S1-packs'
     : /\/shardfiles\/[^/]+\/blobs\//.test(u) ? 'S1-loose' : /\/shardfiles\//.test(u) ? 'shardfiles' : /\/assets\/packs\//.test(u) ? 'legacy-packs'
-    : u.startsWith('/assets/spawn/') ? 'manifests' : u.startsWith('/b/') || /\.(?:js|mjs|css|html)(?:\?|$)/.test(u) || u === '/' ? 'app' : /\/assets\//.test(u) ? 'assets' : 'other';
+    : u.startsWith('/assets/spawn/') ? 'manifests' : (u.startsWith('/builds/') || u.startsWith('/b/')) || /\.(?:js|mjs|css|html)(?:\?|$)/.test(u) || u === '/' ? 'app' : /\/assets\//.test(u) ? 'assets' : 'other';
   for (const r of rows) { byStage[r.stage] = (byStage[r.stage] ?? 0) + r.wire; const k = klass(r.url); byClass[k] = (byClass[k] ?? 0) + r.wire; }
   return { requests: rows.length, wireBytes: sum(rows), byStage, byClass };
 };

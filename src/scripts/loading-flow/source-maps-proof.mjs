@@ -42,7 +42,7 @@ const index = v.parse(
 );
 const chunk = Object.entries(index).find(([, row]) => row.moduleIds.includes(file))?.[0];
 assert.ok(chunk !== undefined);
-assert.match(chunk, /^b\/[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+\.js$/u);
+assert.match(chunk, /^(?:builds\/[a-zA-Z0-9._-]+|b)\/[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+\.js$/u);
 mkdirSync(scratch, { recursive: true });
 const out = mkdtempSync(join(scratch, "sweep-map-proof-"));
 try {

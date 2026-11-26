@@ -5,22 +5,22 @@ import { existsSync, readdirSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import { build } from 'vite';
 import { rapierAlias } from '../../../vite/rapier.ts';
-import { BUILD_ID_EXPRESSION, codeDirectory } from './buildIdentity.mjs';
+import { BUILD_ID_EXPRESSION, CODE_ROOTS, codeDirectory, engineVersionOf } from './buildIdentity.mjs';
 import { engineRelease } from '../changelog.mjs';
 
 /** Where a build's emitted shell is served from.
- * @param {string} buildId */
-export const standaloneDirectory = (buildId) => `${codeDirectory(buildId)}/standalone`;
+ * @param {string} buildId @param {string} [engineVersion] */
+export const standaloneDirectory = (buildId, engineVersion) => `${codeDirectory(buildId, engineVersion)}/standalone`;
 
 /** @param {string} path */
-export const standaloneServerFile = path => /^b\/[^/]+\/standalone\/(?:shell\.js|server(?:Worker|Runtime)[^/]*\.js)$/u.test(path);
+export const standaloneServerFile = path => /^(?:builds\/[^/]+|b)\/[^/]+\/standalone\/(?:shell\.js|server(?:Worker|Runtime)[^/]*\.js)$/u.test(path);
 
 /** Check the complete output, including previous deploy chunks.
  * @param {string} outDir @param {boolean} preview */
 export function checkServerOutput(outDir, preview) {
-  const b = resolve(outDir, 'b');
-  const files = existsSync(b) ? readdirSync(b, { recursive: true, withFileTypes: true })
-    .filter(row => row.isFile()).map(row => relative(outDir, resolve(row.parentPath, row.name))) : [];
+  // PV9: this build's folder and the carried ones, in either layout (`builds/` or the legacy `b/`)
+  const files = CODE_ROOTS.map(name => resolve(outDir, name)).flatMap(root => existsSync(root) ? readdirSync(root, { recursive: true, withFileTypes: true })
+    .filter(row => row.isFile()).map(row => relative(outDir, resolve(row.parentPath, row.name))) : []);
   const server = files.filter(standaloneServerFile);
   if (!preview && server.length > 0) throw new Error(`Unexpected in-page server output: ${server.join(', ')}`);
   if (preview && !server.some(path => /\/serverWorker[^/]*\.js$/u.test(path))) throw new Error('Solo build has no server worker');
@@ -28,7 +28,7 @@ export function checkServerOutput(outDir, preview) {
 
 /** @param {string} outDir @param {string} buildId @param {string} root @param {{ preview?: boolean, devserver?: boolean }} [options] */
 export async function writeStandaloneOutput(outDir, buildId, root, options = {}) {
-  const directory = standaloneDirectory(buildId);
+  const directory = standaloneDirectory(buildId, engineVersionOf(root));
   await build({
     configFile: false, root, logLevel: 'warn', publicDir: false, resolve: { alias: rapierAlias }, assetsInclude: ['**/*.bin', '**/*.wasm'],
     // SENTRY-TRIAGE S5: the shells report errors too, under the same wildshard@<version> release as the page

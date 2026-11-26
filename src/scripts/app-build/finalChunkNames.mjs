@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, sep } from 'node:path';
+import { CODE_ROOTS } from './buildIdentity.mjs';
 
 /**
  * A chunk's file name names its final bytes (main ci 43076662972). Vite writes `__vite__mapDeps`, a dynamic import's
@@ -33,6 +34,9 @@ function files(dir, keep) {
   }
   return out;
 }
+/** PV9: every code file under the build roots, the new `builds/` and a carried build's legacy `b/`.
+ * @param {string} outDir @param {(name: string) => boolean} keep */
+const codeFiles = (outDir, keep) => CODE_ROOTS.flatMap(root => files(join(outDir, root), keep));
 
 /** The text files of a build that may name a chunk: its code tree's scripts and tables, Vite's manifests and the
  * documents at the top and one folder down.
@@ -46,11 +50,11 @@ function namingFiles(outDir) {
   });
   const roots = readdirSync(outDir).filter(name => name === 'importmap.json').map(name => join(outDir, name));
   return [...documents, ...roots, ...files(join(outDir, '.vite'), name => name.endsWith('.json')),
-    ...files(join(outDir, 'b'), name => name.endsWith('.js') || name.endsWith('.json'))];
+    ...codeFiles(outDir, name => name.endsWith('.js') || name.endsWith('.json'))];
 }
 
 /**
- * Rename each preload-carrying chunk under `outDir/b` to the hash of its final bytes and rewrite every file that names
+ * Rename each preload-carrying chunk under `outDir/builds` to the hash of its final bytes and rewrite every file that names
  * it. Repeats until nothing moves (a rewrite inside another carrier changes that carrier's bytes).
  * @param {string} outDir
  * @returns {{ from: string, to: string }[]} the renames, as paths relative to `outDir`
@@ -59,10 +63,10 @@ export function nameChunksByFinalBytes(outDir) {
   /** @type {{ from: string, to: string }[]} */ const renames = [];
   // A rename rewrites only names, and importers name a carrier by its key: the second round normally finds nothing.
   // A chain of carriers naming each other by value settles one link a round; the bound is one round per carrier.
-  const bound = files(join(outDir, 'b'), name => name.endsWith('.js')).length + 2;
+  const bound = codeFiles(outDir, name => name.endsWith('.js')).length + 2;
   for (let round = 0; round < bound; round++) {
     /** @type {Map<string, string>} old basename -> new basename */ const moved = new Map();
-    for (const path of files(join(outDir, 'b'), name => name.endsWith('.js'))) {
+    for (const path of codeFiles(outDir, name => name.endsWith('.js'))) {
       const code = readFileSync(path);
       if (!code.includes(PRELOAD_LIST)) continue;
       const name = basename(path), stem = HASHED.exec(name)?.[1];

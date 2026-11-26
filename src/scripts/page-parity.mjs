@@ -15,6 +15,7 @@
 import { agentFetch as fetch } from './agent-requests.mjs';
 import { createHash } from 'node:crypto';
 import process from 'node:process';
+import { codeFolderBuild } from './app-build/buildIdentity.mjs';
 
 const FIELDS = ['status', 'cache-control', 'content-type', 'content-encoding', 'clear-site-data', 'location', 'body'];
 const OK = 200;
@@ -68,8 +69,8 @@ async function urls() {
     '/', '/index.html', '/?doctor', '/index.html?doctor', '/version.json', '/asset-index.json', '/asset-manifest.json',
     '/manifest.webmanifest', '/sw.js', '/clear-cache.json', '/deploy-chunks.json', '/favicon.png',
     '/page-parity-missing.js', '/basis/r186/basis_transcoder.wasm',
-    need('page chunk', /"(\/b\/[^"]+\.css)"/u.exec(page)?.[1]),
-    need('carried build chunk', carried.find(path => path.startsWith(`b/${build}/`) && path.endsWith('.js'))),
+    need('page chunk', /"(\/(?:builds|b)\/[^"]+\.css)"/u.exec(page)?.[1]),
+    need('carried build chunk', carried.find(path => codeFolderBuild(path) === build && path.endsWith('.js'))),
     need('sw-core file', /\/sw-core\/[0-9a-f]+\.js/u.exec(sw)?.[0]),
     asset(/^\/assets\/physics\//u), asset(/^\/assets\/tex\//u), asset(/^\/assets\/models\/.*\.bin$/u),
     asset(/^\/assets\/hdri\/.*\.hdr$/u), asset(/^\/assets\/music\/.*\.json$/u), asset(/^\/assets\/sfx\/.*\.json$/u),

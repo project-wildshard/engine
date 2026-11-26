@@ -73,7 +73,7 @@ try {
     await enterZone(page, { zone: shard, base, flags: 'sw=0' });
     check(await loadingShard(page), `the shard is loading before the stale chunk fails`);
     const chunk = await page.evaluate(() => {
-      const url = performance.getEntriesByType('resource').map(entry => entry.name).find(name => /\/b\/[\w.-]+\/[^/]+-[\w-]{8}\.js$/u.test(new URL(name).pathname)) ?? '';
+      const url = performance.getEntriesByType('resource').map(entry => entry.name).find(name => /\/(?:builds\/shared|builds\/[\w.-]+\/[\w.-]+|b\/[\w.-]+)\/[^/]+-[\w-]{8}\.js$/u.test(new URL(name).pathname)) ?? '';
       if (url !== '') void Promise.reject(new TypeError(`Failed to fetch dynamically imported module: ${url}`));
       return url;
     });

@@ -114,7 +114,7 @@ try {
   let titleSince;
   let outcome = '';
   while (Date.now() < deadline) {
-    const newDocument = served.some(row => row.side === 'new' && row.method === 'GET' && row.type.startsWith('text/html') && !row.url.startsWith('/b/'));
+    const newDocument = served.some(row => row.side === 'new' && row.method === 'GET' && row.type.startsWith('text/html') && !(row.url.startsWith('/builds/') || row.url.startsWith('/b/')));
     const reloaded = navigations.length > oldDocuments && newDocument;
     if (reloaded && reloadedAt === undefined) reloadedAt = navigations[navigations.length - 1]?.at;
     const text = await page.evaluate('document.body?.innerText ?? ""').catch(() => '');

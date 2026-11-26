@@ -42,7 +42,7 @@ const codeRows = address.code === undefined ? [] : (await (await fetch(new URL(a
 const listed = new Set([...manifest.files, ...codeRows].map(row => row.url.split('?')[0]));
 // Title art loads through <img> on the title page; any other image read before control is recorded (DL11: an unlisted
 // read waits for the whole set).
-const prefix = `/shardfiles/${slug}/`, shell = /^\/(?:assets\/(?!spawn\/|boot-tables-)|b\/)[^?]+$/u, code = /\.(?:js|mjs|css|map)$/u;
+const prefix = `/shardfiles/${slug}/`, shell = /^\/(?:assets\/(?!spawn\/|boot-tables-)|builds\/|b\/)[^?]+$/u, code = /\.(?:js|mjs|css|map)$/u;
 // DL11 slice 4: setup reads only its selected boot audio (`profile.bootFiles`, extras.ts); every other music / sfx read
 // before control is the extras queue's speculative prefetch (`prefetchAfter`). Listing those made control wait for them
 // (Nalati packs +19.7 MB wire), so an audio file is recorded only when the run held it for the whole set (below).

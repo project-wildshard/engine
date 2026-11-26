@@ -72,6 +72,8 @@
     "src/client/engine/boot/audioPack.ts": "client",
     "src/client/engine/boot/bakedApi.ts": "client",
     "src/client/engine/boot/bakedTextures.ts": "client",
+    "src/client/engine/boot/codeFolder.ts": "client",
+    "src/client/engine/boot/oldTab.ts": "client",
     "src/client/engine/boot/bootCache.ts": "client",
     "src/client/engine/boot/bootTrace.ts": "client",
     "src/client/engine/boot/browserChunkRecovery.ts": "client",

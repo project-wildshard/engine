@@ -4,7 +4,7 @@ import { createServer } from 'node:http';
 import { mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { resolve as resolvePath, join } from 'node:path';
 import { chromium, webkit } from "./browser-playwright.mjs";
-import { writeStandaloneOutput } from './app-build/standaloneOutput.mjs';
+import { standaloneDirectory, writeStandaloneOutput } from './app-build/standaloneOutput.mjs';
 import { KEYCHAIN_ARGS } from './.kit/chromium-keychain.mjs';
 
 const output = process.argv.find(arg => arg.startsWith('--output='))?.slice(9);
@@ -13,7 +13,7 @@ await mkdir(output, { recursive: true });
 const directory = await mkdtemp(join(resolvePath(output), 'bootstrap-'));
 try {
   await writeStandaloneOutput(directory, 'bootstrap-proof', process.cwd(), { preview: true });
-  const paths = await readdir(join(directory, 'b/bootstrap-proof/standalone'));
+  const paths = await readdir(join(directory, standaloneDirectory('bootstrap-proof')));
   const workerFile = paths.find(path => /^serverWorker.*\.js$/u.test(path));
   assert.ok(workerFile, 'Build emitted no actual worker');
   const runtimeFile = paths.find(path => /^serverRuntime.*\.js$/u.test(path));
@@ -58,7 +58,7 @@ try {
             return { heard, failed };
           }
           finally { control.port1.close(); game.port1.close(); worker.terminate(); }
-        }, `/b/bootstrap-proof/standalone/${workerFile}`);
+        }, `/${standaloneDirectory('bootstrap-proof')}/${workerFile}`);
         assert.ok(blocked, `${name}: actual heavy module request was not held`);
         assert.equal(first.heard, true, `${name}: worker has no first message before its heavy graph loads`);
         assert.equal(first.failed, true, `${name}: refused runtime left boot hanging`);
@@ -70,7 +70,7 @@ try {
           try {
             return await Promise.race([shell.booted.then(()=>false,()=>true),new Promise(resolve=>{setTimeout(()=>{resolve(false);},750);})]);
           } finally {shell.dispose();}
-        }, '/b/bootstrap-proof/standalone/shell.js');
+        }, `/${standaloneDirectory('bootstrap-proof')}/shell.js`);
         assert.equal(loadFailure,true,`${name}: actual bootstrap HTTP503 left booted pending`);
         console.log(`${name}: actual bootstrap HTTP503 rejects the page shell boot`);
       } finally { await browser.close(); }

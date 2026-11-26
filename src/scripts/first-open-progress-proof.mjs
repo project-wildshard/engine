@@ -38,7 +38,7 @@ const server = createServer((request, response) => {
   setTimeout(() => {
     response.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream', 'content-length': size,
       // as deployed: hashed files immutable, so the stylesheet's print-to-all swap reuses its bytes; the page always revalidates
-      'cache-control': path.startsWith('/b/') || path.startsWith('/assets/') || path.startsWith('/fonts/') ? 'public, max-age=31536000, immutable' : 'no-cache' });
+      'cache-control': (path.startsWith('/builds/') || path.startsWith('/b/')) || path.startsWith('/assets/') || path.startsWith('/fonts/') ? 'public, max-age=31536000, immutable' : 'no-cache' });
     const stream = createReadStream(file, { highWaterMark: 16 * 1024 });
     stream.on('data', chunk => { stream.pause(); response.write(chunk); setTimeout(() => { stream.resume(); }, chunk.length / bytesPerMs); });
     stream.on('end', () => { response.end(); });
@@ -108,7 +108,7 @@ try {
   console.log(`first paint ${JSON.stringify(timing.paint)}; document ${JSON.stringify(timing.nav)}`);
   for (const [start, end, bytes, name] of timing.resources.slice(0, 14)) console.log(`  ${String(start).padStart(5)}-${String(end).padStart(5)} ms ${String(bytes).padStart(8)} B ${name}`);
   // iOS keeps a Home Screen app's still launch image until `load`: the moment the live shell can first be seen.
-  handover = { load: timing.nav[0]?.load ?? Number.NaN, firstBundle: Math.min(...timing.resources.filter(row => String(row[3]).startsWith('/b/')).map(row => Number(row[0]))) };
+  handover = { load: timing.nav[0]?.load ?? Number.NaN, firstBundle: Math.min(...timing.resources.filter(row => (String(row[3]).startsWith('/builds/') || String(row[3]).startsWith('/b/'))).map(row => Number(row[0]))) };
   const video = page.video();
   await context.close();
   if (video !== null) {

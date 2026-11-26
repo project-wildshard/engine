@@ -73,7 +73,7 @@ export function goldenScriptPaths(graph,build) {
   const owners=rows.filter(row=>row?.build===build);
   if (owners.length!==1||!Array.isArray(owners[0].files)) throw new Error('Golden build chunk ownership is ambiguous');
   return owners[0].files.map(row=>row.path).filter(path=>typeof path==='string'&&path.endsWith('.js')
-    &&path.startsWith('b/')&&!path.split('/').some(part=>part==='..'||part===''||part.includes('\\')));
+    &&(path.startsWith('builds/')||path.startsWith('b/'))&&!path.split('/').some(part=>part==='..'||part===''||part.includes('\\')));
 }
 
 /** Fail closed when the compiler shape changes; no guessed export or copied release binding.

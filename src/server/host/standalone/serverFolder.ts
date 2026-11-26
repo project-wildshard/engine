@@ -51,9 +51,9 @@ async function serverBytes(url: URL, path: string): Promise<Uint8Array> {
   });
 }
 
-/** The worker runs from its build's folder (`/b/<build>/standalone/`), which says whose it is. */
+/** The worker runs from its build's folder (`/builds/<engineVersion>/<build>/standalone/`, PV9; `/b/<build>/` before), which says whose it is. */
 function workerBuild(): string {
-  const build = /^\/b\/([^/]+)\//u.exec(globalThis.location.pathname)?.[1];
+  const build = /^\/(?:builds\/[^/]+|b)\/([^/]+)\/standalone\//u.exec(globalThis.location.pathname)?.[1];
   if (build === undefined) throw new Error('The server worker runs outside a build folder');
   return build;
 }

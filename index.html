@@ -125,7 +125,7 @@
           data.resources.push({...plain(entry), url: entry.name, initiator: entry.initiatorType, realm, timeOrigin: workerOrigin,
             pageStart: workerOrigin + entry.startTime - origin, pageEnd: workerOrigin + entry.responseEnd - origin});
           data.progress('resource:completed', 1, null, 'files');
-          if (data.build === null) data.build = /\/b\/([^/]+)\//.exec(entry.name)?.[1] || null;
+          if (data.build === null) data.build = /\/(?:builds\/(?!shared\/)[^/]+|b)\/([^/]+)\//.exec(entry.name)?.[1] || null;
         };
         let observer, paintObserver;
         try {

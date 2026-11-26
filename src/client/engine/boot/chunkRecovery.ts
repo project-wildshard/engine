@@ -4,11 +4,11 @@ export function staleChunkFailure(error: unknown, base: string): boolean {
   const module = /Failed to fetch dynamically imported module|Importing a module script failed|error loading (?:a )?dynamically imported module/iu.test(error.message);
   const stylesheet = /^(?:Stylesheet failed:|Unable to preload CSS for )/u.test(error.message);
   if (!module && !stylesheet) return false;
-  const address = /(?:https?:\/\/[^\s"']+|\/(?:assets|b)\/[^\s"']+)/u.exec(error.message)?.[0];
+  const address = /(?:https?:\/\/[^\s"']+|\/(?:assets|builds|b)\/[^\s"']+)/u.exec(error.message)?.[0];
   if (address === undefined) return module;
   try {
     const url = new URL(address, base);
-    return url.origin === new URL(base).origin && /^\/(?:assets|b\/[\w.-]+)\/[^/]+-[\w-]{8}\.(?:js|css)$/u.test(url.pathname);
+    return url.origin === new URL(base).origin && /^\/(?:assets|builds\/shared|builds\/[\w.-]+\/[\w.-]+|b\/[\w.-]+)\/[^/]+-[\w-]{8}\.(?:js|css)$/u.test(url.pathname);
   } catch { return false; }
 }
 export interface ChunkRecoveryPorts {

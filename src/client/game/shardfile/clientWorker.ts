@@ -15,6 +15,7 @@ import type { Player } from '@wildshard/engine/player/Player';
 import { Scene, Vector3, type Object3D } from 'three';
 import { appIdentity } from '@wildshard/engine/app/identity';
 import { bootMark, bootTask } from '@wildshard/engine/boot/timing';
+import { buildCodeFolder } from '@wildshard/engine/boot/codeFolder';
 import { SEAT_GRACE_MS, seatedInTime } from './seatGrace';
 import { exploreChannel } from '@wildshard/engine/app/view/exploreChannel';
 import { importPageSaves, pageOnlyServerSaves, openIndexedSaves, serverSaveDatabase, serverStopsForImport, type IndexedSaves } from '@wildshard/engine/saves/indexed';
@@ -416,7 +417,7 @@ async function readWorker(shell: Shell, report: WorkerClientReport): Promise<voi
 /** Boot the server in its worker and put this page on it. */
 const buildRoot = (): { build: string; root: string } => {
   const build = (globalThis as { __WS_BUILD_ID__?: string }).__WS_BUILD_ID__ ?? '';
-  return { build, root: `/b/${build}/standalone` };
+  return { build, root: `${buildCodeFolder(build)}/standalone` };
 };
 /** The server's page-side modules, once a page: its identity, its save environment and its shell. */
 let serverModules: Promise<ShellModule> | null = null;
