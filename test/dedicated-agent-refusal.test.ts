@@ -2,9 +2,11 @@
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 // oxlint-disable-next-line import/no-nodejs-modules -- Await actual socket events.
 import { once } from 'node:events';
+// oxlint-disable-next-line import/no-nodejs-modules -- Read the pinned key the VPS setup holds.
+import { readFileSync } from 'node:fs';
 import { WebSocket } from 'ws';
 import { afterEach, expect, test, vi } from 'vitest';
-import { AGENTS_REFUSED, agentsRefusedOn, carriesAgentMarker, classifyActor } from '../src/shared/engine/app/actor';
+import { AGENTS_REFUSED, PINNED_RELEASE_KEY, agentsRefusedOn, carriesAgentMarker, classifyActor } from '../src/shared/engine/app/actor';
 import { World, type WorkerLink } from '../src/server/host/dedicated/world';
 import { memoryPlayerSaves } from '../src/server/host/dedicated/playerSaves';
 import { SocketTransport } from '../src/server/host/dedicated/socketTransport';
@@ -56,6 +58,7 @@ const MARKED: readonly (readonly [string, string, Record<string, string>])[] = [
 test('only production refuses agents, and only on a marker an agent sets on purpose', () => {
   expect(agentsRefusedOn('production')).toBe(true);
   for (const channel of ['staging', 'preview', 'local']) expect(agentsRefusedOn(channel)).toBe(false);
+  expect(agentsRefusedOn('production', PINNED_RELEASE_KEY.toUpperCase())).toBe(true);
   expect(carriesAgentMarker(classifyActor({ userAgent: `${HUMAN} WildshardAgent/1` }))).toBe(true);
   expect(carriesAgentMarker(classifyActor({ userAgent: HUMAN, query: 'lane' }))).toBe(true);
   expect(carriesAgentMarker(classifyActor({ userAgent: HUMAN, stored: 'lane' }))).toBe(true);
@@ -110,4 +113,14 @@ test('a production Zone Select press from a marked agent is refused and counts n
     expect(await send({ 'user-agent': HUMAN })).toEqual({ status: 204, text: '' });
   }
   expect(press.mock.calls.map(([, actor]: readonly unknown[]) => (actor as { actor: string }).actor)).toEqual(['human', 'agent', 'agent', 'human']);
+});
+
+// QA 11-24 row 72: mmo-bots' replica signs a production release with its own throwaway key, and its marked bots were all
+// refused (refusals agent 32). Production is the release the pinned key signed; a replica is not production.
+test('a self-signed production replica admits agents; the pinned key is the release pipeline\'s', () => {
+  expect(agentsRefusedOn('production', PINNED_RELEASE_KEY)).toBe(true);
+  expect(agentsRefusedOn('production', '302a300506032b6570032100' + 'ab'.repeat(32))).toBe(false);
+  expect(agentsRefusedOn('staging', PINNED_RELEASE_KEY)).toBe(false);
+  const setup = /^EXPECTED_RELEASE_PUBLIC_KEY=([0-9a-f]+)$/mu.exec(readFileSync('src/scripts/vps/setup.sh', 'utf8'))?.[1];
+  expect(setup).toBe(PINNED_RELEASE_KEY);
 });
