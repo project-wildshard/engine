@@ -2,7 +2,7 @@
 // QA 11-25 row 131: production's content reach check, fed v0.1.92's shape (rows 121 and 123): a page naming boot tables, grid
 // seams and title art its content set's index lacks.
 import {expect, test} from 'vitest';
-import {contentReach, namedPaths, pageScripts, reachProblems, type Answer} from '../src/scripts/page-release/content-reach.mjs';
+import {contentReach, namedPaths, ownGraph, pageScripts, reachProblems, reachSummary, type Answer} from '../src/scripts/page-release/content-reach.mjs';
 
 const build = '889b423bed33b64e778d7e69b07450eef62aad2a';
 const set = '2ba30cfddecd9b49';
@@ -110,4 +110,44 @@ test('a page with no content base, or CORS for another origin, is refused', asyn
   const reach = await contentReach({origin: 'https://staging.wildshard.io', readPage, get: (url, _from) => get(url, origin)});
   expect(reach.misses).toHaveLength(content.size);
   expect(reach.misses[0]).toMatch(/^CORS https:\/\/play\.wildshard\.io /u);
+});
+
+// QA 11-25 row 146: v0.1.96's page carried v0.1.85's books, spawn lists and boot tables (previousDeploy.mjs keeps an
+// unmarked build's content-named files), which name 190 paths its set never held and no client of v0.1.96 fetches. A walk
+// of every file in dist/ counted them (9417 of 9607); the check asks only for the paths this build's own graph names,
+// its shared `b/c/` code included.
+test("only this build's graph is read: a carried build's names are left out, this build's shared code is not", async () => {
+  const old = '95061e376d4084fbf069b44a804fc72ba2178a79';
+  const shared = 'const art="/assets/title/zone-card-0a1b2c3d.jpg";';
+  const oldStartup = 'fetch("/assets/boot-tables-9d8838ab.json");';
+  const oldBook = JSON.stringify({book: 'packs', build: old, client: {nine: {phone: {code: {url: '/assets/spawn/code/0e358624f30399f3.json'}}}}});
+  const graph = JSON.stringify({format: 2, builds: [
+    {build, content: true, files: [{path: `b/${build}/main-C0XQtDof.js`, bytes: 1}, {path: 'b/c/zone-cards-Qx1.js', bytes: 1}, {path: 'b/c/style-Qx2.css', bytes: 1}]},
+    {build: old, files: [{path: 'b/c/control-0-0-4xdk-startup-QXVG.js', bytes: 1}, {path: `assets/spawn/packs-${old}.json`, bytes: 1}, {path: 'b/c/zone-cards-Qx1.js', bytes: 1}]},
+  ]});
+  const page = new Map([...pages, ['deploy-chunks.json', graph], ['b/c/zone-cards-Qx1.js', shared],
+    ['b/c/control-0-0-4xdk-startup-QXVG.js', oldStartup], [`assets/spawn/packs-${old}.json`, oldBook]]);
+  const read = (path: string) => {
+    const body = page.get(path);
+    return body === undefined ? Promise.reject(new Error(`${path} 404`)) : Promise.resolve(body);
+  };
+  expect(ownGraph(graph, build)).toEqual({own: [`b/${build}/main-C0XQtDof.js`, 'b/c/zone-cards-Qx1.js'], carried: 2});
+  expect(ownGraph(graph, '0'.repeat(40))).toBeUndefined();
+  expect(ownGraph('<html>', build)).toBeUndefined();
+
+  const held = [...content.keys(), 'assets/title/zone-card-0a1b2c3d.jpg'];
+  const reach = await contentReach({origin, readPage: read, get: cdn(held, held).get});
+  expect(reachProblems(reach)).toEqual([]);
+  expect(reach).toMatchObject({named: held.length, code: 3, carried: 2, gaps: [], misses: []});
+  expect(reachSummary(reach)).toMatch(/: 3 page files read, 2 carried from older builds left out; /u);
+
+  // a path only this build's shared code names, missing from its set, is a real miss (row 131's check never read b/c/)
+  const {get} = cdn(content.keys(), content.keys());
+  const missing = await contentReach({origin, readPage: read, get, sleep: () => Promise.resolve()});
+  expect(missing.gaps).toEqual(['assets/title/zone-card-0a1b2c3d.jpg']);
+  expect(missing.misses).toEqual(['404 assets/title/zone-card-0a1b2c3d.jpg']);
+
+  // a file this build's graph lists that the page does not serve fails the check by name
+  const broken = await contentReach({origin, readPage: path => path === 'b/c/zone-cards-Qx1.js' ? Promise.reject(new Error('404')) : read(path), get: cdn(held, held).get});
+  expect(broken.misses).toEqual(['unreadable page file b/c/zone-cards-Qx1.js']);
 });

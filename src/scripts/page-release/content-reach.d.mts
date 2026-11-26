@@ -10,8 +10,10 @@ export interface ReachInput {
 }
 export interface Reach {
   build: string; base: string; named: number; indexed: number; misses: string[]; gaps: string[]; differ: string[]; unstaged: number;
-  staging?: string;
+  staging?: string; code: number; carried?: number;
 }
+export const DEPLOY_CHUNKS: string;
+export function ownGraph(text: string, build: string): {own: string[]; carried: number} | undefined;
 export function namedPaths(text: string): Set<string>;
 export function pageScripts(html: string, build: string): string[];
 export function buildOf(html: string): string | undefined;
