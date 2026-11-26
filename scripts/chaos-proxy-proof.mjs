@@ -974,7 +974,7 @@ await test('shared pressure heals both native sending directions', async () => {
     await fixture.close()
   }
 })
-await test('a grid cell query, its spawn and the agent marker reach the world door, and nothing else does', async () => {
+await test('the bare door and the agent marker reach the world door, and nothing else does (CP5: the cell rides the goto word)', async () => {
   const fixture = await nativeFixture()
   /** @type {string[]} */ const seen = []
   fixture.wss.on('connection', (_peer, request) => {
@@ -982,21 +982,21 @@ await test('a grid cell query, its spawn and the agent marker reach the world do
   })
   try {
     const world = fixture.proxy.ready.worldOrigin
-    const cell = new WebSocket(`${world.replace('http:', 'ws:')}/?chunk=driftwood-isle`)
+    const cell = new WebSocket(`${world.replace('http:', 'ws:')}/`)
     await once(cell, 'open')
     cell.close()
     await once(cell, 'close')
-    // meta QA-FEEDBACK-2026-11-22 row 7: an agent page's marker and a Zone Select spawn pass too (webSocketTransport.ts, gotoSocket)
-    for (const path of ['/?agent=1', '/?chunk=driftwood-isle&at=spawn&agent=mini-qafix']) {
+    // meta QA-FEEDBACK-2026-11-22 row 7: an agent page's marker passes too (webSocketTransport.ts)
+    for (const path of ['/?agent=1', '/?agent=mini-qafix']) {
       const marked = new WebSocket(`${world.replace('http:', 'ws:')}${path}`)
       await once(marked, 'open')
       marked.close()
       await once(marked, 'close')
     }
-    assert.deepEqual(seen, ['/?chunk=driftwood-isle', '/?agent=1', '/?chunk=driftwood-isle&at=spawn&agent=mini-qafix'])
+    assert.deepEqual(seen, ['/', '/?agent=1', '/?agent=mini-qafix'])
     const state = await (await fixture.proxy.control()).json()
     assert.equal(state.counters.upgrades, 3)
-    for (const path of ['/?chunk=a&other=1', '/?chunk=a&chunk=b', '/?chunk=..%2F', '/x?chunk=a', '/?other=1', '/?at=spawn', '/?chunk=a&at=x',
+    for (const path of ['/?agent=1&other=1', '/?zone=a', '/x?agent=1', '/x', '/?other=1', '/?at=spawn', '/?agent=1&at=spawn',
       '/?agent=1&agent=2', '/?agent=a%20b'])
       assert.equal((/** @type {{status:number}} */ (await rawRequest(world, path, { connection: 'Upgrade', upgrade: 'websocket', 'sec-websocket-key': 'YWJjZGVmZ2hpamtsbW5vcA==', 'sec-websocket-version': '13' }))).status, 404, path)
     assert.equal(seen.length, 3)

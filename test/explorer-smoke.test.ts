@@ -16,7 +16,7 @@ const catalogue = [
   {slug:'open-plot-alien-plain',status:'hidden',legacy:false,shardSelect:false},
   {slug:'nine-dragon-stack-legacy',status:'live',legacy:true},
 ];
-const currentDocument={url:'https://test.example/?chunk=fixture',id:'fixture-document',timeOrigin:1,slug:'fixture'};
+const currentDocument={url:'https://test.example/?explore=model',id:'fixture-document',timeOrigin:1,slug:'fixture'};
 const diagnostics={document:currentDocument,timingBufferFull:false,navigation:null,resources:[],measures:[]};
 function storageFixture() {
   const storage=legacyDouble<CDPSession>({send:()=>Promise.reject(new Error('Unconfigured protocol response'))});
@@ -27,7 +27,8 @@ function fixtureBrowser(evaluate: Page['evaluate'], report?: Request, requests: 
   readonly request: Request; readonly response?: Response; readonly settled?: 'requestfinished' | 'requestfailed';
 }[] = []): { browser: Browser; close: ReturnType<typeof vi.fn<BrowserContext['close']>> } {
   const events = new EventEmitter();
-  const page: Page = legacyDouble<Page>({ evaluate, on: (event, listener) => {
+  const tap = { dispose: (): Promise<void> => Promise.resolve(), [Symbol.asyncDispose]: (): Promise<void> => Promise.resolve() };
+  const page: Page = legacyDouble<Page>({ evaluate, addInitScript: vi.fn<Page['addInitScript']>().mockResolvedValue(tap), on: (event, listener) => {
     events.on(event, listener);
     return page;
   },
@@ -212,7 +213,8 @@ test('a model-ready invalidation between presence and pixels waits for the repla
   evaluate.mockResolvedValueOnce(state).mockResolvedValueOnce({before:{...state,ready:false},cards:[missing],after:{...state,ready:false}})
     .mockResolvedValueOnce(state).mockResolvedValueOnce({before:state,cards:[drawn],after:state})
     .mockResolvedValueOnce(diagnostics);
-  const page: Page = legacyDouble<Page>({ evaluate, on: () => page,
+  const tap = { dispose: (): Promise<void> => Promise.resolve(), [Symbol.asyncDispose]: (): Promise<void> => Promise.resolve() };
+  const page: Page = legacyDouble<Page>({ evaluate, on: () => page, addInitScript: vi.fn<Page['addInitScript']>().mockResolvedValue(tap),
     goto: vi.fn<Page['goto']>().mockResolvedValue(null),
     close: vi.fn<Page['close']>().mockResolvedValue(),
     screenshot: vi.fn<Page['screenshot']>().mockRejectedValue(new Error('Unexpected failure capture')) });
@@ -258,8 +260,7 @@ test('a ready catalogue must belong to the requested new world document',()=>{
   expect(()=>verifyExplorerDocument(currentDocument,'https://test.example/','fixture',undefined)).not.toThrow();
   for(const observed of [
     {...currentDocument,slug:'previous'},
-    {...currentDocument,url:'https://test.example/?chunk=previous'},
-    {...currentDocument,url:'https://foreign.example/?chunk=fixture'},
+    {...currentDocument,url:'https://foreign.example/?explore=model'},
     {...currentDocument,timeOrigin:Number.NaN},
     {...currentDocument,id:''},
   ])expect(()=>verifyExplorerDocument(observed,'https://test.example/','fixture',undefined)).toThrow('stale or foreign');
@@ -268,12 +269,13 @@ test('a ready catalogue must belong to the requested new world document',()=>{
 
 function sessionFixture(stale=false){
   let frozen=stale;
-  let identity={...currentDocument,timeOrigin:0};
+  let identity={...currentDocument,timeOrigin:0},tapped='';
+  const taps:string[]=[];
   const listeners=new Map<string,unknown>();
   const goto=vi.fn<Page['goto']>().mockImplementation(url=>{
     if(url==='about:blank')return Promise.resolve(null);
     identity={url,id:frozen?identity.id:String(identity.timeOrigin+1),timeOrigin:frozen&&identity.timeOrigin>0?identity.timeOrigin:identity.timeOrigin+1,
-      slug:frozen&&identity.timeOrigin>0?identity.slug:new URL(url).searchParams.get('chunk')??''};
+      slug:frozen&&identity.timeOrigin>0?identity.slug:tapped};
     return Promise.resolve(null);
   });
   const evaluate=vi.fn<Page['evaluate']>().mockImplementation(fn=>{
@@ -283,7 +285,12 @@ function sessionFixture(stale=false){
     if(fn===explorerDiagnostics)return Promise.resolve({...diagnostics,document:identity});
     return Promise.resolve([{id:`${identity.slug}/actual`,ready:true,pixels:100,darkShare:.2}]);
   });
-  const page:Page=legacyDouble<Page>({evaluate,goto,on:(event:string,listener:unknown)=>{listeners.set(event,listener);return page;},
+  // the page's Explore tap (CP16, J522): its init script names the zone the next document boots
+  const addInitScript=vi.fn<Page['addInitScript']>().mockImplementation(script=>{
+    tapped=/slug: "([^"]+)"/u.exec(typeof script==='object'&&script!==null&&'content' in script?String(script.content):'')?.[1]??'';taps.push(tapped);
+    return Promise.resolve({dispose:()=>Promise.resolve(),[Symbol.asyncDispose]:()=>Promise.resolve()});
+  });
+  const page:Page=legacyDouble<Page>({evaluate,goto,addInitScript,on:(event:string,listener:unknown)=>{listeners.set(event,listener);return page;},
     screenshot:vi.fn<Page['screenshot']>().mockRejectedValue(new Error('No capture in the bounded fixture'))});
   const close=vi.fn<BrowserContext['close']>().mockResolvedValue(undefined);
   const newPage=vi.fn<BrowserContext['newPage']>().mockResolvedValue({...page});
@@ -293,7 +300,7 @@ function sessionFixture(stale=false){
   const newCDPSession=vi.fn<BrowserContext['newCDPSession']>().mockResolvedValue({...storage});
   const context=legacyDouble<BrowserContext>({newPage,route,close,newCDPSession,addInitScript:vi.fn<BrowserContext['addInitScript']>().mockResolvedValue(disposable)});
   const newContext=vi.fn<Browser['newContext']>().mockResolvedValue({...context});
-  return {browser:legacyDouble<Browser>({newContext}),context:{...context},newContext,newPage,route,close,listeners,send,goto,evaluate,freezeDocument:()=>{frozen=true;}};
+  return {browser:legacyDouble<Browser>({newContext}),context:{...context},newContext,newPage,route,close,listeners,send,goto,evaluate,taps,freezeDocument:()=>{frozen=true;}};
 }
 
 test('native context retirement bounds each group while every catalogue still draws',async()=>{
@@ -415,10 +422,11 @@ test('one context and page retain native caches while every catalogue has new do
     expect(f.newContext).toHaveBeenCalledOnce();expect(f.newPage).toHaveBeenCalledOnce();
     expect(f.send).toHaveBeenCalledTimes(3);
     expect(f.goto.mock.calls.map(([url])=>url)).toEqual([
-      'about:blank',expect.stringContaining('chunk=first'),
-      'about:blank',expect.stringContaining('chunk=second'),
-      'about:blank',expect.stringContaining('chunk=first'),
+      'about:blank',expect.stringContaining('explore=model'),
+      'about:blank',expect.stringContaining('explore=model'),
+      'about:blank',expect.stringContaining('explore=model'),
     ]);
+    expect(f.taps).toEqual(['first','second','first']);
     for(const [method,params] of f.send.mock.calls){
       expect(method).toBe('Storage.clearDataForOrigin');
       expect(params).toMatchObject({origin:'https://test.example'});

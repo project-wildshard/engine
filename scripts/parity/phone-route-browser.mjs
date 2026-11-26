@@ -44,7 +44,8 @@ export function phoneDocumentMatches(snapshot, url, previous) {
     || !('visit' in snapshot) || snapshot.visit !== previous.visit || !('document' in snapshot) || typeof snapshot.document !== 'string'
     || snapshot.document.length === 0 || snapshot.document === previous.document || !('boot' in snapshot) || typeof snapshot.boot !== 'string') return false;
   try { const boot = new URL(snapshot.boot), expected = new URL(url);
-    return boot.origin === expected.origin && boot.pathname === expected.pathname && boot.searchParams.has('chunk');
+    // the entry document boots at the bare address: the zone rides the tap in the tab (CHUNK-PARAM-REMOVAL CP16, J522)
+    return boot.origin === expected.origin && boot.pathname === expected.pathname;
   } catch { return false; }
 }
 

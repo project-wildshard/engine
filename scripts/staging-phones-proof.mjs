@@ -27,6 +27,7 @@ import { decodeProtocolPng } from './parity/fast-png.mjs';
 import { soakInspector } from './soak/inspector.mjs';
 import { ownSimulatorHid } from './staging-qa-idb.mjs';
 import { chatLinePattern, playerNameSource, roomsHealthURL, splitRoomsHealthLines } from './staging-proof-lines.mjs';
+import { SAVE_PREFIX, tapDocument } from './zone-entry.mjs';
 
 const STAGING = 'https://staging.wildshard.io', RELEASE = 'https://packs.wildshard.io/releases/staging.json', SHARD = 'driftwood-isle';
 const SOCKETS = new Set(['wss://rooms-staging.wildshard.io', 'wss://wildshard.tailb41b20.ts.net:8443']);
@@ -248,11 +249,13 @@ else {
 }
 
 const phone = device === 'safari' ? safari(process.env.SIM_UDID ?? '') : android(process.env.ANDROID_SERIAL ?? 'emulator-5554');
-const url = agentUrl(`${BASE}/?chunk=${SHARD}&mute=1&nolock=1&skipintro=1`);
+// CHUNK-PARAM-REMOVAL CP16 (J522): the zone rides the tap in the tab, written on the origin before the bare page opens.
+const url = agentUrl(`${BASE}/?mute=1&nolock=1&skipintro=1`);
 let code = 1;
 try {
   await phone.open(`${BASE}/version.json`);
   await phone.evaluate(SETUP);
+  await phone.evaluate(`sessionStorage.setItem(${JSON.stringify(`${SAVE_PREFIX}session`)}, ${JSON.stringify(tapDocument({ zone: SHARD }))}); true`);
   console.log(`  ${row} browser and GPU at open: ${JSON.stringify(await phone.evaluate(GPU).catch((/** @type {unknown} */ error) => String(error).slice(0, 200)))}`);
   await phone.evaluate(`location.replace(${JSON.stringify(url)}); true`).catch(() => undefined);
   // The hosted Android emulator draws on a software GPU at 1 to 2 fps: its title took over 4 minutes (run 43977695438).

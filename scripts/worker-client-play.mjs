@@ -67,47 +67,22 @@ export async function play(browser, phone, base, only = '') {
   };
 
 
+  // CHUNK-PARAM-REMOVAL CP16 (J522): the split-repair checks that read the one-shard page's own simulation (perks, hare,
+  // pine-writes, held-melee, whip, nalati-signals with its storm, horse-panic, movers, sky-trails) retired with that page
+  // (the plan's Q2 (a)); the ones that pass on the grid page a tap opens stay.
   if (only === 'perks') {
-    const { run } = await import('./split-repair-perks.mjs');
     const { run: stun } = await import('./split-repair-stun.mjs');
-    await step('perks: shop grants real owner health and damage', () => run(browser, phone, base));
     await step('perks: real elite roar projects its timed stun', () => stun(browser, phone, base));
     return steps;
   }
   if (only === 'pine-writes') {
-    const { run } = await import('./split-repair-pine-writes.mjs');
-    const { run: hare } = await import('./split-repair-hare.mjs');
     const { run: loss } = await import('./split-repair-wake-loss.mjs');
-    await step('Pine: harvest persists and respawn refills authority', () => run(browser, phone, base));
-    await step('Pine: a real wired bolt retires an ambient hare', () => hare(browser, phone, base));
     await step('Pine: a real boss death records lost', () => loss(browser, phone, base));
     return steps;
   }
-  if (only === 'held-melee') {
-    const { run } = await import('./split-repair-held-melee.mjs');
-    const { run: whip } = await import('./split-repair-whip.mjs');
-    await step('melee: direct fan Heavy reaches the server', () => run(browser, phone, base));
-    await step('melee: whip contacts leave settlement on the server', () => whip(browser, phone, base));
-    return steps;
-  }
   if (only === 'nalati-signals') {
-    const { run, storm } = await import('./split-repair-nalati-signals.mjs');
     const { run: guardian } = await import('./split-repair-guardian.mjs');
-    const { run: panic } = await import('./split-repair-horse-panic.mjs');
-    await step('Nalati: real stampede signals, notice and knockdown', () => run(browser, phone, base));
     await step('Nalati: a natural raid makes the guardian bark, and the page flock bleats', () => guardian(browser, phone, base));
-    await step('Nalati: a replicated storm telegraph plays its crackle cue', () => storm(browser, phone, base));
-    await step('Nalati: a real mounted bite panics the horse', () => panic(browser, phone, base));
-    return steps;
-  }
-  if (only === 'movers') {
-    const { run } = await import('./split-repair-movers.mjs');
-    await step('movers: a real canoe ride and winch raise present their moments', () => run(browser, phone, base));
-    return steps;
-  }
-  if (only === 'sky-trails') {
-    const { run } = await import('./split-repair-sky-trails.mjs');
-    await step('sky-trails: rays draw wakes', () => run(browser, phone, base));
     return steps;
   }
   if (runs('pine-economy')) { const { pineEconomy } = await import('./worker-client-pine.mjs'); await pineEconomy(browser, phone, base, step); }

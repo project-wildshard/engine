@@ -100,7 +100,7 @@ describe('offline proof rules (OF1)', () => {
     expect(at('driftwood-isle')).toEqual(['not-in-cell']);
     expect(at(null)).toEqual(['not-in-cell']);
     expect(at()).toEqual(['not-in-cell']);
-    // an Open Plot has no card: its `?chunk=` link opens the one-shard page, judged as that page
+    // an Open Plot has no card: it is entered by its tap (CP16, J522), judged as a linked entry
     expect(judge({ ...base, channel: 'preview', entry: 'deck', placed: true, linked: true, rows: greenLog, samples: inPlay, outcome: 'play' }).map(failure => failure.rule)).toEqual([]);
   });
   it('fails the load error screen, the proof\'s own error, a resume never offered, a leak, and (OF5, OF9) any end outside the world', () => {

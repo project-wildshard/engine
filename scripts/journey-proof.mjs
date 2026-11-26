@@ -15,6 +15,7 @@ import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { keepReleaseProof, openReleaseRun } from './release-run.mjs';
 import { join, resolve as resolvePath } from 'node:path';
 import { watchFaults } from './proof-faults.mjs';
+import { initScript } from './zone-entry.mjs';
 
 /** iPhone 17 Pro portrait, as Jake holds it. */
 export const PHONE = Object.freeze({
@@ -27,13 +28,14 @@ export const PHONE = Object.freeze({
 export async function readOnlyPhoneLoad(base, build) {
   const { webkit } = await import('./browser-playwright.mjs');
   const url = new URL('/', base);
-  url.search = new URLSearchParams({ chunk: 'driftwood-isle', mute: '1', nolock: '1' }).toString();
+  url.search = new URLSearchParams({ mute: '1', nolock: '1' }).toString(); // the zone rides the tap (CP16, J522)
   const browser = await webkit.launch({ headless: true });
   try {
     const context = await browser.newContext({ ...PHONE, deviceScaleFactor: 1, serviceWorkers: 'block' });
     await context.route('**/*', route => route.request().method() === 'GET' ? route.continue() : route.abort());
     await context.routeWebSocket(/.*/u, socket => socket.close({ code: 4000, reason: 'Read-only phone proof' }));
     const page = await context.newPage();
+    await page.addInitScript(initScript('driftwood-isle'));
     const response = await page.goto(url.href, { waitUntil: 'commit' });
     if (response?.status() !== 200) throw new Error('The phone entry did not load');
     const version = await fetch(new URL('/version.json', base), { cache: 'no-store', signal: AbortSignal.timeout(15_000) });

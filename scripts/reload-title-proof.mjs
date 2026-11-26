@@ -86,7 +86,7 @@ try {
     check(await loadingShard(page), `the recovery reload resumes ${shard} (its loading card, not the title)`);
     await sleep(1500);
     check(!await onTitle(page) && await page.locator('#wsdrop').count() === 0, 'no title and no drop modal after the recovery reload');
-    check(!new URL(page.url()).searchParams.has('chunk'), `the address names no zone, the tab does (J522; ${page.url()})`);
+    check(!new URL(page.url()).search.includes(shard), `the address names no zone, the tab does (J522; ${page.url()})`);
     const said = consoleLines.filter(line => line.includes('[lastEnd]'));
     check(said.some(line => line.includes('the previous page: stale deployment code')), `lastEnd names the engine reload (${said.join(' | ')})`);
     await page.screenshot({ path: join(out, '3-chunk-recovery-resumes.png') });

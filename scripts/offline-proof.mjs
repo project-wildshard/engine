@@ -10,7 +10,8 @@
 //            (`routeWebSocket`) that says the world word (SOCKET_WORLD, every proof shard on a 20-cell grid) and never seats,
 //            as opus-offlinefix1's run did. So a staging-like load ends at the seat (LOAD step `server`), never in play.
 // Per shard, one persistent headless Chromium profile per channel (402x874, touch): a warm visit by the player's path, then
-// the mode, entered by the deck (Shard select; Open Plots, and a shard the deck doesn't show, by `?chunk=<slug>&skipintro` with Developer on)
+// the mode, entered by the deck (Shard select; Open Plots, and a shard the deck doesn't show, by its tap and `/?skipintro` with Developer on,
+// CHUNK-PARAM-REMOVAL CP16, J522)
 // and by resume (reopen `/`, whatever the site does). Modes, all inside that one browser, never the laptop's network:
 //   offline    `context.setOffline(true)` plus CDP offline on every target (page, workers, the service worker)
 //   slow       CDP 0.7 Mbit/s, 300 ms on every target
@@ -51,6 +52,7 @@ import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { ALL_SHARDS, DECK_SHARDS, gridPlaces, judge, OPEN_PLOTS, pathOf, screenKey, servedCounts } from './offline-proof-rules.mjs';
 import { CHANNELS, RELEASE_PUBLIC_KEY } from './page-release/flow.mjs';
+import { initScript } from './zone-entry.mjs';
 
 /** @typedef {import('./offline-proof-rules.mjs').RequestRow} RequestRow */
 /** @typedef {import('./offline-proof-rules.mjs').ScreenSample} ScreenSample */
@@ -341,15 +343,18 @@ async function enter(run) {
     /** @type {() => string[]} */
     let leakedUrls = () => [];
     try {
-      const open = OPEN_PLOTS.includes(slug) && entry === 'deck' ? `/?chunk=${slug}&skipintro&mute=1` : '/?mute=1';
-      // a deep link is the entry itself: its reads are the card's from the first one
-      let linked = open !== '/?mute=1';
+      const tapped = OPEN_PLOTS.includes(slug) && entry === 'deck';
+      // a tapped zone is the entry itself: its reads are the card's from the first one
+      let linked = tapped;
       if (linked) phase = 'none';
       const hitsBefore = stamperHits;
       proxyOffline = mode === 'offline' && (channel === 'staging' || oneOrigin) && jobs === 1;
       leakFrom = () => stamperHits - hitsBefore;
       leakedUrls = () => stamperSeen.slice(-Math.min(stamperSeen.length, stamperHits - hitsBefore));
-      await page.goto(new URL(open, ORIGINS[channel]).href, { waitUntil: 'commit', timeout: 60_000 }).catch((/** @type {unknown} */ error) => { consoleLines.push(`goto ${String(error).slice(0, 200)}`); });
+      // the tap rides the document's start, not a stop on the origin first: offline, that stop is a page the run never asked for
+      const tap = tapped ? await page.addInitScript({ content: initScript(slug) }) : null;
+      await page.goto(new URL(tapped ? '/?skipintro&mute=1' : '/?mute=1', ORIGINS[channel]).href, { waitUntil: 'commit', timeout: 60_000 }).catch((/** @type {unknown} */ error) => { consoleLines.push(`goto ${String(error).slice(0, 200)}`); });
+      await tap?.dispose();
       if (entry === 'deck' && !OPEN_PLOTS.includes(slug)) {
         const select = page.locator('.ws-main-select');
         await select.waitFor({ state: 'visible', timeout: mode === 'slow' ? 180_000 : 60_000 });
@@ -361,9 +366,10 @@ async function enter(run) {
         const index = names.findIndex(name => name.trim().toLowerCase() === card.toLowerCase());
         if (index === -1) {
           // a shard this build's deck doesn't show (Pastel Plain, Ink & Cel): the deep link with Developer on, as for Open Plots
-          consoleLines.push(`no deck card "${card}" (deck: ${names.join(', ')}): entered by ?chunk=`);
+          consoleLines.push(`no deck card "${card}" (deck: ${names.join(', ')}): entered by its tap`);
           phase = 'none'; linked = true;
-          await page.goto(new URL(`/?chunk=${slug}&skipintro&mute=1`, ORIGINS[channel]).href, { waitUntil: 'commit', timeout: 60_000 });
+          const linkTap = await page.addInitScript({ content: initScript(slug) });
+          try { await page.goto(new URL('/?skipintro&mute=1', ORIGINS[channel]).href, { waitUntil: 'commit', timeout: 60_000 }); } finally { await linkTap.dispose(); }
         } else {
           await page.locator(`.ws-menu-dots i[data-i="${String(index)}"]`).click();
           await page.locator('.ws-menu-play').click();

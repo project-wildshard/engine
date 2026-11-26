@@ -8,6 +8,7 @@ import { serve } from './serve.mjs';
 import { bootTimelineEntries } from '../loading-flow/stalls.mjs';
 import { bootCases, bootErrorReport, bootSlowDiagnostic, discoverCatalogue } from './boot-smoke.mjs';
 import { saveFixtureCode, harnessPinCode } from '../debug-settings.mjs';
+import { initScript } from '../zone-entry.mjs';
 
 /** Browser-side, read-only: the existing card canvases after the ordinary Explorer has drawn every one.
  * No re-render, material replacement or injected scene supplies the pixels. */
@@ -128,7 +129,7 @@ async function withinProgressBudget(work,remainingMs){
  * @param {string} base @param {string} slug @param {string|undefined} previous */
 export function verifyExplorerDocument(observed,base,slug,previous){
   const url=new URL(observed.url);
-  if(url.origin!==new URL(base).origin || url.searchParams.get('chunk')!==slug || observed.slug!==slug ||
+  if(url.origin!==new URL(base).origin || observed.slug!==slug ||
     !Number.isFinite(observed.timeOrigin) || observed.id==='' || observed.id===previous)
     throw new Error(`Explorer requested ${slug} but observed a stale or foreign catalogue`);
 }
@@ -254,8 +255,10 @@ async function sweepPage(page,faults,reports,base,slug,out,lifetime,reset,sessio
   try{
     await withinProgressBudget(reset(),hangMs-(Date.now()-progressAt));
     const url=new URL(base);
-    for(const [key,value]of Object.entries({chunk:slug,explore:'model',tier:'phone',touch:'1',mute:'1',nolock:'1',sw:'0'}))url.searchParams.set(key,value);
-    await page.goto(url.href,{waitUntil:'domcontentloaded',timeout:30000});
+    for(const [key,value]of Object.entries({explore:'model',tier:'phone',touch:'1',mute:'1',nolock:'1',sw:'0'}))url.searchParams.set(key,value);
+    // the zone rides an Explore tap in the tab, written as the document starts and then dropped (CHUNK-PARAM-REMOVAL CP16, J522)
+    const tap=await page.addInitScript({content:`if(location.origin===${JSON.stringify(url.origin)})${initScript(slug,'explore')}`});
+    try{await page.goto(url.href,{waitUntil:'domcontentloaded',timeout:30000});}finally{await tap.dispose();}
     let empty=false,drawn=false;
     /** @type {ReturnType<typeof explorerCapture>|undefined} */ let captured;
     while(Date.now()-progressAt<hangMs){

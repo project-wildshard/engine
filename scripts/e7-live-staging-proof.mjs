@@ -6,6 +6,7 @@ import {chromium,webkit,devices} from "./browser-playwright.mjs";
 import {KEYCHAIN_ARGS} from './chromium-keychain.mjs';
 import {saveFixture} from './debug-settings.mjs';
 import {PRIVATE_HEALTH_SKIPPED,chatLinePattern,guardStagingSockets,playerNameSource,privateHealthURL,roomsHealthURL,splitRoomsHealthLines} from './staging-proof-lines.mjs';
+import { enterZone } from './zone-entry.mjs';
 
 const [base,build,key,engine,epochArg]=process.argv.slice(2);
 const expectedEpoch=epochArg===undefined?undefined:Number(/^--save-epoch=(\d+)$/u.exec(epochArg)?.[1]);
@@ -43,7 +44,7 @@ try{
   page.on('requestfailed',r=>faults.push({name,text:`Request failed ${r.url()}: ${r.failure()?.errorText??'unknown'}`,url:r.url()}));page.on('crash',()=>faults.push({name,text:'Native page crash'}));
   page.on('websocket',ws=>{if(new URL(ws.url()).origin!==socket)faults.push({name,text:'Non-staging live socket'});ws.on('socketerror',e=>faults.push({name,text:`Socket error ${e}`}));console.log('NATIVE STAGING SOCKET',engine,name,ws.url());});
   console.log('STAGING PAGE ACTION',engine,name,'navigate');
-  await page.goto(new URL('/?chunk=driftwood-isle&mute=1&nolock=1&skipintro=1',base).href,{waitUntil:'load',timeout:90000});
+  await enterZone(page,{zone:'driftwood-isle',base,flags:'mute=1&nolock=1&skipintro=1',timeout:90000});
   console.log('STAGING PAGE ACTION',engine,name,'wait for real Name form');
   await page.locator('#ws-name-box input').waitFor({timeout:150000});
   await page.locator('#ws-name-box input').fill(name);await page.locator('#ws-name-box button[type=submit]').click();

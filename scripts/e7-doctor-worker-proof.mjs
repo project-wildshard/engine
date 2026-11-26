@@ -166,15 +166,15 @@ try {
     controller.postMessage({ type: "PRECACHE" }, []);
   });
   await heldReady;
-  await page.goto(`${origin}/?doctor&chunk=fixture&from=link`, {
+  await page.goto(`${origin}/?doctor&from=link`, {
     waitUntil: "load",
     timeout: 3000,
   });
   assert.equal(new URL(page.url()).pathname, "/doctor/");
   assert.equal(await page.title(), "Doctor fixture");
-  assert.equal(new URL(page.url()).searchParams.get("chunk"), "fixture");
+  assert.equal(new URL(page.url()).search.includes("fixture"), false); // CP7 (J522): no zone in the address
   assert.equal(new URL(page.url()).searchParams.get("from"), "link");
-  assert.ok(network.includes("/?doctor&chunk=fixture&from=link"));
+  assert.ok(network.includes("/?doctor&from=link"));
   await page.waitForFunction(
     () => Reflect.get(globalThis, "doctorMetadataRead") === true,
     {},

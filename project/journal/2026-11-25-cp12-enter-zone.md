@@ -33,3 +33,10 @@ CP16's split-repair checks tell the two paths apart: a `?chunk=` page on a previ
 enters the grid. guardian, stun and wake-loss pass on the tap and move now. hare, whip, held-melee, horse-panic, movers,
 nalati-signals, perks, pine-writes and sky-trails find no hare, boar, camp horse or `showRow` on the grid page (they
 pass on `?chunk=`), and the worker-client scripts are unproven there, so they stay until their checks read the grid world.
+
+The planner's call came back: a check that proves only the one-shard page's own simulation retires with that page, and
+the hosted drivers land now (release QA runs the release tree's drivers). The nine split-repair checks retire; the
+staging, doctor, offline and journey drivers enter by the tap, written at the document's start where a run keeps its
+own goto (offline, a stop on `version.json` first is a page the run never asked for, and it stalled the Open Plot
+entry). The socket door takes the agent marker alone. The worker-client harness splits the same way as the nine (its
+old address passes, the tap fails), so it waits on a call rather than a twenty-file retirement nobody named.

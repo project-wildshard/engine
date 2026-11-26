@@ -44,6 +44,13 @@ import { claimFixture, fixtureKey, fixtureRequestOrigins } from './online-rig-ow
 import { rawLeak, selectCases, verdict } from './failmode-cases.mjs';
 import { enterZone } from './zone-entry.mjs';
 
+/** The title's logo: the page is on the title (the address names no zone, CHUNK-PARAM-REMOVAL CP16, J522). */
+const TITLE_LOGO = '.ws-main-logo';
+/** @param {import('playwright').Page} page @param {number} timeout */
+const titleShown = (page, timeout) => page.locator(TITLE_LOGO).first().waitFor({ state: 'visible', timeout });
+/** A world is a page with a player standing in it. @param {import('playwright').Page} page */
+const inWorld = page => page.evaluate(() => window.__wildshard?.world?.player !== undefined).catch(() => false);
+
 process.env.WS_RIG_PORTS ??= '18856';
 const rigPort = Number(process.env.WS_RIG_PORTS);
 if (!Number.isSafeInteger(rigPort) || rigPort < 1029 || rigPort > 65532) throw new Error('WS_RIG_PORTS must reserve explicit unprivileged fixture ports');
@@ -321,10 +328,10 @@ try {
     const { page, context } = entered;
     // a case that ends mid-redial (its finally healed a moment ago) still holds the old link's seat: let the redial seat first, or
     // the quit has no link to go on and the seat stays held (run 4 of row 65: 16b and 17 refused full after 15b and 16)
-    const inWorld = () => { try { return new URL(page.url()).searchParams.get('chunk') !== null; } catch { return false; } };
-    for (const until = Date.now() + 20_000; inWorld() && !await linkOpen(page) && Date.now() < until;) await sleep(500);
+    // the address names no zone (J522): a world is a page with a player in it, the title a page with its logo
+    for (const until = Date.now() + 20_000; await inWorld(page) && !await linkOpen(page) && Date.now() < until;) await sleep(500);
     if (await linkOpen(page)) {
-      const left = page.waitForURL(url => url.searchParams.get('chunk') === null, { timeout: 8000 }).then(() => true, () => false);
+      const left = titleShown(page, 8000).then(() => true, () => false);
       if (await page.evaluate(() => document.dispatchEvent(new Event('ws:exit-to-main'))).then(() => true, () => false)) await left;
     }
     await context.close();
@@ -595,7 +602,7 @@ try {
         if (!/Place 2 in line/u.test(fourthSeen?.copy ?? '')) return { outcome: 'ui-fail', reason: 'the second in line was not told place 2', seen: fourthSeen, shot: secondShot };
         // Title cancels: the third's quit, then it is on the title
         await press(third.page, item.screen, 'Title screen');
-        await third.page.waitForURL(url => url.searchParams.get('chunk') === null, { timeout: 15_000 });
+        await titleShown(third.page, 15_000);
         const moved = await fourth.page.locator(`[data-failmode~="${item.screen}"]`, { hasText: 'Place 1 in line' }).first().waitFor({ timeout: 45_000 }).then(() => true, () => false);
         const firstShot = await shoot(fourth.page, item.id, 'moved-up');
         if (!moved) return { outcome: 'ui-fail', reason: 'Title did not cancel the ticket ahead: the fourth never moved up', seen: fourthSeen, shot: firstShot, notes: await onScreen(fourth.page) };
@@ -838,14 +845,14 @@ try {
         if (result.outcome !== 'pass') return { ...result, shot };
         // Keep playing: the card goes and the player stays in the world; the cancelled wait leaves nothing behind
         await press(page, item.screen, 'Keep playing');
-        const kept = await gone(item.screen, 5000) && new URL(page.url()).searchParams.get('chunk') === SHARD;
+        const kept = await gone(item.screen, 5000) && await inWorld(page);
         if (!kept) return { outcome: 'ui-fail', reason: 'Keep playing did not keep the player in the world', seen: card, shot };
         await exit();
         if (await screen(page, item.screen, 5000) === null) return { outcome: 'ui-fail', reason: 'a second Leave was not held while the save is late', seen: card, shot };
         await press(page, item.screen, 'Leave when saved');
         await sleep(2000);
-        const stayed = new URL(page.url()).pathname !== '/' || new URL(page.url()).searchParams.has('chunk');
-        const titled = page.waitForURL(url => new URL(url).pathname === '/' && !new URL(url).searchParams.has('chunk'), { timeout: 30_000 }).then(() => true, () => false);
+        const stayed = !await page.locator(TITLE_LOGO).first().isVisible().catch(() => false);
+        const titled = titleShown(page, 30_000).then(() => true, () => false);
         db.fault('pass');
         const left = await titled;
         return stayed && left ? { ...result, shot, injection: { database: 'hold', heldBytes: db.stats.heldBytes, taps: 'EXIT TO MAIN, Keep playing, EXIT TO MAIN, Leave when saved' }, recovery: 'release: left for the title on the confirmed save' }

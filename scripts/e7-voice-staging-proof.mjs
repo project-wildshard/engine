@@ -12,6 +12,7 @@ import {KEYCHAIN_ARGS} from './chromium-keychain.mjs';
 import {saveFixture} from './debug-settings.mjs';
 import {playerNameSource} from './staging-proof-lines.mjs';
 import {VOICE_FULL_M} from '../src/client/engine/net/voiceNear.ts';
+import { enterZone } from './zone-entry.mjs';
 
 const [base,build,key,out=new URL('../tmp/e7-voice-staging/',import.meta.url).pathname]=process.argv.slice(2);
 assert.equal(new URL(base).origin,'https://staging.wildshard.io','J205 requires the isolated staging page');
@@ -48,7 +49,7 @@ try{
   await saveFixture(context,{scope:'global',key:'settings',data:{music:false,sfx:false,volume:0},merge:true});
   const page=await context.newPage();
   page.on('pageerror',e=>{faults.push(`${name}: ${e.message}`);});
-  await page.goto(new URL('/?chunk=driftwood-isle&mute=1&nolock=1&skipintro=1',base).href,{waitUntil:'load',timeout:90000});
+  await enterZone(page,{zone:'driftwood-isle',base,flags:'mute=1&nolock=1&skipintro=1',timeout:90000});
   await page.locator('#ws-name-box input').waitFor({timeout:150000});
   await page.locator('#ws-name-box input').fill(name);await page.locator('#ws-name-box button[type=submit]').click();
   await page.waitForFunction(()=>typeof window.__workerClient==='function'&&window.__wildshard?.world?.player!==undefined,undefined,{timeout:120000});

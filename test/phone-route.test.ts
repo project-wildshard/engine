@@ -77,7 +77,7 @@ test('the inherited grid bootstrap keeps fatal collection without polling a titl
   let observers=0;
   const window={addEventListener:(name:string,run:(event:{message?:string;reason?:string})=>void)=>{listeners.set(name,run);}};
   runInNewContext(`(${installPhoneTitlePaint.toString()})('http://fixture.test/?tier=phone')`,{
-    window,location:{href:'http://fixture.test/?chunk=coast'},document:{},
+    window,location:{href:'http://fixture.test/'},document:{},
     performance:{setResourceTimingBufferSize:()=>undefined},
     MutationObserver:class{observe(){observers++;}},
     requestAnimationFrame:()=>{throw new Error('Grid document polled a title hero');}});
@@ -152,16 +152,16 @@ test('phone bootstrap persists numeric mute after a caller replaces settings',()
 
 const priorDocument: PhoneDocument = {url:'http://localhost/?tier=phone',visit:'owned-visit',document:'old-title',boot:'http://localhost/?tier=phone'};
 test('GRID reconnect accepts only the owned fresh entry document at the exact final URL',()=>{
-  const current={url:'http://localhost/',visit:'owned-visit',document:'new-grid',boot:'http://localhost/?chunk=coast'};
+  const current={url:'http://localhost/',visit:'owned-visit',document:'new-grid',boot:'http://localhost/'};
   expect(phoneDocumentMatches(current,'http://localhost/',priorDocument)).toBe(true);
   for(const rejected of [priorDocument,{...current,document:'old-title'},{...current,visit:'another-visit'},
-    {...current,url:'http://localhost/version.json'},{...current,boot:'http://elsewhere/?chunk=coast'},
-    {...current,boot:'http://localhost/'},{...current,document:''},null])
+    {...current,url:'http://localhost/version.json'},{...current,boot:'http://elsewhere/'},
+    {...current,boot:'http://localhost/version.json'},{...current,document:''},null])
     expect(phoneDocumentMatches(rejected,'http://localhost/',priorDocument)).toBe(false);
 });
 
 test('native GRID follows provisional targets on its existing bootstrap connection',async()=>{
-  const current={url:'http://localhost/',visit:'owned-visit',document:'new-grid',boot:'http://localhost/?chunk=coast'};
+  const current={url:'http://localhost/',visit:'owned-visit',document:'new-grid',boot:'http://localhost/'};
   const replies:unknown[]=[priorDocument,{...current,document:'old-title'},{...current,visit:'foreign'},current];
   let closed=false,reads=0;
   const inspector={close:()=>{closed=true;},send:(method:string)=>{

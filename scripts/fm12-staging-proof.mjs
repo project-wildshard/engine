@@ -24,6 +24,7 @@ import { saveFixture } from './debug-settings.mjs';
 import { capFrames } from './journey-proof.mjs';
 import { CHANNELS, RELEASE_PUBLIC_KEY } from './page-release/flow.mjs';
 import { chatLinePattern, guardStagingSockets, playerNameSource } from './staging-proof-lines.mjs';
+import { enterZone } from './zone-entry.mjs';
 
 const outFlag = process.argv.indexOf('--out');
 const out = resolve(outFlag === -1 ? `tmp/${process.env.WS_LANE_NAME ?? 'fm12'}/staging` : process.argv[outFlag + 1] ?? 'tmp/fm12/staging');
@@ -107,7 +108,7 @@ try {
       telemetry.push(row);
       void request.response().then(response => { row.status = response?.status() ?? null; return row.status; }, () => undefined);
     });
-    await page.goto(`${base}/?chunk=driftwood-isle&mute=1&nolock=1&skipintro=1`, { waitUntil: 'load', timeout: 90_000 });
+    await enterZone(page, { zone: 'driftwood-isle', base, flags: 'mute=1&nolock=1&skipintro=1', timeout: 90_000 });
     return { page, context };
   };
   /** the Name box (when it asks; `armed` runs just before the submit) into the world */

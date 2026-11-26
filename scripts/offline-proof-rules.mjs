@@ -127,7 +127,7 @@ export function judge(run) {
   if (run.requireWorld === true && run.outcome !== 'play' && !titleByDesign && !(run.outcome === 'outside-world' && run.placed === false)) out.push({ shard, rule: 'not-in-world', detail: run.outcome });
   // GC26 (J311): preview's deck enters a placed shard in its grid cell, so the player ends inside that cell (the grid's `inside`), not
   // on a one-shard page (no grid: `inside` absent) or another cell. A shard with no card (the Open Plots, Pastel Plain, Ink & Cel) is
-  // entered by its `?chunk=` link, which opens its one-shard page (GC25/GC27: the deck shows 7 grid cards), so it is judged as that page.
+  // entered by its tap (CP16, J522), as a deep link would, so it is judged as linked, not as a deck entry (GC25/GC27: 7 grid cards).
   if (channel === 'preview' && run.placed === true && run.entry === 'deck' && run.linked !== true && run.outcome === 'play') {
     let last; for (const sample of samples) if (sample.player) last = sample;
     if (last !== undefined && last.inside !== shard) out.push({ shard, rule: 'not-in-cell', detail: last.inside === undefined ? 'a one-shard page, not the grid' : `inside ${last.inside ?? 'the road'}` });

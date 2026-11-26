@@ -34,13 +34,6 @@ test('an old shell that resumes into its world is followed to play, its Name ski
   }
 });
 
-test('a shell from before CP4 that names its world in the address is followed the same way', { timeout: 15_000 }, async () => {
-  const { page, taps } = resumingPage(Infinity, '?chunk=driftwood-isle&glreload=1');
-  const samples = await tapJourney(page as never, { card: 'driftwood-isle', path: 'select', budgetMs: 10_000, sampleMs: 10 }) as unknown as { resumed?: boolean };
-  expect(samples.resumed).toBe(true);
-  expect(taps).toEqual(['#ws-name-box [data-name=skip]']);
-});
-
 test('an old shell that updates into this build\'s main screen after its resume is tapped through as ever', { timeout: 15_000 }, async () => {
   const { page, taps } = resumingPage(3);
   const samples = await tapJourney(page as never, { card: 'driftwood-isle', path: 'mmo', budgetMs: 10_000, sampleMs: 10 }) as unknown as { resumed?: boolean };

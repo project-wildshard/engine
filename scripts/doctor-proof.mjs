@@ -10,6 +10,7 @@ import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeF
 import { createServer, request as httpRequest } from 'node:http';
 import { join, normalize, resolve as absolute } from 'node:path';
 import { chromium, devices, webkit } from "./browser-playwright.mjs";
+import { enterZone } from './zone-entry.mjs';
 
 const ROOT = absolute(import.meta.dirname, '..');
 const RELEASE_PORT = 18899, WORLD_PORT = 18897, PAGE_PORT = 18898, BLOCK_PORT = 18896, SHARD = 'driftwood-isle';
@@ -121,13 +122,13 @@ try {
   // 3. The join screen's Check connection carries the cell it was loading.
   {
     const { opened, page } = await context();
-    await page.goto(`${base}/?chunk=${SHARD}&skipintro=1`, { waitUntil: 'load' }); // QA row 16: a bare link lands on the title
+    await enterZone(page, { zone: SHARD, base, flags: 'skipintro=1' }); // CP16 (J522): the tap names the zone
     await page.locator('#ws-name-box [data-doctor=open]').waitFor({ timeout: 150_000 });
     await page.screenshot({ path: join(shots, 'name-box.png') });
     await page.locator('#ws-name-box [data-doctor=open]').click();
     await page.waitForURL(/\/doctor\/\?.*from=join/u, { timeout: 30_000 });
     const rows = await rowsOf(page);
-    check(page.url().includes(`chunk=${SHARD}`) && (rows.join?.value.includes(SHARD) ?? false), `name box → doctor for ${SHARD}`);
+    check(!new URL(page.url()).search.includes(SHARD) && (rows.join?.value.includes(SHARD) ?? false), `name box → doctor for ${SHARD}, with no zone in its address (CP7)`);
     await opened.close();
   }
 
@@ -150,7 +151,7 @@ try {
   // The game itself on that file fails to boot; its failure screen offers the doctor, which carries the screen's report.
   {
     const { opened, page } = await context();
-    await page.goto(`${base}/?chunk=${SHARD}&skipintro=1`, { waitUntil: 'load' }); // QA row 16: a bare link lands on the title
+    await enterZone(page, { zone: SHARD, base, flags: 'skipintro=1' }); // CP16 (J522): the tap names the zone
     const door = page.locator('.ws-load-doctor, #wserr .doctor').first();
     await door.waitFor({ timeout: 150_000 });
     const screen = await page.evaluate(() => document.querySelector('.ws-load-error') === null ? 'error modal' : 'LS4 failure screen');

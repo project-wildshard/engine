@@ -26,10 +26,10 @@ async function read(url){const response=await fetch(url,{cache:'no-store',redire
 const version=await(await read(new URL('/version.json',staticBase))).json();assert.equal(version.build,build);
 const root=await(await read(new URL('/',staticBase))).text(),document=await(await read(new URL('/doctor/',staticBase))).text();
 assert.ok(root.includes('data-doctor-door'));
-const door=await fetch(new URL('/?doctor&chunk=driftwood-isle&from=link',staticBase),{cache:'no-store',redirect:'manual',signal:AbortSignal.timeout(15000)});
+const door=await fetch(new URL('/?doctor&from=link',staticBase),{cache:'no-store',redirect:'manual',signal:AbortSignal.timeout(15000)});
 assert.equal(door.status,307,'Doctor entry must redirect before any game HTML');
 const redirectLocation=door.headers.get('location');assert.ok(redirectLocation!==null);const destination=new URL(redirectLocation,staticBase);
-assert.equal(destination.origin,new URL(staticBase).origin);assert.equal(destination.pathname,'/doctor/');assert.equal(destination.searchParams.get('sw'),'0');assert.equal(destination.searchParams.get('chunk'),'driftwood-isle');assert.equal(destination.searchParams.get('from'),'link');
+assert.equal(destination.origin,new URL(staticBase).origin);assert.equal(destination.pathname,'/doctor/');assert.equal(destination.searchParams.get('sw'),'0');assert.ok(!destination.search.includes('driftwood-isle'),'the doctor names no zone in its address (CP7, J522)');assert.equal(destination.searchParams.get('from'),'link');
 const worldText=/globalThis\.__WS_WORLD__=(\{[^;]+\});/u.exec(document)?.[1];assert.ok(worldText,'Doctor needs a release stamp');const world=JSON.parse(worldText);assert.equal(world.release,releaseURL);assert.equal(world.key,key);
 const scripts=[...document.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/gu)].map(match=>match[1]);assert.ok(scripts.length>0,'Doctor entry must be build scoped');assert.ok(scripts.every(path=>path!==undefined&&path.startsWith(`/b/${build}/doctor/`)),'Every external Doctor script must be build scoped');for(const path of scripts){assert.ok(path!==undefined);await read(new URL(path,staticBase));}
 const signed=await(await read(releaseURL)).json();assert.ok(verify(null,Buffer.from(signed.body),createPublicKey({key:Buffer.from(key,'hex'),format:'der',type:'spki'}),Buffer.from(signed.signature,'hex')));
