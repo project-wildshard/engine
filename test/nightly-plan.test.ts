@@ -7,6 +7,7 @@ import { CELL_HEIGHT, CHUNK_SIZE } from '@wildshard/format/contentBounds';
 import type { StandaloneCatalogue } from '@wildshard/format/standaloneCatalogue';
 import { nightlyHeadCatalogue } from '../scripts/app-build/catalogue';
 import { plan } from '../scripts/nightly-model';
+import { bareSlug } from '../src/shared/game/grid/catalogueSlot';
 import { DEFAULT_LIMITS } from '../src/cook/game/cookWorker';
 
 // Ring 2's nightly plans one row per pinned head. A hard-coded 28 stopped the night before any head ran after a pin
@@ -27,9 +28,24 @@ test('FS30 a cold staging-only head gets its reviewed placement in the nightly c
   const fixture = nightlyHeadCatalogue(built, reviewed, head);
   expect(fixture.placements).toEqual([{...cell, size: [CHUNK_SIZE, CELL_HEIGHT, CHUNK_SIZE]}]);
   expect(fixture.grid).toBe(built.grid);
-  expect(nightlyHeadCatalogue(built, reviewed, {...head, hash: '0'.repeat(64)})).toBe(built);
+  // QA 11-25 row 73: staging's newer revision of the same shard still gives the pinned head its cell.
+  expect(nightlyHeadCatalogue(built, reviewed, {...head, hash: '0'.repeat(64)}).placements)
+    .toEqual([{...cell, size: [CHUNK_SIZE, CELL_HEIGHT, CHUNK_SIZE]}]);
+  expect(nightlyHeadCatalogue(built, reviewed, {slug: 'not-reviewed', hash: head.hash})).toBe(built);
   const alreadyPlaced = {...built, grid: reviewed.grid};
   expect(nightlyHeadCatalogue(alreadyPlaced, reviewed, head)).toBe(alreadyPlaced);
+});
+
+// QA 11-25 row 73: nightly 45670286813 booted mirror-salt, pinned but placed nowhere, and TC22 held v0.1.92's tag.
+test('every pinned nightly head has a place on the grid', () => {
+  const live = JSON.parse(readFileSync('test/pins/catalogue.json', 'utf8')) as StandaloneCatalogue;
+  const {catalogue: reviewed} = JSON.parse(readFileSync('test/pins/staging.json', 'utf8')) as {catalogue: StandaloneCatalogue};
+  const named = (slug: string) => (row: {slug: string}): boolean => bareSlug(row.slug) === slug;
+  const unplaced = plan().heads.filter(head => {
+    const fixture = nightlyHeadCatalogue(live, reviewed, head);
+    return !fixture.placements.some(named(head.slug)) && !fixture.grid.cells.some(named(head.slug));
+  }).map(head => head.slug);
+  expect(unplaced).toEqual([]);
 });
 
 test('FS30 the Ring 2 CLI accepts the nightly cook allowance and refuses anything longer', () => {

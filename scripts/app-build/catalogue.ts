@@ -248,8 +248,10 @@ export function nightlyHeadCatalogue(built: StandaloneCatalogue, reviewed: Stand
   head: {readonly slug: string; readonly hash: string}): StandaloneCatalogue {
   const namesHead = (row: {readonly slug: string}): boolean => bareSlug(row.slug) === head.slug;
   if (built.placements.some(namesHead) || built.grid.cells.some(namesHead)) return built;
+  // QA 11-25 row 73: a cell is the slug's address, not one revision's. Staging moves ahead of the pins (mirror-salt r8
+  // reviewed, r7 pinned), and a hash match left the pinned head unplaced: its boot died on an unknown built-in instance.
   const cell = reviewed.grid.cells.find(namesHead);
-  if (cell === undefined || !reviewed.shards.some(row => row.slug === head.slug && row.hash === head.hash)) return built;
+  if (cell === undefined || !reviewed.shards.some(row => row.slug === head.slug)) return built;
   return {...built, placements: [...built.placements, {
     instance: cell.instance, slug: cell.slug, cell: cell.cell, size: [CHUNK_SIZE, CELL_HEIGHT, CHUNK_SIZE],
   }]};
