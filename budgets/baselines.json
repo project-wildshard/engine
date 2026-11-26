@@ -979,10 +979,10 @@
    "why": "STR22: first hosted memory-footprint run on main to judge the walk (44468967622 at 41d629f2), median of 3 (3.44-3.83 MB/s); the mini's 7.30 pin is not comparable"
   },
   "nine/boot/retained-geometry": {
-   "value": 14152535,
+   "value": 8927535,
    "contentKey": "nine-dragon-stack@11",
    "commit": "ac477377dd086b67de75059a52b52d87b0439436",
-   "why": "one-cell grid entry (b732d1199): residency leases ~15.7 MB, grid code 2.5 MB, deck 0.90 MB; home admission cut (54d03770d)"
+   "why": "QA 11-25 row 122: the old 8.03 MB plus the one-cell grid page's deck (0.90 MB, b732d1199); the rest of row 102's 14.15 MB read has no content behind it (J439)"
   },
   "nine/boot/live-heap": {
    "value": 215556042,
