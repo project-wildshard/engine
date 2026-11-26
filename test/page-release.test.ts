@@ -408,6 +408,15 @@ test('every channel has one page host, workers: any other --host is a usage erro
   }
 });
 
+test('a build with no signing key is refused before any work (v0.1.96 failed it after the whole build)', () => {
+  const env = {...process.env, E7_RELEASE_SIGNING_KEY: ''};
+  for (const channel of ['preview', 'staging', 'production']) {
+    const run = spawnSync(process.execPath, ['src/scripts/page-release.mjs', channel, 'build,upload'], {encoding: 'utf8', timeout: 20_000, env});
+    expect(run.status, run.stderr).toBe(2);
+    expect(run.stderr).toContain('E7_RELEASE_SIGNING_KEY');
+  }
+});
+
 test('--print-env: the three channels build alike but for named keys (PAGE-SIZE PZ6)', () => {
   const envs = Object.fromEntries((['preview', 'staging', 'production'] as const).map(channel => {
     const run = spawnSync(process.execPath, ['src/scripts/page-release.mjs', '--print-env', channel], {encoding: 'utf8', timeout: 20_000});

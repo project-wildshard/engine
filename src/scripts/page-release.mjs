@@ -72,6 +72,12 @@ if (channel === undefined || phaseList === undefined || hostName !== 'workers') 
   console.error('usage: node src/scripts/page-release.mjs <preview|staging|production|explore> <build|upload|check|go-live>[,...] [--host=workers] [--root=<dir>] [--dry-run] [--wait=<minutes>] [--local-qa=<verdict.json>] [--qa=<verdict.json>] [--content] [--catalogue=<file>]');
   process.exit(2);
 }
+// A build signs code-retention.json (FM7) after the whole page build; v0.1.96's production build ran minutes before it
+// failed there on a missing key. Refuse before any work instead.
+if (channel !== 'explore' && phaseList.split(',').includes('build') && flag('dry-run') === undefined && (signingKey === undefined || signingKey === '')) {
+  console.error('page-release: a build signs code-retention.json; set E7_RELEASE_SIGNING_KEY="$(cat ~/.config/wildshard/e7-release-signing.pem)"');
+  process.exit(2);
+}
 const git = (/** @type {string[]} */ argv, /** @type {string} */ cwd) => execFileSync('git', argv, {cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']}).trim();
 const root = resolve(value('root') ?? git(['rev-parse', '--show-toplevel'], process.cwd()));
 const build = git(['rev-parse', 'HEAD'], root);
