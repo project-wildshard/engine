@@ -12,7 +12,7 @@ const entry={file:'test/first.test.ts',owner:'codex-mock',addedAt,deadline:new D
 /** @param {unknown[]} entries */const policy=entries=>writeFileSync(join(root,'test/quarantine.json'),JSON.stringify({schema:1,entries}));
 const check=()=>spawnSync(process.execPath,['src/scripts/test-quarantine.mjs','--check-history'],{cwd:root,encoding:'utf8'});
 try{
- mkdirSync(join(root,'scripts'));mkdirSync(join(root,'test'));copyFileSync('src/scripts/test-quarantine.mjs',join(root,'src/scripts/test-quarantine.mjs'));
+ mkdirSync(join(root,'src/scripts'),{recursive:true});mkdirSync(join(root,'test'));copyFileSync('src/scripts/test-quarantine.mjs',join(root,'src/scripts/test-quarantine.mjs'));
  git(['init','--quiet','--initial-branch=main']);writeFileSync(join(root,entry.file),'unchanged actual test content');policy([entry]);commit(addedAt);
  assert.equal(check().status,0);
  const later=new Date(Date.parse(addedAt)+600_000).toISOString();

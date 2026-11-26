@@ -42,7 +42,7 @@ with tempfile.TemporaryDirectory(dir=source / 'tmp', prefix='commit-refresh-') a
     new_peer = git('rev-parse', ':new-peer.txt')
     (root / 'new-peer.txt').write_text('new peer working\n')
     git('rm', '--cached', '--', 'gone.txt')
-    (root / 'scripts').mkdir()
+    (root / 'src/scripts/.kit').mkdir(parents=True)
     if wrapper_text is None:
         shutil.copy2(wrapper, root / 'src/scripts/.kit/commit.sh')
     else:

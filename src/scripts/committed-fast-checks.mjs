@@ -164,7 +164,7 @@ export async function committedFastChecks(root,base,tip,phase,paths) {
       const policy=json(view,'lint/ratchet.json');
       if(view.files.has('src/scripts/check-spelled-paths.mjs')) {
         const {spelledPathFailures}=/** @type {typeof import('./check-spelled-paths.mjs')} */(await module('src/scripts/check-spelled-paths.mjs'));
-        view.prime([...view.files.keys()].filter(path=>/^src\/(?:client|cook|server|shared)\/(?:engine|game)\/isolated-[^/]+\.test\.ts$|^scripts\/.*\.[cm]?[jt]s$|^src\/shards\/[^/]+\/(?:data|look)\/map\.json$/u.test(path)));
+        view.prime([...view.files.keys()].filter(path=>/^src\/(?:client|cook|server|shared)\/(?:engine|game)\/isolated-[^/]+\.test\.ts$|^src\/scripts\/.*\.[cm]?[jt]s$|^src\/shards\/[^/]+\/(?:data|look)\/map\.json$/u.test(path)));
         failures.push(...spelledPathFailures(view.files,path=>view.read(path).toString('utf8')));
       }
       // The folder rule of check-paths, over committed paths: a new file in a shard's root needs the layout's word.
@@ -181,7 +181,7 @@ export async function committedFastChecks(root,base,tip,phase,paths) {
         failures.push(...checkShardLayout(entries,json(view,'lint/shard-layout.json'),outputs).map(row=>`src/shards/${row}`));
       }
       // What derived-docs walks first: a package's exports. Only a manifest or the lockfile can change that shape.
-      if(view.files.has('scripts/docs/read-shardfile-reference.mjs')&&paths.some(path=>/^(?:pnpm-lock\.yaml|src\/[^/]+\/package\.json|scripts\/docs\/(?:sdk-schemas|read-shardfile-reference|schema-reference)\.mjs)$/u.test(path))) {
+      if(view.files.has('scripts/docs/read-shardfile-reference.mjs')&&paths.some(path=>/^(?:pnpm-lock\.yaml|src\/[^/]+\/package\.json|src\/scripts\/docs\/(?:sdk-schemas|read-shardfile-reference|schema-reference)\.mjs)$/u.test(path))) {
         const child=spawnSync(process.execPath,['--import','./src/scripts/sim-node-loader.mjs','scripts/docs/read-shardfile-reference.mjs'],{cwd:root,encoding:'utf8',maxBuffer:64*1024*1024,timeout:15_000});
         if(child.error===undefined&&child.status!==0)failures.push(`scripts/docs/sdk-schemas.mjs: the schema reference refused: ${child.stderr}`);
       }

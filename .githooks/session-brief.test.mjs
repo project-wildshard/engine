@@ -248,9 +248,9 @@ describe('session brief: last 10 decisions from meta', () => {
   test('prints meta\'s brief-decisions.sh lines right after the header, at most 11', () => {
     const meta = fixtureScratch('fake-meta');
     after(() => rmSync(meta, { recursive: true, force: true }));
-    mkdirSync(join(meta, 'scripts'), { recursive: true });
+    mkdirSync(join(meta, 'scripts'), { recursive: true }); // script-paths: meta's own scripts/, not this repo's
     const lines = ['== Last 10 decisions (meta abc1234, 2026-11-16 09:00 Cancún; full text: x) ==', ...Array.from({ length: 12 }, (_, i) => `  J${400 - i} Decision ${400 - i}`)];
-    writeFileSync(join(meta, 'scripts', 'brief-decisions.sh'), `#!/usr/bin/env bash\nprintf '%s\\n' ${lines.map((line) => `'${line}'`).join(' ')}\n`);
+    writeFileSync(join(meta, 'scripts', 'brief-decisions.sh'), `#!/usr/bin/env bash\nprintf '%s\\n' ${lines.map((line) => `'${line}'`).join(' ')}\n`); // script-paths: meta's
     const out = run({ WS_META_DIR: meta });
     const at = out.indexOf('== Last 10 decisions');
     assert.ok(at > 0 && at < out.indexOf('-- other agents'), out);

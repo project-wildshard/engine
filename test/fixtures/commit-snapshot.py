@@ -32,7 +32,7 @@ def check_cases(cases):
             (root / name).write_text('base\n')
         git('add', '.')
         git('commit', '-qm', 'base')
-        (root / 'scripts').mkdir()
+        (root / 'src/scripts/.kit').mkdir(parents=True)
         (root / 'node_modules/@typescript').mkdir(parents=True)
         (root / 'node_modules/@typescript/typescript6').symlink_to((source / 'node_modules/@typescript/typescript6').resolve())
         shutil.copy2(source / 'src/scripts/repo-size.mjs', root / 'src/scripts/repo-size.mjs')

@@ -11,7 +11,7 @@ const policy=()=>writeFileSync(join(root,'test/quarantine.json'),JSON.stringify(
 /** @param {string[]} args */
 const run=args=>spawnSync(process.execPath,['src/scripts/test-quarantine.mjs',...args],{cwd:root,encoding:'utf8'});
 try{
- mkdirSync(join(root,'scripts'));mkdirSync(join(root,'test'));copyFileSync('src/scripts/test-quarantine.mjs',join(root,'src/scripts/test-quarantine.mjs'));policy();
+ mkdirSync(join(root,'src/scripts'),{recursive:true});mkdirSync(join(root,'test'));copyFileSync('src/scripts/test-quarantine.mjs',join(root,'src/scripts/test-quarantine.mjs'));policy();
  execFileSync('git',['init','--quiet','--initial-branch=main'],{cwd:root});execFileSync('git',['add','scripts','test'],{cwd:root});
  execFileSync('git',['-c','user.name=Window proof','-c','user.email=proof@example.test','commit','--quiet','-m','admit fixture'],{cwd:root,env:{...process.env,GIT_AUTHOR_DATE:addedAt,GIT_COMMITTER_DATE:addedAt}});
  assert.equal(run(['--list']).status,0);

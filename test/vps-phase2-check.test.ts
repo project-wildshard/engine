@@ -10,7 +10,7 @@ test('complete unprivileged check reports all probes after a conflict and change
   const bash = ['bash', '/opt/homebrew/bin/bash', '/usr/local/bin/bash'].find(shell => spawnSync(shell, ['-c', 'test "${BASH_VERSINFO[0]}" -ge 4']).status === 0);
   if (bash === undefined) throw new Error('VPS fixture requires Bash 4+; install Homebrew bash on macOS');
   mkdirSync('tmp', { recursive: true }); const directory = mkdtempSync(resolve('tmp/vps-check-'));
-  const scripts = join(directory, 'scripts'), bin = join(directory, 'bin'), etc = join(directory, 'etc'), calls = join(directory, 'calls');
+  const scripts = join(directory, 'scripts'), bin = join(directory, 'bin'), etc = join(directory, 'etc'), calls = join(directory, 'calls'); // script-paths: the box's scripts folder, not this repo's
   for (const path of [scripts, bin, etc]) mkdirSync(path);
   const key = '302a300506032b657003210012e17122631777e2a6ad68e2fb4883d856def46f812aa9a3e49d701ed44ad17b';
   const keyFile = join(directory, 'public-key'); writeFileSync(keyFile, `${key}\n`); chmodSync(keyFile, 0o644);

@@ -120,7 +120,7 @@ else if(args.slice(0,2).join(' ')==='run download'&&['42','43'].includes(args[2]
     // Unrelated blob/AGENTS/pin checks pass; the real release gate must still
     // refuse before the downstream full check or a byte reaches origin.
     for (const name of ['check-push', 'agents-md', 'pin-provenance']) writeFileSync(join(root, `.githooks/${name}.mjs`), '');
-    mkdirSync(join(root, 'scripts'));
+    mkdirSync(join(root, 'src/scripts'), { recursive: true });
     copyFileSync(resolve('src/scripts/release-nightly.ts'), join(root, 'src/scripts/release-nightly.ts'));
     const marker = join(root, 'full-gate');
     writeFileSync(join(root, '.githooks/run-checks.mjs'), `import{writeFileSync}from'node:fs';writeFileSync(${JSON.stringify(marker)},'reached');`);

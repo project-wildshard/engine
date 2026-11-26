@@ -42,7 +42,7 @@ test('each newly open Sentry outage issue is red once; without a token the issue
 
 test('the LaunchAgent runs one read every 60 s from the canonical checkout', () => {
   const plist = watchPlist('/w/engine', '/Users/me');
-  expect(plist).toContain('<string>/w/engine/scripts/rooms-watch.mjs</string><string>--once</string>');
+  expect(plist).toContain('<string>/w/engine/src/scripts/rooms-watch.mjs</string><string>--once</string>');
   expect(plist).toContain('<key>StartInterval</key><integer>60</integer>');
 });
 

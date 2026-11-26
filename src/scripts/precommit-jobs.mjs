@@ -67,9 +67,9 @@ export function commitGuards(changed) {
   const touches = (/** @type {RegExp} */ pattern) => changed.some(file => pattern.test(file));
   return [
     ...(touches(/^src\/(?:format|sdk|sharddev)\//u) ? ['test/schema-reference.test.ts'] : []),
-    ...(touches(/^(?:lint\/(?:host-callbacks\.mjs|wildshard-plugin\.js)|scripts\/gen-host-catalogue\.mjs|test\/host-callbacks\.test\.ts)$/u) ? ['test/host-callbacks.test.ts'] : []),
+    ...(touches(/^(?:lint\/(?:host-callbacks\.mjs|wildshard-plugin\.js)|src\/scripts\/gen-host-catalogue\.mjs|test\/host-callbacks\.test\.ts)$/u) ? ['test/host-callbacks.test.ts'] : []),
     ...(touches(/^(?:lint\/(?:shardfile-boundaries\.mjs|wildshard-plugin\.js)|test\/shardfile-boundaries\.test\.ts)$/u) ? ['test/shardfile-boundaries.test.ts'] : []),
-    ...(touches(/^(?:src\/shards\/(?:nalati-grasslands|nine-dragon-stack)\/|src\/(?:client|cook|server|shared)\/game\/shard\/manifest\.ts$|scripts\/(?:authored-manifest|manifest-declaration)\.|test\/(?:manifest-declarations\.test\.ts|fixtures\/manifest-declarations\.json)$)/u) ? ['test/manifest-declarations.test.ts'] : []),
+    ...(touches(/^(?:src\/shards\/(?:nalati-grasslands|nine-dragon-stack)\/|src\/(?:client|cook|server|shared)\/game\/shard\/manifest\.ts$|src\/scripts\/(?:authored-manifest|manifest-declaration)\.|test\/(?:manifest-declarations\.test\.ts|fixtures\/manifest-declarations\.json)$)/u) ? ['test/manifest-declarations.test.ts'] : []),
   ];
 }
 

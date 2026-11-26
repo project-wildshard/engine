@@ -26,7 +26,7 @@ export function spelledPathFailures(files, read) {
       const target = side === undefined || rest.length === 0 ? `src/${isolated[1]}/${isolated[2]}/${rel}` : `src/${side}/${isolated[2]}/${rest.join('/')}`;
       if (!exists(files, folders, target)) failures.push(`${file}: no module at ${target}: the isolated test spells a side the file left`);
     }
-    if (/^scripts\/.*\.[cm]?[jt]s$/u.test(file) && !file.includes('.test.')) for (const match of read(file).matchAll(EMITTED))
+    if (/^src\/scripts\/.*\.[cm]?[jt]s$/u.test(file) && !file.includes('.test.')) for (const match of read(file).matchAll(EMITTED))
       if (!exists(files, folders, `src/${match[2]}/${match[3]}`.replace(/[./]+$/u, ''))) failures.push(`${file}: no module at src/${match[2]}/${match[3]}: an emitted import spells a side the file left`);
     if (MAP_FILE.test(file)) for (const input of JSON.parse(read(file)).inputs ?? []) {
       const target = posix.normalize(posix.join(posix.dirname(file), '..', input));

@@ -35,7 +35,7 @@ try {
   ];
   for (const { name, module, expected, cleanup } of cases) {
     const directory = join(temporary, name);
-    mkdirSync(join(directory, "scripts"), { recursive: true });
+    mkdirSync(join(directory, "src/scripts"), { recursive: true });
     writeFileSync(join(directory, "src/scripts/bake-loader.mjs"), "process.exit(7);\n", { flag: "wx" });
     const runner = join(directory, "run.mjs");
     if (module !== "")

@@ -8,7 +8,7 @@
 # root (must refuse); then a few VH2 and VH3 fixes by hand and --check again (those rows must turn ok). After every run, nothing under
 # /etc, /home, /root, /usr, /opt or /var/lib may be newer than the marker set before the first, and the planted token never prints.
 set -euo pipefail
-ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 KEEP=0; if [ "${1:-}" = --keep ]; then KEEP=1; fi
 STAMP=$(date -u +%Y%m%dT%H%M%SZ) NAME=ws-harden-proof-$$ IMAGE=ws-harden-proof:noble
 OUT=$ROOT/tmp/vps-harden-proof/$STAMP
@@ -56,7 +56,7 @@ box sh -c 'echo "*** System restart required ***" > /run/reboot-required'
 # The VPS runs sshd; a socket-activated container has no /run/sshd until it starts, and `sshd -T` needs it.
 box systemctl start ssh.service
 box mkdir -p /root/wildshard/scripts
-docker cp "$ROOT/scripts/vps" "$NAME:/root/wildshard/scripts/vps"
+docker cp "$ROOT/src/scripts/vps" "$NAME:/root/wildshard/scripts/vps"
 box chmod -R a+rX /root/wildshard
 box chmod o+x /root
 box sh -c 'sleep 1; touch /root/marker; sleep 1'

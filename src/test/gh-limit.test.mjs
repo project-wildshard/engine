@@ -33,7 +33,7 @@ function app(clientName = 'github-reader-client-id') {
   roots.push(dir);
   writeFileSync(join(dir, 'github-reader.pem'), 'key\n');
   writeFileSync(join(dir, clientName), 'Iv23reader\n');
-  mkdirSync(join(dir, 'scripts'));
+  mkdirSync(join(dir, 'scripts')); // script-paths: a fake meta (WS_META_DIR), whose scripts/ never moved
   writeFileSync(join(dir, 'scripts/gh-reader-token.mjs'), '');
   return {dir, env: {WS_GH_READER_DIR: dir, WS_GH_READER_CACHE: join(dir, 'cache.json'), WS_META_DIR: dir}};
 }

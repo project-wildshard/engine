@@ -24,7 +24,7 @@ export const SOURCE_GENERATORS = [
   {
     id: 'title-asset-urls', outputs: ['src/scripts/title-assets.generated.json', 'index.html'], committed: true,
     inputs: ['public/assets/title/*', 'src/scripts/title-assets.mjs', 'index.html'],
-    generate: async root => (await import(pathToFileURL(`${root}/scripts/title-assets.mjs`).href)).titleAssetTables(root),
+    generate: async root => (await import(pathToFileURL(`${root}/src/scripts/title-assets.mjs`).href)).titleAssetTables(root),
   },
   starter('starter-arm-clips', 'src/scripts/gen-starter-arm-clips.mjs', 'src/client/game/systems/viewmodel/armAliases.json', 'src/client/game/systems/viewmodel/clips.generated.ts', 'starterArmClipsTableSource'),
   starter('starter-weapons', 'src/scripts/gen-starter-weapons.mjs', 'src/shared/game/weapons/starterBow.json', 'src/shared/game/weapons/starter.generated.ts', 'starterWeaponsTableSource'),
@@ -38,7 +38,7 @@ export const SOURCE_GENERATORS = [
     inputs: ['src/scripts/ktx2-engine-map.json', 'src/scripts/ktx2-tables.mjs'],
     committed: true,
     note: 'the encoder publishes its activated common mappings beside assets; the plain table needs no native encoder',
-    generate: async root => ({ 'src/client/engine/boot/ktx2.generated.ts': (await import(pathToFileURL(`${root}/scripts/ktx2-tables.mjs`).href)).engineKtx2TableSource(root) }),
+    generate: async root => ({ 'src/client/engine/boot/ktx2.generated.ts': (await import(pathToFileURL(`${root}/src/scripts/ktx2-tables.mjs`).href)).engineKtx2TableSource(root) }),
   },
   {
     id: 'port-shares',

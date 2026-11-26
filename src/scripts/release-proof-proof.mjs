@@ -37,7 +37,7 @@ else {
  console.log(JSON.stringify({workflow_runs:['ci','ring-1'].map((name,index)=>({id:index+1,name,event:'push',head_sha:head,status:'completed',conclusion:process.env.GH_FIXTURE_RED&&name==='ci'?'failure':'success'}))}));
 }
 `);chmodSync(gh,0o755);
- mkdirSync(join(producer,'scripts'));symlinkSync(join(engine,'src/scripts/release-check.mjs'),join(producer,'src/scripts/release-check.mjs'));copyFileSync(join(engine,'src/scripts/push-budget.mjs'),join(producer,'src/scripts/push-budget.mjs'));
+ mkdirSync(join(producer,'src/scripts'),{recursive:true});symlinkSync(join(engine,'src/scripts/release-check.mjs'),join(producer,'src/scripts/release-check.mjs'));copyFileSync(join(engine,'src/scripts/push-budget.mjs'),join(producer,'src/scripts/push-budget.mjs'));
  mkdirSync(join(producer,'.githooks'));const entry=join(engine,'.githooks/run-checks.mjs'),hook=join(producer,'.githooks/pre-push');
  writeFileSync(hook,`#!/usr/bin/env node\nimport{readFileSync}from'node:fs';import{spawnSync}from'node:child_process';const p=spawnSync(process.execPath,[${JSON.stringify(entry)},'push'],{env:{...process.env,WS_PUSH_REFS:readFileSync(0,'utf8')},stdio:'inherit'});process.exitCode=p.status??1;\n`);chmodSync(hook,0o755);
  install(producer,false);installProofFixture(producer);git(producer,['add','package.json','pnpm-lock.yaml','.gitignore','value.mjs','value-check.mjs','src/scripts/release-check.mjs','src/scripts/push-budget.mjs','.githooks/pre-push']);git(producer,['commit','--quiet','-m','actual complete fixture']);git(producer,['remote','add','origin',remote]);git(producer,['push','--quiet','origin','main']);
@@ -81,7 +81,7 @@ else {
  execFileSync(process.execPath,[writer,receipt,'related'],{cwd:receiver,env:{...env,PWD:receiver},stdio:'pipe'});assert.equal(probe().status,3,'A successful related proof never qualifies a release full gate');
  // Keep the engine marker. A miss must take the real engine lease path and
  // execute this fixture's complete gate, rather than a generic package branch.
- for(const file of ['heavy-lane.py','quiet_logs.py'])copyFileSync(join(engine,'scripts',file),join(receiver,'scripts',file));
+ for(const file of ['heavy-lane.py','quiet_logs.py'])copyFileSync(join(engine,'src/scripts',file),join(receiver,'src/scripts',file));
  symlinkSync(join(engine,'.githooks/run-checks.mjs'),join(receiver,'.githooks/run-checks.mjs'));
  writeFileSync(join(receiver,'.githooks/push-checks.mjs'),`import{execFileSync}from'node:child_process';import{writeFileSync}from'node:fs';import{assertHeavyLease}from${JSON.stringify(pathToFileURL(join(engine,'src/scripts/heavy-lane-lease.mjs')).href)};assertHeavyLease('full-test');execFileSync('pnpm',['run','--silent','check'],{stdio:'inherit'});writeFileSync(${JSON.stringify(`${counter}.lease`)},'actual authenticated engine-branch lease');`);
  git(receiver,['add','.githooks/run-checks.mjs','.githooks/push-checks.mjs','src/scripts/heavy-lane.py','src/scripts/quiet_logs.py']);git(receiver,['commit','--quiet','-m','complete engine fallback fixture']);

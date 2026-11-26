@@ -275,7 +275,7 @@ const SHORT_TOKEN = /(?<![\w@/.-])(engine|game)\/([\w.\-/]+)/gu;
 const ESCAPED_TOKEN = /src\\\/(engine|game)\\\/(?!\(\?:\(\?:client)/gu;
 /** A path relative to somewhere else: an import a generator emits into its output, a shard's map input. */
 const FOREIGN_RELATIVE = /(?<![\w./-])((?:\.\.?\/)+)(engine|game)\/([\w.\-/]+)/gu;
-const FOREIGN_FILE = /^scripts\/.*\.[cm]?[jt]s$|^src\/shards\/[^/]+\/(?:data|look)\/map\.json$/u;
+const FOREIGN_FILE = /^src\/scripts\/.*\.[cm]?[jt]s$|^src\/shards\/[^/]+\/(?:data|look)\/map\.json$/u;
 
 /** Rewrite repo-rooted spellings: `src/engine/x`, with the bare-file forms a tool may hand a `src(...)` helper. */
 export function rewriteTokens(text, path, tree, moves, dirMoves, notes) {

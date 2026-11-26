@@ -10,7 +10,7 @@
 # The runs, in order: --check; a first run that waits for Tailscale; `tailscale up`; a run that does Phase 2 and waits for
 # cook.env; cook.env filled; a run that installs and starts the cook worker; and a last run that must change nothing.
 set -euo pipefail
-ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 KEEP=0; if [ "${1:-}" = --keep ]; then KEEP=1; fi
 STAMP=$(date -u +%Y%m%dT%H%M%SZ) NAME=ws-rebuild-proof-$$ IMAGE=ws-rebuild-proof:noble
 OUT=$ROOT/tmp/vps-rebuild-proof/$STAMP
@@ -50,7 +50,7 @@ box systemctl is-system-running 2>&1 | tee -a "$OUT/proof.log" || true
 
 # --- What the box gets: src/scripts/vps as committed here, the tailscale stub, the stub API and the shardfile.
 box mkdir -p /root/wildshard/scripts /root/proof
-docker cp "$ROOT/scripts/vps" "$NAME:/root/wildshard/scripts/vps"
+docker cp "$ROOT/src/scripts/vps" "$NAME:/root/wildshard/scripts/vps"
 docker cp "$SHARD_FILE" "$NAME:/root/proof/$SHARD_HASH.tar"
 cat > "$OUT/tailscale" <<'EOF'
 #!/usr/bin/env node

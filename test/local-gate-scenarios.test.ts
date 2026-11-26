@@ -11,7 +11,7 @@ test.each([
 ])('%s consumes an existing product without building an app or starting a server', name => {
   const source = readFileSync(`test/${name}.test.ts`, 'utf8');
   expect(source).toMatch(/builtFolder\(/u);
-  expect(source).not.toMatch(/node:child_process|scripts\/build-shardfiles|createServer\(|localhost:3000/u);
+  expect(source).not.toMatch(/node:child_process|src\/scripts\/build-shardfiles|createServer\(|localhost:3000/u);
 });
 
 test('selected disk readers require exactly their published products', () => {

@@ -215,7 +215,7 @@ def required_sources(blobs, specification, tree=None, executable=None, staged_pa
                 # ./scripts/..., even when their launcher lives in scripts/docs.
                 # Retain that executable closure as well as ordinary relative
                 # imports; both must come from the immutable candidate inputs.
-                if value.startswith('./scripts/') and PurePosixPath(value).suffix in {'.mjs', '.js', '.ts', '.py'}:
+                if value.startswith('./src/scripts/') and PurePosixPath(value).suffix in {'.mjs', '.js', '.ts', '.py'}:
                     child = resolve_specifier(name, value[2:])
                     if child is not None:
                         selected.add(child)

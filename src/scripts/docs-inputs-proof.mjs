@@ -10,7 +10,7 @@ const root=mkdtempSync(join(directory,'run-'));
 /** @param {string[]} args */
 const git=args=>execFileSync('git',['-c','user.name=Docs proof','-c','user.email=proof@example.test',...args],{cwd:root,encoding:'utf8'}).trim();
 try{
- git(['init','--quiet','--initial-branch=main']);mkdirSync(join(root,'kit/scripts'),{recursive:true});mkdirSync(join(root,'docs/tasks/asks'),{recursive:true});mkdirSync(join(root,'docs/plans'),{recursive:true});
+ git(['init','--quiet','--initial-branch=main']);mkdirSync(join(root,'src/scripts/.kit'),{recursive:true});mkdirSync(join(root,'docs/tasks/asks'),{recursive:true});mkdirSync(join(root,'docs/plans'),{recursive:true});
  copyFileSync('src/scripts/.kit/asks.mjs',join(root,'src/scripts/.kit/asks.mjs'));
  writeFileSync(join(root,'docs/plans/actual.md'),'# Real plan');
  writeFileSync(join(root,'docs/tasks/asks/A1.md'),'# A1\n\n**Status:** folded into actual\n\n**Ask:** Original recorded request\n');

@@ -780,7 +780,7 @@ def main():
     service = args.watch_service
     if service and (args.kind != 'build' or len(command) != 4
                     or Path(command[0]).name not in ('node', 'nodejs')
-                    or command[1:] != ['--import', './scripts/format-hook.mjs', 'scripts/e2e-watcher.mjs']
+                    or command[1:] != ['--import', './src/scripts/format-hook.mjs', 'src/scripts/e2e-watcher.mjs']
                     or Path.cwd().resolve() != Path(__file__).resolve().parent.parent.parent):
         parser.error('watch-service is reserved for the official e2e watcher with per-rebuild CPU admission')
     admission_wait_seconds = (None if args.kind == 'full-gate' else WAIT_SECONDS) if args.admission_wait_seconds is None else args.admission_wait_seconds

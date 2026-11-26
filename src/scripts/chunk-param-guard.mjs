@@ -22,11 +22,11 @@ const BASELINE_FILE=join(import.meta.dirname,'chunk-param-guard.baseline.json');
 const SCOPE=['src','index.html','public','scripts','test','.agents','docs'];
 // test/parity/baselines/ and the phone-loading fixture are recorded runs, history like the calibration reports.
 const SKIP=['project/','budgets/calibration-reports/','test/parity/baselines/','test/fixtures/phone-loading-a6701db71.json'];
-const SELF=new Set(['scripts/chunk-param-guard.mjs','scripts/chunk-param-guard.d.mts','scripts/chunk-param-guard.baseline.json','test/chunk-param-guard.test.ts','src/test/chunk-param-guard.test.ts',
+const SELF=new Set(['scripts/chunk-param-guard.mjs','scripts/chunk-param-guard.d.mts','scripts/chunk-param-guard.baseline.json','test/chunk-param-guard.test.ts','src/test/chunk-param-guard.test.ts', // script-paths: guardKey's keys keep the old spelling
   // CP22's proof that an old link is ignored carries one on purpose
   'src/e2e/t1/old-link.ts']);
 /** A path's baseline key: `src/scripts/x` is `scripts/x` (the lean layout's move). @param {string} path */
-export function guardKey(path){return path.replace(/^src\/scripts\//u,'scripts/');}
+export function guardKey(path){return path.replace(/^src\/scripts\//u,'scripts/');} // script-paths: the old spelling is the key
 const TEXT=/\.(?:[cm]?[jt]sx?|mts|json|html|md|sh|py|ya?ml|txt|css)$/u;
 const PAIR=/[?&'"`(]chunk=(?![=>])/gu; // never `(chunk===` or `(chunk=>`, a variable named chunk
 const CALL=/\.(?:get|set|has|delete|append)\(\s*['"`]chunk['"`]/gu;

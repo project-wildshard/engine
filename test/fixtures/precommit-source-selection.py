@@ -38,7 +38,7 @@ with tempfile.TemporaryDirectory(dir=base/'tmp',prefix='staged-inputs-test-') as
  assert not (tree/'src/unrelated.ts').exists()
  # Child --import paths resolve from the repository cwd, not the launcher folder.
  put('scripts/docs/reference.mjs', '''import {spawnSync} from 'node:child_process';
-const result=spawnSync(process.execPath,['--import','./scripts/sim-node-loader.mjs','scripts/docs/read.mjs'],{cwd:process.cwd(),encoding:'utf8'});
+const result=spawnSync(process.execPath,['--import','./scripts/sim-node-loader.mjs','scripts/docs/read.mjs'],{cwd:process.cwd(),encoding:'utf8'}); // script-paths: a dead fixture (no test runs it), half moved by f928fdae2
 if(result.status!==0)throw Error(result.stderr);process.stdout.write(result.stdout);
 ''')
  put('src/scripts/sim-node-loader.mjs', 'import "./loader-helper.mjs";\n')

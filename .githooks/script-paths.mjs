@@ -10,6 +10,13 @@
 //   (d) path: a literal joined to that anchored root (`join(ROOT, 'art/x')`, `resolve(ROOT, flag('cameras', 'art/x'))`)
 //       whose first folder the repo has exists; a ROOT from process.cwd() or a flag is the caller's tree, not judged (outputs under tmp/, progress/, out/, dist/ are not read, nor a path the
 //       script checks with existsSync first or makes with mkdirSync).
+//   (e) moved (meta QA 11-25 row 91): a lean repo (src/scripts/, no tracked scripts/) still names a folder the lean
+//       move left (`scripts`, `kit/scripts`, `test/tooling`) where the new place holds it: a written path (`'scripts/x'`,
+//       a `node -e` source's `./scripts/x`, `"$REPO/scripts/x"`, `${root}/scripts/x`), a join part on any base
+//       (`join(root, 'scripts', file)`, `ROOT / 'scripts' / name`), a regex (`/^scripts\//`), a Python or shell
+//       climb counted from the old depth, a workflow's sparse checkout or `paths:`, a package.json script; and a
+//       `pnpm <x:y>` in shell, a workflow or package.json whose script the package no longer has. Every code file is
+//       read (.py, .sh and tests too, .agents/ aside), with .github/workflows/ and package.json.
 // Code inside strings is not this file's code: a template literal (nested ones too) and a quoted string that can't be a
 // module name (a `node -e` source, a worker body) are blanked first. A line that names a file the build writes beside
 // the script says so in a comment, `// script-paths: <why>`, and is not judged. A missing target the repo's .gitignore
@@ -178,6 +185,170 @@ export function scriptPathFindings({ paths, read, exists: on, ignored = () => fa
   return [...new Set(findings)];
 }
 
+/** The folders the lean layout moved, and where each went (engine f928fdae2, repo-kit R2); the longer name first. */
+export const LEAN_MOVES = [['kit/scripts', 'src/scripts/.kit'], ['test/tooling', 'src/test'], ['scripts', 'src/scripts']]; // script-paths: the moves themselves
+const CODE_FILE = /\.(?:[cm]?[jt]sx?|py|sh|bash)$/u;
+const WORKFLOW = /^\.github\/workflows\/[^/]+\.ya?ml$/u;
+const MARKED = /(?:\/\/|\/\*|#)\s*script-paths:/u;
+const FOLDER = String.raw`(?:kit\/scripts|test\/tooling|scripts)`; // script-paths: the moved folders themselves
+/** A path naming a moved folder, rooted at the line's start, a quote, a space or a variable (`$REPO/`, `${root}/`). */
+const MOVED_PATH = new RegExp(String.raw`(^|[^\w.@/$\\-]|\$\{?\w+\}?\/|\}\/|\)\/)((?:\.{1,2}\/)*)(${FOLDER}(?:\/[\w.@*-]+)*)(\/?)(?![\w@*-])`, 'gmu');
+/** A quoted folder part of a join (`join(root, 'scripts', file)`, `ROOT / 'scripts' / name`). */
+const PART = /(['"])(scripts|tooling)\1/gu;
+/** The text before a quoted part that is still inside a path call's parentheses. */
+const PATH_CALL = /\b(?:join|resolve|resolvePath|pathResolve|Path|mkdirSync|existsSync|readdirSync|rmSync|cpSync)\((?:[^()]|\([^()]*\))*$/u;
+/** A regex naming a moved folder (`/^scripts\//`, `(?:kit\/scripts)\/`). */
+const REGEX = /(?:^|[\^(|:]|(?<!\\)\/)(kit\\\/scripts|test\\\/tooling|scripts)\\\//gu; // script-paths: the moved folders themselves
+/** A run of a namespaced package script (`pnpm test:hooks`, `['pnpm','run','--silent','check:asks']`): never a pnpm command. */
+const PNPM_RUN = /\bpnpm\s+(?:run\s+)?(?:--silent\s+)?([a-z][\w-]*:[\w:-]+)|\[\s*['"]pnpm['"]\s*,\s*(?:['"]run['"]\s*,\s*)?(?:['"]--silent['"]\s*,\s*)?['"]([a-z][\w-]*:[\w:-]+)['"]/gu;
+/** A Python or shell climb to the repo root, assigned to ROOT, REPO or REPO_ROOT. */
+const PY_CLIMB = /^\s*(ROOT|REPO|REPO_ROOT)\s*=.*?Path\(__file__\)(?:\.resolve\(\))?(?:((?:\.parent(?!s))+)|\.parents\[(\d+)\])/mu;
+const SH_CLIMB = /^\s*(ROOT|REPO|REPO_ROOT)=.*?\$\(dirname\s+(?:--\s+)?"?\$(?:0|\{BASH_SOURCE\[0\]\}|BASH_SOURCE)"?\)((?:\/\.\.)*)/mu;
+
+/** The text with JavaScript comments blanked (line lengths kept), quotes and templates read as strings: unlike code(), a
+ *  string holding `/*` or `//` (a glob, a URL) is not a comment. @param {string} text */
+function uncommented(text) {
+  const chars = text.split('');
+  let quote = '';
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quote !== '') {
+      if (ch === '\\') i++;
+      else if (ch === quote || (ch === '\n' && quote !== '`')) quote = '';
+    } else if (ch === '\\') i++;
+    else if (ch === "'" || ch === '"' || ch === '`') quote = ch;
+    else if (ch === '/' && (text[i + 1] === '/' || text[i + 1] === '*')) {
+      const close = text[i + 1] === '/' ? text.indexOf('\n', i) : text.indexOf('*/', i + 2) + 2;
+      const end = close <= 1 || close === -1 ? text.length : close;
+      for (let k = i; k < end; k++) if (chars[k] !== '\n') chars[k] = ' ';
+      i = end - 1;
+    }
+  }
+  return chars.join('');
+}
+
+/** The text with `#` comments blanked (line lengths kept): Python, shell and YAML. @param {string} text */
+function hashless(text) {
+  return text.replaceAll(/(^|\s)(#[^\n]*)/gmu, (_, before, comment) => `${before}${blank(comment)}`);
+}
+
+/**
+ * Meta QA 11-25 row 91: every place a lean repo still names a folder the lean move left (`scripts/`, `kit/scripts/`,
+ * `test/tooling/`) where the moved folder now holds it. Row 82's checks judged only imports and joins on an anchored
+ * uppercase ROOT in scripts/ .mjs files, so these went through: a join on a clone or a lowercase root
+ * (`join(checkout, 'scripts', 'online-rig.mjs')`, `join(root, 'scripts', file)`), a temp checkout's folder
+ * (`mkdirSync(join(producer, 'scripts'))`, `(self.root / 'scripts').mkdir()`), a tool list's `'kit/scripts/asks.mjs'`,
+ * a `node -e` source's `'./scripts/x.mjs'`, a shell `"$REPO/scripts/x.py"`, a template's `${root}/scripts/x.mjs`, a
+ * regex's `/^scripts\//`, a Python or shell climb counted from the old depth, a workflow's sparse checkout or `paths:`
+ * filter, and package.json scripts. Code files anywhere (tests and fixtures too), .github/workflows and package.json
+ * scripts are read; a path is judged only when the move's new place holds it (meta's own scripts/ and long-gone tools
+ * are not this move's). A line marked `script-paths: <why>` is not judged.
+ * @param {{ paths: string[], read: (path: string) => string, exists: (path: string) => boolean }} repo
+ * @returns {string[]}
+ */
+export function movedFindings({ paths, read, exists }) {
+  const moves = LEAN_MOVES.filter(([from, to]) => !paths.some((path) => path.startsWith(`${from}/`)) && exists(to));
+  if (moves.length === 0) return [];
+  /** @type {string[]} */
+  const findings = [];
+  /** A finding when `path` is under a moved folder and only the new place holds it. */
+  const judge = (/** @type {string} */ file, /** @type {string} */ path, /** @type {string} */ written) => {
+    const move = moves.find(([from]) => path === from || path.startsWith(`${from}/`));
+    if (move === undefined) return;
+    const now = `${move[1]}${path.slice(move[0].length)}`, glob = now.indexOf('*');
+    const held = glob === -1 ? exists(now) : exists(now.slice(0, Math.max(0, now.lastIndexOf('/', glob))));
+    if (held && !exists(path)) findings.push(`${file}: moved ${written} (${move[0]}/ is ${move[1]}/ now)`);
+  };
+  /** The folder of the nearest package.json above a file. @param {string} file */
+  const packageDir = (file) => {
+    for (let dir = posix.dirname(file); ; dir = posix.dirname(dir)) {
+      if (exists(dir === '.' ? 'package.json' : `${dir}/package.json`) || dir === '.') return dir;
+    }
+  };
+  /** @type {Map<string, Record<string, string> | null>} */
+  const manifests = new Map();
+  /** A package folder's scripts, or null when it has no readable package.json. @param {string} dir */
+  const scriptsOf = (dir) => {
+    if (!manifests.has(dir)) {
+      try {
+        manifests.set(dir, JSON.parse(read(dir === '.' ? 'package.json' : `${dir}/package.json`)).scripts ?? {});
+      } catch {
+        manifests.set(dir, null);
+      }
+    }
+    return manifests.get(dir) ?? null;
+  };
+  for (const file of [...paths].sort()) {
+    // .agents/ is synced from meta into every repo, lean or not: its kit/scripts/ and scripts/ fallbacks are on purpose
+    if (SKIP.some((prefix) => file.startsWith(prefix)) || file.startsWith('.agents/')) continue;
+    const manifest = file === 'package.json' || file.endsWith('/package.json'), workflow = WORKFLOW.test(file);
+    if (!manifest && !workflow && !CODE_FILE.test(file)) continue;
+    let raw;
+    try {
+      raw = read(file);
+    } catch {
+      continue;
+    }
+    let text = raw;
+    if (manifest) {
+      try {
+        text = Object.values(JSON.parse(raw).scripts ?? {}).join('\n');
+      } catch {
+        continue;
+      }
+    } else text = /\.(?:py|sh|bash|ya?ml)$/u.test(file) ? hashless(raw) : uncommented(raw.replaceAll(/^\s*(?:\/\/|\/\*|\*).*$/gmu, blank));
+    const lines = manifest ? text.split('\n') : raw.split('\n');
+    const marked = (/** @type {number} */ at) => MARKED.test(lines[text.slice(0, at).split('\n').length - 1] ?? '');
+    // a path written out: 'scripts/x.mjs', './scripts/x' in a `node -e` source, "$REPO/scripts/x.py", `${root}/scripts/x`
+    for (const match of text.matchAll(MOVED_PATH)) {
+      const [, lead, dots, path, slash] = match, at = match.index + lead.length;
+      if (marked(at)) continue;
+      // a bare folder only from a variable ("$REPO/scripts"), with its slash (scripts/) or as a list line (sparse checkout)
+      const listed = /^\s*-?\s*['"]?$/u.test(text.slice(text.lastIndexOf('\n', at - 1) + 1, at)) && /^['"]?\s*$/mu.test(text.slice(at + path.length + slash.length).split('\n')[0]);
+      if (!path.includes('/') && slash === '' && !lead.endsWith('/') && !(workflow && listed)) continue;
+      const resolved = dots.includes('..') ? posix.normalize(posix.join(posix.dirname(file), `${dots}${path}`)) : path;
+      if (!resolved.startsWith('..')) judge(file, resolved, `${dots}${path}${slash}`);
+    }
+    // a package script the lean package.json dropped: `pnpm test:hooks` in ci-static.sh (f928fdae2's static red); shell,
+    // workflows and package.json only (the kit's own hooks run a script only when the repo declares it)
+    const scripts = manifest || workflow || /\.(?:sh|bash)$/u.test(file) ? scriptsOf(packageDir(file)) : null;
+    for (const match of text.matchAll(PNPM_RUN)) {
+      const name = match[1] ?? match[2];
+      if (scripts !== null && !(name in scripts) && !marked(match.index)) findings.push(`${file}: moved pnpm ${name} (no such script in ${packageDir(file) === '.' ? '' : `${packageDir(file)}/`}package.json)`);
+    }
+    if (workflow || manifest) continue;
+    // a folder joined as a part: join(root, 'scripts', file), ROOT / 'scripts' / name, (root / 'scripts').mkdir()
+    for (const match of text.matchAll(PART)) {
+      const at = match.index, before = text.slice(Math.max(0, at - 80), at), after = text.slice(at + match[0].length);
+      // only a part of a path call (join, resolve, Path, mkdirSync…) or a Python `/`: never a key, a member, a type or `in`
+      if (marked(at) || !(PATH_CALL.test(before) || /\s\/\s*$/u.test(before))) continue;
+      const previous = /(['"])([\w.@-]+)\1\s*(?:,|\/)\s*$/u.exec(before)?.[2];
+      let path = match[2];
+      // 'test', 'tooling' and 'kit', 'scripts' are moved folders; 'src', 'scripts' is the new place, another literal another folder
+      if (path === 'tooling' ? previous !== 'test' : previous !== undefined && previous !== 'kit') continue;
+      if (previous !== undefined) path = `${previous}/${path}`;
+      const next = /^\s*(?:,|\/)\s*(['"])([\w.@*-]+(?:\/[\w.@*-]+)*)\1/u.exec(after);
+      if (next !== null) path += `/${next[2]}`;
+      judge(file, path, `${match[0]}${next === null ? '' : `, ${next[1]}${next[2]}${next[1]}`}`);
+    }
+    // a regex naming the folder: /^scripts\//
+    for (const match of text.matchAll(REGEX)) {
+      if (!marked(match.index)) judge(file, match[1].replaceAll('\\/', '/'), `${match[1]}\\/`);
+    }
+    // a climb counted from the old depth: ROOT = Path(__file__).parent in a tool one folder deeper now, REPO=$(dirname $0)/..
+    const climb = PY_CLIMB.exec(text) ?? SH_CLIMB.exec(text);
+    if (climb !== null && !marked(climb.index) && moves.some(([, to]) => file.startsWith(`${to}/`))) {
+      const up = climb[3] !== undefined ? Number(climb[3]) + 1
+        : climb[2]?.startsWith('.parent') ? climb[2].split('.parent').length - 1 : 1 + (climb[2]?.match(/\.\./gu) ?? []).length;
+      let dir = file;
+      for (let k = 0; k < up; k++) dir = posix.dirname(dir);
+      const home = packageDir(file), name = (/** @type {string} */ at) => (at === '.' ? 'the repo root' : at);
+      if (dir !== home) findings.push(`${file}: moved climb ${climb[1]} is ${name(dir)}, not ${name(home)}`);
+    }
+  }
+  return [...new Set(findings)];
+}
+
 /** Compare with the shrink-only baseline. @param {string[]} found @param {string[]} baseline */
 export function judge(found, baseline) {
   const known = new Set(baseline), now = new Set(found);
@@ -195,7 +366,8 @@ export function scriptPathsVerdict(root) {
       return false;
     }
   };
-  const found = scriptPathFindings({ paths, read: (path) => readFileSync(join(root, path), 'utf8'), exists: (path) => existsSync(join(root, path)), ignored });
+  const read = (/** @type {string} */ path) => readFileSync(join(root, path), 'utf8'), exists = (/** @type {string} */ path) => existsSync(join(root, path));
+  const found = [...scriptPathFindings({ paths, read, exists, ignored }), ...movedFindings({ paths, read, exists })];
   const file = join(root, BASELINE), recorded = existsSync(file);
   /** @type {string[]} */
   const baseline = recorded ? JSON.parse(readFileSync(file, 'utf8')).findings ?? [] : [];

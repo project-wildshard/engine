@@ -158,7 +158,7 @@ async function main() {
   const {build} = await version.json();
   if (!version.ok || typeof build !== 'string' || build === '') throw new Error('The served build could not be pinned');
   const source = ['fps/table.mjs','fps/plan.mjs','fps/batch.mjs','fps/matrix.mjs','fps/measure.mjs','fps/workload.mjs',...(passBreakdown?['fps/passes.mjs']:[]),'fps/verdict.mjs','memory/iphone/route.mjs']
-    .map(file => readFileSync(join(root,'scripts',file),'utf8'));
+    .map(file => readFileSync(join(root,'src/scripts',file),'utf8'));
   const config = {mode:sampling.mode,build,host,base,zone,count,plan,route,warm:sampling.warm,...(passBreakdown?{passBreakdown}:{}),method:signature(source)};
   const fingerprint = signature(config);
   let out = resolve(choices.out ?? join(root,'tmp/driftwood-fps',fingerprint.slice(0,16)));

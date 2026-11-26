@@ -73,7 +73,7 @@ export function watchPlist(root, home) {
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>Label</key><string>${LABEL}</string>
-<key>ProgramArguments</key><array><string>${home}/.nvm/nvm-exec</string><string>node</string><string>${root}/scripts/rooms-watch.mjs</string><string>--once</string></array>
+<key>ProgramArguments</key><array><string>${home}/.nvm/nvm-exec</string><string>node</string><string>${root}/src/scripts/rooms-watch.mjs</string><string>--once</string></array>
 <key>EnvironmentVariables</key><dict><key>NODE_VERSION</key><string>default</string></dict>
 <key>WorkingDirectory</key><string>${root}</string>
 <key>StandardErrorPath</key><string>${home}/.cache/wildshard/rooms-watch.log</string>

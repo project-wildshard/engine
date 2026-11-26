@@ -26,7 +26,7 @@ with tempfile.TemporaryDirectory(dir=source / 'tmp', prefix='commit-timing-') as
     (root / 'owned.txt').write_text('base\n')
     git('add', '--', 'owned.txt')
     git('commit', '-qm', 'base')
-    (root / 'scripts').mkdir()
+    (root / 'src/scripts/.kit').mkdir(parents=True)
     if wrapper_text is None:
         shutil.copy2(wrapper, root / 'src/scripts/.kit/commit.sh')
     else:

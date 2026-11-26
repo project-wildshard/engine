@@ -7,7 +7,7 @@ import {pathToFileURL} from 'node:url';
 
 const base=resolvePath(process.argv[2]??'tmp/non-engine-admission-proof');mkdirSync(base,{recursive:true});
 const work=mkdtempSync(join(base,'run-')),root=join(work,'scheduler'),engine=join(work,'engine'),pine=join(work,'pine'),marker=join(pine,'checked');mkdirSync(engine);mkdirSync(pine);
-symlinkSync(resolvePath('scripts'),join(engine,'scripts'),'dir');
+mkdirSync(join(engine,'src'));symlinkSync(resolvePath('src/scripts'),join(engine,'src/scripts'),'dir');
 writeFileSync(join(pine,'package.json'),JSON.stringify({name:'plain-check-proof',private:true,scripts:{check:'node check.mjs'}}));
 writeFileSync(join(pine,'value.json'),'{"value":7}');writeFileSync(join(pine,'check.mjs'),"import assert from'node:assert/strict';import{readFileSync,writeFileSync}from'node:fs';assert.equal(JSON.parse(readFileSync('value.json')).value,7);writeFileSync('checked','actual plain check');");
 const broker=pathToFileURL(resolvePath('src/scripts/cpu-broker.mjs')).href,owner=join(engine,'owner.mjs');
