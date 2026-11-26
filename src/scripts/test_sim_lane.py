@@ -1460,16 +1460,20 @@ def run_transport_client(command, exit_seconds=2):
     1.5 s at load 40), and it once ran out a `timeout=2` that also covered
     startup. Startup ends at the record; `exit_seconds` then guards a client
     that ignores its own deadline. A client that never starts is bounded by the
-    whole run's cap (test/sim-transport.test.ts)."""
-    with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) as client:
-        started = client.stdout.readline()  # Blocks until the client runs (or exits without a record).
+    whole run's cap (test/sim-transport.test.ts).
+
+    The pipe is unbuffered (bufsize=0): `communicate` reads the raw fd, so a
+    buffered `readline` that took `complete` along with `started` in one read
+    lost it (engine main red 45806252141, Linux CI)."""
+    with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0) as client:
+        started = client.stdout.readline()  # Byte by byte up to the newline: blocks until the client runs (or exits without a record).
         try:
             rest, errors = client.communicate(timeout=exit_seconds)
         except subprocess.TimeoutExpired:
             client.kill()
             client.communicate()
             raise
-    return subprocess.CompletedProcess(command, client.returncode, started + rest, errors)
+    return subprocess.CompletedProcess(command, client.returncode, (started + rest).decode(), errors.decode())
 
 
 class SimulatorTransportTests(unittest.TestCase):
@@ -1482,6 +1486,11 @@ class SimulatorTransportTests(unittest.TestCase):
         result = run_transport_client(slow_start, exit_seconds=.3)
         self.assertGreaterEqual(time.monotonic() - began, .6)
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual([json.loads(line)['phase'] for line in result.stdout.splitlines()], ['started', 'complete'])
+        # Both records in one write: the read of `started` must not swallow the
+        # rest (engine main red 45806252141 on Linux, where they arrived together).
+        one_write = [PYTHON, '-c', 'import sys;sys.stdout.write(\'{"phase":"started"}\\n{"phase":"complete"}\\n\');sys.stdout.flush()']
+        result = run_transport_client(one_write, exit_seconds=5)
         self.assertEqual([json.loads(line)['phase'] for line in result.stdout.splitlines()], ['started', 'complete'])
         # The bound still holds once the client has started.
         stalled = [PYTHON, '-c', 'import time;print(\'{"phase":"started"}\',flush=True);time.sleep(30)']
