@@ -1360,7 +1360,6 @@
     "./scripts/memory-report-blocks.mjs": "./scripts/memory-report-blocks.mjs",
     "./scripts/check-shards.mjs": "./scripts/check-shards.mjs",
     "./scripts/shards.mjs": "./scripts/shards.mjs",
-    "./scripts/parity.mjs": "./scripts/parity.mjs",
     "./scripts/parity/canvas-bytes.mjs": "./scripts/parity/canvas-bytes.mjs",
     "./scripts/parity/combat.mjs": "./scripts/parity/combat.mjs",
     "./scripts/parity/fingerprint.mjs": "./scripts/parity/fingerprint.mjs",

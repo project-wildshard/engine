@@ -123,7 +123,8 @@ The [audit receipt](../../../progress/shard-platform/sf62/gpu-baseline-refresh.j
 content pin, image/raw/aggregate hashes and three settings witnesses. Runner artifacts come from record runs
 `37735055551` (initial green pairs), `37738217141` (Pine serial replacement), and `37741474189` (Sun idle-canonical replacement).
 
-Official M5 command, run with the matching `harnessSha` from the receipt (one pair at a time; Sky idle recapture batched its two tiers with `--jobs=1`):
+The recorder retired with the one-shard page it booted (CHUNK-PARAM CP16, J522); these baselines stay as the budgets'
+ceiling sources, and git holds the recorder. Official M5 command, as it ran, with the matching `harnessSha` from the receipt (one pair at a time; Sky idle recapture batched its two tiers with `--jobs=1`):
 
 ```sh
 node scripts/parity.mjs --record --runs=3 --lane=m5 --shards=<slug> --tiers=<tier> \

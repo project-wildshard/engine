@@ -13,5 +13,4 @@ for ruler in scripts/*-gpu.mjs; do
   case "$ruler" in scripts/nine-dragon-gpu.mjs|scripts/pine-hollow-gpu.mjs) continue;; esac
   bash scripts/browser-lane.sh --max 10 "$NODE" "$ruler" "--url=$URL" || rc=1
 done
-bash scripts/browser-lane.sh --max 10 "$NODE" scripts/scorecard.mjs "--url=$URL" "--tag=nightly-$TAG" --no-switch --compare=baseline || rc=1
 exit "$rc"

@@ -115,7 +115,7 @@ try {
       } else throw new Error(`nightly supports patch/nightly plants only: ${plant}`);
     }
     // Harness code comes from main's committed head; runtime and baselines remain the selected SHA's.
-    const harnessPaths = ['scripts/parity.mjs', 'scripts/parity', 'scripts/gpu-perf', 'scripts/types', 'scripts/sim-memory.mjs', 'scripts/sim-lane.sh', 'scripts/gen-shards.mjs', 'scripts/gen-shards.d.mts'];
+    const harnessPaths = ['scripts/parity', 'scripts/gpu-perf', 'scripts/types', 'scripts/sim-memory.mjs', 'scripts/sim-lane.sh', 'scripts/gen-shards.mjs', 'scripts/gen-shards.d.mts'];
     const carried = harnessPaths.filter((path) => { try { git('cat-file', '-e', `${harnessSha}:${path}`); return true; } catch { return false; } });
     execFileSync('git', [`--git-dir=${mirror}`, 'archive', '-o', archive, harnessSha, '--', ...carried]);
     execFileSync('tar', ['-xf', archive, '-C', tree]); rmSync(archive);
@@ -135,13 +135,8 @@ try {
     const previousPath = previousMemory.path;
     console.log(`gpu-perf: memory reference ${previousPath || 'none (first complete settled reading)'}`);
     if (!memoryOnly) {
-      // scorecard's established baseline is a deliberate exception to excluded progress history.
-      const baselinePaths = git('ls-tree', '--name-only', '-r', sha, '--', 'progress/scorecard/baseline.json', 'progress/scorecard/baseline').split('\n').filter(Boolean);
-      if (baselinePaths.length > 0) { execFileSync('git', [`--git-dir=${mirror}`, 'archive', '-o', archive, sha, '--', ...baselinePaths]); execFileSync('tar', ['-xf', archive, '-C', tree]); rmSync(archive); }
-      const common = [`--url=${url}`, '--lane=m5', `--shards=${shards.join(',')}`];
-      // Parity owns a slot per browser; an outer lease can deadlock a full lane.
-      await step('parity', node, [join(tree, 'scripts/parity.mjs'), ...common, '--tiers=phone,desktop', '--full', '--ms', `--out=${join(reports, `${stamp}-parity`)}`], 75);
-      await step('offline', node, [join(tree, 'scripts/parity.mjs'), ...common, '--offline', '--tiers=phone'], 15);
+      // CHUNK-PARAM CP16 (J522): the parity run, its offline pass and the scorecard retired with the one-shard page they
+      // booted; the rulers remain.
       // One <=30 minute machine-wide model lock for all timing work.
       const timing = await step('rulers-scorecard', 'lockf', ['-k', join(homedir(), 'projects/localai/.model.lock'), 'bash', join(tree, 'scripts/gpu-perf/timing.sh'), url, `${stamp}-${sha.slice(0, 7)}`, node], 30);
       artifacts.push({ name: 'rulers-scorecard', text: timing.stdout });
@@ -149,7 +144,7 @@ try {
       const ndBudget = rulerBudget(tree, 'nine-dragon-stack', 'phone');
       for (const match of timing.stdout.matchAll(/([^\n]+): GPU ([\d.]+) ms\/frame/g)) measurements.push({ pose: match[1].trim(), gpuMs: Number(match[2]), budgetMs: ndBudget, verdict: Number(match[2]) <= ndBudget ? 'success' : 'failure', formula: RULER_FORMULA });
       if (measurements.length === 0) steps.push({ name: 'GPU ruler readings missing', verdict: 'failure', code: 1 });
-      for (const [dir, pattern] of [[join(tree, 'progress'), /-gpu-.*\.json$/], [join(tree, 'progress/scorecard'), /^nightly-.*\.(json|md)$/], [join(reports, `${stamp}-parity`), /\.(json|md)$/]]) {
+      for (const [dir, pattern] of [[join(tree, 'progress'), /-gpu-.*\.json$/]]) {
         if (existsSync(dir)) for (const file of readdirSync(dir).filter((name) => pattern.test(name))) {
           const text = readFileSync(join(dir, file), 'utf8'); artifacts.push({ name: file, text });
           if (file.endsWith('.desktop.json')) desktopFrames.push(...desktopProjections(JSON.parse(text), desktopReference));

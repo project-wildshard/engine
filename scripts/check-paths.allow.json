@@ -25,36 +25,6 @@
     "why": "Output directory created recursively by writeBaseline; the first recording creates it, so it need not exist beforehand."
   },
   {
-    "path": "src/shards",
-    "file": "scripts/parity.mjs",
-    "why": "Registry folder is introduced by F6; the harness uses the four current slugs until manifests exist."
-  },
-  {
-    "path": "test/parity/quarantine.json",
-    "file": "scripts/parity.mjs",
-    "why": "Optional quarantine input; a missing file deliberately reads as [] (03 section12)."
-  },
-  {
-    "path": "test/parity/renames",
-    "file": "scripts/parity.mjs",
-    "why": "Optional rename-map directory, created by the first rename row; no maps means unchanged comparison."
-  },
-  {
-    "path": "test/parity/baselines",
-    "file": "scripts/parity.mjs",
-    "why": "Recording output folder created recursively at the first baseline record."
-  },
-  {
-    "path": "test/parity/baselines/",
-    "file": "scripts/parity.mjs",
-    "why": "History pathspec prefix; baselines are created by the first recording."
-  },
-  {
-    "path": "test/parity/baselines/gh-macos15",
-    "file": "scripts/parity.mjs",
-    "why": "Runner baseline output folder; absent before the first runner bootstrap artifact."
-  },
-  {
     "path": "src/shards/sample/down.ts",
     "file": "test/fixtures/lint/cases.json",
     "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
@@ -275,12 +245,7 @@
     "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
   },
   {
-    "path": "src/shards/${shard}",
-    "file": "scripts/parity.mjs",
-    "why": "E357 F6m: git diff pathspec template for destination shards."
-  },
-  {
-    "path": "shared (src/world, src/player, src/entities, …)",
+    "path": "shared (src/world, src/player, src/entities, \u2026)",
     "file": "scripts/check-models.mjs",
     "why": "E357 F6m: human-readable report area label, not three repository paths; the actual model folder rules remain manual F6 edits."
   },
