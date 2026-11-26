@@ -979,10 +979,10 @@
    "why": "STR22: first hosted memory-footprint run on main to judge the walk (44468967622 at 41d629f2), median of 3 (3.44-3.83 MB/s); the mini's 7.30 pin is not comparable"
   },
   "nine/boot/retained-geometry": {
-   "value": 6821545,
+   "value": 14773283,
    "contentKey": "nine-dragon-stack@11",
-   "commit": "c6818e75b9d66f4b284da998cd4be293513f292a",
-   "why": "QA 11-25 row 122: the settled read (nine-load lets drawn copies go first), three local SwiftShader boots of the one-cell page at 6.82 MB; 1.5 MB floor in caps.json"
+   "commit": "c3f95ad35d3c6efc412d60d1e1716c4a6f53b2ab",
+   "why": "QA 11-26 rows 4 and 5 (J444, environment, not growth): the 6.82 MB line (row 122, c6818e75b) came from three local SwiftShader boots, where the warm draws upload every Nine fabric tile and it drops its extra arrays; hosted SwiftShader takes the slow-GPU boot, so fabric tiles keep their arrays until first drawn (fabric 9.45 to 10.06 MB hosted, 2.52 MB local; every other owner matches). Hosted reads after c3f95ad35's 20-drawn-frame settle: 14.77 MB (ci 45830159051 at c3f95ad35) and 15.38 MB (ci 45832223834 at 12116e30f); recorded the c3f95ad35 read"
   },
   "nine/boot/live-heap": {
    "value": 215556042,
