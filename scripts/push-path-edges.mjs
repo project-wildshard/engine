@@ -7,6 +7,8 @@
 //   - a shard pin or Ring 1 digest change: ring-step.ts for the Ring 1 slugs it moves (~4 s each), not all seven (17 s).
 // test/push-path-edges.test.ts holds a push for each row that would have gone red, and fails if the gate skips its run.
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { dirname, join, normalize } from 'node:path';
 
 /** CI static's sub-10-second checks the push gate lacked (scripts/ci-static.sh code). */
 export const FS27_STATIC = Object.freeze([
@@ -58,6 +60,32 @@ export function edgeTests(changed) {
   return [...tests].sort((a, b) => a.localeCompare(b));
 }
 
+/** A test that reads a file as `new URL('<path>', import.meta.url)`, the shape the finish.ts readers use. */
+const URL_READ = /new URL\(\s*(['"])([^'"]+)\1\s*,\s*import\.meta\.url\s*\)/gu;
+
+/**
+ * Main red 45746379191 (QA 11-25 row 72's 90714b4e3): finish.ts changed, and finish-background-idle.test.ts, which
+ * runs finish.ts's source read by URL, was not selected, since a read has no import edge. Every test that reads a
+ * changed file by `new URL(..., import.meta.url)` is found here, so no reader needs a hand row in PATH_EDGES.
+ * @param {readonly string[]} changed repo-relative paths @param {string} [cwd] @returns {string[]}
+ */
+export function urlReaderTests(changed, cwd = process.cwd()) {
+  if (changed.length === 0) return [];
+  const want = new Set(changed.map(file => normalize(file)));
+  let listed = '';
+  try {
+    listed = execFileSync('git', ['grep', '-lF', 'new URL(', '--', '*.test.ts', '*.test.mts', '*.test.mjs', '*.test.js', '*.test.tsx'],
+      { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  } catch { return []; } // git grep exits 1 when nothing matches
+  const tests = new Set();
+  for (const test of listed.split('\n').filter(Boolean)) {
+    for (const match of readFileSync(join(cwd, test), 'utf8').matchAll(URL_READ)) {
+      if (want.has(normalize(join(dirname(test), match[2] ?? '')))) { tests.add(test); break; }
+    }
+  }
+  return [...tests].sort((a, b) => a.localeCompare(b));
+}
+
 /** @param {string} sha @param {string} file @param {string} cwd @returns {any} */
 function readAt(sha, file, cwd) {
   try { return JSON.parse(execFileSync('git', ['show', `${sha}:${file}`], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })); } catch { return {}; }
@@ -101,13 +129,13 @@ export function pinChanges(refs, cwd, platform = `${process.platform}-${process.
 /**
  * What FS27 adds to a code push: its static tasks, the Vitest files to run, and the Ring 1 step.
  * @param {{mode:'full'|'related'|'docs', files:string[]}} selection
- * @param {{split:boolean, slugs:readonly string[]}} options
+ * @param {{split:boolean, slugs:readonly string[], cwd?:string}} options
  * @returns {{tasks:{name:string,commands:string[][]}[], tests:string[]}}
  */
 export function fs27Plan(selection, options) {
   if (selection.mode === 'docs') return { tasks: [], tests: [] };
   // A non-split full gate runs the whole suite already.
-  const tests = !options.split && selection.mode === 'full' ? [] : [...new Set([...TABLE_TESTS, ...edgeTests(selection.files)])].sort((a, b) => a.localeCompare(b));
+  const tests = !options.split && selection.mode === 'full' ? [] : [...new Set([...TABLE_TESTS, ...edgeTests(selection.files), ...urlReaderTests(selection.files, options.cwd)])].sort((a, b) => a.localeCompare(b));
   const ring = options.slugs.length === 0 ? [] : [{ name: `ring1 digests (${options.slugs.join(', ')})`,
     commands: [
       [process.execPath, 'scripts/pins.ts', 'install', '--ring-slices', '1'],

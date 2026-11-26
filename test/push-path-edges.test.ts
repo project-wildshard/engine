@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- A real owned Git fixture for the Ring 1 slug read.
 import { join, resolve } from 'node:path';
-import { FS27_STATIC, PATH_EDGES, TABLE_TESTS, fs27Plan, movedRingSlugs, pinChanges, simRingSlugs } from '../scripts/push-path-edges.mjs';
+import { FS27_STATIC, PATH_EDGES, TABLE_TESTS, fs27Plan, movedRingSlugs, pinChanges, simRingSlugs, urlReaderTests } from '../scripts/push-path-edges.mjs';
 import { shardPinTests } from '../scripts/gate-related-tests.mjs';
 import { staticChecks } from '../.githooks/push-checks.mjs';
 
@@ -39,6 +39,18 @@ for (const push of PUSHES) {
     if (push.static !== undefined) expect(staticNames).toContain(push.static);
   });
 }
+
+// Main red 45746379191: finish.ts changed and its URL readers did not run before the push (90714b4e3).
+it('runs every test that reads a changed file by new URL(..., import.meta.url)', () => {
+  const readers = ['src/client/game/session/finish-background-idle.test.ts', 'src/client/game/session/finish-composer-order.test.ts', 'src/client/game/session/finish-road-control.test.ts'];
+  for (const split of [true, false]) {
+    const plan = fs27Plan({ mode: 'related', files: ['src/client/game/session/finish.ts'] }, { split, slugs: [] });
+    for (const test of readers) expect(plan.tests).toContain(test);
+  }
+  expect(urlReaderTests(['src/client/engine/render/precompile.ts'])).toContain('src/client/engine/render/precompile-first-view.test.ts');
+  expect(urlReaderTests(['src/client/engine/ui/hud.ts'])).toEqual([]);
+  expect(urlReaderTests([])).toEqual([]);
+});
 
 it('names only reader files that exist', () => {
   for (const file of [...TABLE_TESTS, ...PATH_EDGES.flatMap(row => row.tests ?? [])]) expect(existsSync(file), file).toBe(true);

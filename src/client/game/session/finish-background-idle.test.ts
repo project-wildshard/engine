@@ -6,6 +6,7 @@ import {stripTypeScriptTypes} from 'node:module';
 // oxlint-disable-next-line import/no-nodejs-modules -- Explicit native ports retain the production continuation's ordering.
 import {runInNewContext} from 'node:vm';
 import {Scope} from '@wildshard/engine/app/scope';
+import {observeAfterBootAudio} from './afterBootAudio';
 import {observeTitlePreparation} from './titlePreparation';
 
 function deferred(): {promise: Promise<boolean>; resolve: (live: boolean) => void} {
@@ -85,7 +86,7 @@ test('native control and first-use audio remain immediate while speculative down
   const source = readFileSync(new URL('finish.ts', import.meta.url), 'utf8');
   const start = source.indexOf('  afterControl(game.levelScope,'), end = source.indexOf('\n\n', start);
   if (start === -1 || end < start) throw new Error('Control publication missing');
-  const owner = new Scope('native-control'), calls: string[] = [];
+  const owner = new Scope('native-control'), calls: string[] = [], afterBootAudio = observeAfterBootAudio();
   let publish: () => void = () => {throw new Error('Control observer missing');};
   try {
     runInNewContext(stripTypeScriptTypes(source.slice(start, end)), {
@@ -94,10 +95,13 @@ test('native control and first-use audio remain immediate while speculative down
       document: {dispatchEvent: (event: Event): void => {calls.push(event.type);}},
       sustainedFrames: {start: (): void => {calls.push('sustained');}}, diagnosticNow: (): number => 0,
       reachControl: (scope: Scope): void => {expect(scope).toBe(owner); calls.push('refinements');},
-      deferredAudio: {}, decodeAfterBoot: (): Promise<void> => {calls.push('audio'); return Promise.resolve();},
+      // QA 11-25 row 72: the after-boot audio runs through the memory meter's observer, still at control.
+      deferredAudio: {}, afterBootAudio,
+      decodeAfterBoot: (): Promise<void> => {calls.push('audio'); return Promise.resolve();},
       backgroundDownloads: (): Promise<void> => {calls.push('idle-downloads'); return Promise.resolve();},
     });
     publish(); expect(calls).toEqual(['ws:control-ready', 'sustained', 'refinements', 'audio', 'idle-downloads']);
+    expect(afterBootAudio.state()).toBe('pending');
   } finally {owner.dispose();}
 });
 
