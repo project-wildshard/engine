@@ -169,7 +169,7 @@ export async function pickZoneCard(page, slug) {
   const all = page.locator('.ws-menu-tab[data-tab="all"]');
   if (await all.count() > 0) await all.click();
   const names = await page.locator('.ws-menu-card b').allTextContents(), index = names.indexOf(String(row.name));
-  if (index < 0) throw new Error(`Shard select shows no ${slug} card`);
+  if (index === -1) throw new Error(`Shard select shows no ${slug} card`);
   await page.locator(`.ws-menu-card[data-i="${String(index)}"]`).click();
   await page.locator(`.ws-menu-card.selected[data-i="${String(index)}"]`).waitFor();
 }

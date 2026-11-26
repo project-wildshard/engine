@@ -6,7 +6,6 @@ import { execFileSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
-import { enterZone } from './zone-entry.mjs';
 
 /** Terminate only the browser launched on this proof's unique fresh profile. No pagehide or fake lifecycle record.
  * @param {string} profile */
