@@ -1,12 +1,13 @@
 import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
+import { enterZone } from './zone-entry.mjs';
 /** Real Pine boss entry and death. Night is selected through the shipped Debug control.
  * @param {import('playwright').Browser} browser @param {import('playwright').BrowserContextOptions} phone @param {string} base */
 export async function run(browser,phone,base) {
   const context=await browser.newContext({...phone,deviceScaleFactor:2}),page=await context.newPage();
   try {
     await saveFixture(context,{scope:'device',key:'devMode',data:true});
-    await page.goto(`${base}/?chunk=pine-hollow&mute=1&nolock=1&sw=0`,{waitUntil:'domcontentloaded'});
+    await enterZone(page, { zone: 'pine-hollow', base, flags: 'mute=1&nolock=1&sw=0', waitUntil: 'domcontentloaded' });
     await page.waitForFunction(()=>Reflect.get(window,'__wildshard')?.world!==undefined,undefined,{timeout:90000});
     await page.evaluate(FLOOR_GRID_ENTER);
     await page.waitForFunction(()=>(Reflect.get(window,'__workerClient')?.().frames??0)>30);

@@ -28,3 +28,8 @@ CP13 closes now that M1 is in: the last ten `src/` tests take a bare address, or
 they need a world page (title-first-paint's `firstDocument` takes a zone, loading-row-ratio writes Brasscap's tap). One
 DL21 case read "an arrival for another shard"; with the tap naming the page's zone there is no such arrival, so it now
 proves a tap past its minute leaves the page the title. The guard's baseline prunes the ten files.
+
+CP16's split-repair checks tell the two paths apart: a `?chunk=` page on a preview opens the one-shard page, the tap
+enters the grid. guardian, stun and wake-loss pass on the tap and move now. hare, whip, held-melee, horse-panic, movers,
+nalati-signals, perks, pine-writes and sky-trails find no hare, boar, camp horse or `showRow` on the grid page (they
+pass on `?chunk=`), and the worker-client scripts are unproven there, so they stay until their checks read the grid world.
