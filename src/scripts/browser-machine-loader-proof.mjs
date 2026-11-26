@@ -43,7 +43,7 @@ await test('actual private policy loads; unsafe mode, oversize and symlink refus
 function movedContext(module,present){
  return {...context,read:()=>Promise.resolve({bytes:JSON.stringify({version:1,module}),uid:501,mode:0o100600,regular:true}),exists:(/** @type {string} */name)=>present.includes(name)};
 }
-await test('a policy naming the pre-lean scripts/ folder follows the move and names the line to write',async()=>{
+await test('a policy naming the pre-lean script folder follows the move and names the line to write',async()=>{
  const old='/repos/sharddev/node_modules/engine/scripts/policy.mjs',moved='/repos/sharddev/node_modules/engine/src/scripts/policy.mjs'; // script-paths: the pre-lean path is this fixture
  const warnings=/** @type {string[]} */([]),loads=/** @type {string[]} */([]);
  assert.equal(await installMachineBrowserAdmission({},{...movedContext(old,[moved]),warn:message=>{warnings.push(message);},load:url=>{loads.push(url);return Promise.resolve({install:()=>Promise.resolve()});}}),true);
