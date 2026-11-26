@@ -4,6 +4,7 @@ import type { ShardManifest } from './manifest';
 import type { Ktx2Table } from '@wildshard/engine/boot/gpuFiles';
 import type { LoadFailure } from '@wildshard/engine/core/errorReport';
 import { loadingStage } from '@wildshard/engine/boot/waits';
+import { bootDiagnostic, bootDiagnosticJson } from '@wildshard/engine/boot/bootTrace';
 
 const tables = new WeakMap<ShardManifest, Promise<void>>();
 
@@ -53,8 +54,10 @@ export async function runShardLoad<T>(manifest: { readonly api: number; readonly
     const failure: ShardLoadFailure = {
       kind: 'shard-load', shard: manifest.slug, name: manifest.name, build: services.build,
       stage,
-      context: { kind: 'shard-load', shard: manifest.slug, build: services.build, stage },
-      tags: { system: 'shard-load', shard: manifest.slug, build: services.build, bootStage: stage, fatal: true },
+      // QA 11-25 row 133: the boot's last checkpoints ride the report, as the fatal card's do (ui/ErrorModal.ts), so a GPU
+      // fault in the load names the operation it died in (compile, texture upload)
+      context: { kind: 'shard-load', shard: manifest.slug, build: services.build, stage, bootDiagnostic: bootDiagnosticJson() },
+      tags: { system: 'shard-load', shard: manifest.slug, build: services.build, bootStage: stage, fatal: true, diagnostic: bootDiagnostic() },
       message: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack ?? '' : String(error),
     };
