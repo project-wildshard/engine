@@ -9,7 +9,7 @@ import { dirname, join, resolve as absolute } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
-import { attributionGap, cutTree, fullCommitArgs, gateInputsMoved, localAttemptDir, nextAdmission, releaseCiAdmission, provesNpmNext, provesReleaseReuse, provesTrainCi, retryRead, trainSha as sha, trainTag as tagPattern, watchTrainRun,
+import { attributionGap, cutTree, fullCommitArgs, writeHold, gateInputsMoved, localAttemptDir, nextAdmission, releaseCiAdmission, provesNpmNext, provesReleaseReuse, provesTrainCi, retryRead, trainSha as sha, trainTag as tagPattern, watchTrainRun,
   type Alias, type Leg, type Run } from './release-train-proof.mjs';
 import { CHANNELS, localQaGap, RELEASE_PUBLIC_KEY, type QaVerdict } from './page-release/flow.mjs';
 import { pidLock } from './.kit/pid-lock.mjs';
@@ -439,6 +439,8 @@ async function main(args: string[]) {
     const failed = stagingVerdict === undefined ? undefined : (read(stagingVerdict) as Verdict | undefined)?.deploy?.zoneEntry?.failures?.[0];
     const pair = failed && /^[a-z0-9_-]+$/u.test(failed.from) && /^[a-z0-9_-]+$/u.test(failed.to)
       ? ` ${failed.from} -> ${failed.to}.` : '';
+    // J505: the folder a HOLD names holds its reason and the failed leg's log, before the scratch is removed.
+    if (evidence !== undefined) writeHold(evidence, error instanceof Error ? error.message : String(error));
     receipt(lane, `HOLD ${tag} train.${pair}${evidence === undefined ? '' : ` See ${evidence}.`}`);
     throw error;
   } finally {

@@ -21,3 +21,4 @@ export function localAttemptDir(saved: string, held: (dir: string) => boolean): 
 export function releaseCiAdmission(build: string, ci: number): { staging_build: string; staging_qualification: string };
 export function gateInputsMoved(log: string): boolean;
 export function cutTree(root: string, sha: string, dir: string): string;
+export function writeHold(dir: string, reason: string): string;

@@ -1,6 +1,7 @@
 // FS28: staging npm admission uses only exact CI and alias evidence.
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { provesCode } from './ci-proof-jobs.mjs';
 import { releaseOnlyParent } from './release-gate.mjs';
 
@@ -144,4 +145,19 @@ export function cutTree(root, sha, dir) {
     throw new Error(`The train runs its legs only from the clean clone at ${sha.slice(0, 10)}`);
   }
   return dir;
+}
+
+/** J505: a HOLD writes its reason into the folder it points at, with the last lines of each log the reason names; the
+ * run's scratch, where those logs live, is removed on exit. v0.1.94's first HOLD pointed at an empty folder and a deleted
+ * local.log. @param {string} dir @param {string} reason @returns {string} the hold file */
+export function writeHold(dir, reason) {
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  let text = `${reason}\n`;
+  for (const [, log] of reason.matchAll(/See (\/\S+\.log)\b/gu)) {
+    try { text += `\n--- ${log}, last 200 lines\n${readFileSync(log, 'utf8').split('\n').slice(-200).join('\n')}\n`; }
+    catch { text += `\n--- ${log} could not be read\n`; }
+  }
+  const file = join(dir, 'hold.txt');
+  writeFileSync(file, text, { mode: 0o600 });
+  return file;
 }

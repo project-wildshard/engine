@@ -1,8 +1,9 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, test } from 'vitest';
-import { attributionGap, cutTree, fullCommitArgs, gateInputsMoved, localAttemptDir, nextAdmission, provesNpmNext, releaseCiAdmission, provesReleaseReuse, provesTrainCi, retryRead, watchTrainRun } from '../src/scripts/release-train-proof.mjs';
+import { attributionGap, cutTree, fullCommitArgs, writeHold, gateInputsMoved, localAttemptDir, nextAdmission, provesNpmNext, releaseCiAdmission, provesReleaseReuse, provesTrainCi, retryRead, watchTrainRun } from '../src/scripts/release-train-proof.mjs';
 import { createTempRepo } from '../src/test/helpers/git';
 
 const build = 'a'.repeat(40);
@@ -211,4 +212,29 @@ test('a train leg runs the cut from its own clone while the canonical checkout m
   const fromRoot = [...train.matchAll(/runLogged\(root, (?:join\([^)]*\)|\w+), ([^,]+),/gu)].map(match => match[1]);
   expect(fromRoot.length).toBeGreaterThan(0);
   expect(fromRoot.filter(file => !["'gh'", 'kit'].includes(file ?? ''))).toEqual([]);
+});
+
+// J505: v0.1.94's first HOLD named an empty folder and a local.log the scratch cleanup had removed.
+test('a HOLD writes its reason and the failed leg log into the folder it names, even when the clone step fails', () => {
+  const work = mkdtempSync(join(tmpdir(), 'train-hold-'));
+  const repo = createTempRepo();
+  try {
+    repo.git(['remote', 'add', 'origin', 'https://github.com/project-wildshard/engine.git']);
+    let reason = '';
+    try { cutTree(repo.dir, 'f'.repeat(40), join(work, 'cut-tree')); }
+    catch (error) { reason = error instanceof Error ? error.message : String(error); }
+    expect(reason).not.toBe('');
+    const evidence = join(work, 'evidence');
+    expect(readFileSync(writeHold(evidence, reason), 'utf8')).toBe(`${reason}\n`);
+    const log = join(work, 'local.log');
+    writeFileSync(log, 'Error: listen EINVAL: invalid argument pg.sock\n');
+    const text = readFileSync(writeHold(evidence, `bash did not finish. See ${log}`), 'utf8');
+    expect(text).toContain(`bash did not finish. See ${log}`);
+    expect(text).toContain('listen EINVAL');
+  } finally {
+    repo.cleanup();
+    rmSync(work, { recursive: true, force: true });
+  }
+  const train = readFileSync(join(import.meta.dirname, '../src/scripts/release-train.ts'), 'utf8');
+  expect(train).toMatch(/if \(evidence !== undefined\) writeHold\(evidence, [^\n]+\n\s+receipt\(lane, `HOLD/u);
 });

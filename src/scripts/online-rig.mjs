@@ -9,7 +9,7 @@ import { Client } from 'pg';
 import { childListener, databaseFront, listenLoopback, rigFront } from './rig-listeners.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
-import { rigOptions } from './online-rig-options.mjs';
+import { rigOptions, rigSocketPath } from './online-rig-options.mjs';
 import { claimFixture, fixtureKey, freeFixturePorts, ownedPostgres, ownedEphemeralPostgres, confirmPostgres } from './online-rig-owned.mjs';
 import { signRetention } from './code-retention.mjs';
 import { enterZone } from './zone-entry.mjs';
@@ -135,7 +135,7 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
   if (pglite) {
     if (ephemeral) throw new Error('A pglite: rig uses the named ports');
     const { PGlite } = await import('@electric-sql/pglite'), { PGLiteSocketServer } = await import('@electric-sql/pglite-socket');
-    const path = join(absolute(work), 'pg.sock');
+    const path = rigSocketPath(absolute(work));
     rmSync(path, { force: true });
     const db = new PGlite(), pgSocket = new PGLiteSocketServer({ db, path, maxConnections: 16 });
     await pgSocket.start();
