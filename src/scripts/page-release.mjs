@@ -31,7 +31,7 @@
 // Phase results go to <root>/tmp/page-release/<channel>-<sha>.json, which the next phase reads.
 import {execFileSync} from 'node:child_process';
 import {setTimeout as delay} from 'node:timers/promises';
-import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
+import {appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {CHANNELS, pinnedReleaseKey, RefusedError, buildEnv, runPhase} from './page-release/flow.mjs';
 import {agentFetch} from './agent-requests.mjs';
@@ -42,6 +42,7 @@ import {contentKeys, missingKeysMessage, publishContent, r2Content, r2Copies} fr
 import {deployStaging} from './page-release/staging-deploy.mjs';
 import {contentReach, fetchAnswer, pageReader, reachProblems, reachSummary} from './page-release/content-reach.mjs';
 import {openReleaseRun} from './release-run.mjs';
+import {phaseTable} from './page-release/phase-times.mjs';
 
 /** SQ15: the staging-qa verdict.json, or why it could not be read. @param {string} file */
 function readQa(file) {
@@ -183,10 +184,13 @@ async function run(step, generatedQa) {
     });
     if (refusals.length > 0) log(`DRY-RUN ${channel} ${step}: ${refusals.length} gate(s) would refuse today`);
 }
+/** @type {import('./page-release/phase-times.mjs').PhaseTime[]} */
+const phaseTimes = [];
 try {
   scratch = openReleaseRun(root, 'page');
   for (phase of phases) {
     if (bundled && (phase === 'upload' || phase === 'check')) continue;
+    const phaseStarted = Date.now();
     if (bundled && phase === 'go-live' && localQaSource !== undefined) {
       const proof = value('observer-proof'), resume = value('zone-entry-resume');
       await deployStaging({ root, build, release: `v${manifest.version}`, source: localQaSource,
@@ -197,6 +201,7 @@ try {
         // FR-A19: staging QA starts only when every staging head has packs for this build (at most 45 min).
         waitPacks: () => waitForPacks(build, 'staging', {log}) });
     } else await run(/** @type {import('./page-release/flow.mjs').Phase} */ (phase));
+    phaseTimes.push({phase, ms: Date.now() - phaseStarted});
   }
 } catch (error) {
   // CLI and fetch errors can carry argv or headers: only redacted text leaves this process.
@@ -204,6 +209,14 @@ try {
   console.error('the alias did not move unless an ALIAS MOVED line is above');
   process.exitCode = 1;
 } finally {
+  // fix-preview PV19: seconds per phase in the log and the job summary, amber over the release step's 180 s budget
+  if (phaseTimes.length > 0) {
+    const table = phaseTable(channel, phaseTimes);
+    for (const line of table.lines) log(line);
+    if (table.warning !== undefined) console.log(table.warning);
+    const summary = process.env.GITHUB_STEP_SUMMARY;
+    if (summary !== undefined && summary !== '') try { appendFileSync(summary, table.summary); } catch { /* a summary never fails the release */ }
+  }
   try { contentCopies?.close(); }
   finally { scratch?.close(); }
 }
