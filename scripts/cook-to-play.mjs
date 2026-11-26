@@ -99,7 +99,8 @@ try {
     const route=titles.find(row=>bareSlug(row.slug)===bareSlug(index.slug))?.slug;
     if(route===undefined)throw new Error(`No public title route for ${index.slug}`);
     fetched.clear();
-    const result=await bootCase(browser,preview.url,'standalone',out,route,true,null,async context=>{
+    // CP16 (J522): the cooked zone boots alone, a one-cell world: the proof is its own bytes, with no neighbours to fetch
+    const result=await bootCase(browser,preview.url,'alone',out,route,true,null,async context=>{
       for(const fixture of levelDownloadFixtures('packs'))await saveFixture(context,fixture);
     });
     const used=[...fetched];

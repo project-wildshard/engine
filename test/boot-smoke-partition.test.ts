@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { bootCaseBrowser, bootCases, bootJobs, gameplayProbeTime, navigationCut } from '../scripts/parity/boot-smoke.mjs';
+import { bootCaseBrowser, bootCases, bootJobs, gameplayProbeTime, gridStandsIn, navigationCut } from '../scripts/parity/boot-smoke.mjs';
 
 const catalogue = [
   { slug: 'driftwood-isle', status: 'live', legacy: false },
@@ -56,4 +56,16 @@ test('a read a navigation cut short is not a boot failure', () => {
   expect(navigationCut(new Error('page.evaluate: Execution context was destroyed, most likely because of a navigation'))).toBe(true);
   expect(navigationCut(new Error('Fatal boot: shader link failed'))).toBe(false);
   expect(navigationCut('Execution context was destroyed')).toBe(false);
+});
+
+// main red 45750864926, second cause: cook-to-play's world shows Brasscap in Pine Hollow's cell, so a tap on Brasscap
+// stands in instance pine-hollow; the zone is the cell's slug
+test('a grid stands in a zone by its cell\'s instance or the slug that cell shows', () => {
+  const grid = (current: string, ready = true) => ({ cells: [{ instance: 'pine-hollow', slug: 'brasscap-mesa' }, { instance: 'sunscar-dunes', slug: 'sunscar-dunes' }],
+    live: { live: { current, gameplayReady: ready } } });
+  expect(gridStandsIn(grid('pine-hollow'), 'brasscap-mesa')).toBe(true);
+  expect(gridStandsIn(grid('sunscar-dunes'), 'sunscar-dunes')).toBe(true);
+  expect(gridStandsIn(grid('_sunscar-dunes'), 'sunscar-dunes')).toBe(true);
+  expect(gridStandsIn(grid('sunscar-dunes'), 'brasscap-mesa')).toBe(false);
+  expect(gridStandsIn(grid('pine-hollow', false), 'brasscap-mesa')).toBe(false);
 });

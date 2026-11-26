@@ -8,7 +8,7 @@ import { browserPool, parallel } from './pool.mjs';
 import { registerCaptureTrace } from './capture-trace.mjs';
 import { serve } from './serve.mjs';
 import { NAME_ASKED, saveFixture } from '../debug-settings.mjs';
-import { initScript } from '../zone-entry.mjs';
+import { initScript, oneCellPage } from '../zone-entry.mjs';
 import { captureBootFrame } from './black-frame.mjs';
 import { observeTitleCapture } from './title-trace.mjs';
 import { gridBootWaitHistory } from './grid-boot-waits.mjs';
@@ -189,8 +189,12 @@ export async function pickZoneCard(page, slug) {
 export function gridStandsIn(grid, slug) {
   const session = typeof grid === 'object' && grid !== null && 'live' in grid ? grid.live : null;
   const live = typeof session === 'object' && session !== null && 'live' in session ? session.live : null;
-  return typeof live === 'object' && live !== null && 'current' in live && typeof live.current === 'string' && live.current.replace(/^_/u, '') === slug
-    && 'gameplayReady' in live && live.gameplayReady === true;
+  if (typeof live !== 'object' || live === null || !('current' in live) || typeof live.current !== 'string' || !('gameplayReady' in live) || live.gameplayReady !== true) return false;
+  // a cell is named by its instance and shows a zone by its slug: a cooked world's cells may show a zone under another
+  // instance (cook-to-play's world puts Brasscap in Pine Hollow's cell), so either names the zone the tap entered
+  const current = live.current, cells = typeof grid === 'object' && grid !== null && 'cells' in grid && Array.isArray(grid.cells) ? grid.cells : [];
+  const cell = cells.find((/** @type {unknown} */ row) => typeof row === 'object' && row !== null && 'instance' in row && row.instance === current);
+  return current.replace(/^_/u, '') === slug || (typeof cell === 'object' && cell !== null && 'slug' in cell && cell.slug === slug);
 }
 
 /** Every public primary enters through its real public button; experimental primaries enter with Developer on.
@@ -442,7 +446,7 @@ export async function gameplayProbeTime(probe, now = () => performance.now()) {
 /** `developer`: a standalone case with Developer on, for a shard that is still Developer-only (Signal Dunes: SF57's composer
  * coverage broke its boot on main, 9fb0cca1d, and no public case could see it).
  * `arrival` consumes the real travel handoff for a grid-only product with no picker card.
- * @param {import('playwright').Browser} browser @param {string} base @param {'standalone'|'grid'|'public-policy'|'arrival'} mode @param {string} out @param {string} [shard] @param {boolean} [developer]
+ * @param {import('playwright').Browser} browser @param {string} base @param {'standalone'|'grid'|'public-policy'|'arrival'|'alone'} mode @param {string} out @param {string} [shard] @param {boolean} [developer]
  * @param {((page:import('playwright').Page)=>Promise<void>)|null} [afterGameplay]
  * @param {((context:import('playwright').BrowserContext)=>Promise<void>)|null} [configureContext]
  * @param {import('./boot-smoke.mjs').GameplayEvidence|null} [gameplayEvidence] */
@@ -524,11 +528,23 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
     // CHUNK-PARAM CP16 (J522): no zone in the address. A standalone case taps its zone's card on Shard select (below); an
     // arrival writes the tab's tap, as the engine's own handoff does (titleArrival.ts handZoneOnReload), and opens `/`.
     if (mode === 'arrival') await page.addInitScript(initScript(shard));
+    // An alone case boots its zone as a one-cell world (CP10; Q1 (a), a proof of one zone's own bytes, cook-to-play's):
+    // the page's catalogue holds the one cell and it boots straight in, with no title and no neighbours
+    // An alone case boots its zone as a one-cell world (CP10; Q1 (a), a proof of one zone's own bytes, cook-to-play's): `/`
+    // carries the one cell and boots straight in, with no title and no neighbours. A routed document has no address space
+    // of its own, so its fetches to a cooked store on another loopback port need the local-network grant.
+    const home = (/** @type {URL} */ at) => at.origin === url.origin && at.pathname === '/';
+    if (mode === 'alone') {
+      url.searchParams.set('skipintro', '1'); // a one-cell world boots straight in; the intro would hold it at the title
+      await page.context().grantPermissions(['local-network-access'], { origin: url.origin });
+      await page.route(home, async route => { const response = await route.fetch(); await route.fulfill({ response, body: oneCellPage(await response.text(), shard) }); });
+    }
     // NINE-DRAGON-BENCHMAX NB6: a standalone load whose props stage sits idle with no named wait is refused at control
     // (the world may build behind the title, so the profile runs from the document's start)
-    if (mode === 'standalone') stallProfile = await startStallProfile(page);
+    if (mode === 'standalone' || mode === 'alone') stallProfile = await startStallProfile(page);
     await page.goto(url.href, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    if (mode !== 'arrival') {
+    if (mode === 'alone') await page.unroute(home);
+    if (mode !== 'arrival' && mode !== 'alone') {
     // CP16 (J522): with no zone in the address no world warms behind the title, for a standalone case as for the grid's
     await until(page, faults, async observed => await page.evaluate(titleViewVisible) && titleCaptureReady(observed, true), 'rendered usable title with completed warm-up', deadline);
     phases.titleMs = Date.now() - started;
@@ -583,7 +599,7 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
         revealSkipped = await page.locator('.ws-grid-reveal').dispatchEvent('pointerdown').then(() => true, () => false);
       }
       if (!value.ready) return false;
-      if (mode === 'standalone' || mode === 'arrival') return value.grid === null ? value.shard === shard : gridStandsIn(value.grid, shard);
+      if (mode === 'standalone' || mode === 'arrival' || mode === 'alone') return value.grid === null ? value.shard === shard : gridStandsIn(value.grid, shard);
       const grid = value.grid;
       if (typeof grid !== 'object' || grid === null || !('home' in grid) || typeof grid.home !== 'string' || grid.home.length === 0 ||
         !('inside' in grid) || grid.home !== grid.inside || (requireRings && (!('ringsReady' in grid) || grid.ringsReady !== true)) ||

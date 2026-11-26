@@ -41,12 +41,15 @@ export function initScript(zone, mode = 'enter', prefix = SAVE_PREFIX) {
 }
 
 /** The build's catalogue with only `zone`'s cell and placement: a one-cell world (CP10).
- *  @param {{ placements?: { slug: string }[]; grid?: { cells?: { slug: string }[] } }} catalogue @param {string} zone */
+ *  @param {{ placements?: { slug: string }[]; grid?: { cells?: { slug: string; instance?: string }[] } }} catalogue @param {string} zone */
 export function oneCellCatalogue(catalogue, zone) {
   const bare = (/** @type {string} */ slug) => slug.replace(/^_/u, '');
   const cells = (catalogue.grid?.cells ?? []).filter(cell => bare(cell.slug) === zone);
-  if (cells.length !== 1) throw new Error(`zone-entry: the build's catalogue has ${String(cells.length)} cells for ${zone}, not one`);
-  return { ...catalogue, grid: { ...catalogue.grid, cells: [{ ...cells[0], cell: [0, 0] }] } };
+  // a world may show one zone in several cells (cook-to-play's fills its grid with the zone it cooked): its own instance's
+  // cell first, else the catalogue's first; the bytes are the zone's either way
+  const cell = cells.find(row => 'instance' in row && row.instance === zone) ?? cells[0];
+  if (cell === undefined) throw new Error(`zone-entry: the build's catalogue has 0 cells for ${zone}, not one`);
+  return { ...catalogue, grid: { ...catalogue.grid, cells: [{ ...cell, cell: [0, 0] }] } };
 }
 
 const INLINE = /<script type="application\/json" id="ws-catalogue">([^<]*)<\/script>/u;

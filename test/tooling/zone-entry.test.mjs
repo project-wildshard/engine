@@ -51,6 +51,10 @@ test('alone cuts the inline catalogue to the zone\'s one cell, at the origin as 
   assert.deepEqual(one.grid.cells, [{ instance: 'b', slug: 'driftwood-isle', cell: [0, 0], note: '</script>' }]);
   assert.deepEqual(one.placements, catalogue.placements, 'the title rows stay; only the world is one cell');
   assert.throws(() => oneCellCatalogue(catalogue, 'nine-dragon-stack'), /0 cells for nine-dragon-stack/u);
+  // main red 45750864926: cook-to-play's world shows its cooked zone in many cells; its own instance's cell wins, else the first
+  const filled = { grid: { cells: [{ instance: 'x', slug: 'brasscap-mesa', cell: [0, 1] }, { instance: 'brasscap-mesa', slug: 'brasscap-mesa', cell: [2, 2] }, { instance: 'y', slug: 'brasscap-mesa', cell: [1, 1] }] } };
+  assert.deepEqual(oneCellCatalogue(filled, 'brasscap-mesa').grid.cells, [{ instance: 'brasscap-mesa', slug: 'brasscap-mesa', cell: [0, 0] }]);
+  assert.deepEqual(oneCellCatalogue({ grid: { cells: [filled.grid.cells[0], filled.grid.cells[2]] } }, 'brasscap-mesa').grid.cells, [{ instance: 'x', slug: 'brasscap-mesa', cell: [0, 0] }]);
   const html = `<html><script type="application/json" id="ws-catalogue">${JSON.stringify(catalogue).replaceAll('<', `${'\\'}u003c`)}</script></html>`;
   const page = oneCellPage(html, 'driftwood-isle');
   const inline = /id="ws-catalogue">(.*?)<\/script>/su.exec(page)?.[1] ?? '';
