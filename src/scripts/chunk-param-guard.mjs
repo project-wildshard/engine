@@ -81,7 +81,7 @@ export function oneShardBranches(read){
 // and inspector tools can't route a page, so they write the tap (J522 (7)).
 export const MEASURING=['scripts/budgets/','scripts/goldens/','scripts/gpu-gate/','scripts/memory/measure.mjs','scripts/memory/heapReader.mjs', // script-paths: guardKey's keys keep the old spelling
   'scripts/memory/ci.mjs','scripts/frame-floor.mjs','scripts/bench-load.mjs','scripts/boot-memory-peak.mjs','scripts/shard-phone-memory.mjs', // script-paths: guardKey's keys
-  'scripts/crossroads-rig/desktop-probe.mjs']; // script-paths: guardKey's keys
+  'scripts/crossroads-rig/desktop-probe.mjs','scripts/loading-flow/nine-load.mjs']; // script-paths: guardKey's keys
 /** A line that measures the grid on purpose (frame-floor's grid arm) carries this mark. */
 export const GRID_ARM='chunk-param-guard: grid arm';
 const TAP=/\b(?:initScript|tapDocument|tapSessionDocument|setTitleArrival)\(|['"`]titleArrival['"`]/gu;
