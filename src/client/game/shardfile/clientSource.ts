@@ -147,7 +147,7 @@ function clientSource(admitted: AdmittedFolder, options: FolderOptions, bindings
   return result;
 }
 
-/** CHUNK-PARAM-REMOVAL CP25 (J522): a data shard that is a grid page's own home is admitted at its region's charge, as
+/** CHUNK-PARAM-REMOVAL CP25 (J522): a shard that is a grid page's own home is admitted at its region's charge, as
  * session.ts admits an owned data home, so the live grid's initial handoff takes that exact claim. Builder dev's inline
  * candidate (`wildshard dev` enters it as its one cell) reaches here before the session; a claimed home is left alone. */
 function admitGridDataHome(source: Shardfile, bindings: Pick<ShardfileClientBindings, 'instance' | 'residency'>): void {
