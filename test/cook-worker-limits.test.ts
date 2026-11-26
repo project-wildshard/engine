@@ -119,11 +119,11 @@ describe('the cook worker', () => {
     expect(JSON.parse(outcome.kind === 'refused' ? outcome.reason : '{}')).toEqual({home: true, hosts: true, write: true, child: true, secret: null, cookKey: null, token: null});
   }, 30_000);
 
-  // QA 11-25 row 57: this test failed twice on CI (runs 45664266724 and 45686413697, tests (6), about 1.4 s) and passed each rerun.
-  // Its child said its verdict on stdout just before exit, and CI's arm runs it under sudo, which may relay a child's output
-  // through a pseudo-terminal (Ubuntu's `use_pty`) and drop a quick exit's last line, so the verdict read as a bare refusal. The
-  // child now writes it where a real cook job does (`<out>.result.json`, scripts/cook-job.mjs), each run to its own file. No retry:
-  // a miss prints a `row57` line naming what each child returned.
+  // QA 11-25 row 57: this test failed on CI only on runners whose image caches Node 26 (setup-node resolves engines
+  // `<27` to whichever major the image holds: run 45731753083 gave tests (4) 26.13.1 and the rest 24.22.3). From Node 25,
+  // `--permission` also denies the network unless `--allow-net` is given, so the open arm itself was refused
+  // (`false ERR_ACCESS_DENIED`). A real cook job keeps that denial. Here both arms grant `--allow-net` where Node has it,
+  // so the open arm reaches the host and the shut arm proves the OS wrap alone. A miss prints a `row57` line.
   it('takes a job off the network through the host wrap', {timeout: 30_000}, async () => {
     const work = join(mkdtempSync(join(h.scratch, 'limit-')), 'job'), script = join(work, 'net.mjs');
     mkdirSync(work);
@@ -143,8 +143,10 @@ describe('the cook worker', () => {
         : undefined;
     try {
       if (wrap === undefined) throw new Error('Cook network proof requires an actual OS network boundary');
-      const open = await runJob(h.launcher(script), join(work, 'x.tar'), join(work, 'open')), openReached = reached;
-      const shut = await runJob({...h.launcher(script), wrap}, join(work, 'x.tar'), join(work, 'shut'));
+      // Node 25+ denies the network under --permission by itself: grant it, so only the wrap can take it away.
+      const allowNet = process.allowedNodeEnvironmentFlags.has('--allow-net') ? ['sh', '-c', 'exec "$0" --allow-net "$@"'] : [];
+      const open = await runJob({...h.launcher(script), wrap: allowNet}, join(work, 'x.tar'), join(work, 'open')), openReached = reached;
+      const shut = await runJob({...h.launcher(script), wrap: [...wrap, ...allowNet]}, join(work, 'x.tar'), join(work, 'shut'));
       if (!(open.kind === 'refused' && open.reason === 'true' && openReached === 1 && shut.kind === 'refused' && shut.reason.startsWith('false ') && reached === 1))
         console.error(JSON.stringify({row57: {open, openReached, shut, reached}}).slice(0, 4000));
       expect(open).toEqual({kind: 'refused', reason: 'true'});
