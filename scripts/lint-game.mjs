@@ -23,6 +23,9 @@ if(asked.length===0){
  // ZONE-SNAPSHOTS ZS1 (J507): no checked-in zone snapshots beyond the shrink-only baseline.
  const guard=spawnSync(process.execPath,['scripts/zone-snapshot-guard.mjs'],{stdio:'inherit'});
  if(guard.status!==0)process.exit(guard.status??1);
+ // CHUNK-PARAM-REMOVAL CP23 (J522): no new chunk param read or write beyond the shrink-only baseline.
+ const chunkGuard=spawnSync(process.execPath,['scripts/chunk-param-guard.mjs'],{stdio:'inherit'});
+ if(chunkGuard.status!==0)process.exit(chunkGuard.status??1);
 }
 const threads = process.env.WS_PUSH_LINT_THREADS;
 if (threads !== undefined && !/^[1-9]\d*$/u.test(threads)) throw new Error('Invalid push lint worker limit');
