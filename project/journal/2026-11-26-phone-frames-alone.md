@@ -15,3 +15,6 @@
   public-grid arm measures the grid on purpose and carries the `chunk-param-guard: grid arm` mark.
 - The one-cell world counts more programs than the deleted one-shard page did (brasscap Low 49 against 34, Glowfen 82
   against 51); the keys over their line are declared with this row, for the next pin lane to record (row 68 (t)).
+- Declared (85 keys, budgets/baselines.json): every phone programs key and phone-Low draws key. A local sweep of 20 of
+  27 zones, none timing out, read about +18 programs and +7 draws in every zone, the open plots most clearly (41 to 44
+  programs against 22 to 25), with triangles moving only with content: the grid shell, not new weight.

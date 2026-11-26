@@ -1430,13 +1430,15 @@
    "value": 54,
    "contentKey": "brasscap-mesa@19",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/brasscap-mesa": {
    "value": 34,
    "contentKey": "brasscap-mesa@19",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/triangles/driftwood-isle": {
    "value": 304489,
@@ -1448,13 +1450,15 @@
    "value": 44,
    "contentKey": "driftwood-isle@12",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/driftwood-isle": {
    "value": 88,
    "contentKey": "driftwood-isle@12",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/triangles/far-reach": {
    "value": 1657757,
@@ -1466,13 +1470,15 @@
    "value": 121,
    "contentKey": "far-reach@9",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/far-reach": {
    "value": 87,
    "contentKey": "far-reach@9",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/triangles/ink-cel-valley": {
    "value": 313335,
@@ -1484,13 +1490,15 @@
    "value": 115,
    "contentKey": "ink-cel-valley@1",
    "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/ink-cel-valley": {
    "value": 39,
    "contentKey": "ink-cel-valley@1",
    "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/triangles/nalati-grasslands": {
    "value": 853036,
@@ -1502,13 +1510,15 @@
    "value": 76,
    "contentKey": "nalati-grasslands@10",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/nalati-grasslands": {
    "value": 93,
    "contentKey": "nalati-grasslands@10",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/triangles/nine-dragon-stack": {
    "value": 634477,
@@ -1520,13 +1530,15 @@
    "value": 92,
    "contentKey": "nine-dragon-stack@11",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/nine-dragon-stack": {
    "value": 50,
    "contentKey": "nine-dragon-stack@11",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/triangles/open-plot-alien-plain": {
    "value": 44156,
@@ -1538,13 +1550,15 @@
    "value": 47,
    "contentKey": "open-plot-alien-plain@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/open-plot-alien-plain": {
    "value": 22,
    "contentKey": "open-plot-alien-plain@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/triangles/open-plot-clockwork-canyon": {
    "value": 71484,
@@ -1556,13 +1570,15 @@
    "value": 50,
    "contentKey": "open-plot-clockwork-canyon@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/open-plot-clockwork-canyon": {
    "value": 24,
    "contentKey": "open-plot-clockwork-canyon@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/triangles/open-plot-coral-drift": {
    "value": 105008,
@@ -1574,13 +1590,15 @@
    "value": 55,
    "contentKey": "open-plot-coral-drift@4",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/open-plot-coral-drift": {
    "value": 22,
    "contentKey": "open-plot-coral-drift@4",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/triangles/open-plot-desert-ruin": {
    "value": 95629,
@@ -1592,13 +1610,15 @@
    "value": 51,
    "contentKey": "open-plot-desert-ruin@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/open-plot-desert-ruin": {
    "value": 23,
    "contentKey": "open-plot-desert-ruin@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/triangles/open-plot-ember-forge": {
    "value": 84752,
@@ -1610,13 +1630,15 @@
    "value": 55,
    "contentKey": "open-plot-ember-forge@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/open-plot-ember-forge": {
    "value": 23,
    "contentKey": "open-plot-ember-forge@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/triangles/open-plot-fossil-badlands": {
    "value": 83298,
@@ -1628,13 +1650,15 @@
    "value": 49,
    "contentKey": "open-plot-fossil-badlands@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/open-plot-fossil-badlands": {
    "value": 24,
    "contentKey": "open-plot-fossil-badlands@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/triangles/open-plot-frostline-peaks": {
    "value": 96510,
@@ -1646,13 +1670,15 @@
    "value": 54,
    "contentKey": "open-plot-frostline-peaks@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/open-plot-frostline-peaks": {
    "value": 24,
    "contentKey": "open-plot-frostline-peaks@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/triangles/open-plot-jungle-ziggurat": {
    "value": 73613,
@@ -1664,13 +1690,15 @@
    "value": 51,
    "contentKey": "open-plot-jungle-ziggurat@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/open-plot-jungle-ziggurat": {
    "value": 23,
    "contentKey": "open-plot-jungle-ziggurat@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/triangles/open-plot-lantern-bayou": {
    "value": 120687,
@@ -1682,13 +1710,15 @@
    "value": 50,
    "contentKey": "open-plot-lantern-bayou@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/open-plot-lantern-bayou": {
    "value": 23,
    "contentKey": "open-plot-lantern-bayou@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/triangles/open-plot-mosslight-ruins": {
    "value": 116799,
@@ -1700,13 +1730,15 @@
    "value": 53,
    "contentKey": "open-plot-mosslight-ruins@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/open-plot-mosslight-ruins": {
    "value": 25,
    "contentKey": "open-plot-mosslight-ruins@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/triangles/open-plot-night-market": {
    "value": 141711,
@@ -1718,13 +1750,15 @@
    "value": 54,
    "contentKey": "open-plot-night-market@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/open-plot-night-market": {
    "value": 25,
    "contentKey": "open-plot-night-market@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/triangles/open-plot-patchwork-fairground": {
    "value": 80172,
@@ -1736,13 +1770,15 @@
    "value": 41,
    "contentKey": "open-plot-patchwork-fairground@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/open-plot-patchwork-fairground": {
    "value": 24,
    "contentKey": "open-plot-patchwork-fairground@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/triangles/open-plot-saltwind-lighthouse": {
    "value": 23394,
@@ -1754,13 +1790,15 @@
    "value": 50,
    "contentKey": "open-plot-saltwind-lighthouse@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/open-plot-saltwind-lighthouse": {
    "value": 24,
    "contentKey": "open-plot-saltwind-lighthouse@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/triangles/open-plot-sky-harbor": {
    "value": 86000,
@@ -1772,13 +1810,15 @@
    "value": 42,
    "contentKey": "open-plot-sky-harbor@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/open-plot-sky-harbor": {
    "value": 24,
    "contentKey": "open-plot-sky-harbor@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/triangles/open-plot-sky-race": {
    "value": 83796,
@@ -1790,13 +1830,15 @@
    "value": 41,
    "contentKey": "open-plot-sky-race@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/open-plot-sky-race": {
    "value": 24,
    "contentKey": "open-plot-sky-race@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/triangles/open-plot-starfall-observatory": {
    "value": 67276,
@@ -1808,13 +1850,15 @@
    "value": 50,
    "contentKey": "open-plot-starfall-observatory@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/open-plot-starfall-observatory": {
    "value": 24,
    "contentKey": "open-plot-starfall-observatory@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/triangles/open-plot-thin-ice": {
    "value": 42328,
@@ -1826,13 +1870,15 @@
    "value": 36,
    "contentKey": "open-plot-thin-ice@4",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/open-plot-thin-ice": {
    "value": 24,
    "contentKey": "open-plot-thin-ice@4",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/triangles/pastel-plain": {
    "value": 152425,
@@ -1844,13 +1890,15 @@
    "value": 35,
    "contentKey": "pastel-plain@1",
    "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/pastel-plain": {
    "value": 33,
    "contentKey": "pastel-plain@1",
    "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/triangles/pine-hollow": {
    "value": 914493,
@@ -1862,13 +1910,15 @@
    "value": 81,
    "contentKey": "pine-hollow@18",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/pine-hollow": {
    "value": 107,
    "contentKey": "pine-hollow@18",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/triangles/sunscar-dunes": {
    "value": 150735,
@@ -1880,13 +1930,15 @@
    "value": 47,
    "contentKey": "sunscar-dunes@8",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/sunscar-dunes": {
    "value": 51,
    "contentKey": "sunscar-dunes@8",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "download/phone/mirror-salt": {
    "value": 5706880,
@@ -1910,13 +1962,15 @@
    "value": 101,
    "contentKey": "mirror-salt@7",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/mirror-salt": {
    "value": 44,
    "contentKey": "mirror-salt@7",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/triangles/mossgate": {
    "value": 1247059,
@@ -1928,169 +1982,197 @@
    "value": 130,
    "contentKey": "mossgate@25",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/mossgate": {
    "value": 101,
    "contentKey": "mossgate@25",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-high/programs/brasscap-mesa": {
    "value": 31,
    "contentKey": "brasscap-mesa@19",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-high/programs/driftwood-isle": {
    "value": 84,
    "contentKey": "driftwood-isle@12",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-high/programs/far-reach": {
    "value": 86,
    "contentKey": "far-reach@9",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-high/programs/mirror-salt": {
    "value": 39,
    "contentKey": "mirror-salt@7",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-high/programs/mossgate": {
    "value": 98,
    "contentKey": "mossgate@25",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-high/programs/nalati-grasslands": {
    "value": 94,
    "contentKey": "nalati-grasslands@10",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-high/programs/nine-dragon-stack": {
    "value": 49,
    "contentKey": "nine-dragon-stack@11",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-high/programs/open-plot-alien-plain": {
    "value": 22,
    "contentKey": "open-plot-alien-plain@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-high/programs/open-plot-clockwork-canyon": {
    "value": 23,
    "contentKey": "open-plot-clockwork-canyon@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-high/programs/open-plot-coral-drift": {
    "value": 22,
    "contentKey": "open-plot-coral-drift@4",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-high/programs/open-plot-desert-ruin": {
    "value": 23,
    "contentKey": "open-plot-desert-ruin@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-high/programs/open-plot-ember-forge": {
    "value": 23,
    "contentKey": "open-plot-ember-forge@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-high/programs/open-plot-fossil-badlands": {
    "value": 23,
    "contentKey": "open-plot-fossil-badlands@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-high/programs/open-plot-frostline-peaks": {
    "value": 23,
    "contentKey": "open-plot-frostline-peaks@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-high/programs/open-plot-jungle-ziggurat": {
    "value": 23,
    "contentKey": "open-plot-jungle-ziggurat@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-high/programs/open-plot-lantern-bayou": {
    "value": 22,
    "contentKey": "open-plot-lantern-bayou@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-high/programs/open-plot-mosslight-ruins": {
    "value": 24,
    "contentKey": "open-plot-mosslight-ruins@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-high/programs/open-plot-night-market": {
    "value": 24,
    "contentKey": "open-plot-night-market@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-high/programs/open-plot-patchwork-fairground": {
    "value": 23,
    "contentKey": "open-plot-patchwork-fairground@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-high/programs/open-plot-saltwind-lighthouse": {
    "value": 23,
    "contentKey": "open-plot-saltwind-lighthouse@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-high/programs/open-plot-sky-harbor": {
    "value": 23,
    "contentKey": "open-plot-sky-harbor@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-high/programs/open-plot-sky-race": {
    "value": 23,
    "contentKey": "open-plot-sky-race@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-high/programs/open-plot-starfall-observatory": {
    "value": 23,
    "contentKey": "open-plot-starfall-observatory@3",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-high/programs/open-plot-thin-ice": {
    "value": 23,
    "contentKey": "open-plot-thin-ice@4",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-high/programs/pine-hollow": {
    "value": 104,
    "contentKey": "pine-hollow@18",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-high/programs/sunscar-dunes": {
    "value": 50,
    "contentKey": "sunscar-dunes@8",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "download/phone/glowfen": {
    "value": 6489656,
@@ -2108,19 +2190,22 @@
    "value": 50,
    "contentKey": "glowfen@8",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-low/programs/glowfen": {
    "value": 51,
    "contentKey": "glowfen@8",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   },
   "render/phone-high/programs/glowfen": {
    "value": 48,
    "contentKey": "glowfen@8",
    "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
-   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
+   "declared": "QA 11-25 row 99 (J522 (4)): phone frames now measure a one-cell world, not the deleted one-shard page; its grid shell adds about 18 programs and 7 draws in every zone (local sweep, 20 of 27 zones)"
   }
  }
 }
