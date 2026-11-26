@@ -64,12 +64,16 @@ export function bundleDescriptor(archive, tag) {
 /** The release's shards, by the name the server reads them under; a variable may give a pin's slug or its folder.
  * @param {unknown} pins @param {string} names @returns {ReleaseFile['shards']} */
 export function releaseShards(pins, names) {
-  const rows = v.parse(v.object({ shards: v.array(v.object({ slug: v.string(), revision: v.pipe(v.number(), v.integer(), v.minValue(0)) })) }), pins).shards;
+  const upload = v.optional(v.pipe(v.number(), v.integer(), v.minValue(0)));
+  const head = v.object({slug: v.string(), uploadNumber: upload, revision: upload});
+  const rows = v.parse(v.object({shards: v.array(head)}), pins).shards;
   const selected = names.split(',').map(name => name.trim()).filter(Boolean).map(servedSlug);
   if (selected.length === 0 || new Set(selected).size !== selected.length) throw new Error('E7_SERVER_SHARDS must name unique pinned shards');
   return selected.map(slug => {
     const row = rows.find(shard => servedSlug(shard.slug) === slug);
-    if (row === undefined) throw new Error(`No pinned revision for ${slug}`);
-    return { slug, revision: row.revision };
+    const uploadNumber = row?.uploadNumber ?? row?.revision;
+    if (uploadNumber === undefined) throw new Error(`No pinned uploadNumber for ${slug}`);
+    // Deployed readers of the signed release still use the old field.
+    return {slug, revision: uploadNumber};
   });
 }

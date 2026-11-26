@@ -24,7 +24,7 @@ test('the pass is off until the host names a sidecar folder, a recorder, its cli
   expect(cookSidecars({COOK_SIDECARS: 'tmp/sidecars'})).toBe(resolve('tmp/sidecars'));
   const off = (env: Record<string, string>): unknown => recordPorts(env, MOVED, root, quiet);
   expect(off({})).toEqual({off: 'no COOK_SIDECARS'});
-  expect(recordPorts(full, undefined, root, quiet)).toEqual({off: 'no renderer uploadNumber'});
+  expect(recordPorts(full, undefined, root, quiet)).toEqual({off: 'no renderer revision'});
   expect(off({...full, COOK_RECORDER: ''})).toEqual({off: 'no COOK_RECORDER'});
   expect(off({...full, COOK_PREPARATION_CLIENT: ''})).toEqual({off: 'no COOK_PREPARATION_CLIENT'});
   expect(off({...full, COOK_RECORD_CANARY: ''})).toEqual({off: 'no COOK_RECORD_CANARY'});
