@@ -41,8 +41,9 @@ const ROOT = resolvePath(new URL('..', import.meta.url).pathname);
 const argv = process.argv.slice(2);
 const flag = (name, d) => { const a = argv.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : d; };
 const WS = flag('ws', 'ws://127.0.0.1:9231/devtools/page/1');
-const GAME_PAGE = new URL(flag('url', 'https://play.wildshard.io/'));
-const URL_GAME = agentUrl(zoneHome(GAME_PAGE.origin, GAME_PAGE.search)); // CHUNK-PARAM CP17 (J522): zoneHome refuses a zone in it
+const URL_GAME = agentUrl(flag('url', 'https://play.wildshard.io/'));
+// CHUNK-PARAM CP17 (J522): the page names no zone (the tap enters it); zoneHome refuses a `--url` that still does
+zoneHome(new URL(URL_GAME).origin, new URL(URL_GAME).search);
 const ZONE = flag('zone', 'nalati-grasslands');
 const TAG = flag('tag', `reading-${new Date().toISOString().slice(0, 16).replaceAll(/[:T]/g, '')}`);
 const FPS_S = Number(flag('fps', '0'));
