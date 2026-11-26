@@ -255,6 +255,7 @@
     "./ai/view/eliteEntry": "./src/client/engine/ai/view/eliteEntry.ts",
     "./world/scalarChannel": "./src/shared/engine/world/scalarChannel.ts",
     "./boot/waits": "./src/shared/engine/boot/waits.ts",
+    "./boot/zoneAssets": "./src/shared/engine/boot/zoneAssets.ts",
     "./boot/liveJsonParser": "./src/client/engine/boot/liveJsonParser.ts",
     "./boot/loadWindow": "./src/client/engine/boot/loadWindow.ts",
     "./boot/download": "./src/client/engine/boot/download.ts",

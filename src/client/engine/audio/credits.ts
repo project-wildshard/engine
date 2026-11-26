@@ -8,7 +8,7 @@ import { engineString } from '../../../shared/engine/strings';
 //
 //   sfxCredit(getSfxSet())   → 'Sound effects: MOSS-SoundEffect v2 · Stable Audio 3 Medium — Powered by Stability AI' ('' for synth, or a set not shipped)
 //   onSfxCredit(fn)          → a set's sfx.json credit arrived (Audio.ts calls setSfxCredit)
-import { type SfxSet, shipped } from '../../../shared/engine/audio/bootAudio';
+import { type SfxSet, sfxDir, shipped } from '../../../shared/engine/audio/bootAudio';
 import { onOwnerDispose } from '../../../shared/engine/app/ownership';
 
 export const MUSIC_CREDIT: string = engineString('s_7fc7e56bbd7f');
@@ -36,7 +36,7 @@ export function installSfxCredit(credit: string, scope: Scope): void {
 
 export function sfxCredit(set: SfxSet): string {
   if (scopedCredits.size > 0) return [...new Set(scopedCredits.values())].join(' · ');
-  if (set === 'synth' || !shipped(`/assets/sfx/${set}/sfx.json`)) return ''; // a set this build does not ship plays no model's sounds
+  if (set === 'synth' || !shipped(`${sfxDir(set)}sfx.json`)) return ''; // a set this build does not ship plays no model's sounds
   const c = loaded.get(set) ?? NAMES[set];
   return !STABILITY_SETS.has(set) || c.includes('Stability AI') ? c : engineString('s_276bbc529952', [c, STABILITY]);
 }

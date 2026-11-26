@@ -56,3 +56,18 @@ test('an unreadable cook or a bad mount refuses and installs nothing', () => wit
   expect(() => inlineMountBytes({})).toThrow('Inline candidate cook has no mounts');
   expect(publicBytes()).toEqual({ '/assets/kept.bin': 42 });
 }));
+
+// SF4 (standalone shardfiles): a re-packed zone mounts its audio under its own name; the table row keeps that folder.
+test('an inline candidate adds its zone-scoped audio manifests with their folders', () => withTables(async () => {
+  const cook = { mounts: [{ url: '/assets/open-plot-sky-race/sfx/sky-race/sfx.json', path: 'm/a', bytes: 5, hash: 'h' },
+    { url: '/assets/open-plot-sky-race/music/sky-race/music.json', path: 'm/b', bytes: 6, hash: 'h' }] };
+  const files: Record<string, unknown> = {
+    'http://127.0.0.1:4000/cook.json': cook,
+    'http://127.0.0.1:4000/assets/open-plot-sky-race/sfx/sky-race/sfx.json': { beds: {}, provenance: [] },
+    'http://127.0.0.1:4000/assets/open-plot-sky-race/music/sky-race/music.json': { style: 'sky-race' },
+  };
+  const read = vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(files[url]))));
+  expect(await adoptInlineMounts({ cook: { path: 'cook.json' } }, 'http://127.0.0.1:4000/', read)).toBe(2);
+  expect(sfxManifests()).toEqual({ 'sky-race': { beds: {}, $dir: '/assets/open-plot-sky-race/sfx/sky-race/' } });
+  expect(musicManifests()).toEqual({ 'sky-race': { style: 'sky-race', $dir: '/assets/open-plot-sky-race/music/sky-race/' } });
+}));

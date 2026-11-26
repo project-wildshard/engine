@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { readdirSync, statSync, readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { contentNamed, hashTree } from './assetHashes';
+import { ZONE_DIR, isZoneSlug } from '../../shared/engine/boot/zoneAssets';
 import { copyRapierWasm } from '../../../vite/rapier';
 import { copyBasisTranscoder } from './basis';
 import { publicBytesTableSource, assetVersionsTableSource } from '../boot-publication.mjs';
@@ -90,14 +91,19 @@ export function assetVersionRows(): Record<string, string> {
 export function audioTableSource(root: string = process.cwd()): string {
   const read = (sub: string, name: string): Record<string, unknown> => {
     const out: Record<string, unknown> = {};
-    const dir = join(root, 'public/assets', sub);
-    if (!existsSync(dir)) return out;
-    for (const d of readdirSync(dir).sort()) {
-      const p = join(dir, d, name);
-      if (!existsSync(p)) continue;
+    const add = (p: string, key: string, dir?: string): void => {
       const input: unknown = JSON.parse(readFileSync(p, 'utf8'));
       if (typeof input !== 'object' || input === null || Array.isArray(input)) throw new Error(`${p}: audio manifest must be an object`);
-      out[d] = Object.fromEntries(Object.entries(input).filter(([key]) => key !== 'provenance' && key !== 'synth_keeps'));
+      if (Object.hasOwn(out, key)) throw new Error(`${p}: a second ${sub} manifest for '${key}' (SF4: one key, one zone)`);
+      out[key] = { ...Object.fromEntries(Object.entries(input).filter(([field]) => field !== 'provenance' && field !== 'synth_keeps')), ...dir === undefined ? {} : { [ZONE_DIR]: dir } };
+    };
+    const assets = join(root, 'public/assets'), dir = join(assets, sub);
+    if (existsSync(dir)) for (const d of readdirSync(dir).sort()) { const p = join(dir, d, name); if (existsSync(p)) add(p, d); }
+    // SF4 (standalone shardfiles): a re-packed zone keeps its audio under its own name, /assets/<slug>/<sub>/<key>/
+    if (existsSync(assets)) for (const slug of readdirSync(assets).sort()) {
+      const zone = join(assets, slug, sub);
+      if (!isZoneSlug(slug) || !existsSync(zone) || !statSync(zone).isDirectory()) continue;
+      for (const d of readdirSync(zone).sort()) { const p = join(zone, d, name); if (isZoneSlug(d) && existsSync(p)) add(p, d, `/assets/${slug}/${sub}/${d}/`); }
     }
     return out;
   };

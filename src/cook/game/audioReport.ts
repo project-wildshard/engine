@@ -4,7 +4,8 @@
 // fails a build or main: an overrun is an AMBER line that CI's budget reporter annotates and main-watch receipts (J295).
 
 /** A recording a spawn manifest lists (AU1): engine music and sound effects and a shard's own audio mounts. */
-const AUDIO_URL = /^\/assets\/(?:music|sfx)\/[^?]+\.(?:m4a|mp3|ogg|opus|wav|webm|flac)(?:\?|$)/u;
+// SF4: a re-packed zone keeps its own audio under /assets/<slug>/(music|sfx)/ (shared/engine/boot/zoneAssets.ts).
+const AUDIO_URL = /^\/assets\/(?:[a-z0-9]+(?:-[a-z0-9]+)*\/)?(?:music|sfx)\/[^?]+\.(?:m4a|mp3|ogg|opus|wav|webm|flac)(?:\?|$)/u;
 export const isAudioUrl = (url: string): boolean => AUDIO_URL.test(url);
 
 /** J303 (Jake, 2026-11-12): "each shard can have 10 megabytes of audio. Red over 10. Green up to 6. Amber between 6 and 10". */

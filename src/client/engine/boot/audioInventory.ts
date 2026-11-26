@@ -1,3 +1,4 @@
+import { isAudioUrl } from '../../../shared/engine/boot/zoneAssets';
 import type { BootSpec } from '../../../shared/engine/level/spec';
 
 export interface BootAudioFiles { readonly music: string[]; readonly sfx: string[] }
@@ -17,8 +18,9 @@ export function prepareBootAudio(boot: BootSpec | undefined): Promise<void> {
     pending = resolveBootAudio(boot).then((files) => {
       const music: string[] = [], sfx: string[] = [];
       for (const file of files) {
-        if (file.startsWith('/assets/music/')) music.push(file);
-        else if (file.startsWith('/assets/sfx/')) sfx.push(file);
+        const kind = isAudioUrl(file); // SF4: an engine-wide or a zone's own music or sfx folder
+        if (kind === 'music') music.push(file);
+        else if (kind === 'sfx') sfx.push(file);
         else throw new Error(`Boot audio inventory has an unsupported path: ${file}`);
       }
       const result = { music, sfx }; ready.set(boot, result); return result;

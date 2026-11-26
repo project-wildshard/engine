@@ -25,7 +25,7 @@ import type { Scope } from '../../../shared/engine/app/scope';
 // carries `layers` (bass, drums) and `phases` (each boss phase's layer gains). `decodeStyle(genre, slots, …, set)` reads it.
 // A deck of the boss plays its layers at the current phase's gains (Deck.setPhase), moved on the bar like the tension stem.
 
-import { STINGS, musicManifest, musicSetDir, shipped, type SCORE_GENRE, type MusicStyle as MusicGenre, type BossPhase, type MusicSet, type SlotName, type SlotSpec, type StemSting } from '../../../shared/engine/audio/bootAudio';
+import { STINGS, musicDir, musicManifest, musicSetDir, shipped, type SCORE_GENRE, type MusicStyle as MusicGenre, type BossPhase, type MusicSet, type SlotName, type SlotSpec, type StemSting } from '../../../shared/engine/audio/bootAudio';
 
 /** a decoded slot: its spec and the stems (tension absent for the title cut; layers only on the boss) */
 export interface SlotAudio { genre: MusicGenre | typeof SCORE_GENRE; slot: SlotName; spec: SlotSpec; calm: AudioBuffer | AacTrack; tension: AudioBuffer | AacTrack | undefined; layers: (AudioBuffer | AacTrack)[] }
@@ -56,7 +56,7 @@ export async function decodeRecordingStem(bytes: ArrayBuffer, spec: SlotSpec, de
 export async function decodeStyle(genre: MusicGenre, slots: readonly SlotName[], read: (url: string) => Promise<ArrayBuffer>, decode: AudioDecode, onFile?: () => void, set: MusicSet = 'base', stings: readonly StemSting[] = STINGS, withTension = true): Promise<StyleBank> {
   const m = musicManifest(genre, set);
   if (!m) throw new Error(`no music.json for '${musicSetDir(genre, set)}' in this build`);
-  const base = `/assets/music/${musicSetDir(genre, set)}/`;
+  const base = musicDir(musicSetDir(genre, set));
   const bank: StyleBank = { genre, set, slots: new Map(), stings: new Map(), log: [] };
   const owner = resourceScope();
   const readOne = async <T>(file: string, convert: (bytes: ArrayBuffer) => Promise<T>): Promise<T> => {

@@ -7,6 +7,7 @@
  */
 import type { AudioData } from '@wildshard/format/audio';
 import { musicManifests, publicBytes, sfxManifests } from '../boot/tables';
+import { audioDirOf } from '../boot/zoneAssets';
 
 /** J304 (AUDIO AU16): the engine's one recorded music style. There is no choice: the synth score plays only where a
  *  recording is missing or fails to decode. */
@@ -42,8 +43,9 @@ function ordered<T extends string>(all: readonly T[], selected: string, manifest
 }
 export const sfxSetsFor = (set: SfxSet): string[] => ordered(SFX_SETS, set, sfxManifests());
 const filesOf = (dir: string, manifest: unknown): string[] => manifestFiles(manifest).map((f) => `${dir}${f}`).filter((p) => p in publicBytes()); // a file the build does not ship is never asked for
-export const musicDir = (style: string): string => `/assets/music/${style}/`;
-export const sfxDir = (set: string): string => `/assets/sfx/${set}/`;
+/** SF4: a zone-scoped manifest's folder (`/assets/<slug>/music/<key>/`, boot/zoneAssets.ts), else the engine-wide one */
+export const musicDir = (style: string): string => audioDirOf(musicManifests()[style], `/assets/music/${style}/`);
+export const sfxDir = (set: string): string => audioDirOf(sfxManifests()[set], `/assets/sfx/${set}/`);
 /** the manifest without `drop`'s slots */
 function withoutSlots(m: unknown, drop: readonly string[]): unknown {
   if (drop.length === 0 || typeof m !== 'object' || m === null || Array.isArray(m)) return m;
@@ -119,7 +121,7 @@ export function styleFiles(genre: MusicStyle, slots: readonly SlotName[], withSt
   const files: string[] = [];
   for (const k of slots) { const sp = m.slots[k]; if (sp) files.push(sp.calm, ...(!withTension || sp.tension === undefined ? [] : [sp.tension])); }
   if (withStings) for (const k of STINGS) { const f = m.stings[k]; if (f !== undefined) files.push(f); }
-  return [...new Set(files.map((f) => `/assets/music/${genre}/${f}`))].filter(shipped);
+  return [...new Set(files.map((f) => `${musicDir(genre)}${f}`))].filter(shipped);
 }
 
 // ---- a level's own score set ----
@@ -183,14 +185,14 @@ export function cueManifest(key: string): Record<string, unknown> | undefined { 
 /** Resolve a confined shipped filename, or an explicit recording in another
  * shipped catalogue. References are one hop; paths and nested aliases refuse. */
 export function cueFile(key: string, value: unknown): string | undefined {
-  if (typeof value === 'string') return cueFileIn(`/assets/sfx/${key}/`, value);
+  if (typeof value === 'string') return cueFileIn(sfxDir(key), value);
   if (!isObj(value) || Object.keys(value).length !== 2 || typeof value['set'] !== 'string'
     || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(value['set']) || cueManifest(value['set']) === undefined) return undefined;
   const target = cueManifest(value['set']);
   const known = ['beds', 'hums'].some(section => {
     const rows = target?.[section]; return isObj(rows) && Object.values(rows).some(row => isObj(row) && typeof row['file'] === 'string' && row['file'] === value['file']);
   });
-  return known ? cueFileIn(`/assets/sfx/${value['set']}/`, value['file']) : undefined;
+  return known ? cueFileIn(sfxDir(value['set']), value['file']) : undefined;
 }
 /** Original family order for array and object-form manifests. */
 export function cueFamilyNames(manifest: Record<string, unknown> | undefined, family: string): string[] {
@@ -289,7 +291,7 @@ function scoreSetSelection(bootSlots: readonly string[], policy: ScorePolicy, se
   const slots = bootSlots.filter(slot => slot !== 'title');
   const titleFiles = (genre: MusicStyle): string[] => {
     if (policy.inventory === 'base') return styleFiles(genre, ['title']);
-    const title = musicManifest(genre)?.slots['title']; return title ? [`/assets/music/${genre}/${title.calm}`].filter(shipped) : [];
+    const title = musicManifest(genre)?.slots['title']; return title ? [`${musicDir(genre)}${title.calm}`].filter(shipped) : [];
   };
   const useCues = (): boolean => !policy.cueOverlay || sfxSet() !== 'synth';
   return {

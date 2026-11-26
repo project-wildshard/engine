@@ -2,6 +2,7 @@ import { installAssetTables, publicBytes, assetVersions, musicManifests, sfxMani
 import { readContent } from '@wildshard/engine/boot/contentRead';
 import { contentURL } from '@wildshard/engine/boot/contentBase';
 import { prepareBootImports } from './bootDownloads';
+import { ZONE_DIR, audioManifestRow } from '@wildshard/engine/boot/zoneAssets';
 
 /** Exact compiler address consumed by the existing size/hash-verified table reader. */
 export interface AssetTableAddress { readonly url: string; readonly bytes: number; readonly sha256: string }
@@ -108,13 +109,15 @@ export async function adoptInlineMounts(descriptor: unknown, base: string, read:
   // compiles them; the candidate's copy wins over a pinned one, since the mounts served beside the page are its own.
   const music: Record<string, unknown> = { ...musicManifests() }, sfx: Record<string, unknown> = { ...sfxManifests() };
   for (const url of Object.keys(added)) {
-    const audio = /^\/assets\/(music|sfx)\/([^/]+)\/(music|sfx)\.json$/u.exec(url);
-    if (audio === null || audio[1] !== audio[3] || audio[2] === undefined) continue;
+    // SF4: an engine-wide /assets/<kind>/<key>/ manifest or a zone's own /assets/<slug>/<kind>/<key>/ one (boot/zoneAssets.ts)
+    const audio = audioManifestRow(url);
+    if (audio === null) continue;
     const manifestResponse = await read(new URL(url, base).href);
     if (!manifestResponse.ok) throw new Error(`Inline candidate ${url} unreadable: ${String(manifestResponse.status)}`);
     const manifest: unknown = await manifestResponse.json();
     if (!record(manifest)) throw new Error(`Inline candidate ${url} is not a manifest`);
-    (audio[1] === 'music' ? music : sfx)[audio[2]] = Object.fromEntries(Object.entries(manifest).filter(([key]) => key !== 'provenance' && key !== 'synth_keeps'));
+    (audio.kind === 'music' ? music : sfx)[audio.key] = { ...Object.fromEntries(Object.entries(manifest).filter(([key]) => key !== 'provenance' && key !== 'synth_keeps')),
+      ...audio.dir === undefined ? {} : { [ZONE_DIR]: audio.dir } };
   }
   installAssetTables({ bytes: { ...publicBytes(), ...added }, versions: assetVersions(), music, sfx, packs: bootPacks() });
   return Object.keys(added).length;

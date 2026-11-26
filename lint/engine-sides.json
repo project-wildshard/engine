@@ -1667,6 +1667,7 @@
     "src/shared/engine/boot/timing.ts": "shared",
     "src/shared/engine/boot/workerTiming.ts": "shared",
     "src/shared/engine/boot/waits.ts": "shared",
+    "src/shared/engine/boot/zoneAssets.ts": "shared",
     "src/shared/engine/combat/ammo.ts": "shared",
     "src/shared/engine/combat/blocks/ads.ts": "shared",
     "src/shared/engine/combat/blocks/melee.ts": "shared",
