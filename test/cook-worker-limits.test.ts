@@ -11,7 +11,7 @@ import {writeTar} from '@wildshard/format/tar';
 import {createCookWorker, indexKey, objectHeaders, runJob, type JobLauncher} from '../src/cook/game/cookWorker';
 import {validateShardfileFolder} from '@wildshard/format/shardfileValidation';
 import {checkShardfile} from '../src/server/host/checkShardfile';
-import {runCookJob, ShardfileRefusedError} from '../src/cook/game/cookJob';
+import {admission, runCookJob, ShardfileRefusedError} from '../src/cook/game/cookJob';
 import {folderStore, r2Store} from '../src/cook/game/packStore';
 import {hashOf, rawTar, slug, useCookHarness} from './fixtures/cookWorkerHarness';
 
@@ -49,7 +49,7 @@ describe('the cook worker', () => {
   }, 60_000);
 
   it.each(['budget', 'entry'] as const)('keeps the shared %s refusal unchanged before any pack is published', async failure => {
-    const product = validateShardfileFolder({read: path => {const value = h.files.get(path); if (value === undefined) throw new Error(path); return value;}, paths: () => h.files.keys()}, {hash: hashOf});
+    const product = validateShardfileFolder({read: path => {const value = h.files.get(path); if (value === undefined) throw new Error(path); return value;}, paths: () => h.files.keys()}, admission());
     const message = `Blocked portal route: ${'edge detail '.repeat(200)}`;
     const validate = failure === 'entry' ? (): Promise<never> => Promise.reject(new Error(message))
       : () => Promise.resolve({ticks: 240, lanes: 4, steps: 16, scripts: {p95Micros: 1e9, maxMicros: 1e9, samples: 180}, fuel: {p95: 10, max: 20, samples: 240}});

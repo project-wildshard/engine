@@ -5,6 +5,7 @@ import {createRequire} from 'node:module';
 import {createServer} from 'node:http';
 import {mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync, existsSync} from 'node:fs';
 import {dirname, join, resolve as resolvePath} from 'node:path';
+import {brotliDecompressSync} from 'node:zlib';
 import {afterEach, expect, test} from 'vitest';
 import {readTar} from '@wildshard/format/tar';
 import {validationSourceBytes} from '@wildshard/format/validationReceipt';
@@ -19,13 +20,14 @@ import {openWorld} from '../src/server/host/openWorld';
 import {loadRapier} from '../src/shared/engine/physics/rapier';
 
 const roots: string[] = [];
+const localMount = '/assets/brasscap-mesa/pin-local-proof.json';
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, {recursive: true, force: true}); });
 function addLocalMount(source: string): void {
   const digest = (body: Uint8Array): string => createHash('sha256').update(body).digest('hex');
-  const url = '/assets/local-proof/shared.json', bytes = Buffer.from('{}'), path = `mounts${url}`;
+  const bytes = Buffer.from('{}'), path = `mounts${localMount}`;
   mkdirSync(dirname(join(source, path)), {recursive: true}); writeFileSync(join(source, path), bytes);
   const cook = JSON.parse(readFileSync(join(source, 'cook.json'), 'utf8')) as {mounts: {url: string; path: string; hash: string; bytes: number}[]; inputHash?: string; renderer?: string};
-  cook.mounts.push({url, path, hash: digest(bytes), bytes: bytes.length});
+  cook.mounts.push({url: localMount, path, hash: digest(bytes), bytes: bytes.length});
   // A prepared product (the live pin, QA 11-24 row 70) binds its mounts in the preparation's input hash.
   if (cook.inputHash !== undefined) cook.inputHash = digest(cookPreparationBytes(parseOutputIndex(JSON.parse(readFileSync(join(source, 'shard.json'), 'utf8'))), cook.mounts, cook.renderer));
   const cookBytes = validationSourceBytes(cook); writeFileSync(join(source, 'cook.json'), cookBytes);
@@ -39,7 +41,9 @@ function fixture() {
   mkdirSync('tmp/codex-pins-ll4-tests', {recursive: true});
   const root = mkdtempSync(resolvePath('tmp/codex-pins-ll4-tests/product-')); roots.push(root);
   const product = wholeBrasscapProduct(), source = join(root, 'producer/out/brasscap-mesa');
-  for (const [path, bytes] of readTar(product.bytes)) {
+  // Local admission checks today's upload rules. The published pin below is still a stored product.
+  const candidate = brotliDecompressSync(readFileSync('test/fixtures/pin-local-brasscap.tar.br'));
+  for (const [path, bytes] of readTar(candidate)) {
     mkdirSync(dirname(join(source, path)), {recursive: true}); writeFileSync(join(source, path), bytes);
   }
   addLocalMount(source);
@@ -95,7 +99,7 @@ test('actual local admission, runtime open and published restoration leave the t
     const restored = await cli(root, ['install'], {WILDSHARD_PIN_MIRROR: `http://127.0.0.1:${address.port}`, WILDSHARD_PIN_CACHE: join(root, 'cache')});
     expect(restored.output).toContain('1 of 1 pins admitted'); expect(restored.status).toBe(0);
     expect(existsSync(join(root, LOCAL_CANDIDATES))).toBe(false);
-    expect(existsSync(join(root, 'public/assets/local-proof/shared.json'))).toBe(false);
+    expect(existsSync(join(root, 'public', localMount))).toBe(false);
     expect(readFileSync(join(root, 'test/pins/shardfiles.json'))).toEqual(pins);
     expect(JSON.parse(readFileSync(join(root, 'out/brasscap-mesa/validation.json'), 'utf8'))).not.toHaveProperty('source');
   } finally { server.closeAllConnections(); server.close(); }
@@ -115,12 +119,11 @@ test('malformed input and symlinks refuse before replacing an installed product'
 });
 
 test('a mount owned by another shard refuses without changing that owner', async () => {
-  const {root, source} = fixture(), url = '/assets/local-proof/shared.json';
-  const target = join(root, 'public', url);
+  const {root, source} = fixture(), target = join(root, 'public', localMount);
   mkdirSync(dirname(target), {recursive: true}); writeFileSync(target, 'other shard bytes');
   mkdirSync(join(root, 'out/other'), {recursive: true});
   writeFileSync(join(root, 'out/other/shard.json'), '{}');
-  writeFileSync(join(root, 'out/other/cook.json'), JSON.stringify({mounts: [{url, path: 'other'}]}));
+  writeFileSync(join(root, 'out/other/cook.json'), JSON.stringify({mounts: [{url: localMount, path: 'other'}]}));
   const refused = await cli(root, ['install', '--from-dir', source]);
   expect(refused.output).toContain('conflicts with another owner'); expect(refused.status).not.toBe(0);
   expect(readFileSync(target, 'utf8')).toBe('other shard bytes');
@@ -136,7 +139,7 @@ test('CI refuses explicit local admission and ignores even malformed local prove
 });
 
 test('an unowned existing mount remains untouched even when its bytes match', async () => {
-  const {root, source} = fixture(), target = join(root, 'public/assets/local-proof/shared.json');
+  const {root, source} = fixture(), target = join(root, 'public', localMount);
   mkdirSync(dirname(target), {recursive: true}); writeFileSync(target, '{}');
   const refused = await cli(root, ['install', '--from-dir', source]);
   expect(refused.status).not.toBe(0);
