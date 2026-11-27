@@ -36,7 +36,9 @@ test('the cook lists the boot recordings the page reads, plus the fence audio, a
   expect(page.length).toBeGreaterThan(10);
   expect(page.some(url => url.startsWith('/assets/music/piano/'))).toBe(true);
   expect(page.some(url => url.startsWith('/assets/sfx/best/'))).toBe(true);
-  const shippedSfx = Object.keys(PUBLIC_BYTES).find(url => url.startsWith('/assets/sfx/best/') && !page.includes(url));
+  // A shipped recording the page does not read; never the set's `sfx.json` manifest, which the cook does not list as
+  // audio (once the page read every tracked recording, the manifest was the only unread file and the case went red).
+  const shippedSfx = Object.keys(PUBLIC_BYTES).find(url => url.startsWith('/assets/sfx/best/') && !url.endsWith('.json') && !page.includes(url));
   const fence = [...(shippedSfx === undefined ? [] : [`${shippedSfx}?v=12345678`]), '/assets/sfx/fixture-isle/gone-00000000.m4a', '/assets/gpu/rock.ktx2'];
   const listed = shardBootAudio(new Map([['audio/audio', { audio: catalogue }]]), tables, fence);
   expect(listed).toEqual([...page, ...(shippedSfx === undefined ? [] : [shippedSfx])]);
