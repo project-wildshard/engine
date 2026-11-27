@@ -282,3 +282,9 @@ test('a leg that dirties the train clone is named with its files, and a clean cl
   expect(train).toContain("treeDirt(stageTree, 'The staging build')");
   expect(train).toContain("treeDirt(stageTree, 'Staging go-live')");
 });
+
+test('PV17: the train\'s staging page leg publishes no content set', () => {
+  const train = readFileSync(join(import.meta.dirname, '../src/scripts/release-train.ts'), 'utf8');
+  expect(train).toContain("[...pageArgs, 'build']");
+  expect(train).not.toMatch(/'--content'/u);
+});

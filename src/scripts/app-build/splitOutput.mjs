@@ -5,7 +5,10 @@
 // `--join` moves it back, for a host that serves one tree: until a channel stamps a `contentBase` (PZ8), page-release
 // joins before it packages, and the jobs that serve the whole game from dist (nightly, hover contract) join too.
 //
-//   node src/scripts/app-build/splitOutput.mjs [dist] [--join]
+// Fix preview PV17: `--join --no-shard-content` (staging and production, which publish no content set) joins engine art
+// only, and refuses a content tree that holds shard content: their zones come from the cook (PV16), never the page.
+//
+//   node src/scripts/app-build/splitOutput.mjs [dist] [--join [--no-shard-content]]
 import {constants, copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, rmdirSync, writeFileSync} from 'node:fs';
 import {dirname, join, resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -122,6 +125,14 @@ export function contentGaps(dist, held) {
   return files(root).filter(row => row.path !== SPLITTING && isContent(row.path, shards) && !held.has(row.path)).map(row => row.path).sort();
 }
 
+/** PV17: the shard content (S1 to S7) a content tree holds, by page path. A page that publishes no content set joins its
+ *  content back; for staging and production that must be engine art only, since their zones come from the cook (PV16).
+ * @param {string} dist @param {string} [content] @returns {string[]} */
+export function shardContent(dist, content = contentDirOf(dist)) {
+  const from = resolve(content), shards = new Set([...shardNames(resolve(dist)), ...shardNames(from)]);
+  return files(from).filter(row => classify(row.path, shards).kind === 'shard content').map(row => row.path).sort();
+}
+
 /** Put the content back into the page, one tree again, and remove dist-content.
  * @param {string} dist @param {string} [content] @returns {{files: number, bytes: number}} */
 export function joinOutput(dist, content = contentDirOf(dist)) {
@@ -135,6 +146,11 @@ export function joinOutput(dist, content = contentDirOf(dist)) {
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const args = process.argv.slice(2), join_ = args.includes('--join'), dist = resolve(args.find(arg => !arg.startsWith('--')) ?? 'dist');
+  const zones = join_ && args.includes('--no-shard-content') ? shardContent(dist) : [];
+  if (zones.length > 0) {
+    console.error(`splitOutput: ${contentDirOf(dist)} holds ${zones.length} shard content files (${zones.slice(0, 3).join(', ')}): this channel's zones come from the cook, not the page (fix preview PV16, PV17)`);
+    process.exit(1);
+  }
   const mb = (/** @type {number} */ bytes) => (bytes / 1e6).toFixed(1);
   const moved = join_ ? joinOutput(dist) : splitOutput(dist);
   console.info(join_

@@ -204,6 +204,9 @@ export async function runPhase(phase, deps) {
         if (expected === '' || sha256(deps.readFile(deps.catalogue)) !== sha256(Buffer.from(expected))) refuse('Explore catalogue differs from the live staging build');
       }
     }
+    // Fix preview PV17: staging and production publish no content set; their zones come from the cook (PV16)
+    const zonesFromCook = channel.channel === 'staging' || channel.channel === 'production';
+    if (zonesFromCook && deps.content !== undefined) refuse(`${channel.channel} publishes no content set: its zones come from the cook (fix preview PV17); drop --content`);
     // PV16: staging and production read every zone from the cook too, at their own build's key (their pins, main's cook)
     const own = channel.solo ? undefined : ownTablePath(deps);
     if (own !== undefined) {
@@ -221,7 +224,10 @@ export async function runPhase(phase, deps) {
     // PAGE-SIZE PZ4: build:game splits the page (dist/) from its content (dist-content/). A release that publishes its
     // content (--content, PZ6) stamps the set's base into the page and keeps the split; one that doesn't joins the two, so
     // the page serves its own content.
-    if (deps.content === undefined) {
+    if (deps.content === undefined && zonesFromCook) {
+      plan('join dist-content/ back into dist/, refusing any shard content (S1 to S7): the zones come from the cook (PV17)');
+      if (!dry) deps.run('node', ['src/scripts/app-build/splitOutput.mjs', 'dist', '--join', '--no-shard-content'], {});
+    } else if (deps.content === undefined) {
       plan('join dist-content/ back into dist/ (no content base: the page serves its own content)');
       if (!dry) deps.run('node', ['src/scripts/app-build/splitOutput.mjs', 'dist', '--join'], {});
     } else {

@@ -120,7 +120,7 @@ test('the four phases run in order and move the alias last', async () => {
   const {deps, calls, lines} = rig();
   await through(deps, 'go-live');
   expect(fetched(calls)).toEqual([
-    OWN_TABLE, 'prepare', 'run pnpm build:game', 'run node src/scripts/app-build/splitOutput.mjs dist --join', 'package', 'state build',
+    OWN_TABLE, 'prepare', 'run pnpm build:game', 'run node src/scripts/app-build/splitOutput.mjs dist --join --no-shard-content', 'package', 'state build',
     'packs.publish', 'upload', 'state upload',
     'run node src/scripts/release-cook.mjs --staging --build=' + build,
     'run node --import ./src/scripts/bake-loader.mjs src/scripts/release-placed-ready.mjs staging',
@@ -165,8 +165,24 @@ test('staging go-live binds both complete QA verdicts to the source, deployment 
   expect(calls).toContain('goLive');
 });
 
+test('PV17: staging and production publish no content set, and their build joins no shard content', async () => {
+  for (const channel of ['staging', 'production'] as const) {
+    const {deps, calls} = rig(channel);
+    deps.content = {publish: () => Promise.reject(new Error('unreached'))};
+    await expect(runPhase('build', deps)).rejects.toThrow(/publishes no content set: its zones come from the cook \(fix preview PV17\)/u);
+    expect(calls).not.toContain('run pnpm build:game');
+    // the dry run of the release plans no `content/<set>/` key and no stamped base (`dist-content/` is the local tree
+    // it joins), and the join refuses shard content
+    const dry = rig(channel);
+    dry.deps.dryRun = true;
+    for (const phase of ['build', 'upload'] as const) await runPhase(phase, dry.deps);
+    expect(dry.lines.some(line => /(?<![-\w])content\/|content set's base/u.test(line))).toBe(false);
+    expect(dry.lines.some(line => line.includes('refusing any shard content (S1 to S7)'))).toBe(true);
+  }
+});
+
 test('--content publishes the content set before the packs and the page (PAGE-SIZE PZ2)', async () => {
-  const {deps, calls, files, state} = rig();
+  const {deps, calls, files, state} = rig('preview');
   const seen: {dir: string, cors: string, dryRun: boolean}[] = [];
   deps.content = {publish: context => {
     seen.push(context); calls.push('content.publish');
@@ -176,25 +192,25 @@ test('--content publishes the content set before the packs and the page (PAGE-SI
   const stamped = Buffer.from(`${String(files.get('/out/index.html'))}<script type="application/json" id="boot-module-files">{"contentBase":"https://packs.wildshard.io/content/0123456789abcdef/"}</script>`);
   files.set('/out/index.html', stamped);
   await through(deps, 'upload');
-  expect(fetched(calls)).toEqual([OWN_TABLE, 'prepare', 'run pnpm build:game', 'run node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/stamp-content.mjs dist', 'package', 'state build', 'content.publish', 'packs.publish', 'upload', 'state upload']);
-  expect(seen).toEqual([{dir: '/out-content', cors: CHANNELS.staging.origin, dryRun: false}]);
+  expect(fetched(calls)).toEqual(['prepare', 'run pnpm build:game', 'run node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/stamp-content.mjs dist', 'package', 'state build', 'content.publish', 'upload', 'state upload']);
+  expect(seen).toEqual([{dir: '/out-content', cors: CHANNELS.preview.origin, dryRun: false}]);
   expect(state['build']).toMatchObject({contentBase: 'https://packs.wildshard.io/content/0123456789abcdef/'});
-  deps.content = {publish: () => Promise.resolve({set: 's', base: 'b', files: 5, bytes: 50, uploaded: 1, uploadedBytes: 10, held: 3, cors: CHANNELS.staging.origin})};
+  deps.content = {publish: () => Promise.resolve({set: 's', base: 'b', files: 5, bytes: 50, uploaded: 1, uploadedBytes: 10, held: 3, cors: CHANNELS.preview.origin})};
   await expect(runPhase('upload', deps)).rejects.toThrow(/content: 3 held \+ 1 uploaded is not 5/u);
   // a published set other than the stamped one is refused
-  deps.content = {publish: () => Promise.resolve({set: 'fedcba9876543210', base: 'https://packs.wildshard.io/content/fedcba9876543210/', files: 5, bytes: 50, uploaded: 2, uploadedBytes: 20, held: 3, cors: CHANNELS.staging.origin})};
+  deps.content = {publish: () => Promise.resolve({set: 'fedcba9876543210', base: 'https://packs.wildshard.io/content/fedcba9876543210/', files: 5, bytes: 50, uploaded: 2, uploadedBytes: 20, held: 3, cors: CHANNELS.preview.origin})};
   await expect(runPhase('upload', deps)).rejects.toThrow(/published https:\/\/packs\.wildshard\.io\/content\/fedcba9876543210\/, but the page is stamped with https:\/\/packs\.wildshard\.io\/content\/0123456789abcdef\//u);
 });
 
 test('PZ6: a --content build whose page has no content base is refused', async () => {
-  const {deps} = rig();
+  const {deps} = rig('preview');
   deps.content = {publish: () => Promise.reject(new Error('unreached'))};
   const envs: Record<string, string>[] = [];
   const run = deps.run;
   deps.run = (file, args, env) => { envs.push(env); run(file, args, env); };
   await expect(runPhase('build', deps)).rejects.toThrow(/index\.html content base is missing/u);
   // PZ5: the build marks its kept-build graph `content: true`, so the next release carries its code only
-  expect(envs[1]?.['WS_CONTENT_BASE']).toBe('https://packs.wildshard.io/content/'); // after PV16's own zone table
+  expect(envs[0]?.['WS_CONTENT_BASE']).toBe('https://packs.wildshard.io/content/'); // preview writes no zone table of its own
 });
 
 test('the build bakes the channel release file from packs.wildshard.io', async () => {

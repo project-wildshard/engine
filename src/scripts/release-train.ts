@@ -348,14 +348,14 @@ async function main(args: string[]) {
     stagingVerdict = stageVerdict;
     let pageDone = existsSync(stageVerdict);
     if (!pageDone && state()?.build?.build !== build) await runLogged(stageTree, join(out, 'staging-build.log'), process.execPath,
-      [...pageArgs, 'build', '--content'], env);
+      [...pageArgs, 'build'], env);
     const builtDirt = treeDirt(stageTree, 'The staging build');
     if (builtDirt !== undefined) throw new Error(builtDirt);
     const runPage = async () => {
       if (pageDone) return;
       try {
         await runLogged(stageTree, join(out, 'staging.log'), process.execPath,
-          [...pageArgs, 'go-live', '--content', `--local-qa=${local}`, `--qa-out=${deployRoot}`, '--wait=60', ...resume], env);
+          [...pageArgs, 'go-live', `--local-qa=${local}`, `--qa-out=${deployRoot}`, '--wait=60', ...resume], env);
       } catch (error) {
         const dirt = treeDirt(stageTree, 'Staging go-live');
         throw dirt === undefined ? error : new Error(`${error instanceof Error ? error.message : String(error)}\n${dirt}`);

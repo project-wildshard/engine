@@ -8,7 +8,7 @@ import {dirname, join, resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Run the CLI as build:game does.
 import {spawnSync} from 'node:child_process';
 import {afterEach, expect, test} from 'vitest';
-import {SPLITTING, contentDirOf, contentGaps, joinOutput, splitOutput} from '../src/scripts/app-build/splitOutput.mjs';
+import {SPLITTING, contentDirOf, contentGaps, joinOutput, shardContent, splitOutput} from '../src/scripts/app-build/splitOutput.mjs';
 import {gatePage, pageSize} from '../src/scripts/page-size.mjs';
 
 const roots: string[] = [];
@@ -190,4 +190,20 @@ test('a content path the build shares with a kept unmarked build reaches the set
   expect(refused.status).not.toBe(0);
   expect(refused.stderr).toMatch(/holds 3 content path\(s\) its set lacks/u);
   expect(readFileSync(join(dist, 'index.html'), 'utf8')).toBe(page);
+});
+
+test('PV17: shardContent names the shard content a content tree holds, never engine art', () => {
+  mkdirSync('tmp/codex-netlag', {recursive: true});
+  const root = mkdtempSync(resolve('tmp/codex-netlag/pv17-split-')); roots.push(root);
+  {
+    const dist = join(root, 'dist'), content = join(root, 'dist-content');
+    mkdirSync(join(content, 'shardfiles/pine-hollow'), {recursive: true});
+    mkdirSync(join(content, 'assets/engine'), {recursive: true});
+    mkdirSync(dist, {recursive: true});
+    writeFileSync(join(content, 'shardfiles/pine-hollow/shard.json'), '{}');
+    writeFileSync(join(content, 'assets/engine/sun.png'), 'png');
+    expect(shardContent(dist, content)).toEqual(['shardfiles/pine-hollow/shard.json']);
+    rmSync(join(content, 'shardfiles'), {recursive: true});
+    expect(shardContent(dist, content)).toEqual([]);
+  }
 });
