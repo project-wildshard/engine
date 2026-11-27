@@ -24,7 +24,7 @@ import { ARM_CLIPS, armClipNames } from '../src/client/game/systems/viewmodel/ar
  * no texture declarations, so parse their exact bytes. */
 const RIGS: Record<string, readonly [string, string]> = {
   'driftwood-arms.glb': ['driftwood-isle', 'mounts/assets/driftwood-isle/models/driftwood-fp/fp-arms.glb'],
-  'nine-arms.glb': ['nine-dragon-stack', 'mounts/assets/nine-dragon/viewmodel/fp-rig.glb'],
+  'nine-arms.glb': ['nine-dragon-stack', 'mounts/assets/nine-dragon-stack/viewmodel/fp-rig.glb'],
 };
 function originalRig(name: string): Uint8Array<ArrayBuffer> {
   const rig = RIGS[name];
