@@ -138,6 +138,13 @@ export async function enterDeclaredAudioPhase(ctx: ShardContext, phase: 'kit' | 
   await adoptCookedMusic(ctx.product.slug, music.source);
   if (ctx.scope.disposed || ctx.scope.disposing) return;
  }
+ const samples = runtimeAudio(ctx, ctx.product.shardfile.audio).samples;
+ if (samples?.set !== undefined) {
+  // SF11: the zone's own cue bank and its credit, read from its parts on a page whose tables list only engine-wide sets
+  const {adoptCookedSfx} = await import('../shardfile/audioCatalogue');
+  await adoptCookedSfx(ctx.product.slug, samples.set);
+  if (ctx.scope.disposed || ctx.scope.disposing) return;
+ }
  if (entry.scene === true) { await enterClientAudioScene(ctx); return; }
  const audio = ctx.app.audio;
  if (audio === null) throw new Error('Audio entry requires its native mixer');

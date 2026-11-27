@@ -6,7 +6,7 @@
 import { existsSync, rmSync } from 'node:fs';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import type { AudioData } from '@wildshard/format/audio';
-import type { SpawnManifestBook } from '../src/cook/game/entryTotals';
+import { withShardMounts, type SpawnManifestBook } from '../src/cook/game/entryTotals';
 import { readBuiltSpawnManifest } from '../src/cook/game/engineHalf';
 import { openShardfile, shardHalf } from '../src/cook/game/shardCook';
 import { folderTarball } from '../src/cook/game/folderTarball';
@@ -34,8 +34,11 @@ function audioDiff(listed: readonly string[], want: readonly string[]): { extra:
 const clean = { extra: [], missing: [], twice: [] };
 
 // The shard's own words, read without the cook: the selected boot recordings and the recorded fence mounts.
-function expected(shard: string, common: AssetTables): { want: string[]; engineMusic: string[] } {
-  const half = shardHalf(openShardfile(folderTarball(`out/${shard}`)), (_url, bytes) => bytes.length);
+function expected(shard: string, built: AssetTables): { want: string[]; engineMusic: string[] } {
+  const opened = openShardfile(folderTarball(`out/${shard}`)), half = shardHalf(opened, (_url, bytes) => bytes.length);
+  // SF11: no pin copies a zone's mounts under public/, so the cook sizes the zone's own files (and reads its own audio
+  // manifests) from its phone sets, as the page does from its download (data.ts, audioCatalogue's adoption)
+  const common = withShardMounts(built, [...half.mountRows('phone', 'entry'), ...half.mountRows('phone', 'whole')], url => half.read(url));
   const row = half.shard.sections.get('audio/audio') as { audio: AudioData } | undefined, data = row?.audio;
   const shipped = (url: string): boolean => Object.hasOwn(common.bytes, url);
   const engineMusic = data === undefined ? [] : withAssetTables(common, () => engineMusicFiles(data));
