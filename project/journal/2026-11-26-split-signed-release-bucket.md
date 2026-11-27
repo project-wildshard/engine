@@ -22,3 +22,7 @@ names and icons on either URL. The offline proof permits unavailable
 signed metadata, and placement and Doctor tests keep cooked content
 on packs while reading signed metadata at the new origin. A signed
 placement file still has to match the channel in its address.
+
+The page Worker reads signed placement metadata at the same release
+origin for unfurls and retired slug redirects. Its signed fixtures cover
+the deployed URLs, and its standalone Wrangler bundle still builds.

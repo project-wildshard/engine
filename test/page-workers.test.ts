@@ -240,7 +240,7 @@ beforeEach(() => {
   vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => { const url = String(input instanceof Request ? input.url : input); asked.push(url); try { return Promise.resolve(network(url)) } catch (error) { return Promise.reject(error) } })
 })
 afterEach(() => { vi.restoreAllMocks(); network = () => new Response('missing', { status: 404 }) })
-/** The packs file and API row a new author's slug would have, the file signed by `key`. */
+/** The release bucket file and API row a new author's slug would have, the file signed by `key`. */
 function placedNetwork(channel: string, key = keys.privateKey): (url: string) => Response {
   return url => {
     if (url === `https://releases.wildshard.io/${channel}-placements.json`) return new Response(signedFile(placementBody(channel, ['new-author-isle']), key))

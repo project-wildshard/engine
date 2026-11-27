@@ -2,7 +2,7 @@
  * SA49 (meta SHARD-AUTHORING-PLAN): a `/slug/<slug>` link for a shard the API placed after this page was built (a new
  * author's upload, SA30/SA33) names no row in the page, so slug-meta.ts finds nothing. On that miss the Worker asks two
  * things, each cached at the edge for a minute: its channel's signed placement file (the box's and the page's own,
- * `releases/<channel>-placements.json`, checked under the API's placement key) for whether the slug has a cell, and the
+ * `<channel>-placements.json` on the release origin, checked under the API's placement key) for whether the slug has a cell, and the
  * API's catalogue row (`/api/catalogue/shards/<slug>`, SA46) for its name. Only a placed slug with a row unfurls; anything
  * else, a host with no channel or any failure, stays the 404 it was. No binding and no var: the addresses are the
  * channel's, as the page's own (src/shared/game/grid/placementRows.ts).
@@ -12,7 +12,7 @@
 
 /** The API placement key's public half, SPKI DER in hex: placementRows.ts `PLACEMENT_PUBLIC_KEY` (a test holds them equal). */
 const PLACEMENT_PUBLIC_KEY = '302a300506032b65700321004afd39342aac6a4de6066cb72e9df54cbd3d4eb522e5e6e175a17954ab98f25e'
-const PACKS = 'https://packs.wildshard.io'
+const RELEASES = 'https://releases.wildshard.io'
 const API = 'https://api.wildshard.io'
 /** Each host's placement channel: preview's page bakes staging's cells (SA35), so it reads staging's file. */
 const CHANNELS: Readonly<Record<string, 'production' | 'staging'>> = {
@@ -64,7 +64,7 @@ async function verifiedBody(file: unknown): Promise<unknown> {
 
 /** The channel's believed placement file body, or undefined. */
 async function placementBody(channel: 'production' | 'staging'): Promise<Readonly<Record<string, unknown>> | undefined> {
-  const body = await verifiedBody(await edgeJson(`${PACKS}/releases/${channel}-placements.json`))
+  const body = await verifiedBody(await edgeJson(`${RELEASES}/${channel}-placements.json`))
   return record(body) && body['kind'] === 'placement' && body['channel'] === channel ? body : undefined
 }
 
