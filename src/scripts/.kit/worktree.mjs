@@ -28,7 +28,7 @@ import {basename,dirname,join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {WORKTREES} from './worktree-ignore.mjs';
 import {byHand,freshTool,relaunch} from '../worktree-fresh.mjs';
-import {clonePaths} from './apfs-clone.mjs';
+import {clonePaths,runCloneHelper} from './apfs-clone.mjs';
 import {freeBytes,lastActivity,linkedWorktrees,onMain,parseReapArgs,processDirectories,reap} from './worktree-reap.mjs';
 import {installLag} from '../install-lag.mjs';
 import {laneLive} from './lane-live.mjs';
@@ -264,8 +264,8 @@ export function cloneTrackedFiles(canonical,tree){
   cloned.push(path);
  }
  if(pairs.length===0)return 0;
- const result=spawnSync('python3',['-I','-c',CLONEFILE],{input:`${pairs.join('\0')}\0`,encoding:'utf8',maxBuffer:64<<20});
- if(result.status!==0)process.stderr.write(`worktree: clone stopped early (${result.stderr.trim()===''?result.error?.message??'failed':result.stderr.trim()}); git writes the rest\n`);
+ const refusal=runCloneHelper(CLONEFILE,`${pairs.join('\0')}\0`);
+ if(refusal!==null)process.stderr.write(`worktree: clone stopped early (${refusal}); git writes the rest\n`);
  // The raw bytes of every clone hash to its blob, and its mode is the index's; anything else is deleted for git.
  // If the check itself fails, no clone is trusted: all of them go, and git writes every file.
  let kept=0;

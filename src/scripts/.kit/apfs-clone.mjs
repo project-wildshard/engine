@@ -1,6 +1,6 @@
 // DEV-SPEED DS12: real APFS clones from Node. Node's `COPYFILE_FICLONE` makes a full copy on macOS (measured: a
 // clone's ATTR_CMNEXT_PRIVATESIZE equals its size, so every "clone" cost its bytes again) and `cpSync` ignores the
-// flag, so a clone here is fclonefileat(2), called through python3's ctypes: one process for every pair.
+// flag, so a clone here is fclonefileat(2), called through python3's ctypes: one process for the whole batch.
 //
 // Each source is opened without following a final symlink and must be a regular file or a directory by its open
 // descriptor, so a path swapped for a link between any check and the clone is refused, never followed. A directory is
@@ -12,6 +12,15 @@
 // with the same refusal of a linked source.
 import {spawnSync} from 'node:child_process';
 import {closeSync,constants,cpSync,fstatSync,lstatSync,openSync,readFileSync,writeFileSync} from 'node:fs';
+
+/** Bound the Python helper even if it stops reading the path list or ignores SIGTERM.
+ * @param {string} script @param {string} input @param {number} [timeoutMs] */
+export function runCloneHelper(script,input,timeoutMs=60_000){
+ const result=spawnSync('python3',['-I','-c',script],{input,encoding:'utf8',maxBuffer:64<<20,timeout:timeoutMs,killSignal:'SIGKILL'});
+ if(result.error!==undefined&&'code' in result.error&&result.error.code==='ETIMEDOUT')return `Python APFS clone helper timed out after ${timeoutMs} ms`;
+ if(result.status===0)return null;
+ return result.error?.message??(result.stderr?.trim()||`Python APFS clone helper exited ${result.signal??result.status}`);
+}
 
 const CLONE=`import ctypes, os, stat, sys
 libc = ctypes.CDLL(None, use_errno=True)
@@ -56,9 +65,8 @@ export function clonePaths(pairs,{platform=process.platform,copy=true}={}){
  if(pairs.length===0)return 'none';
  let rest=pairs;
  if(platform==='darwin'){
-  const result=spawnSync('python3',['-I','-c',CLONE],{input:`${pairs.flat().join('\0')}\0`,encoding:'utf8',maxBuffer:64<<20});
-  if(result.status===0)return 'clone';
-  const reason=result.error?.message??result.stderr.trim();
+  const reason=runCloneHelper(CLONE,`${pairs.flat().join('\0')}\0`);
+  if(reason===null)return 'clone';
   // Only a refusal the filesystem gives (no clone support, another volume) falls back to copies; anything else stops.
   if(!/Operation not supported|Cross-device link/u.test(reason))throw new Error(`clonefile: ${reason}`);
   rest=pairs.filter(([,target])=>{try{lstatSync(target);return false;}catch{return true;}});
