@@ -9,3 +9,6 @@ If origin advances, main-push replays the original selection and runs
 the normal gate for the new update. A regression adds a commit during
 the early gate. Another advances the remote during the gate and checks
 that the replay carries only the original change.
+
+The pin fixture clears the hosted CI flags in its simulated local
+push. Both FS18 regressions pass with the flags set in the parent.

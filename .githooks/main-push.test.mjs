@@ -153,7 +153,7 @@ printf '%s\\n' "$refs" | "$WS_TEST_NODE" "$WS_TEST_PIN_HOOK"
   write(a, 'test/pins/rings.json', '{"rings":2}\n');
   const result = spawnSync(process.execPath, [SCRIPT, '--wait', '0', '-m', 'fix(pins): record rings', 'test/pins/rings.json'], {
     cwd: a, encoding: 'utf8',
-    env: {...env, ...ID, ALLOW_CARRY: '1', ALLOW_PIN_PUSH: '', SKIP_CHECK: '', WS_MAIN_PUSH_PREGATE: '1',
+    env: {...env, ...ID, CI: '', GITHUB_ACTIONS: '', ALLOW_CARRY: '1', ALLOW_PIN_PUSH: '', SKIP_CHECK: '', WS_MAIN_PUSH_PREGATE: '1',
       WS_TEST_EARLY_REFS: early, WS_TEST_FINAL_REFS: final, WS_TEST_PROOF: proof, WS_TEST_NODE: process.execPath,
       WS_TEST_PIN_HOOK: fileURLToPath(new URL('pin-provenance.mjs', import.meta.url))},
   });
