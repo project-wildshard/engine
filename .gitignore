@@ -286,9 +286,14 @@ public/assets/driftwood-isle/map/top.webp
 /public/assets/models/wooden_crate_02/textures/wooden_crate_02_nor_gl_1k.jpg
 /public/assets/models/wooden_crate_02/wooden_crate_02.bin
 /public/assets/models/wooden_crate_02/wooden_crate_02.gltf
-# Driftwood's and Pine's piano slots: their pins publish them, named by their bytes since sdk 0.2.10 (AU21).
+# Driftwood's and Pine's piano slots: their pins publish them, named by their bytes since sdk 0.2.10 (AU21). The pair
+# piano music.json names is engine's own and tracked (meta standalone-shardfiles SF8): a re-pack stops mounting it.
 /public/assets/music/piano/island-*.m4a
+!/public/assets/music/piano/island-calm-05125ed8.m4a
+!/public/assets/music/piano/island-tension-7faf0468.m4a
 /public/assets/music/piano/pine-*.m4a
+!/public/assets/music/piano/pine-calm-923e0056.m4a
+!/public/assets/music/piano/pine-tension-cc014e5b.m4a
 /public/assets/nine-dragon/grade-lut-cleanroom.bin
 # Nine Dragon's lab folder is all pin output since C0b (e47c74ae1) dropped its last tracked files; its pin still writes
 # grapple/ and organic/, which stopped land's clean-tree check in worktrees (opus-compat-w6, 2026-11-23).

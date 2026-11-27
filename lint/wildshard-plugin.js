@@ -831,7 +831,10 @@ const shardSandbox = rule('Shard services, globals, settings and assets stay ins
   const text = (raw) => stringOf(raw) ?? (unwrap(raw)?.type === 'Identifier' ? strings.get(unwrap(raw).name) ?? null : null);
   const isGlobal = (raw) => globalObject(raw) || (unwrap(raw)?.type === 'Identifier' && globals.has(unwrap(raw).name));
   const isDocument = (raw) => nameOf(raw) === 'document' || documents.has(nameOf(raw));
-  const assetPatterns = [...meta.assets, ...(shardWords.sharedAssets ?? [])].map((glob) => new RegExp(`^${glob.split('*').map(escapeRegex).join('.*')}$`, 'u'));
+  // SF4 (meta standalone-shardfiles): a zone's art lives under its own name, so `/assets/<own slug>/` is always its own,
+  // even before shard-words.pin.json lists the folder; a re-pack can move there without an engine words bump.
+  const ownFolder = `public/assets/${own.slug}/**`;
+  const assetPatterns = [ownFolder, ...meta.assets, ...(shardWords.sharedAssets ?? [])].map((glob) => new RegExp(`^${glob.split('*').map(escapeRegex).join('.*')}$`, 'u'));
   const hit = (node, what) => report(context, node, `Shard sandbox: ${what}; use the owning ShardContext service`);
   return {
     ImportDeclaration(node) {
