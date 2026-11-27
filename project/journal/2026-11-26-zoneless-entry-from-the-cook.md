@@ -20,3 +20,7 @@ Offline, the third visit stalled on main.js: no code chunk was in any cache. The
 exists (serviceWorker.ts `splitBundle`, for a split page), and a split left from an earlier build named 22 files this page doesn't
 hold; one missing name fails the whole precache. The zoneless check now refuses a worker that precaches a file the page doesn't
 hold, and names a leftover split when there is one.
+
+Headless, the game never reaches control (`ws:control-ready`) on this page, and the probe never installs, so the page never asks
+its worker for the precache (DL1) and the offline visit has no title code. Asked by hand, the worker precaches the build in under a
+second. The proof now logs control, page errors and the boot trace while that is open.
