@@ -11,3 +11,9 @@ bakes its zones as before: the switch is the pins, not a flag.
 A local staging-mode build with a table (`WS_CHANNEL=staging`, the release URL and key, `--mode staging`) passes the zoneless
 check: no zone file and no zone server part; the server book keeps the road's row. The carry filter now keeps both rules for a
 zoneless world page (no standalone server file, no zone file); before, the zone rule replaced the server one.
+
+The staging-mode entry is proven (`test/cooked-zones-world.proof.mjs`, run by hand through the browser lane). A staging-mode build
+with its own table and the online rig's release URL and key went zoneless (9,634 zone files moved out), the rig ran the dedicated
+server built from this checkout on a release file signed on 127.0.0.1, and a phone-sized page (402x874, headless, sound off) took a
+seat and stood in Driftwood in Chromium (325 cooked reads) and WebKit (288), with 0 zone files read from the page origin. Real
+staging still waits on pins that name a shard version.
