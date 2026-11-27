@@ -211,7 +211,8 @@ function installMemberLayer(): boolean {
       return readCookedResponse(url, member, native(member.part, {credentials: 'omit',
         ...(signal === undefined || signal === null ? {} : {signal}), ...(cache === undefined ? {} : {cache})}));
     }
-    if (/^\/assets\/[^/]+\/music\//u.test(url.pathname)) return await partMember(url) ?? network(input, init);
+    // SF11: a cooked zone's file past this page's download (its music, a file past its fence) is read from its part
+    if (url.pathname.startsWith('/assets/') && cookedZoneSlug(url.pathname.split('/')[2] ?? '')) return await partMember(url) ?? network(input, init);
     if (!url.pathname.startsWith('/shardfiles/')) return network(input, init);
     const held = await heldPartMember(url);
     if (held !== null) return held;
@@ -239,10 +240,10 @@ const keptMembers = new Set<string>();
 /** Verified play-time members whose optional disk publication exhausted quota. */
 const memoryPartMembers = new ResidentByteCache<string, Uint8Array<ArrayBuffer>>(CACHE_BYTE_LIMITS.packedFallback);
 let partTier: 'phone' | 'desktop' = 'phone';
-async function partTable(slug: string): Promise<PartMembers | null> {
-  const selected = spawnSelection(slug, 'client', partTier, '000');
+async function partTable(slug: string, tier: 'phone' | 'desktop'): Promise<PartMembers | null> {
+  const selected = spawnSelection(slug, 'client', tier, '000');
   if (selected === null || typeof selected.cacheName !== 'string' || typeof caches === 'undefined') return null;
-  const address = await packsSelection(slug, 'client', partTier, '000');
+  const address = await packsSelection(slug, 'client', tier, '000');
   if (address === null) return null;
   const [response, code] = await Promise.all([downloadFetch()(onPacks(address.url, selected.base)),
     address.code === undefined ? undefined : downloadFetch()(contentURL(new URL(address.code.url, document.baseURI).href))]);
@@ -254,20 +255,44 @@ async function partTable(slug: string): Promise<PartMembers | null> {
   const cacheName = selected.cacheName, table = { base: selected.base, store: nativeCacheCall(() => caches.open(cacheName)), files };
   // Charge parsed objects, strings and Map entries conservatively from the bounded manifest.
   const bytes = (address.bytes + (address.code?.bytes ?? 0)) * 4 + files.size * 96;
-  if (partTables.set(slug, table, bytes)) {
+  if (partTables.set(`${tier}/${slug}`, table, bytes)) {
     memoryAttribution.label(table, { owner: partTables.limit.owner, asset: address.url });
     memoryAttribution.allocation(table, 'ram', 'cache-document', bytes, 'estimate');
   }
   return table;
 }
-function lookupPartTable(slug: string): Promise<PartMembers | null> {
-  const ready = partTables.get(slug);
+function lookupPartTable(slug: string, tier: 'phone' | 'desktop' = partTier): Promise<PartMembers | null> {
+  const key = `${tier}/${slug}`, ready = partTables.get(key);
   if (ready !== undefined) return Promise.resolve(ready);
-  const pending = partTableReads.get(slug);
+  const pending = partTableReads.get(key);
   if (pending !== undefined) return pending;
-  const read = partTable(slug).finally(() => { partTableReads.delete(slug); });
-  partTableReads.set(slug, read);
+  const read = partTable(slug, tier).finally(() => { partTableReads.delete(key); });
+  partTableReads.set(key, read);
   return read;
+}
+/** SF11: the part that holds a zone's file. A page reads a zone's file past its download from that tier's whole level, else
+ *  from the other tier's: every mount is in one of them (a phone-only mount in the phone's, cook 1.19.0; any other in the
+ *  desktop's), and no pin copies a zone's mounts under public/ any more. A phone Explorer (Pine's sky) or a phone read past a
+ *  fence (Nine's lab textures) reads the desktop part that holds it, as a zone-table page reads its cooked member (PV4). */
+async function partRow(slug: string, path: string): Promise<{table: PartMembers; row: NonNullable<ReturnType<PartMembers['files']['get']>>} | null> {
+  for (const tier of [partTier, partTier === 'phone' ? 'desktop' : 'phone'] as const) {
+    const table = await lookupPartTable(slug, tier), row = table?.files.get(path);
+    if (table !== null && row !== undefined) return {table, row};
+  }
+  return null;
+}
+let zoneBank: {readonly text: string; readonly slugs: ReadonlySet<string>} | undefined;
+/** Whether `/assets/<slug>/` names a cooked zone this page can download (a placed one or one its bank lists), not an engine
+ *  folder (`/assets/tex/`): only a zone's reads look in its parts. The bank is parsed once per text. */
+function cookedZoneSlug(slug: string): boolean {
+  if (slug === 'spawn' || typeof document === 'undefined') return false;
+  if (placedSpawn(slug) !== undefined) return true;
+  const text = bootBankText() ?? '';
+  if (zoneBank?.text !== text) {
+    const client = text === '' ? undefined : get(get(JSON.parse(text) as unknown, 'spawnManifests'), 'client');
+    zoneBank = {text, slugs: new Set(typeof client === 'object' && client !== null ? Object.keys(client).map(bareSlug) : [])};
+  }
+  return zoneBank.slugs.has(bareSlug(slug));
 }
 function readMembersOf(part: SpawnPart, table: PartMembers): Promise<PartFallback> {
   const held = partReads.get(part.url);
@@ -318,7 +343,7 @@ async function heldPartMember(url: URL): Promise<Response | null> {
   if (memory !== undefined) return memberResponse(url, memory);
   if (!keptMembers.has(url.pathname)) return null;
   const slug = url.pathname.split('/')[2] ?? '';
-  const table = partTables.get(slug), cacheName = spawnSelection(slug, 'client', partTier, '000')?.cacheName;
+  const table = partTables.get(`${partTier}/${slug}`), cacheName = spawnSelection(slug, 'client', partTier, '000')?.cacheName;
   const store = table?.store ?? (typeof cacheName === 'string' ? nativeCacheCall(() => caches.open(cacheName)) : undefined);
   return await nativeCacheCall(async () => (await store)?.match(new URL(url.pathname, document.baseURI).href)) ?? null;
 }
@@ -326,9 +351,9 @@ async function heldPartMember(url: URL): Promise<Response | null> {
 async function partMember(url: URL): Promise<Response | null> {
   try {
     const slug = url.pathname.split('/')[2] ?? '';
-    const table = await lookupPartTable(slug), row = table?.files.get(url.pathname);
-    if (table === null || row === undefined) return null;
-    const fallback = (await readMembersOf(row.part, table)).get(url.pathname);
+    const held = await partRow(slug, url.pathname);
+    if (held === null) return null;
+    const fallback = (await readMembersOf(held.row.part, held.table)).get(url.pathname);
     return fallback === undefined ? await heldPartMember(url) : memberResponse(url, fallback);
   } catch { return null; }
 }
@@ -370,7 +395,7 @@ export async function spawnMountSize(url: string): Promise<number | undefined> {
   const listed = spawnListedBytes(url);
   if (listed !== undefined) return listed;
   const path = new URL(url, location.href).pathname, owner = path.split('/')[2];
-  return owner === undefined ? undefined : (await lookupPartTable(owner))?.files.get(path)?.file.bytes;
+  return owner === undefined ? undefined : (await partRow(owner, path))?.row.file.bytes;
 }
 // SF4: a cooked zone's own mounts are read where its download lists them, not from the page's engine-wide copies
 useZoneDownloadListing(spawnListed);

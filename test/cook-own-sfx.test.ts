@@ -59,3 +59,15 @@ test("the build finds a zone's own mount by its page URL, and no engine file", (
   expect(own('/assets/cli-fixture/sfx/cli-fixture/sfx.json?v=00000000')?.url.split('?')[0]).toBe('/assets/cli-fixture/sfx/cli-fixture/sfx.json');
   expect(own('/assets/sfx/best/hit-1-aefbc41d.m4a')).toBeUndefined();
 });
+
+// SF11: a page with no zone table reads a zone's file past its download from one tier's whole-level parts (the client's
+// cross-tier part read), so every mount of a fence zone must be in the phone or the desktop whole set: a phone-only one in
+// the phone's (cook 1.19.0), any other in the desktop's. A mount in neither is a file no page could read.
+test("every mount of a fence zone is in one tier's whole set", () => {
+  const shard = openShardfile(folderTarball('test/fixtures/made-up-fence'));
+  const half = shardHalf(shard, (_url, bytes) => bytes.length);
+  const whole = new Set([...half.mountRows('phone', 'whole'), ...half.mountRows('desktop', 'whole')].map(row => row.url.split('?')[0]));
+  // (its programs file is read from its loose folder, not a part)
+  expect((shard.cook?.mounts ?? []).map(row => row.url).filter(url => url.startsWith('/assets/') && !whole.has(url))).toEqual([]);
+  expect(whole.has('/assets/cli-fixture/baked/rain.phone.bin')).toBe(true);
+});
