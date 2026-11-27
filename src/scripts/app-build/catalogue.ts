@@ -192,7 +192,8 @@ export function addCookedShards(outDir: string, shards: readonly CookedShard[], 
   if (added.length > 0) writeTitleRows(outDir, [...readTitleRows(outDir).filter(row => !added.some(next => next.slug === row.slug)), ...added]);
 }
 
-/** The verdict array shares a script with build labels and other stamps.
+/** Stamp attached headers, replacing the verdict for each path they serve.
+ * The verdict array shares a script with build labels and other stamps.
  * Find its JSON boundary without consuming or executing those assignments. */
 export function appendValidationVerdicts(html: string, verdicts: readonly unknown[]): string {
   const marker = 'globalThis.__WS_SHARDFILE_VERDICTS__=', start = html.indexOf(marker);
@@ -212,11 +213,20 @@ export function appendValidationVerdicts(html: string, verdicts: readonly unknow
       if (depth === 0) {
         const before: unknown = JSON.parse(html.slice(from, at + 1));
         if (!Array.isArray(before)) throw new Error('Invalid validation verdicts');
-        return html.slice(0, from) + JSON.stringify([...before, ...verdicts]).replaceAll('<', String.raw`\u003c`) + html.slice(at + 1);
+        const installed = new Set(verdicts.map(verdictPath).filter(path => path !== undefined));
+        const retained = before.filter((row: unknown) => {
+          const path = verdictPath(row);
+          return path === undefined || !installed.has(path);
+        });
+        return html.slice(0, from) + JSON.stringify([...retained, ...verdicts]).replaceAll('<', String.raw`\u003c`) + html.slice(at + 1);
       }
     }
   }
   throw new Error('Unclosed validation verdicts');
+}
+
+function verdictPath(row: unknown): string | undefined {
+  return typeof row === 'object' && row !== null && 'path' in row && typeof row.path === 'string' ? row.path : undefined;
 }
 
 // SHARD-COMPAT CP10 (J486): a pinned or stored shard file was judged at its upload; memory policy only reports here.

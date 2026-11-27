@@ -182,20 +182,23 @@ describe('the bake', () => {
       writeFileSync(join(out, 'assets/spawn/whole.json'), JSON.stringify(manifest));
       const book = join(out, packsBookPath('build-1'));
       writeFileSync(book, JSON.stringify({book: 'packs', build: 'build-1', client: {}}));
-      const verdict = (slug: string): unknown => ({path: `/shardfiles/${slug}/shard.json`});
+      const verdict = (slug: string, indexHash: string) => ({path: `/shardfiles/${slug}/shard.json`, indexHash});
+      const other = verdict('a', 'a'.repeat(64));
+      const original = verdict('test-shard', 'b'.repeat(64));
+      const attached = verdict('test-shard', 'c'.repeat(64));
       // The real stamp continues after verdicts. The old whole-script regex
       // swallowed those assignments and failed every nightly head at JSON.parse.
       const world = {release: 'release-1', key: 'key-1', recordTag: 'quoted ];globalThis.fake=[];'};
       writeFileSync(join(out, 'index.html'), stampBuildHtml('<head><script type="application/json" id="boot-module-files">{"spawnManifests":{"client":{}}}</script></head>', 'build-1',
-        {validator: 'a'.repeat(64), verdicts: [verdict('a')], world, label: 'staging'}));
+        {validator: 'a'.repeat(64), verdicts: [other, original], world, label: 'staging'}));
       const row = (url: string, set: 'entry' | 'whole'): {url: string; tier: 'phone'; set: 'entry' | 'whole'; files: number; totalBytes: number; wireBytes: number} => ({url, tier: 'phone', set, files: 0, totalBytes: 0, wireBytes: 0});
       const discovery = new TextEncoder().encode(JSON.stringify({data: {...title(discoverySlug), shardfile: `/shardfiles/${discoverySlug}/shard.json`,
         card: {thumb: `/shardfiles/${discoverySlug}/blobs/image/thumb.jpg`, portrait: 'portrait', landscape: 'landscape'}}}));
-      addCookedShards(out, [{slug: 'test-shard', hash: fresh.hash, header: '', verdict: verdict('test-shard'), discovery, manifests: [row('/assets/spawn/entry.json', 'entry'), row('/assets/spawn/whole.json', 'whole')]}], out,
+      addCookedShards(out, [{slug: 'test-shard', hash: fresh.hash, header: '', verdict: attached, discovery, manifests: [row('/assets/spawn/entry.json', 'entry'), row('/assets/spawn/whole.json', 'whole')]}], out,
         {base: 'https://packs.example/', shards: ['test-shard'], ...(loose === '' ? {} : {loose: {'test-shard': loose}})});
       const html = readFileSync(join(out, 'index.html'), 'utf8');
       expect(html).toContain('"spawnManifests":{"client":{"test-shard":{"phone":{"url":"/assets/spawn/entry.json"');
-      expect(html).toContain('__WS_SHARDFILE_VERDICTS__=[{"path":"/shardfiles/a/shard.json"},{"path":"/shardfiles/test-shard/shard.json"}]');
+      expect(html).toContain(`__WS_SHARDFILE_VERDICTS__=${JSON.stringify([other, attached])};`);
       expect(html).toContain(`globalThis.__WS_WORLD__=${JSON.stringify(world)};globalThis.__WS_BUILD_LABEL__="staging";</script>`);
       const titles = JSON.parse(/id="ws-title-rows">([^<]*)<\/script>/u.exec(html)?.[1] ?? '[]') as TitleManifest[];
       const at = `https://packs.example/${loose}`;
