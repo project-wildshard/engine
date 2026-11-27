@@ -108,8 +108,7 @@ test('binds boot packs, transport bytes and the installed binary copies', async 
     'node_modules/three/examples/jsm/libs/basis/basis_transcoder.wasm']) f.put(file, 'installed bytes');
   const files = ['src/client/game/boot/bytes.generated.ts', 'src/client/game/boot/versions.generated.ts',
     'src/client/game/boot/audio.generated.ts', 'src/client/game/boot/packs.generated.ts',
-    'public/assets/physics/rapier.wasm', 'public/assets/packs/shard.hash.bin', 'public/basis/r186/basis_transcoder.wasm',
-    'src/scripts/boot-publication.generated.json'];
+    'public/assets/physics/rapier.wasm', 'public/assets/packs/shard.hash.bin', 'public/basis/r186/basis_transcoder.wasm'];
   for (const folder of ['src/client/game/boot', 'src/client/game/shard']) mkdirSync(resolve(f.root, folder), { recursive: true });
   let calls = 0;
   const run = (): void => { calls++; for (const file of files) f.put(file, readFileSync(resolve(f.root, module), 'utf8')); };
@@ -119,9 +118,7 @@ test('binds boot packs, transport bytes and the installed binary copies', async 
   expect(await sourceTablesCached(f.root, 'boot', run)).toBe(false);
   rmSync(resolve(f.root, 'public/assets/packs/shard.hash.bin'));
   expect(await sourceTablesCached(f.root, 'boot', run)).toBe(false);
-  f.put('src/scripts/boot-publication.generated.json', 'poisoned published facts');
-  expect(await sourceTablesCached(f.root, 'boot', run)).toBe(false);
-  expect(calls).toBe(4);
+  expect(calls).toBe(3);
 });
 
 

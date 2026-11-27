@@ -345,7 +345,6 @@
  "test/binary-source-file-only.test.ts",
  "test/boot-pack-parts.test.ts",
  "test/boot-product-totals.test.ts",
- "test/boot-publication.test.ts",
  "test/boot-smoke-partition.test.ts",
  "test/boot-title-preparation.test.ts",
  "test/boss-bounty-lone.test.ts",
