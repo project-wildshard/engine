@@ -743,7 +743,23 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     await put(indexKey(build, hash), new TextEncoder().encode(JSON.stringify(index)), {type: 'application/json', cache: 'public, max-age=300'});
   };
   /** CP2b2b: the API's copy digest for each head it listed (`source.heads`), checked after the job, before publishing. */
-  const expectations = new Map<string, ExpectedCopy>();
+  const expectations = new Map<string, {readonly copy: ExpectedCopy; readonly read: number}>();
+  const expectedCopy = (hash: string): ExpectedCopy | undefined => expectations.get(hash)?.copy;
+  let catalogueRead = 0;
+  const readCatalogue = (stage: CookStage): {readonly read: number; readonly rows: Promise<readonly CatalogueRow[]>} => {
+    const read = ++catalogueRead;
+    return {read, rows: source.heads(stage)};
+  };
+  const rememberCopy = (hash: string, copy: ExpectedCopy, read: number): void => {
+    const previous = expectations.get(hash);
+    if (previous !== undefined && previous.read > read) return;
+    if (previous?.copy.chainId === copy.chainId && previous.copy.digest === copy.digest) {
+      expectations.set(hash, {copy: previous.copy, read});
+      return;
+    }
+    expectations.set(hash, {copy, read});
+    if (verdicts.get(hash)?.state === 'refused') verdicts.delete(hash);
+  };
   /** FORMAT-PRUNE FP27c: the catalogue's armed word per hash, from the upload feed. A head without one (a recook) leaves the
    *  format to decide; a stored file's memory policy only reports there (CP10). */
   const armedWords = new Map<string, boolean>();
@@ -800,14 +816,14 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     if (versioned === undefined) prefetch();
     const outcome = await runJob(launcher, file, out, shardSlugOf(head.slug), phases => {
       log(`cook ${head.slug} ${head.hash.slice(0, 12)}: phases ${phases}`);
-    }, sidecarPath(launcher.sidecars, head.hash, launcher.renderer), armedWords.get(head.hash), {...head, expected: expectations.get(head.hash)});
+    }, sidecarPath(launcher.sidecars, head.hash, launcher.renderer), armedWords.get(head.hash), {...head, expected: expectedCopy(head.hash)});
     if (outcome.kind === 'refused') return {...head, state: 'refused', detail: outcome.reason, ...(outcome.check === undefined ? {} : {check: outcome.check})};
     if (outcome.kind === 'killed') return {...head, state: 'failed', detail: outcome.reason};
     if (!outcome.report.check?.pass) return {...head, state: 'failed', detail: 'The job supplied no successful full check'};
     if (outcome.report.hash !== head.hash) return {...head, state: 'failed', detail: 'The job cooked other bytes'};
     if (!new Set([shardSlugOf(head.slug)]).has(outcome.report.slug)) return {...head, state: 'refused', detail: `A shardfile for ${outcome.report.slug} under ${head.slug}`};
     // CP2b2b: the cook and the API ran one chain on one original; a different digest under the same chain is never published.
-    const disagrees = provenanceRefusal(head.slug, outcome.report.provenance, expectations.get(head.hash), head.shardVersion);
+    const disagrees = provenanceRefusal(head.slug, outcome.report.provenance, expectedCopy(head.hash), head.shardVersion);
     if (disagrees !== undefined) return {...head, state: 'refused', detail: disagrees};
     // MAP-NEXT MN5 (J450): a cook always draws both maps (`cookedMapPngs` falls back rather than throw), so a report without one
     // is a job from before it or a broken one: its index would list no cooked-map-v1, and the page would draw the olive plot.
@@ -845,7 +861,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
       if (body === undefined) continue;
       const index = JSON.parse(new TextDecoder().decode(body)) as CookIndex;
       if (index.cook !== carryKey || index.check?.pass !== true || index.hash !== head.hash || !new Set([shardSlugOf(head.slug)]).has(index.slug)) continue;
-      if (provenanceRefusal(head.slug, index.provenance, expectations.get(head.hash), head.shardVersion) !== undefined) continue;
+      if (provenanceRefusal(head.slug, index.provenance, expectedCopy(head.hash), head.shardVersion) !== undefined) continue;
       if (!existsSync(join(serverPacks, index.slug, head.hash))) continue;
       if (index.loose !== undefined && !await store.has(index.loose + index.header)) continue;
       const {carried: _from, ...own} = index, copy: CookIndex = {...own, build, carried: donor};
@@ -887,7 +903,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   };
   const versionedHit = async (recipe: VersionedCook, head: CookHead): Promise<CookRow | undefined> => {
     const ref = versionedRef(recipe, head), existing = await readVersionedCook(recipe.store, ref, head.hash);
-    const expected = expectations.get(head.hash);
+    const expected = expectedCopy(head.hash);
     if (existing !== undefined && provenanceRefusal(head.slug, existing.provenance, expected, head.shardVersion) === undefined)
       return {...head, state: 'present', check: existing.check};
     const donor = recipe.sameOutputFrom;
@@ -910,7 +926,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
       if (held !== undefined) {
         const index = JSON.parse(new TextDecoder().decode(held)) as CookIndex;
         if (index.check?.pass && index.hash === head.hash && new Set([shardSlugOf(head.slug)]).has(index.slug)
-          && provenanceRefusal(head.slug, index.provenance, expectations.get(head.hash), head.shardVersion) === undefined) return {...head, state: 'present', check: index.check};
+          && provenanceRefusal(head.slug, index.provenance, expectedCopy(head.hash), head.shardVersion) === undefined) return {...head, state: 'present', check: index.check};
       }
       const carried = await carry(head);
       if (carried !== undefined) return carried;
@@ -921,6 +937,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     finally { rmSync(work, {recursive: true, force: true}); }
   };
   const cook = async (head: CookHead): Promise<CookRow> => {
+    const expected = expectedCopy(head.hash);
     let row: CookRow = {...head, state: 'failed', detail: 'never ran'};
     const encodes = encodeFolder(scratch);
     for (let tries = 0, progress = 0; tries < TRANSIENT_TRIES; tries++) {
@@ -938,7 +955,8 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
       }
       log(`cook ${head.slug} ${head.hash.slice(0, 12)}: try ${tries + 1} failed: ${row.detail ?? ''}`);
     }
-    verdicts.set(head.hash, row);
+    // A catalogue read during this cook can make a refusal stale before it reaches the cache.
+    if (row.state !== 'refused' || expected === expectedCopy(head.hash)) verdicts.set(head.hash, row);
     log(`cook ${head.slug} ${head.hash.slice(0, 12)}: ${row.state}${row.seconds === undefined ? '' : ` in ${row.seconds.toFixed(1)} s`}${row.preparation === undefined ? '' : `, ${preparationWords(head.slug, row.preparation)}`}${row.detail === undefined ? '' : `: ${row.detail}`}`);
     return row;
   };
@@ -948,7 +966,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   // FAST-RELEASE FR-A20 (11-25): after v0.1.90's cook move an upload no channel advertises (an old pine-hollow, 849 s) jumped all
   // 37 recooks while Brasscap r19, the head staging QA needed, waited 33rd. Order: an advertised head no build has indexed (a
   // new pin), then advertised heads in catalogue order, then anything no catalogue advertises (a bare upload notice), last.
-  interface Job {readonly head: CookHead; fresh: boolean; readonly seq: number; readonly done: Promise<CookRow>; readonly settle: (row: CookRow) => void}
+  interface Job {readonly head: CookHead; fresh: boolean; refresh: CookStage | undefined; readonly seq: number; readonly done: Promise<CookRow>; readonly settle: (row: CookRow) => void}
   const waiting: Job[] = [], pending = new Map<string, Job>();
   /** The heads the catalogues advertised at the last look, in catalogue order. */
   let advertised = new Map<string, number>();
@@ -965,6 +983,20 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     }
     return best < 0 ? undefined : waiting.splice(best, 1)[0];
   };
+  /** QA44: read the exact notified upload before judging its cached verdict or cooked index. */
+  const refreshNotice = async (head: CookHead, stage: CookStage): Promise<CookHead> => {
+    try {
+      const {read, rows} = readCatalogue(stage);
+      const row = (await rows).find(candidate => Object.is(candidate.slug, head.slug) && candidate.hash === head.hash);
+      if (row === undefined) return head;
+      const {expected, ...identity} = row;
+      if (expected !== undefined) rememberCopy(head.hash, expected, read);
+      return {...head, ...identity};
+    } catch (error) {
+      log(`cook ${head.slug} ${head.hash.slice(0, 12)}: notify catalogue read failed: ${String(error)}`);
+      return head;
+    }
+  };
   const drain = async (): Promise<void> => {
     if (running) return;
     running = true;
@@ -972,7 +1004,14 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
       for (;;) {
         const job = next();
         if (job === undefined) break;
-        const row = await cook(job.head);
+        let head = job.head, row: CookRow;
+        do {
+          const refresh = job.refresh;
+          job.refresh = undefined;
+          if (refresh !== undefined) head = await refreshNotice(head, refresh);
+          row = await cook(head);
+          // A notice delivered during this cook still gets a fresh read before the job settles.
+        } while (job.refresh !== undefined);
         if (row.state === 'failed') failures.set(job.head.hash, {count: (failures.get(job.head.hash)?.count ?? 0) + 1, at: clock()});
         else failures.delete(job.head.hash);
         pending.delete(job.head.hash);
@@ -980,11 +1019,15 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
       }
     } finally { running = false; }
   };
-  const schedule = (head: CookHead, fresh: boolean): Promise<CookRow> => {
+  const schedule = (head: CookHead, fresh: boolean, refresh?: CookStage): Promise<CookRow> => {
     const known = pending.get(head.hash);
-    if (known !== undefined) { known.fresh ||= fresh; return known.done; }
+    if (known !== undefined) {
+      known.fresh ||= fresh;
+      if (refresh !== undefined) known.refresh = refresh;
+      return known.done;
+    }
     let settle: (row: CookRow) => void = () => undefined;
-    const done = new Promise<CookRow>(resolve => { settle = resolve; }), job: Job = {head, fresh, seq: queued++, done, settle};
+    const done = new Promise<CookRow>(resolve => { settle = resolve; }), job: Job = {head, fresh, refresh, seq: queued++, done, settle};
     pending.set(head.hash, job); waiting.push(job);
     if (fresh && running && waiting.length > 1) {
       log(`cook ${head.slug} ${head.hash.slice(0, 12)}: ${advertised.has(head.hash) ? `a new advertised upload, ahead of ${waiting.length - 1} waiting` : `an upload no catalogue advertises, after the ${waiting.length - 1} waiting`}`);
@@ -1001,10 +1044,13 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   };
   const headsOf = async (stages: readonly CookStage[]): Promise<CookHead[]> => {
     const seen = new Map<string, CookHead>();
-    for (const stage of stages) for (const row of await source.heads(stage)) {
-      const {expected: _expected, ...identity} = row;
-      seen.set(row.hash, {...seen.get(row.hash), ...identity});
-      if (row.expected !== undefined) expectations.set(row.hash, row.expected);
+    for (const stage of stages) {
+      const {read, rows} = readCatalogue(stage);
+      for (const row of await rows) {
+        const {expected, ...identity} = row;
+        seen.set(row.hash, {...seen.get(row.hash), ...identity});
+        if (expected !== undefined) rememberCopy(row.hash, expected, read);
+      }
     }
     advertised = new Map([...seen.keys()].map((hash, at) => [hash, at]));
     return [...seen.values()];
@@ -1018,7 +1064,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
       log(`recook ${build}: ${rows.length} heads in ${((clock() - started) / 1000).toFixed(1)} s`);
       return rows;
     },
-    enqueue: notice => { void schedule({slug: notice.shard, hash: notice.hash, uploadNumber: notice.uploadNumber, shardVersion: notice.shardVersion}, true); },
+    enqueue: notice => { void schedule({slug: notice.shard, hash: notice.hash, uploadNumber: notice.uploadNumber, shardVersion: notice.shardVersion}, true, notice.stage); },
     idle: async () => { while (pending.size > 0) await Promise.all([...pending.values()].map(job => job.done)); },
     rows: () => [...verdicts.values()],
     maintain: storeExclusive,
