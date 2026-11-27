@@ -336,8 +336,12 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, folder: st
     mountRows: (tier, set) => {
       // SF4: a fence shard's phone whole set also carries its own far view, which the grid reads outside any fence (the
       // preparation records the client flow): without it a cooked Driftwood's phone read the page's engine-wide copy.
+      const music = source.audio.music;
+      const scoreDir = music?.catalogue?.mode === 'bank' ? music.source?.dir : undefined;
+      // Muted author preparation can read the score manifest without playing its recordings.
+      const ownScore = (url: string): boolean => scoreDir !== undefined && scoreDir.startsWith(`/assets/${shard.slug}/music/`) && url.startsWith(scoreDir);
       const urls = wholeSet(tier, set) ? mounts.map(row => row.url).filter(url => onTier(url, tier))
-        : set === 'whole' ? [...new Set([...fence.mounts, ...mounts.map(row => row.url).filter(url => ownFarView(url, shard.slug) && onTier(url, tier))])] : fence.mounts;
+        : set === 'whole' ? [...new Set([...fence.mounts, ...mounts.map(row => row.url).filter(url => (ownFarView(url, shard.slug) || ownScore(url)) && onTier(url, tier))])] : fence.mounts;
       // A phone file whose target no phone list names (a fence shard's file read past its fence) rides in the phone's whole
       // set: no other tier's part holds it, and it costs less than the target a phone read from a desktop part before.
       const textures = blobRows(tier, wholeSet(tier, set) ? undefined : fence.hashes);

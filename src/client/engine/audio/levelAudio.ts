@@ -57,6 +57,7 @@ export async function createCatalogueAudio(data: AudioData, extras?: AudioCatalo
   }
   const samples = data.samples, music = data.music, policy = samples?.catalogue;
   if (samples === undefined || music === undefined || policy === undefined) throw new Error('Missing declared audio catalogue');
+  const bankSource = music.catalogue?.mode === 'bank' ? music.source : null;
   const [{ audioSelection }, { getSfxSet }, { decodeStyle }, { decodeSfxSet }] = await Promise.all([
     import('../../../shared/engine/audio/bootAudio'), import('../ui/Settings'), import('./Stems'), import('./preload'),
   ]);
@@ -83,13 +84,13 @@ export async function createCatalogueAudio(data: AudioData, extras?: AudioCatalo
     controlFiles: selection.controlFiles,
     ...(music.controlTension === 'late' ? { controlDecode: async (style: MusicStyle, read: AudioRead, decode: AudioDecode, onFile?: () => void): Promise<LevelAudioBank> => {
       const [title, bank] = await Promise.all([
-        decodeStyle(style, music.bootSlots, read, decode, onFile, 'base', [], false).catch(() => undefined), decodeSamples(read, decode, onFile),
+        decodeStyle(style, music.bootSlots, read, decode, onFile, 'base', [], false, bankSource).catch(() => undefined), decodeSamples(read, decode, onFile),
       ]);
       return { title, samples: bank, score: { slots: new Map(), stings: new Map() }, cues: { loops: new Map(), shots: new Map() } };
     } } : {}),
     decode: async (style, read, decode, onFile) => {
       const [title, bank] = await Promise.all([
-        decodeStyle(style, music.bootSlots, read, decode, onFile).catch(() => undefined), decodeSamples(read, decode, onFile),
+        decodeStyle(style, music.bootSlots, read, decode, onFile, 'base', undefined, true, bankSource).catch(() => undefined), decodeSamples(read, decode, onFile),
         ...(getSfxSet() === 'synth' || catalogueExtras === undefined ? [] : [catalogueExtras.decode(read, onFile, decode)]),
       ]);
       return { title, samples: bank, score: { slots: new Map(), stings: new Map() }, cues: { loops: new Map(), shots: new Map() } };

@@ -261,7 +261,7 @@ export class CatalogueScore implements ScoreSource {
   private async prepareBank(genre:MusicStyle):Promise<void> {
     try {
       const [{decodeStyle},{cachedBytes,decodeBytes}]=await Promise.all([import('./Stems'),import('./preload')]);
-      const bank=await decodeStyle(genre,this.profile.bootSlots,cachedBytes,decodeBytes);
+      const bank=await decodeStyle(genre,this.profile.bootSlots,cachedBytes,decodeBytes,undefined,'base',undefined,true,this.profile.source);
       if(!this.retired&&!this.scope?.disposed&&this.music.genre===genre)this.useStyleBank(bank);
     } catch { this.failures.add(genre); }
     finally {if(this.bankDecoding===genre)this.bankDecoding=undefined;if(!this.retired&&!this.scope?.disposed)this.music.refreshScore();}

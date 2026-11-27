@@ -113,15 +113,29 @@ export function parseManifest(raw: unknown): MusicManifest | undefined {
 export const musicSetDir = (genre: MusicStyle, set: MusicSet = 'base'): string => (set === 'base' ? genre : `${set}-${genre}`);
 /** this build's manifest for `genre` (compiled in from public/assets/music/<dir>/music.json), or undefined */
 export function musicManifest(genre: MusicStyle, set: MusicSet = 'base'): MusicManifest | undefined { return parseManifest(musicManifests()[musicSetDir(genre, set)]); }
+/** A zone bank replaces its declared score slots. Title and stings still use the engine bank. */
+export function styleSlot(genre: MusicStyle, slot: SlotName, set: MusicSet, source?: ScoreSet | null): {spec: SlotSpec; dir: string} | undefined {
+  if (slot !== 'title' && source !== null && source !== undefined) {
+    const own = scoreManifest(source)?.slots[slot];
+    if (own !== undefined) return {spec: own, dir: source.dir};
+  }
+  const spec = musicManifest(genre, set)?.slots[slot];
+  return spec === undefined ? undefined : {spec, dir: musicDir(musicSetDir(genre, set))};
+}
 /** the files `decodeStyle(genre, slots)` reads (URLs), so the loading bar can tell them from the files it only downloads;
  *  `withStings: false` lists the slots' stems alone */
-export function styleFiles(genre: MusicStyle, slots: readonly SlotName[], withStings = true, withTension = true): string[] {
+export function styleFiles(genre: MusicStyle, slots: readonly SlotName[], withStings = true, withTension = true, source?: ScoreSet | null): string[] {
   const m = musicManifest(genre);
   if (!m) return [];
   const files: string[] = [];
-  for (const k of slots) { const sp = m.slots[k]; if (sp) files.push(sp.calm, ...(!withTension || sp.tension === undefined ? [] : [sp.tension])); }
-  if (withStings) for (const k of STINGS) { const f = m.stings[k]; if (f !== undefined) files.push(f); }
-  return [...new Set(files.map((f) => `${musicDir(genre)}${f}`))].filter(shipped);
+  for (const k of slots) {
+    const picked = styleSlot(genre, k, 'base', source);
+    if (picked === undefined) continue;
+    files.push(`${picked.dir}${picked.spec.calm}`);
+    if (withTension && picked.spec.tension !== undefined) files.push(`${picked.dir}${picked.spec.tension}`);
+  }
+  if (withStings) for (const k of STINGS) { const f = m.stings[k]; if (f !== undefined) files.push(`${musicDir(genre)}${f}`); }
+  return [...new Set(files)].filter(shipped);
 }
 
 // ---- a level's own score set ----
@@ -263,6 +277,8 @@ export function audioSelection(data: AudioData, set: () => SfxSet, extraFiles?: 
   const policy = samples?.catalogue;
   if (samples === undefined || music === undefined || policy === undefined) throw new Error('Missing declared audio catalogue');
   const levels = { loopGains: samples.loopGains };
+  const scoped = music.catalogue?.mode === 'bank' ? music.source ?? undefined : undefined;
+  const scopedSlots = scoped === undefined ? [] : music.slots.filter(slot => slot !== 'title' && scoreManifest(scoped)?.slots[slot] !== undefined);
   const ownMusic = (): string[] => {
     const key = `${samples.set}-${ENGINE_MUSIC_STYLE}`;
     return policy.ownMusic && Object.hasOwn(musicManifests(), key) ? [key] : [];
@@ -272,17 +288,20 @@ export function audioSelection(data: AudioData, set: () => SfxSet, extraFiles?: 
     ...(policy.overlaySamples && set() !== 'synth' ? sfxFiles(samples.set, samples.bed, levels) : []),
     ...(set() === 'synth' ? [] : extras?.() ?? [])];
   return {
-    files: () => audioFilesFor(set(), { omitSlots: policy.inventoryOmitSlots, musicSets: ownMusic(), sfxSets: ownSfx() }),
+    files: () => {
+      const files = audioFilesFor(set(), { omitSlots: [...policy.inventoryOmitSlots, ...scopedSlots], musicSets: ownMusic(), sfxSets: ownSfx() });
+      return { music: [...new Set([...files.music, ...styleFiles(ENGINE_MUSIC_STYLE, scopedSlots, false, true, scoped)])], sfx: files.sfx };
+    },
     ...(policy.priorityOwn ? { priorityFiles: () => {
       const files = audioFilesFor(set(), { musicSets: ownMusic(), sfxSets: ownSfx() }), dirs = [...ownMusic().map(musicDir), ...ownSfx().map(sfxDir)];
       return [...files.music, ...files.sfx].filter(url => dirs.some(dir => url.startsWith(dir)));
     } } : {}),
-    bootFiles: genre => [...styleFiles(genre, music.bootSlots), ...selectedSfx()],
+    bootFiles: genre => [...styleFiles(genre, music.bootSlots, true, true, scoped), ...selectedSfx()],
     titleFiles: genre => {
-      const played = new Set(styleFiles(genre, music.bootSlots.filter(slot => slot !== 'title'), false));
+      const played = new Set(styleFiles(genre, music.bootSlots.filter(slot => slot !== 'title'), false, true, scoped));
       return styleFiles(genre, ['title'], false).filter(url => !played.has(url));
     },
-    controlFiles: genre => [...styleFiles(genre, music.bootSlots, false, music.controlTension !== 'late'), ...sfxBedFiles(set(), samples.bed, levels),
+    controlFiles: genre => [...styleFiles(genre, music.bootSlots, false, music.controlTension !== 'late', scoped), ...sfxBedFiles(set(), samples.bed, levels),
       ...(policy.overlaySamples && set() !== 'synth' ? sfxBedFiles(samples.set, samples.bed, levels) : [])],
   };
 }

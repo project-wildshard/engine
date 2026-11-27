@@ -211,6 +211,7 @@ function installMemberLayer(): boolean {
       return readCookedResponse(url, member, native(member.part, {credentials: 'omit',
         ...(signal === undefined || signal === null ? {} : {signal}), ...(cache === undefined ? {} : {cache})}));
     }
+    if (/^\/assets\/[^/]+\/music\//u.test(url.pathname)) return await partMember(url) ?? network(input, init);
     if (!url.pathname.startsWith('/shardfiles/')) return network(input, init);
     const held = await heldPartMember(url);
     if (held !== null) return held;
@@ -359,9 +360,17 @@ export async function spawnHeldBytes(url: string, demand = true): Promise<ArrayB
 }
 /** AUDIO AU2: this page's download lists `url` (bare or versioned), so LOAD reads its bytes with `spawnHeldBytes`, never
  *  with `fetch` (QA 11-12 row 36: on bad LTE each LOAD audio read went back to the network and the card sat on it). */
-export function spawnListed(url: string): boolean {
+function spawnListedBytes(url: string): number | undefined {
   const address = new URL(pageURL(new URL(url, location.href).href), location.href);
-  return pageFiles.has(address.origin + address.pathname);
+  return pageFiles.get(address.origin + address.pathname)?.bytes;
+}
+export const spawnListed = (url: string): boolean => spawnListedBytes(url) !== undefined;
+/** A cooked mount can first be needed on play, outside the selected entry's fence. */
+export async function spawnMountSize(url: string): Promise<number | undefined> {
+  const listed = spawnListedBytes(url);
+  if (listed !== undefined) return listed;
+  const path = new URL(url, location.href).pathname, owner = path.split('/')[2];
+  return owner === undefined ? undefined : (await lookupPartTable(owner))?.files.get(path)?.file.bytes;
 }
 // SF4: a cooked zone's own mounts are read where its download lists them, not from the page's engine-wide copies
 useZoneDownloadListing(spawnListed);

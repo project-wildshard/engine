@@ -132,6 +132,12 @@ const enteredScenes=new WeakMap<Scope,WeakMap<ShardFolder,AudioSceneDirector>>()
 export async function enterDeclaredAudioPhase(ctx: ShardContext, phase: 'kit' | 'play'): Promise<void> {
  const entry = ctx.product.shardfile.audio.entry?.[phase];
  if (entry === undefined) return;
+ const music = runtimeAudio(ctx, ctx.product.shardfile.audio).music;
+ if (entry.score && music?.catalogue?.mode === 'bank' && music.source !== null && music.source !== undefined) {
+  const {adoptCookedMusic} = await import('../shardfile/audioCatalogue');
+  await adoptCookedMusic(ctx.product.slug, music.source);
+  if (ctx.scope.disposed || ctx.scope.disposing) return;
+ }
  if (entry.scene === true) { await enterClientAudioScene(ctx); return; }
  const audio = ctx.app.audio;
  if (audio === null) throw new Error('Audio entry requires its native mixer');

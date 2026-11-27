@@ -25,7 +25,7 @@ import type { Scope } from '../../../shared/engine/app/scope';
 // carries `layers` (bass, drums) and `phases` (each boss phase's layer gains). `decodeStyle(genre, slots, …, set)` reads it.
 // A deck of the boss plays its layers at the current phase's gains (Deck.setPhase), moved on the bar like the tension stem.
 
-import { STINGS, musicDir, musicManifest, musicSetDir, shipped, type SCORE_GENRE, type MusicStyle as MusicGenre, type BossPhase, type MusicSet, type SlotName, type SlotSpec, type StemSting } from '../../../shared/engine/audio/bootAudio';
+import { STINGS, musicDir, musicManifest, musicSetDir, shipped, styleSlot, type SCORE_GENRE, type MusicStyle as MusicGenre, type BossPhase, type MusicSet, type ScoreSet, type SlotName, type SlotSpec, type StemSting } from '../../../shared/engine/audio/bootAudio';
 
 /** a decoded slot: its spec and the stems (tension absent for the title cut; layers only on the boss) */
 export interface SlotAudio { genre: MusicGenre | typeof SCORE_GENRE; slot: SlotName; spec: SlotSpec; calm: AudioBuffer | AacTrack; tension: AudioBuffer | AacTrack | undefined; layers: (AudioBuffer | AacTrack)[] }
@@ -53,14 +53,14 @@ export async function decodeRecordingStem(bytes: ArrayBuffer, spec: SlotSpec, de
  * Decode `slots` + every sting of `genre`. `read` hands over a file's bytes (by URL), `decode` turns them into an AudioBuffer
  * (an OfflineAudioContext's — no live context needed). Rejects only when the build has no manifest for the genre.
  */
-export async function decodeStyle(genre: MusicGenre, slots: readonly SlotName[], read: (url: string) => Promise<ArrayBuffer>, decode: AudioDecode, onFile?: () => void, set: MusicSet = 'base', stings: readonly StemSting[] = STINGS, withTension = true): Promise<StyleBank> {
+export async function decodeStyle(genre: MusicGenre, slots: readonly SlotName[], read: (url: string) => Promise<ArrayBuffer>, decode: AudioDecode, onFile?: () => void, set: MusicSet = 'base', stings: readonly StemSting[] = STINGS, withTension = true, source?: ScoreSet | null): Promise<StyleBank> {
   const m = musicManifest(genre, set);
   if (!m) throw new Error(`no music.json for '${musicSetDir(genre, set)}' in this build`);
   const base = musicDir(musicSetDir(genre, set));
   const bank: StyleBank = { genre, set, slots: new Map(), stings: new Map(), log: [] };
   const owner = resourceScope();
-  const readOne = async <T>(file: string, convert: (bytes: ArrayBuffer) => Promise<T>): Promise<T> => {
-    const t = performance.now(), url = `${base}${file}`;
+  const readOne = async <T>(file: string, convert: (bytes: ArrayBuffer) => Promise<T>, dir = base): Promise<T> => {
+    const t = performance.now(), url = `${dir}${file}`;
     try {
       if (!shipped(url)) throw new Error(`${url} is not in this build`);
       const bytes = await read(url), size = bytes.byteLength; // decodeAudioData detaches the buffer
@@ -71,10 +71,11 @@ export async function decodeStyle(genre: MusicGenre, slots: readonly SlotName[],
   };
   await Promise.all([
     ...slots.map(async (slot) => {
-      const spec = m.slots[slot];
-      if (!spec) return;
+      const picked = styleSlot(genre, slot, set, source);
+      if (picked === undefined) return;
+      const {spec, dir} = picked;
       try {
-        const stem = (file: string): Promise<AudioBuffer | AacTrack> => readOne(file, bytes => decodeRecordingStem(bytes, spec, decode, owner));
+        const stem = (file: string): Promise<AudioBuffer | AacTrack> => readOne(file, bytes => decodeRecordingStem(bytes, spec, decode, owner), dir);
         const [calm, tension, ...layers] = await Promise.all([stem(spec.calm), !withTension || spec.tension === undefined ? Promise.resolve(undefined) : stem(spec.tension), ...spec.layers.map(stem)]);
         // the loop must fit the file (a bad loopEnd would loop into silence)
         if (spec.loopEnd > calm.duration + 0.05) throw new Error(`${slot}: loopEnd ${spec.loopEnd} past the file (${calm.duration.toFixed(2)} s)`);
