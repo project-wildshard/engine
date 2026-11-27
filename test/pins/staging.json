@@ -2,8 +2,8 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "ac886644821e37c3c98032f31a26a5a2569494160ae01bcc83214bdc0af46124",
-  "releaseHash": "826b6dc7be99507f773c05f8dd8b469683ecbc43b20b206b9b89abe551628502",
+  "catalogueHash": "c56b8a88c13140065e83d3852973980da6b90232fe19333ecc282cc81a4da314",
+  "releaseHash": "8c3c23ce692280d9c47636012f3f6760be32e6bcd84b3d8225d5d31931ce9590",
   "catalogue": {
     "version": 0,
     "placements": [
@@ -614,9 +614,9 @@
       {
         "slug": "mirror-salt",
         "name": "Mirror Salt",
-        "uploadNumber": 8,
-        "shardVersion": "0.0.8",
-        "hash": "bb9e8863589556ed2de17432dfc0b0040429fc48b91e86d6e58d8fd4768248fc"
+        "uploadNumber": 9,
+        "shardVersion": "0.0.9",
+        "hash": "7a2c1c34e79beaac7f4684575c8b9d15cdfb86a91a6428f854689b17857264bf"
       },
       {
         "slug": "mossgate",
@@ -792,10 +792,10 @@
     },
     {
       "slug": "mirror-salt",
-      "uploadNumber": 8,
-      "shardVersion": "0.0.8",
-      "hash": "bb9e8863589556ed2de17432dfc0b0040429fc48b91e86d6e58d8fd4768248fc",
-      "bytes": 14926336
+      "uploadNumber": 9,
+      "shardVersion": "0.0.9",
+      "hash": "7a2c1c34e79beaac7f4684575c8b9d15cdfb86a91a6428f854689b17857264bf",
+      "bytes": 17572864
     },
     {
       "slug": "mossgate",
