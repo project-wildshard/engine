@@ -75,12 +75,15 @@ function ktx2StandIn(url: string, tex: TexMode): string | undefined {
   return standIn(path, tex);
 }
 /** the tier's copy of a file (`.phone.webp` / `.phone.glb`), whatever the textures ride as */
-export function phoneUrl(url: string): string {
+export function phoneUrl(url: string): string { return phoneCopy(url, known); }
+/** `phoneUrl` against another table of files: an aliased model's own (SF5d: a cooked shardfile names its hand-made
+ *  `.phone.glb` only in its alias table, never in the page's byte table). */
+export function phoneCopy(url: string, has: (file: string) => boolean): string {
   if (TIER_CONFIG.maxTexture > 1024) return url;
   const m = /^(.*)\.(png|jpg|webp|glb)$/.exec(url);
   if (!m) return url;
   const u = `${m[1]}.phone.${m[2] === 'glb' ? 'glb' : 'webp'}`;
-  return known(u) ? u : url;
+  return has(u) ? u : url;
 }
 /** the file this device downloads for `url` in mode `tex`: tierUrl's, or its KTX2 stand-in for an image (E157) — what the boot declares */
 export function gpuUrl(url: string, tex: TexMode = texMode()): string {

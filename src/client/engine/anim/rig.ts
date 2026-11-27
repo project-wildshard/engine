@@ -1,6 +1,7 @@
 
 import { retried } from '../boot/retry';
 import {readModuleGroups} from '../boot/download';
+import { phoneCopy } from '../boot/bytes';
 import { type AnimationClip, type Object3D, type Texture, BufferGeometry, DefaultLoadingManager, InstancedBufferAttribute, InstancedMesh, LoadingManager, SkinnedMesh } from 'three';
 import type * as RigParser from './rigParser';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -64,7 +65,8 @@ export async function loadRigFile(url: string, aliases: Readonly<Record<string, 
       const request = (resolved.protocol === 'http:' || resolved.protocol === 'https:') && resolved.origin === page.origin
         ? `${resolved.pathname}${resolved.search}${resolved.hash}` : path;
       const served = DefaultLoadingManager.resolveURL(request), key = new URL(served, page).pathname;
-      return DefaultLoadingManager.resolveURL(aliases[key] ?? request);
+      // SF5d: a phone reads the model's hand-made phone copy when the alias table names one, as the page's own table does
+      return DefaultLoadingManager.resolveURL(aliases[phoneCopy(key, file => file in aliases)] ?? request);
     });
   }
   const gltf = await read.loadAsync(url);

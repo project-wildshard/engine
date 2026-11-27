@@ -47,3 +47,28 @@ it('resolves root and relative images from the original aliased model before tie
   expect(reads).toEqual([{ model: '/assets/compact/crate.gltf', root: '/assets/pine/wood.ktx2',
     relative: '/assets/models/crate/textures/wood.phone.webp', external: 'https://cdn.example/metal.jpg', blob: 'blob:https://game.example/resource' }]);
 });
+
+it('reads an aliased model\'s hand-made phone copy on the phone (SF5d)', async () => {
+  // Pine Hollow's rock scene material names rock_moss_set_01_lod.glb; its cooked alias table names both product files, and
+  // the phone set holds only the .phone.glb, so a phone that read the desktop file got a 404 from the cook store.
+  vi.stubGlobal('location', { href: 'https://game.example/play/' });
+  DefaultLoadingManager.setURLModifier(path => path);
+  const { TIER_CONFIG } = await import('@wildshard/engine/core/tier');
+  const file = await new GLTFLoader().parseAsync(JSON.stringify({ asset: { version: '2.0' }, scene: 0, scenes: [{ nodes: [] }], nodes: [] }), '');
+  const reads: string[] = [];
+  vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(function readFixture(this: GLTFLoader, url) {
+    reads.push(this.manager.resolveURL(url));
+    return Promise.resolve(file);
+  });
+  const model = '/assets/pine/rock/rock_lod.glb', aliases = { [model]: 'https://cook.example/blobs/desktop.bin',
+    '/assets/pine/rock/rock_lod.phone.glb': 'https://cook.example/blobs/phone.bin' };
+  const was = TIER_CONFIG.maxTexture;
+  try {
+    TIER_CONFIG.maxTexture = 2048;
+    await loadRigFile(model, aliases);
+    TIER_CONFIG.maxTexture = 1024;
+    await loadRigFile(model, aliases);
+    await loadRigFile(model, { [model]: 'https://cook.example/blobs/desktop.bin' });
+  } finally { TIER_CONFIG.maxTexture = was; }
+  expect(reads).toEqual(['https://cook.example/blobs/desktop.bin', 'https://cook.example/blobs/phone.bin', 'https://cook.example/blobs/desktop.bin']);
+});
