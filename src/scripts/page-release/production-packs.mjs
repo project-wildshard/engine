@@ -20,17 +20,25 @@ const CHANNEL = Object.freeze({
   production: {catalogue: PRODUCTION_CATALOGUE, origin: 'https://play.wildshard.io'},
   staging: {catalogue: 'https://api.wildshard.io/api/catalogue.json?channel=staging', origin: 'https://staging.wildshard.io'},
 });
+// RL10: these exact staging heads still advertise an old identity copy.
+// The API found different bytes on re-proof. Their re-packs replace them.
+const STALE_STAGING_BUILD = '37db5402c1c5f8424765e2383638bcd556c946b6';
+const STALE_STAGING_HEADS = new Map([
+  ['nalati-grasslands', {hash: 'b730599048b8a4a2797b3b2ad3a36d90c40870650a3002ca416a5fa09ad9b718', row: 'SF6'}],
+  ['nine-dragon-stack', {hash: 'a38ee0a18e59d2e7860a7a6e9320bf1aa3d089ce5b39566a4a23f7b6f7f6689c', row: 'SF7'}],
+]);
 /** FR-A19: how long a staging deploy waits for the cook before it holds (a full recook took about 40 min on 11-25). */
 export const PACK_WAIT_MS = 45 * 60_000;
 
 /** @typedef {(url: string, init?: RequestInit) => Promise<Response>} Fetch */
+/** @typedef {{slug:string,hash:string,status:number}} MissingPack */
 
 /**
- * Each head a channel advertises whose exact-build pack index does not answer 200, as `<slug> <status>`.
+ * Each head a channel advertises whose exact-build pack index does not answer 200.
  * @param {string} build @param {'production'|'staging'} channel @param {Fetch} [read]
- * @returns {Promise<string[]>}
+ * @returns {Promise<MissingPack[]>}
  */
-export async function missingPacks(build, channel, read = agentFetch) {
+async function missingPackRows(build, channel, read) {
   if (!/^[0-9a-f]{40}$/u.test(build)) throw new Error(`A ${channel} pack check needs a full build SHA, not ${build}`);
   const {catalogue: url, origin} = CHANNEL[channel];
   const response = await read(url, {cache: 'no-store', signal: AbortSignal.timeout(30_000)});
@@ -47,9 +55,24 @@ export async function missingPacks(build, channel, read = agentFetch) {
       status = index.status;
       await index.body?.cancel();
     } catch { status = 0; }
-    return status === 200 ? undefined : `${String(head.slug)} ${status === 0 ? 'unread' : status}`;
+    return status === 200 ? undefined : {slug: String(head.slug), hash: String(head.hash), status};
   }));
   return rows.filter(row => row !== undefined);
+}
+
+/** @param {MissingPack} pack */
+const describe = ({slug, status}) => `${slug} ${status === 0 ? 'unread' : status}`;
+
+/** @param {string} build @param {'production'|'staging'} channel @param {Fetch} [read] */
+export async function missingPacks(build, channel, read = agentFetch) {
+  return (await missingPackRows(build, channel, read)).map(describe);
+}
+
+/** @param {string} build @param {'production'|'staging'} channel @param {MissingPack} pack */
+function clearsStaleHead(build, channel, pack) {
+  if (channel !== 'staging' || build !== STALE_STAGING_BUILD || pack.status !== 404) return undefined;
+  const expected = STALE_STAGING_HEADS.get(pack.slug);
+  return expected?.hash === pack.hash ? expected.row : undefined;
 }
 
 /** Production's missing heads (FR-A17). @param {string} build @param {Fetch} [read] */
@@ -64,9 +87,16 @@ export async function waitForPacks(build, channel, {log, read = agentFetch, slee
   now = Date.now, limitMs = PACK_WAIT_MS, everyMs = 60_000}) {
   const start = now();
   for (;;) {
-    const missing = await missingPacks(build, channel, read);
+    const missing = [], stale = [];
+    for (const pack of await missingPackRows(build, channel, read)) {
+      const row = clearsStaleHead(build, channel, pack);
+      if (row === undefined) missing.push(describe(pack));
+      else stale.push(`known stale staging head ${pack.slug} ${pack.hash} will be replaced by ${row}`);
+    }
     if (missing.length === 0) {
-      log(`PASS ${channel} packs: every advertised head has index/${build} after ${Math.round((now() - start) / 1000)} s`);
+      for (const line of stale) log(line);
+      const heads = stale.length === 0 ? 'every advertised head' : 'every other advertised head';
+      log(`PASS ${channel} packs: ${heads} has index/${build} after ${Math.round((now() - start) / 1000)} s`);
       return;
     }
     const waited = now() - start;

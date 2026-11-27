@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { expect, test } from 'vitest';
-import { missingProductionPacks, PRODUCTION_CATALOGUE } from '../src/scripts/page-release/production-packs.mjs';
+import { missingProductionPacks, PRODUCTION_CATALOGUE, waitForPacks } from '../src/scripts/page-release/production-packs.mjs';
 
 const build = 'a'.repeat(40);
 
@@ -21,7 +21,6 @@ test('the production pack check names each advertised head whose exact-build ind
 
 // FR-A19: a staging deploy waits, bounded, for the cook instead of touring a build into 404 packs.
 test('the pack wait passes once every head is cooked, and holds with the missing heads after its limit', async () => {
-  const { waitForPacks } = await import('../src/scripts/page-release/production-packs.mjs');
   let clock = 0, cooked = 0;
   const read = (url: string): Promise<Response> => {
     if (url.includes('catalogue.json?channel=staging')) return Promise.resolve(Response.json({shards: [{slug: 'brasscap-mesa', hash: 'h1'}, {slug: 'glowfen', hash: 'h2'}]}));
@@ -36,4 +35,24 @@ test('the pack wait passes once every head is cooked, and holds with the missing
   cooked = -100; clock = 0;
   await expect(waitForPacks(build, 'staging', {log: () => undefined, read, sleep, now: () => clock, limitMs: 180_000}))
     .rejects.toThrow(/still missing on 2 head\(s\) after 3 min: brasscap-mesa 404, glowfen 404/u);
+});
+
+test('RL10 staging lists the exact stale heads and still refuses other missing packs', async () => {
+  const release = '37db5402c1c5f8424765e2383638bcd556c946b6';
+  const nalati = 'b730599048b8a4a2797b3b2ad3a36d90c40870650a3002ca416a5fa09ad9b718';
+  const nine = 'a38ee0a18e59d2e7860a7a6e9320bf1aa3d089ce5b39566a4a23f7b6f7f6689c';
+  let second = nine, status = 404;
+  const read = (url: string): Promise<Response> => Promise.resolve(url.includes('/api/catalogue.json')
+    ? Response.json({shards: [{slug: 'nalati-grasslands', hash: nalati}, {slug: 'nine-dragon-stack', hash: second}]})
+    : new Response('', {status}));
+  const lines: string[] = [], opts = {read, log: (line: string) => lines.push(line), limitMs: 0};
+  await waitForPacks(release, 'staging', opts);
+  expect(lines[0]).toBe(`known stale staging head nalati-grasslands ${nalati} will be replaced by SF6`);
+  expect(lines[1]).toBe(`known stale staging head nine-dragon-stack ${nine} will be replaced by SF7`);
+  await expect(waitForPacks(release, 'production', opts)).rejects.toThrow(/still missing on 2 head\(s\)/u);
+  await expect(waitForPacks(build, 'staging', opts)).rejects.toThrow(/still missing on 2 head\(s\)/u);
+  second = 'new-head';
+  await expect(waitForPacks(release, 'staging', opts)).rejects.toThrow(/still missing on 1 head\(s\).*nine-dragon-stack 404/u);
+  status = 500;
+  await expect(waitForPacks(release, 'staging', opts)).rejects.toThrow(/nalati-grasslands 500/u);
 });
