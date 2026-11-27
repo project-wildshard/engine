@@ -5,7 +5,7 @@ import {parseArgs} from 'node:util';
 import {resolve} from 'node:path';
 import * as v from 'valibot';
 import {HeadObjectCommand, S3Client} from '@aws-sdk/client-s3';
-import {publishChannel} from '../server-release/publish.mjs';
+import {publishChannel, RELEASE_BUCKET} from '../server-release/publish.mjs';
 import {COMMIT, releaseShards} from '../server-release/sign.mjs';
 import {pinnedReleaseKey} from './flow.mjs';
 
@@ -43,11 +43,14 @@ const account = need('R2_ACCOUNT_ID');
 if (!/^[0-9a-f]{32}$/u.test(account)) throw new Error('Invalid R2_ACCOUNT_ID');
 const privateKey = need('E7_RELEASE_SIGNING_KEY');
 const publicKey = pinnedReleaseKey(process.env.E7_RELEASE_PUBLIC_KEY);
-const client = new S3Client({region: 'auto', endpoint: `https://${account}.r2.cloudflarestorage.com`,
+const endpoint = `https://${account}.r2.cloudflarestorage.com`;
+const packs = base === undefined ? undefined : new S3Client({region: 'auto', endpoint,
   credentials: {accessKeyId: need('R2_PACKS_ACCESS_KEY_ID'), secretAccessKey: need('R2_PACKS_SECRET_ACCESS_KEY')}});
+const client = new S3Client({region: 'auto', endpoint,
+  credentials: {accessKeyId: need('R2_RELEASES_ACCESS_KEY_ID'), secretAccessKey: need('R2_RELEASES_SECRET_ACCESS_KEY')}});
 const pins = JSON.parse(readFileSync('test/pins/shardfiles.json', 'utf8'));
 try {
-  const result = await publishChannel({client, bucket: 'wildshard-packs', privateKey, publicKey,
+  const result = await publishChannel({client, bucket: RELEASE_BUCKET, privateKey, publicKey,
     candidate: {channel: 'preview', serial: 1, engineBuild: build,
       saveEpoch: JSON.parse(readFileSync('save-epoch.json', 'utf8')).saveEpoch,
       shards: releaseShards(pins, pins.shards.map((/** @type {{slug: string}} */ row) => row.slug).join(','))},
@@ -58,13 +61,13 @@ try {
     },
     packsReady: async () => {
       // The index is the publisher's completion marker, written after every content file is verified.
-      if (base !== undefined) await client.send(new HeadObjectCommand({Bucket: 'wildshard-packs', Key: `${new URL(base).pathname.slice(1)}content.json`}));
+      if (packs !== undefined && base !== undefined) await packs.send(new HeadObjectCommand({Bucket: 'wildshard-packs', Key: `${new URL(base).pathname.slice(1)}content.json`}));
       return null;
     },
   });
   if (!['published', 'unchanged'].includes(result.status) || result.release.engineBuild !== build) throw new Error('Preview publication is stale; alias stays unchanged');
   console.log(`preview ${result.status}: ${build} signed at serial ${result.release.serial}, no socket`);
-} finally { client.destroy(); }
+} finally { client.destroy(); packs?.destroy(); }
 
 }
 

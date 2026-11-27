@@ -11,6 +11,8 @@ import { bundleDescriptor, COMMIT, DEFAULT_SERVER_SHARDS, publication, readPubli
 import { copyItemCatalogue, itemBytesMatch } from './items.mjs';
 import { preparedReleaseFollows } from './history.mjs';
 
+export const RELEASE_BUCKET = 'wildshard-releases';
+
 /** @typedef {import('../../shared/host/releaseRows.ts').ReleaseFile} ReleaseFile */
 /** @typedef {{client: S3Client, bucket: string, candidate: ReleaseFile, privateKey: string, publicKey: string, isAncestor: (older: string, newer: string) => boolean,
  *   packsReady: (release: ReleaseFile) => Promise<string | null>, align?: boolean,
@@ -139,7 +141,6 @@ async function main() {
   if (values.bundle === undefined || values.tag === undefined || values.out === undefined) throw new Error('Expected --bundle, --tag and --out');
   const privateKey = need('E7_RELEASE_SIGNING_KEY'), publicKey = need('E7_RELEASE_PUBLIC_KEY'), account = need('R2_ACCOUNT_ID'), bucket = need('R2_BUCKET_PACKS');
   const credentials = { accessKeyId: need('R2_PACKS_ACCESS_KEY_ID'), secretAccessKey: need('R2_PACKS_SECRET_ACCESS_KEY') };
-  const releaseBucket = 'wildshard-releases';
   const releaseCredentials = { accessKeyId: need('R2_RELEASES_ACCESS_KEY_ID'), secretAccessKey: need('R2_RELEASES_SECRET_ACCESS_KEY') };
   if (!/^[0-9a-f]{32}$/u.test(account)) throw new Error('Invalid R2_ACCOUNT_ID');
   if (bucket !== 'wildshard-packs') throw new Error('R2_BUCKET_PACKS must be wildshard-packs (C26)');
@@ -154,9 +155,9 @@ async function main() {
   const client = new S3Client({ region: 'auto', endpoint, credentials });
   const releaseClient = new S3Client({ region: 'auto', endpoint, credentials: releaseCredentials });
   try {
-    const packsReady = (/** @type {ReleaseFile} */ release) => serverPacksReady(client, bucket, release, { client: releaseClient, bucket: releaseBucket });
-    const items = await copyItemCatalogue(releaseClient, releaseBucket);
-    const result = await publishChannel({ client: releaseClient, bucket: releaseBucket, candidate: { ...candidate, items }, privateKey, publicKey, isAncestor,
+    const packsReady = (/** @type {ReleaseFile} */ release) => serverPacksReady(client, bucket, release, { client: releaseClient, bucket: RELEASE_BUCKET });
+    const items = await copyItemCatalogue(releaseClient, RELEASE_BUCKET);
+    const result = await publishChannel({ client: releaseClient, bucket: RELEASE_BUCKET, candidate: { ...candidate, items }, privateKey, publicKey, isAncestor,
       preparedFollows: preparedReleaseFollows, align, packsReady });
     writeFileSync(values.out, `${result.signed}\n`);
     console.log(JSON.stringify({ status: result.status, channel: result.release.channel, serial: result.release.serial, engineBuild: result.release.engineBuild, object: `${result.release.channel}.json`,

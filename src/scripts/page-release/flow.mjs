@@ -8,7 +8,7 @@
 //            the producer's signed serial to name this build and the channel's /health to show that build and serial.
 //   go-live  the alias move, LAST: refused without a fresh signed-release and /health match.
 //
-// Preview (the solo build of green main, J274) signs releases/preview.json as a deployment gate (PZ6 D2).
+// Preview (the solo build of green main, J274) signs preview.json in the release bucket (PZ6 D2).
 // Its document has no world stamp or release URL: the offline page still runs its server in a worker.
 //
 // The flow owns order and gates; the host (hosts/workers.mjs, page-release.mjs --host) owns how a
