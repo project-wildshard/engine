@@ -63,8 +63,9 @@ export function bakedZoneTable(root: Pick<Document, 'getElementById'> = document
 export async function cookedZone(table: ZoneTable, row: ZoneTableRow, ports: CookedZonePorts): Promise<CookedZone | undefined> {
   try {
     const ref = zoneRef(table, row), product = row.slug, at = (key: string): string => new URL(key, ports.origin ?? table.origin ?? COOKED_ORIGIN).href;
-    const init: RequestInit = { credentials: 'omit', redirect: 'error', signal: ports.signal };
-    const body = decode(await bounded(await ports.fetch(at(row.index), init), INDEX_BYTES));
+    // a detached call: `ports.fetch(…)` would run the browser's fetch with `ports` as its receiver (Illegal invocation)
+    const read = ports.fetch, init: RequestInit = { credentials: 'omit', redirect: 'error', signal: ports.signal };
+    const body = decode(await bounded(await read(at(row.index), init), INDEX_BYTES));
     const address = readCookedIndexAddress(body), rest = v.parse(IndexRest, body);
     if (!same(address, ref)) return undefined;
     if (ports.validator !== null && rest.verdict?.revision !== ports.validator) return undefined;
@@ -79,9 +80,11 @@ export async function cookedZone(table: ZoneTable, row: ZoneTableRow, ports: Coo
       return url;
     };
     const addresses = await Promise.all(rest.manifests.map(async manifest => {
-      const bytes = await bounded(await ports.fetch(object(manifest.url), init), MANIFEST_BYTES);
-      const read = readSpawnManifest(decode(bytes));
-      if (read.shard !== product || read.tier !== manifest.tier || read.files.length !== manifest.files || read.totalBytes !== manifest.totalBytes) throw new Error(`${manifest.url} is not its row`);
+      const bytes = await bounded(await read(object(manifest.url), init), MANIFEST_BYTES);
+      const parsed = readSpawnManifest(decode(bytes));
+      // a row with a code list (OF5) counts the code rows the manifest keeps apart: only the shard and tier must agree then
+      const whole = manifest.code === undefined && (parsed.files.length !== manifest.files || parsed.totalBytes !== manifest.totalBytes);
+      if (parsed.shard !== product || parsed.tier !== manifest.tier || whole || parsed.files.length > manifest.files) throw new Error(`${manifest.url} is not its row`);
       return { manifest, address: readSpawnManifestAddress({ url: manifest.url, bytes: bytes.byteLength, totalBytes: manifest.totalBytes, files: manifest.files, wireBytes: manifest.wireBytes,
         ...(manifest.code === undefined ? {} : { code: manifest.code }) }) };
     }));
@@ -91,7 +94,7 @@ export async function cookedZone(table: ZoneTable, row: ZoneTableRow, ports: Coo
     const entry = pick('entry');
     if (entry.phone === undefined || entry.desktop === undefined) return undefined;
     const page = new URL('/', location.href).href;
-    const card = await cookedCard(row.slug, objects, async url => bounded(await ports.fetch(url, init), DISCOVERY_BYTES));
+    const card = await cookedCard(row.slug, objects, async url => bounded(await read(url, init), DISCOVERY_BYTES));
     const content: PlacedContent = { spawn: { slug: row.slug, entry, whole: pick('whole'), base: page, loose: page, listed: new Set([...objects.keys(), ...members.map(([path]) => path)]),
       programs: objects.has(`/programs/${row.slug}.json`),
       maps: objects.has(`/${cookedMapPath(row.slug, 'full')}`) && objects.has(`/${cookedMapPath(row.slug, 'cell')}`) },

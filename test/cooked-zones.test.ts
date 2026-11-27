@@ -32,7 +32,9 @@ const served = (): Map<string, unknown> => new Map<string, unknown>([
 ]);
 function store(objects = served()): typeof fetch & { asked: string[] } {
   const asked: string[] = [];
-  const read = (input: string | URL | Request): Promise<Response> => {
+  const read = function (this: unknown, input: string | URL | Request): Promise<Response> {
+    // the browser's fetch throws "Illegal invocation" when called on another receiver (`ports.fetch(…)`); so does this one
+    if (this !== undefined && this !== globalThis) throw new TypeError('Illegal invocation');
     const url = String(input instanceof Request ? input.url : input);
     asked.push(url);
     const body = url.startsWith(ORIGIN) ? objects.get(url.slice(ORIGIN.length)) : undefined;

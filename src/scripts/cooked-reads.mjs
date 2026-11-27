@@ -24,12 +24,12 @@ async function readObject(url) {
 }
 
 /**
- * Every zone of `table` opened at `origin`: `fetchFile` answers a page path from the zone that maps it (404 when none does), and
+ * Every zone of `table` opened at `origin` (the table's own bucket, else cooked.wildshard.io): `fetchFile` answers a page path from the zone that maps it (404 when none does), and
  * `header` names a zone's `shard.json` page path. A zone whose index is missing or not the table's refuses.
  * @param {ZoneTable} table @param {{origin?: string}} [options]
  * @returns {Promise<{fetchFile: (path: string) => Promise<Response>, header: (slug: string) => string | undefined, zones: number, objects: number}>}
  */
-export async function cookedReader(table, {origin = COOKED_ORIGIN} = {}) {
+export async function cookedReader(table, {origin = table.origin ?? COOKED_ORIGIN} = {}) {
   const root = origin.endsWith('/') ? origin : `${origin}/`;
   /** @type {Map<string, string>} */ const objects = new Map();
   /** @type {Map<string, import('../shared/engine/boot/tables.ts').CookedPartMember>} */ const members = new Map();

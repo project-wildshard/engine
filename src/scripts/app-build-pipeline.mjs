@@ -245,10 +245,14 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
   // PZ12 (J274): an isolated channel's page origin sends COOP and COEP on every path; the worker reads the same rule
   if (writeIsolationRule(outDir, process.env.WS_CHANNEL)) console.log(`cross-origin isolated: ${process.env.WS_CHANNEL}`);
   // Fix preview PV3: a page with a zone table reads every zone from the cook (PV4), so the zone files the engine's public/ copy and the
-  // entry bake wrote leave before the service worker lists the bundle, and no product folder is copied in below
+  // entry bake wrote, with the product folders, leave before the service worker lists the bundle
   const zoneless = (process.env.WS_ZONE_TABLE ?? "") !== "";
   const keep = process.env.WS_ZONE_FILES_OUT;
+  // the product folders a page serves (and the discovery its cook rewrote) are zone files too: they go with the rest, so a kept
+  // copy (WS_ZONE_FILES_OUT) holds every file the zones' page paths name, and `.discovery` leaves dist; the pinned baked art is
+  // checked before the strip removes it (SF4)
   if (zoneless) {
+    copyOutputFolders(process.cwd(), outDir);
     checkBakedTextures(process.cwd(), outDir);
     const dropped = dropZoneFiles(outDir, keep === undefined || keep === "" ? {} : { keep: resolve(keep) });
     console.log(`zoneless page: ${dropped.length} zone files ${keep ? `moved to ${keep}` : "dropped"}`);
@@ -272,7 +276,7 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
     JSON.stringify(mode === "devserver" ? { devserver: true, devHook: devHookVersion() } : { devserver: false }),
   );
 
-  // the data products beside the app (was vite/outputFolders.ts)
+  // the data products beside the app (was vite/outputFolders.ts); a zoneless page copied and dropped them above
   if (!zoneless) copyOutputFolders(process.cwd(), outDir);
   // DL20: the deploy drops the loose copies nothing reads by URL
   const dropped = pruneLooseCopies(outDir);
