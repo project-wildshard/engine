@@ -51,7 +51,7 @@ it('lists a fetched phone texture blob once and still carries a texture outside 
   const fixture: OpenShardfile = {
     ...held, preparationOnly: false, index: {...held.index, files: [inside, outside]},
     cook: {version: 3, renderer: inside.hash, inputHash: inside.hash, packs: 'fence',
-      fence: [inside.hash], programs: {version: 2, lines: ['void main() {}'], shaders: [[0]], programs: [[0, 0]]},
+      fence: [inside.hash], programs: {version: 2, build: 'wire-fixture', lines: ['void main() {}'], shaders: [[0]], programs: [[0, 0]]},
       mounts: [{url: `/shardfiles/${held.slug}/discovery.json`, path: discoveryPath, hash: digest(discovery), bytes: discovery.length}]},
     read: path => reads.get(path) ?? held.read(path),
   };
