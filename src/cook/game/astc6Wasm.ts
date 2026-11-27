@@ -27,7 +27,7 @@ import type {Astc6Encode, TextureRole} from './tierTextures';
 /** The vendored build; a new build is a new cache key. */
 export const BASISU_WASM_BUILD = '32c7b74';
 /** SF21: every key names the encoder and its tier, the build and the settings (`encodeCache.ts` adds the cook version). */
-const KEY_PARTS = ['astc6-wasm/2', 'phone', BASISU_WASM_BUILD, 'ASTC_LDR_6x6 effort 4'] as const;
+const KEY_PARTS = ['astc6-wasm/1', BASISU_WASM_BUILD, 'ASTC_LDR_6x6 effort 4'] as const;
 const MAX_LANES = 6;
 /** A 6x6 encode's heap per texel of its top level (measured 2026-11-26: a 2048 grew a heap by about 1.9 GB). */
 const ASTC6_HEAP_PER_TEXEL = 470, HEAP_FLOOR = 32 << 20;

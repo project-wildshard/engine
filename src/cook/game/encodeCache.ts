@@ -3,24 +3,23 @@
  * every try). The two encoders (`imageKtx2Wasm.ts` for the desktop tier, `astc6Wasm.ts` for the phone's 6x6) keep each
  * output in a cache folder, named by a key over everything that output depends on:
  *
- *   the encoder and its tier, basisu's build, the encode settings, the texel read (role) and flip, the cook version
- *   (`cook-version.json`, bumped whenever cook output changes), and the input bytes.
+ *   the encoder and its revision (which names its tier), basisu's build, the encode settings, the texel read (role) and
+ *   flip, and the input bytes.
  *
- * So a changed setting or a cook change (the 11-26 coat fix) is a new key and never serves a stale file. A hit is used
+ * So a changed setting, a new basisu build or an encoder change (its revision is bumped) is a new key and never serves a
+ * stale file. The key is not the cook version's (QA 11-26 row 31): the cook version moves on every cook change (1.11 to
+ * 1.14 in a few hours), and naming it emptied every cache on each bump, so CI's memory build encoded all 27 pins from
+ * cold and ran out of its 30 minutes. The keys are byte for byte the ones from before SF21, so caches made then still
+ * hit (`test/cook-encode-cache.test.ts` fixes one). A hit is used
  * only when it is a whole KTX2 (its identifier, and every level inside the file); anything else is encoded again and
  * replaced. A cook job's folder is `COOK_ENCODE_CACHE`, which `cookWorker.ts` sets to the job's surviving cache folder. */
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {createHash} from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {existsSync, readFileSync, utimesSync} from 'node:fs';
-import cookRecord from './cook-version.json' with {type: 'json'};
 import {isKtx2} from './tierTextures.ts';
 
 const LEVEL_INDEX = 80, LEVEL_ENTRY = 24;
-
-/** The cook version every key names (`cook-version.json`). Imported, not read by URL: an author bundle inlines a
- *  `new URL(..., import.meta.url)` as a data: URL, which `readFileSync` refuses (opus-sdk, 2026-11-27). */
-export const COOK_VERSION: string = cookRecord.cookVersion;
 
 /** The cache folder an encoder uses: the one it was given, else the cook job's (`COOK_ENCODE_CACHE`), else none. */
 export function encodeCacheDir(given: string | undefined): string | undefined {
@@ -28,9 +27,9 @@ export function encodeCacheDir(given: string | undefined): string | undefined {
   return given ?? (fromJob === undefined || fromJob === '' ? undefined : fromJob);
 }
 
-/** The cache key of one encode: every setting part and the cook version, then the input bytes. */
-export function encodeKey(parts: readonly string[], input: Uint8Array, cookVersion: string = COOK_VERSION): string {
-  return createHash('sha256').update(`${[...parts, `cook ${cookVersion}`].join('|')}|`).update(input).digest('hex');
+/** The cache key of one encode: every setting part, each followed by `|`, then the input bytes. */
+export function encodeKey(parts: readonly string[], input: Uint8Array): string {
+  return createHash('sha256').update(`${parts.join('|')}|`).update(input).digest('hex');
 }
 
 /** True when `bytes` is a whole KTX2: its identifier, and every level's bytes inside the file. */

@@ -580,6 +580,16 @@ jobs:
           fi
           node src/scripts/gen.mjs --inputs-only
           python3 src/scripts/heavy-lane.py build -- node src/scripts/build-app.mjs --mode preview --outDir tmp/memory-ledger/preview/dist
+      # QA 11-26 row 31: a build that fails or runs out of time keeps the encodes it finished (each one is written whole
+      # the moment it is done) under a per-run key the next try restores through the prefix, so a cold run gets further
+      # on every try instead of starting from nothing (run 45952914915 stopped at 30 min with nothing kept).
+      - name: Save partial full-ledger encodes
+        if: ${{ always() && steps.ledger-codec.outcome == 'success' && steps.ledger-client.outcome != 'success' && steps.ledger-client.outcome != 'skipped' }}
+        continue-on-error: true
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/wildshard/gen/spawn-parts-br
+          key: ${{ steps.ledger-codec.outputs.prefix }}partial-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Archive the full pinned preview
         run: |
           products=$(node --input-type=module -e 'import {armedMemory} from "./src/scripts/memory/armed.mjs"; console.log([...armedMemory().zones].join("\n"))')

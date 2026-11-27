@@ -15,7 +15,8 @@ import {pathToFileURL} from 'node:url';
 import sharp from 'sharp';
 import {afterAll, beforeAll, describe, expect, it} from 'vitest';
 import {runJob} from '../src/cook/game/cookWorker';
-import {COOK_VERSION, encodeCacheDir, encodeKey, wholeKtx2} from '../src/cook/game/encodeCache';
+import {createHash} from 'node:crypto';
+import {encodeCacheDir, encodeKey, wholeKtx2} from '../src/cook/game/encodeCache';
 import {wasmImageKtx2} from '../src/cook/game/imageKtx2Wasm';
 import {wasmAstc6} from '../src/cook/game/astc6Wasm';
 
@@ -28,19 +29,33 @@ beforeAll(async () => {
 afterAll(() => { rmSync(folder, {recursive: true, force: true}); });
 const kept = (cache: string): string[] => readdirSync(cache).filter(name => name.endsWith('.ktx2'));
 
-describe('SF21: the key covers every setting and the cook version', () => {
-  it('names the cook version of cook-version.json and changes with any part, the version or the input', () => {
-    expect(COOK_VERSION).toBe((JSON.parse(readFileSync('src/cook/game/cook-version.json', 'utf8')) as {cookVersion: string}).cookVersion);
-    const base = encodeKey(['image-ktx2-wasm/2', 'desktop', 'build', 'settings', 'srgb', 'flip'], png);
+describe('SF21: the key covers every setting, and no cook version', () => {
+  it('changes with any part or the input', () => {
+    const base = encodeKey(['image-ktx2-wasm/1', 'build', 'settings', 'srgb', 'flip'], png);
     const others = [
-      encodeKey(['image-ktx2-wasm/2', 'phone', 'build', 'settings', 'srgb', 'flip'], png),
-      encodeKey(['image-ktx2-wasm/2', 'desktop', 'build', 'other settings', 'srgb', 'flip'], png),
-      encodeKey(['image-ktx2-wasm/2', 'desktop', 'build', 'settings', 'linear', 'flip'], png),
-      encodeKey(['image-ktx2-wasm/2', 'desktop', 'build', 'settings', 'srgb', 'keep'], png),
-      encodeKey(['image-ktx2-wasm/2', 'desktop', 'build', 'settings', 'srgb', 'flip'], png, `${COOK_VERSION}-next`),
-      encodeKey(['image-ktx2-wasm/2', 'desktop', 'build', 'settings', 'srgb', 'flip'], png.subarray(1)),
+      encodeKey(['astc6-wasm/1', 'build', 'settings', 'srgb', 'flip'], png),
+      encodeKey(['image-ktx2-wasm/1', 'other build', 'settings', 'srgb', 'flip'], png),
+      encodeKey(['image-ktx2-wasm/1', 'build', 'other settings', 'srgb', 'flip'], png),
+      encodeKey(['image-ktx2-wasm/1', 'build', 'settings', 'linear', 'flip'], png),
+      encodeKey(['image-ktx2-wasm/1', 'build', 'settings', 'srgb', 'keep'], png),
+      encodeKey(['image-ktx2-wasm/1', 'build', 'settings', 'srgb', 'flip'], png.subarray(1)),
     ];
     expect(new Set([base, ...others]).size).toBe(others.length + 1);
+  });
+
+  // QA 11-26 row 31: naming the cook version emptied every encode cache on each cook bump, and CI's memory build ran out
+  // of its 30 minutes encoding all 27 pins from cold. The key is the pre-SF21 one byte for byte, so caches made before
+  // SF21 (nightly, full ledger, local) still hit, and a cook bump (the record is read here) never moves it.
+  it('is the pre-SF21 key byte for byte and does not read the cook record', () => {
+    const input = new Uint8Array([1, 2, 3, 4]);
+    const old = (prefix: string): string => createHash('sha256').update(prefix).update(input).digest('hex');
+    expect(encodeKey(['astc6-wasm/1', 'B', 'ASTC_LDR_6x6 effort 4', 'srgb'], input)).toBe(old('astc6-wasm/1|B|ASTC_LDR_6x6 effort 4|srgb|'));
+    expect(encodeKey(['image-ktx2-wasm/1', 'B', 'S', 'normal', 'flip'], input)).toBe(old('image-ktx2-wasm/1|B|S|normal|flip|'));
+    for (const file of ['src/cook/game/encodeCache.ts', 'src/cook/game/astc6Wasm.ts', 'src/cook/game/imageKtx2Wasm.ts']) {
+      expect(readFileSync(file, 'utf8'), file).not.toMatch(/cook-version|cookVersion/u);
+    }
+    expect(readFileSync('src/cook/game/astc6Wasm.ts', 'utf8')).toContain("const KEY_PARTS = ['astc6-wasm/1', BASISU_WASM_BUILD, 'ASTC_LDR_6x6 effort 4']");
+    expect(readFileSync('src/cook/game/imageKtx2Wasm.ts', 'utf8')).toContain("const KEY_PARTS = ['image-ktx2-wasm/1', BASISU_WASM_BUILD, IMAGE_KTX2_SETTINGS]");
   });
 
   it('takes the cook job\'s folder from COOK_ENCODE_CACHE when an encoder is given none', () => {

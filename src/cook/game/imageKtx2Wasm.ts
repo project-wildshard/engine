@@ -40,7 +40,7 @@ export type ImageKtx2Encode = (image: Uint8Array, as: ImageEncodeAs) => Uint8Arr
 /** The encode's settings, in every cache key: a change is a new key, so no cook reads a file made with other settings. */
 export const IMAGE_KTX2_SETTINGS = 'uastc-ldr-4x4 level 2, no rdo, box mips, zstd';
 /** SF21: every key names the encoder and its tier, the build and the settings (`encodeCache.ts` adds the cook version). */
-const KEY_PARTS = ['image-ktx2-wasm/2', 'desktop', BASISU_WASM_BUILD, IMAGE_KTX2_SETTINGS] as const;
+const KEY_PARTS = ['image-ktx2-wasm/1', BASISU_WASM_BUILD, IMAGE_KTX2_SETTINGS] as const;
 const MAX_LANES = 6;
 /** A UASTC encode's heap per texel (measured 2026-11-26: a 2048 JPG grew a heap by about 230 MB). */
 const IMAGE_HEAP_PER_TEXEL = 60, HEAP_FLOOR = 32 << 20;
