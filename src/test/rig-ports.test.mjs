@@ -12,8 +12,8 @@ const base = resolve('tmp/rig-ports');
 mkdirSync(base, { recursive: true });
 const root = mkdtempSync(join(base, 'run-'));
 afterAll(() => { rmSync(root, { recursive: true, force: true }); });
-/** A pool of its own, clear of the real one, so a lane's live rig never meets this test. */
-const pool = { first: 31_476 + (process.pid % 200) * 40, blocks: 8 };
+/** Separate from the rig pool and below the default ephemeral ranges on the CI hosts. */
+const pool = { first: 21_476 + (process.pid % 200) * 40, blocks: 8 };
 
 test('an explicit WS_RIG_PORTS is used as given, with no lock and no probe', async () => {
   const locks = join(root, 'explicit');
@@ -26,26 +26,31 @@ test('an explicit WS_RIG_PORTS is used as given, with no lock and no probe', asy
 test('runs at once take different blocks; a held port or a live lock is passed over, a dead one is taken', async () => {
   const locks = join(root, 'pool');
   const [one, two] = await Promise.all([reserveRigPorts({ explicit: '', locks, ...pool }), reserveRigPorts({ explicit: '', locks, ...pool })]);
-  expect(one.explicit).toBe(false);
-  expect(new Set([one.base, two.base]).size).toBe(2);
-  expect(readdirSync(locks).sort()).toEqual([`${String(one.base)}.lock`, `${String(two.base)}.lock`].sort());
-  // a port in the next free block held outside the pool (an older cut's fixed rig): that block is skipped
-  const next = Math.max(one.base, two.base) + 4, outside = createServer();
-  await new Promise(done => { outside.listen(next + 3, '127.0.0.1', () => { done(undefined); }); });
   try {
-    const three = await reserveRigPorts({ explicit: '', locks, ...pool });
-    expect(three.base).toBe(next + 4);
-    three.release();
-  } finally { await new Promise(done => { outside.close(() => { done(undefined); }); }); }
-  one.release(); two.release(); one.release();
+    expect(one.explicit).toBe(false);
+    expect(new Set([one.base, two.base]).size).toBe(2);
+    expect(readdirSync(locks).sort()).toEqual([`${String(one.base)}.lock`, `${String(two.base)}.lock`].sort());
+  } finally { one.release(); two.release(); one.release(); }
   expect(readdirSync(locks)).toEqual([]);
-  // a lock whose process is gone is taken over; one whose process lives is not
-  writeFileSync(join(locks, `${String(pool.first)}.lock`), JSON.stringify({ pid: 2 ** 22 + 7, token: 'gone' }));
-  writeFileSync(join(locks, `${String(pool.first + 4)}.lock`), JSON.stringify({ pid: process.ppid, token: 'live' }));
-  const taken = await reserveRigPorts({ explicit: '', locks, ...pool });
-  expect(taken.base).toBe(pool.first);
+
+  // Let the OS choose the busy port. No assertion depends on an adjacent block being free.
+  const outside = createServer();
+  await new Promise((done, reject) => { outside.once('error', reject); outside.listen(0, '127.0.0.1', () => { done(undefined); }); });
+  try {
+    const address = outside.address();
+    if (address === null || typeof address === 'string') throw new Error('Expected a loopback port');
+    await expect(reserveRigPorts({ explicit: '', locks, first: address.port - 3, blocks: 1 })).rejects.toThrow('No free rig port block');
+    expect(readdirSync(locks)).toEqual([]);
+  } finally { await new Promise(done => { outside.close(() => { done(undefined); }); }); }
+
+  const deadLock = `${String(one.base)}.lock`, liveLock = `${String(two.base)}.lock`;
+  writeFileSync(join(locks, deadLock), JSON.stringify({ pid: 2 ** 22 + 7, token: 'gone' }));
+  writeFileSync(join(locks, liveLock), JSON.stringify({ pid: process.pid, token: 'live' }));
+  await expect(reserveRigPorts({ explicit: '', locks, first: two.base, blocks: 1 })).rejects.toThrow('No free rig port block');
+  const taken = await reserveRigPorts({ explicit: '', locks, first: one.base, blocks: 1 });
   taken.release();
-  expect(readdirSync(locks)).toEqual([`${String(pool.first + 4)}.lock`]);
+  expect(taken.base).toBe(one.base);
+  expect(readdirSync(locks)).toEqual([liveLock]);
 });
 
 test('two QA-shaped rigs (PGlite, named ports) run at once on one machine, and both serve', async () => {
