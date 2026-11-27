@@ -243,7 +243,7 @@ else {
   const release = v.parse(v.looseObject({ channel: v.string(), socket: v.string(), engineBuild: v.string() }), JSON.parse(signed.body));
   socket = release.socket.replace(/\/$/u, '');
   const html = await (await fetch(BASE, { signal: AbortSignal.timeout(30_000) })).text();
-  const isolated = release.channel === 'staging' && SOCKETS.has(socket) && html.includes(RELEASE) && !html.includes('/releases/production.json');
+  const isolated = release.channel === 'staging' && SOCKETS.has(socket) && html.includes(RELEASE) && !html.includes('https://releases.wildshard.io/production.json');
   note(row, 'J205: the page is staging, its release is staging, its socket is the staging door', isolated, { build: version.build, release: release.engineBuild, socket });
   if (!isolated) throw new Error('J205 refuses anything but the isolated staging page');
 }

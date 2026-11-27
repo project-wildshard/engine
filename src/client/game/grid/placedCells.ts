@@ -1,10 +1,10 @@
 // SHARD-AUTHORING SA33 to SA35, the page half (meta SHARD-AUTHORING-PLAN): a released page (staging, production) learns the cells the API
-// placed after its build, at runtime, from the same signed placement file the MMO reads (`releases/<channel>-placements.json`, SA33a).
+// placed after its build, at runtime, from the same signed placement file the MMO reads (`<channel>-placements.json`, SA33a).
 // Its build bakes the pinned grid (`catalogue.json`, C3); the MMO's grid is that plus this file, so without it a placed shard had no
 // Shard Select card and its zone landed on the deck. The file is believed only under the API's placement key, as the box and
 // SA35's preview bake believe it. A missing, late, unreadable or refused file keeps the build's grid: boot never waits past
-// `PLACED_DEADLINE_MS` and never fails here. The bucket sends it `no-store`, the read asks `no-store`, and the service worker leaves
-// `/releases/` to the network (sw.js `isContentRead`), so no cache serves an old file.
+// `PLACED_DEADLINE_MS` and never fails here. The bucket sends it `no-store`, the read asks `no-store`, and the service worker passes
+// release-origin requests to the network.
 // OFFLINE OF20: the device keeps the last file it believed (its text, in OF0's `gridRoute` slot, beside the world's kept word), and
 // the next page installs it at once, its signature checked again: offline, or on a link that hangs past the deadline, Shard Select
 // still has the cells this device last saw. A fresh file read in time replaces it, from the build's own catalogue; a 404 drops it.

@@ -8,3 +8,6 @@ keeps the R2 ETag condition, including on the first write.
 The preview deploy's signed gate uses the release bucket too. While it
 still publishes a content set, it checks that set in the packs bucket
 before signing the preview release.
+
+Production pointer reconciliation reads the root production object.
+The staging smoke drivers reject a page with the new production URL.

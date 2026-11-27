@@ -31,7 +31,7 @@ function network(state = v0192()) {
     const headers = new Headers(init?.headers);
     const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
     seen.push({ method, url, body, auth: headers.get('authorization') });
-    if (url.endsWith('/releases/production.json')) return Response.json({ body: JSON.stringify({ channel: 'production', serial: 53, shards: state.entries }), signature: 'x' });
+    if (url === 'https://releases.wildshard.io/production.json') return Response.json({ body: JSON.stringify({ channel: 'production', serial: 53, shards: state.entries }), signature: 'x' });
     if (url.endsWith('/api/shardfiles')) return Response.json({ shardfiles: state.listed });
     if (url.endsWith('/api/catalogue')) return Response.json({ shards: state.catalogue });
     if (url.endsWith('/api/channels/production/flip') && method === 'POST') {
@@ -62,7 +62,7 @@ describe('production pointers follow the signed release file', () => {
     const flips = net.seen.filter(one => one.method === 'POST');
     expect(flips.map(one => one.body)).toEqual(BEHIND.map(([slug, , to]) => ({ slug, hash: hashOf(slug, to) })));
     expect(flips.every(one => one.auth === `Bearer ${'t'.repeat(32)}`)).toBe(true);
-    expect(lines.at(-1)).toBe('production pointers match releases/production.json (6 moved)');
+    expect(lines.at(-1)).toBe('production pointers match production.json (6 moved)');
   });
 
   test('a release entry the API lists no upload for refuses before any flip', async () => {

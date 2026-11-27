@@ -21,7 +21,7 @@ const HASH = /^[0-9a-f]{64}$/u;
 
 /** @typedef {{slug: string, revision?: number, hash?: string}} ReleaseEntry */
 /** @typedef {{slug: string, from: number | undefined, to: number, hash: string}} PointerMove */
-/** @typedef {{fetch?: typeof fetch, api?: string, packs?: string, token?: string, log?: (line: string) => void}} PointerDeps */
+/** @typedef {{fetch?: typeof fetch, api?: string, releases?: string, token?: string, log?: (line: string) => void}} PointerDeps */
 
 /** @param {typeof fetch} get @param {string | URL} url @param {RequestInit} [init] @returns {Promise<any>} */
 async function json(get, url, init) {
@@ -33,7 +33,7 @@ async function json(get, url, init) {
 /** The entries production's signed release file names (the file players load). @param {unknown} signed @returns {ReleaseEntry[]} */
 export function releaseEntries(signed) {
   const body = typeof signed === 'object' && signed !== null && 'body' in signed && typeof signed.body === 'string' ? JSON.parse(signed.body) : undefined;
-  if (body?.channel !== 'production' || !Array.isArray(body.shards)) throw new Error('releases/production.json is not a signed production release');
+  if (body?.channel !== 'production' || !Array.isArray(body.shards)) throw new Error('production.json is not a signed production release');
   return body.shards;
 }
 
@@ -64,9 +64,9 @@ export function pointerMoves(entries, listed, catalogue) {
 
 /** Read the release file, the API's list and its catalogue, and answer the moves still owed. @param {PointerDeps} deps */
 export async function readMoves(deps = {}) {
-  const get = deps.fetch ?? agentFetch, api = deps.api ?? API, packs = deps.packs ?? RELEASES;
+  const get = deps.fetch ?? agentFetch, api = deps.api ?? API, releases = deps.releases ?? RELEASES;
   const [signed, listed, catalogue] = await Promise.all([
-    json(get, `${packs}/production.json`, { cache: 'no-store' }),
+    json(get, `${releases}/production.json`, { cache: 'no-store' }),
     json(get, new URL('/api/shardfiles', api)),
     json(get, new URL('/api/catalogue', api)),
   ]);
@@ -88,7 +88,7 @@ export async function alignProductionPointers(deps = {}) {
   }
   const left = await readMoves(deps);
   if (left.length > 0) throw new Error(`production pointers still off the release file: ${left.map(move => `${move.slug} r${move.from ?? '-'} for r${move.to}`).join(', ')}`);
-  log(`production pointers match releases/production.json (${moves.length} moved)`);
+  log(`production pointers match production.json (${moves.length} moved)`);
   return moves;
 }
 
@@ -98,7 +98,7 @@ async function main() {
     const moves = await readMoves();
     for (const move of moves) console.log(`owed ${move.slug}: r${move.from ?? '-'} -> r${move.to}`);
     if (moves.length > 0) process.exitCode = 1;
-    else console.log('production pointers match releases/production.json');
+    else console.log('production pointers match production.json');
     return;
   }
   await alignProductionPointers({ token: process.env.PRODUCTION_FLIP_TOKEN });

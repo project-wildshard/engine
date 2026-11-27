@@ -5,7 +5,7 @@
 //
 // This is the one way an engine secret leaves GitHub (meta's .agents/hooks/secret-delete-guard.mjs refuses a bare
 // `gh secret delete` on engine). It lists every ref that can still run a workflow: main, and each release/vX.Y.Z
-// branch or vX.Y.Z tag newer than the version production plays (releases/production.json's engineBuild). It refuses,
+// branch or vX.Y.Z tag newer than the version production plays (production.json's engineBuild). It refuses,
 // naming them, while any of those refs' .github/workflows reads `secrets.<NAME>`; otherwise it deletes the secret.
 //
 //   node src/scripts/server-release/secret-remove.mjs <NAME> [--env <environment>] [--check]
@@ -74,13 +74,13 @@ export function secretReaders(name, workflows) {
 /** @param {string[]} args */
 const runGit = args => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
 
-/** releases/production.json's engineBuild. */
+/** production.json's engineBuild. */
 async function liveBuild() {
   const answer = await agentFetch(`${RELEASES}/production.json`, { cache: 'no-store', signal: AbortSignal.timeout(60_000) });
-  if (!answer.ok) throw new Error(`releases/production.json: HTTP ${answer.status}`);
+  if (!answer.ok) throw new Error(`production.json: HTTP ${answer.status}`);
   const signed = /** @type {{body?: unknown}} */ (await answer.json());
   const body = typeof signed.body === 'string' ? JSON.parse(signed.body) : undefined;
-  if (typeof body?.engineBuild !== 'string') throw new Error('releases/production.json names no engineBuild');
+  if (typeof body?.engineBuild !== 'string') throw new Error('production.json names no engineBuild');
   return body.engineBuild;
 }
 

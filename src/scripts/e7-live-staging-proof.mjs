@@ -23,7 +23,7 @@ const socket=release.socket.replace(/\/$/u,'');assert.ok(sockets.includes(socket
 const healthURL=privateHealthURL();
 if(healthURL===undefined)console.log(PRIVATE_HEALTH_SKIPPED);else{const health=await(await fetch(healthURL,{signal:AbortSignal.timeout(15000)})).json();assert.equal(health.build,build);assert.equal(health.serial,release.serial);}
 const version=await(await fetch(new URL('/version.json',base),{signal:AbortSignal.timeout(30000)})).json();assert.equal(version.build,build);assert.equal(version.saveEpoch,release.saveEpoch);
-const html=await(await fetch(base,{signal:AbortSignal.timeout(30000)})).text();assert.ok(html.includes(releaseURL));assert.ok(!html.includes('/releases/production.json'));
+const html=await(await fetch(base,{signal:AbortSignal.timeout(30000)})).text();assert.ok(html.includes(releaseURL));assert.ok(!html.includes('https://releases.wildshard.io/production.json'));
 const browser=await(engine==='chromium'?chromium:webkit).launch({headless:true,args:engine==='chromium'?[...KEYCHAIN_ARGS,'--mute-audio',...(process.platform==='darwin'?['--use-angle=metal']:[])]:[]});
 /** @type {{page:import('playwright').Page,context:import('playwright').BrowserContext,name:string}[]} */
 const opened=[];
