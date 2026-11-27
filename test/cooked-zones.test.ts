@@ -4,7 +4,7 @@
 // resolves page paths (parts, manifests, loose files, programs) to where the cook stored them.
 import { afterEach, expect, test } from 'vitest';
 import { bakedZoneTable, COOKED_ZONE_MISSING, cookedZone, learnCookedZones } from '../src/client/game/grid/cookedZones';
-import { clearCookedObjects, contentURL, cookedObjectURL, pageURL } from '@wildshard/engine/boot/contentBase';
+import { clearCookedObjects, contentURL, cookedObjectURL, loadPortrait, pageURL } from '@wildshard/engine/boot/contentBase';
 import { clearPlacedSpawns, placedSpawn } from '../src/client/game/boot/placedSpawn';
 import { entryProgramsURL } from '../src/client/game/boot/spawnDownload';
 import { readZoneTable, type ZoneTable } from '../src/shared/game/grid/zoneTable';
@@ -102,6 +102,22 @@ test('the table\'s own bucket origin is where its zones are read, and a manifest
   const zone = await cookedZone({ ...table, origin: other }, row, { fetch: read, signal: new AbortController().signal, validator: null });
   expect(asked.every(url => url.startsWith(other))).toBe(true);
   expect(zone?.content.spawn.entry.phone?.code).toEqual(code);
+});
+
+test('the loading card holds a zone\'s art until the cook says where it is, then paints it from there', async () => {
+  const art = `/${IMAGE('2')}`, root = document.documentElement;
+  document.head.innerHTML = `<script type="application/json" id="ws-zone-table">${JSON.stringify(table)}</script>`;
+  root.style.removeProperty('--ws-load-portrait');
+  loadPortrait(art);
+  // the page origin holds no zone file: nothing is painted (no read) until the zone's index is in
+  expect(root.style.getPropertyValue('--ws-load-portrait')).toBe('');
+  expect(root.dataset['wsLoadArt']).toBe(art);
+  await learnCookedZones(table, ports(store()));
+  expect(root.style.getPropertyValue('--ws-load-portrait')).toBe(`url("${ORIGIN}${common('i2')}")`);
+  expect(root.dataset['wsLoadArt']).toBeUndefined();
+  loadPortrait('/assets/title/x.jpg');
+  expect(root.style.getPropertyValue('--ws-load-portrait')).toBe('url("/assets/title/x.jpg")');
+  document.head.innerHTML = '';
 });
 
 test('a page carries its table inline, or none', () => {

@@ -12,6 +12,7 @@ import { HudSlots } from '../ui/hudSlots';
 import { appIdentity } from '../../../shared/engine/app/identity';
 import { beginLoadingWait, finishLoadingWait } from '../../../shared/engine/boot/loadingWaits';
 import { arrivalCard } from './titleArrival';
+import { loadPortrait } from './contentBase';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
 import { engineString } from '../../../shared/engine/strings';
 
@@ -100,7 +101,7 @@ export function startShellClock(owner: Scope, slug: string): void {
   const slugField = field('slug'), tierField = field('tier'), clock = field('clock'), fact = field('stFact');
   if (slugField !== null && slugField.textContent === '') slugField.textContent = arrival?.name ?? slug.replaceAll('-', ' ');
   if (tierField !== null && tierField.textContent === '' && arrival?.tier !== undefined) tierField.textContent = arrival.tier;
-  if (!inline && arrival?.art !== undefined) document.documentElement.style.setProperty('--ws-load-portrait', arrival.art === '' ? 'none' : `url("${arrival.art}")`);
+  if (!inline && arrival?.art !== undefined) loadPortrait(arrival.art);
   if (fact !== null && fact.textContent === '—') fact.textContent = engineString('s_loading_code');
   if (inline) return;
   const tick = (): void => { if (clock !== null) clock.textContent = clockText(diagnosticNow() - started); };

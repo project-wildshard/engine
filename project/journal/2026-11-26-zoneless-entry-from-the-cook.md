@@ -9,3 +9,9 @@ receiver, now it does); the cook's manifest rows carry a code list the manifest 
 Runtime packs on, the download read the page's packs book first, which a zoneless page has no zone row in, so the entry sat at 2 of
 530 files. The product folders are now copied before the drop, so the kept copy holds every page path the zones name, and the
 build fixture gives each zone only its own files.
+
+The second and third visits (through the service worker) still read the title's zone art from the page: the plain title painted
+before the zones' indexes were in, and the loading card's art (`--ws-load-portrait`, set from the stored arrival by index.html's
+first paint, the shell, the in-page entry and the grid's destination) is a page path by design. The plain title now waits for the
+cooked zones on the same 3 s deadline, and every portrait setter goes through `loadPortrait`, which holds a zone's art until its
+index says where the cook stored it.

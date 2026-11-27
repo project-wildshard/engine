@@ -35,6 +35,7 @@ import { startLowPowerProbe, startTitleLowPowerProbe } from '@wildshard/engine/b
 import { guardBoot } from '@wildshard/engine/boot/stuck';
 import { progressOfCard, reportCardOf, stuckContext, stuckMessage, watchStuckStep } from '@wildshard/engine/boot/stuckStep';
 import { startShellClock, waitForLoadingStyles } from '@wildshard/engine/boot/shell';
+import { loadPortrait } from '@wildshard/engine/boot/contentBase';
 import { inspectPreviousBoot, previousBootLine, previousBootLevel } from '@wildshard/engine/boot/bootTrace';
 import { Scope } from '@wildshard/engine/app/scope';
 import { titleGate } from './titleGate';
@@ -95,7 +96,8 @@ installTitleManifests(titleRows);
 // catalogue before anything reads the grid; `enterPage` waits for it (3 s at most), and any failure keeps the build's grid.
 // Fix preview PV4: a page that bakes a zone table (preview) loads every zone from the cook, beside the placement read and on its deadline;
 // a late answer still installs (it only adds the zones' spawn rows and object table).
-const placedCells = Promise.all([learnPlacedCellsOnce(), learnCookedZonesOnce()]).then(() => undefined);
+const cookedZones = learnCookedZonesOnce();
+const placedCells = Promise.all([learnPlacedCellsOnce(), cookedZones]).then(() => undefined);
 // G727 / I9: Settings' "Download everything"; the prefetch loads only when the player opens or presses it
 installOfflineDownload({
   size: async owner => (await import('@wildshard/engine/game/grid/prefetch')).remainingDownloadBytes(owner),
@@ -202,7 +204,9 @@ async function enterPage(): Promise<unknown> {
   // The live menu's code can arrive while styles and the previous-end query settle.
   // Placement still gates every route that can admit a world or a public shard card.
   if (plainTitle) pageTitleImports();
-  if (!plainTitle) await placedCells;
+  // PV4: a page with a zone table paints the title's zone cards from the cook too (their art is at its object keys), so even the
+  // plain title waits for the zones' objects (on the same deadline); a page without one resolves at once
+  await (plainTitle ? cookedZones : placedCells);
   if (slugged !== null && requested === null) {
     const path = slugPathOf(slugged); // the address bar reads a shard's public name, not its old API slug
     if (location.pathname.replace(/\/$/u, '') !== path) history.replaceState(history.state, '', `${path}${location.search}`);
@@ -595,7 +599,7 @@ async function installInPageEntry(): Promise<void> {
       // the running manifest is resolved once a page; the next session's is the target, as a fresh page at this address would read
       setActiveChunk(slug);
       // ZE10c: the target's art is read only once the old world is gone
-      if (art !== undefined && art !== '') document.documentElement.style.setProperty('--ws-load-portrait', `url("${art}")`);
+      if (art !== undefined && art !== '') loadPortrait(art);
     } catch (error) {
       // a teardown that fails leaves this page unfit for a second session: the fresh page takes the same handoff and arrival
       console.warn('[grid] same-page entry could not retire the last world; entering on a fresh page', error);

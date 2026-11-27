@@ -3,6 +3,7 @@ import { beginNavigationShell } from '@wildshard/engine/boot/shell';
 import { pageScope } from '@wildshard/engine/app/resources';
 import { registerBeforeReload, type LastEnd } from '@wildshard/engine/boot/lastEnd';
 import { arrivalArt, freshPageArrival, pendingTitleArrival } from '@wildshard/engine/boot/titleArrival';
+import { loadPortrait } from '@wildshard/engine/boot/contentBase';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { saves } from '@wildshard/engine/saves/runtime';
 import type { SaveKeyDef, SaveStore } from '@wildshard/engine/saves/store';
@@ -68,7 +69,7 @@ export function showGridDestination(slug: string): void {
   if (name === null || home === undefined) return;
   const shown = gridDestination({ slug }, home);
   name.textContent = shown.name;
-  document.documentElement.style.setProperty('--ws-load-portrait', shown.art === '' ? 'none' : `url("${shown.art}")`);
+  loadPortrait(shown.art);
 }
 
 /** At most this many re-entries a minute in one tab; the next goes to the title. */
@@ -159,7 +160,7 @@ export function enterGrid(): void {
   if (guess === undefined) throw new Error(`The grid's home cell names no shard: ${gridHome().slug}`);
   const read = (to: { readonly cell: GridCell; readonly row: TitleManifest }): { readonly name: string; readonly art: string } => {
     const shown = gridDestination({ slug: to.row.slug }, to.row);
-    document.documentElement.style.setProperty('--ws-load-portrait', shown.art === '' ? 'none' : `url("${shown.art}")`);
+    loadPortrait(shown.art);
     startEntryDownload(to.row.slug, 'grid');
     titlePrefetchChoice(saves).remember(to.row.slug, 'grid');
     startGridStripDownload(gridMode(DEVSERVER), to.cell.instance, 'metadata');

@@ -87,6 +87,8 @@ export function installCookedObjects(objects: Iterable<readonly [string, string]
     if (at.search !== '' || at.hash !== '' || (at.protocol !== 'https:' && at.protocol !== 'http:')) throw new Error(`Invalid cooked object URL: ${url}`);
     cooked.set(page, at.href); cookedBack.set(at.href, page); cookedOrigins.add(at.origin);
   }
+  const held = typeof document === 'undefined' ? undefined : document.documentElement.dataset['wsLoadArt'];
+  if (held !== undefined && cooked.has(held)) loadPortrait(held);
 }
 const packed = new Map<string, CookedPartMember>();
 export function installCookedMembers(rows: Iterable<readonly [string, CookedPartMember]>): void {
@@ -95,13 +97,21 @@ export function installCookedMembers(rows: Iterable<readonly [string, CookedPart
 export function cookedMember(path: string): CookedPartMember | undefined { return packed.get(path); }
 export function cookedMembers(): readonly (readonly [string, CookedPartMember])[] { return [...packed]; }
 export function clearCookedObjects(): void { cooked.clear(); cookedBack.clear(); cookedOrigins.clear(); packed.clear(); }
-/** Where the cook stores a page path (`/assets/spawn/parts/…`), with `search` kept; undefined for a path no installed zone maps. */
 /** PV4: the installed table, page path to cooked URL, for a worker with no document (the in-page server). */
 export function cookedObjects(): readonly (readonly [string, string])[] { return [...cooked]; }
-
+/** Where the cook stores a page path (`/assets/spawn/parts/…`), with `search` kept; undefined for a path no installed zone maps. */
 export function cookedObjectURL(pathname: string, search = ''): string | undefined {
   const url = cooked.size === 0 ? undefined : cooked.get(pathname);
   return url === undefined ? undefined : `${url}${search}`;
+}
+/** The loading card's art (`--ws-load-portrait`) for a page path, or none for ''. PV4: on a page with a zone table a zone's art is at
+ *  the cook's object key, unknown until its index is read, so until then the path is held (`data-ws-load-art`, as index.html's first
+ *  paint holds it) and `installCookedObjects` paints it: the page origin has no zone file, so reading it there is a 404. */
+export function loadPortrait(art: string): void {
+  const root = document.documentElement, at = art.startsWith('/') && !art.startsWith('//') ? cookedObjectURL(art) : undefined;
+  if (at === undefined && art.startsWith('/shardfiles/') && document.getElementById('ws-zone-table') !== null) { root.dataset['wsLoadArt'] = art; return; }
+  delete root.dataset['wsLoadArt'];
+  root.style.setProperty('--ws-load-portrait', art === '' ? 'none' : `url("${at ?? art}")`);
 }
 
 /** A path the content base serves: shard products, programs, and `/assets/` art and books, not code or physics. */
