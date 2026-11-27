@@ -341,7 +341,10 @@ export function phoneTier(discovery: Uint8Array, read: (url: string) => Uint8Arr
       const encodedBefore = encodes;
       const cookedMaster = masterBytes === undefined ? undefined : cook(masterBytes);
       const trimmed = cookedMaster !== undefined && encodes > encodedBefore ? cookedMaster : cook(bytes), fromMaster = trimmed === cookedMaster;
-      file = fromMaster || absent || trimmed.length < bytes.length ? {from: target, url: `${match[1] ?? ''}.t${max}-${hex8(trimmed)}.${ext}`, bytes: trimmed} : null;
+      // SF15: a kept row the 6×6 encode ran on takes the 6×6 file even when its wire is larger than a zstd UASTC source's: the
+      // phone holds 6×6 at under half the GPU bytes of the 4×4 its UASTC transcodes to (S12d's intent for kept rows).
+      const sixBySix = own && encodes > encodedBefore;
+      file = fromMaster || absent || sixBySix || trimmed.length < bytes.length ? {from: target, url: `${match[1] ?? ''}.t${max}-${hex8(trimmed)}.${ext}`, bytes: trimmed} : null;
       made.set(key, file);
       if (file !== null) files.set(target, [...files.get(target) ?? [], file]);
     }

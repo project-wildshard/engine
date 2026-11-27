@@ -28,6 +28,9 @@ import { entryReadSet } from '@wildshard/format/entryReadSet';
 import {phoneTier, splatPhoneTier, type Astc6Encode, type SplatPhoneLayer} from './tierTextures';
 import {splatTerrainOf} from '@wildshard/format/splatTerrain';
 import {wasmAstc6} from './astc6Wasm';
+import {desktopKtx2} from './cookedKtx2';
+import {wasmImageKtx2, type ImageKtx2Encode} from './imageKtx2Wasm';
+import {cookedKtx2TableOf, EMPTY_COOKED_KTX2_TABLE, type CookedKtx2Table} from '../../shared/game/shardfile/cookedKtx2Table';
 import {createPartEncoder, packable, writeSpawnParts, type CookedMember, type PartEncoder} from './spawnParts';
 import {cookedMapPngs, type CookedMapOptions, type CookedMapStats, type MapDrawn} from './cookedMap';
 import {cookedMapPath} from '../../shared/game/shardfile/cookedMapPath';
@@ -173,6 +176,8 @@ export interface ShardHalf {
   readonly stableKey: (url: string) => string | undefined;
   /** A mount's bytes as this cook serves it: the discovery document carries the phone tier's table (S12b). */
   readonly mountBytes: (row: CookMount) => Uint8Array;
+  /** SF15: the KTX2 table this cook serves, as the cooked index carries it (`cookedKtx2Table.ts`). */
+  readonly ktx2Table: CookedKtx2Table;
 }
 
 /** S12b: what the cook does with a shard's textures per tier. `phone`: give each phone row of the KTX2 table its own
@@ -180,23 +185,33 @@ export interface ShardHalf {
  *  the cook's own 6×6 encode (S12c) can replace the hand-made sets. `encode` (S12c): cook each phone row from its desktop
  *  master as ASTC 6×6 (`basisuAstc6`), what the phone reads once the hand-made sets are gone. */
 export interface CookTiers {readonly phone?: boolean; readonly encode?: Astc6Encode
-  /** S12d: run the encodes a cook will ask for on worker threads first (`wasmAstc6`'s `record` and `flush`). */
-  readonly prepare?: {readonly record: Astc6Encode; readonly flush: () => Promise<void>}}
+  /** SF15 (J525): encode every JPG and PNG mount as a desktop UASTC KTX2 (`desktopKtx2`), named in the table; the phone's
+   *  6x6 files are then cooked from those. */
+  readonly images?: ImageKtx2Encode
+  /** S12d: run the encodes a cook will ask for on worker threads first (`wasmAstc6`'s `record` and `flush`; SF15's
+   *  `images`, run before them, as the phone's encodes read their output). */
+  readonly prepare?: {readonly record: Astc6Encode; readonly flush: () => Promise<void>; readonly images?: {readonly record: ImageKtx2Encode; readonly flush: () => Promise<void>}}}
 
 /** S12d: the phone tier is on by default, 6×6 by basisu's WebAssembly build: no child process, nothing to install, so
  *  the box's cook job and CI's bake cook what `cook --phone-astc6` did. `cacheDir` keeps encodes between cooks; a cook
  *  job passes none (its files can't be relied on by the next job). */
 export async function defaultCookTiers(cacheDir?: string): Promise<CookTiers> {
   const lanes = process.env['COOK_CPU_SLOTS'] === undefined ? undefined : Math.max(1, Number(process.env['COOK_CPU_SLOTS']) - 1);
-  const astc6 = await wasmAstc6({...(cacheDir === undefined ? {} : {cacheDir}), ...(lanes === undefined || !Number.isSafeInteger(lanes) ? {} : {lanes})});
-  return {phone: true, encode: astc6.encode, prepare: astc6};
+  const options = {...(cacheDir === undefined ? {} : {cacheDir}), ...(lanes === undefined || !Number.isSafeInteger(lanes) ? {} : {lanes})};
+  const [astc6, images] = await Promise.all([wasmAstc6(options), wasmImageKtx2(options)]);
+  return {phone: true, encode: astc6.encode, images: images.encode, prepare: {record: astc6.record, flush: astc6.flush, images}};
 }
 
 /** `shardHalf` with its encodes run in parallel first, when the tiers can. */
 export async function preparedShardHalf(shard: OpenShardfile, wireBytes: WireBytes, folder: string, tiers: CookTiers): Promise<ShardHalf> {
+  // SF15: the images first, as the phone's 6x6 encodes read the desktop files they make.
+  if (tiers.images !== undefined && tiers.prepare?.images !== undefined) {
+    shardHalf(shard, () => 0, folder, {images: tiers.prepare.images.record});
+    await tiers.prepare.images.flush();
+  }
   if (tiers.phone === true && tiers.prepare !== undefined) {
     // Only the encodes' inputs matter here: no file of this pass is sized or kept.
-    shardHalf(shard, () => 0, folder, {phone: true, encode: tiers.prepare.record});
+    shardHalf(shard, () => 0, folder, {phone: true, encode: tiers.prepare.record, ...(tiers.images === undefined ? {} : {images: tiers.images})});
     await tiers.prepare.flush();
   }
   return shardHalf(shard, wireBytes, folder, tiers);
@@ -230,13 +245,17 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, folder: st
   const document = shard.cook?.mounts.find(row => row.url === `${prefix}discovery.json`), mounts = downloaded(shard);
   // S12b: the phone tier's files, made from the KTX2 table's own targets; the discovery document names them.
   const onTier = mountTiers(new Set(mounts.map(row => row.url))), mountByURL = new Map(mounts.map(row => [row.url, row])), mountOf = (url: string): Uint8Array | undefined => { const row = mountByURL.get(url); return row === undefined ? undefined : shard.read(row.path); };
-  const phone = tiers.phone === true && document !== undefined ? phoneTier(shard.read(document.path), mountOf, undefined, tiers.encode) : undefined;
-  const tieredBytes = phone?.discovery ?? (document === undefined ? undefined : shard.read(document.path));
+  // SF15: the cook's desktop KTX2 of each image mount, named in the table; a mount row may keep its image (`keepImage`).
+  const images = tiers.images !== undefined && document !== undefined ? desktopKtx2(shard.read(document.path), mounts.map(row => ({url: row.url, read: () => shard.read(row.path), ...(Reflect.get(row, 'keepImage') === true ? {keepImage: true} : {})})), tiers.images) : undefined;
+  const cooked = new Map(images?.files.map(file => [file.url, file.bytes]));
+  const ownBytes = images?.discovery ?? (document === undefined ? undefined : shard.read(document.path));
+  const phone = tiers.phone === true && ownBytes !== undefined ? phoneTier(ownBytes, url => cooked.get(url) ?? mountOf(url), undefined, tiers.encode) : undefined;
+  const tieredBytes = phone?.discovery ?? ownBytes;
   // S12f2b1: a splat ground's own phone layers (product blobs) get 6×6 files too, named in the same table
   const layers = tiers.phone === true && tiers.encode !== undefined && tieredBytes !== undefined ? splatPhoneTier(tieredBytes, folder, splatPhoneLayers(shard, prefix), tiers.encode) : undefined;
   const documentBytes = layers?.discovery ?? tieredBytes;
   const discovery: readonly SpawnFile[] = document === undefined || documentBytes === undefined ? [] : [(() => {
-    const hash = phone === undefined && layers === undefined ? document.hash : sha256(documentBytes);
+    const hash = images === undefined && phone === undefined && layers === undefined ? document.hash : sha256(documentBytes);
     return {url: `${document.url}?v=${hash.slice(0, 8)}`, bytes: documentBytes.length, hash, wireBytes: wireBytes(document.url, documentBytes, hash)};
   })()];
   for (const row of discovery) if (documentBytes !== undefined) sources.set(row.url, () => documentBytes);
@@ -256,9 +275,21 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, folder: st
     sources.set(file.url, () => file.bytes);
     return [hash, {url: file.url, bytes: file.bytes.length, hash: sum, wireBytes: wireBytes(file.url, file.bytes, sum)}] as const;
   }));
-  /** A phone list names each trimmed target's phone files in its place, and the target too while a kept row still reads it. */
-  const tiered = (tier: CookTier, url: string): readonly string[] => tier !== 'phone' || !tierRows.has(url) ? [url] : phone?.kept.has(url) === true ? [url, `tier:${url}`] : [`tier:${url}`];
-  return {shard, header, tierFiles: [...[...tierRows.values()].flat(), ...layerRows.values()], discovery: discovery[0] === undefined || documentBytes === undefined ? undefined : {row: discovery[0], bytes: documentBytes},
+  // SF15: the cook's desktop files; a phone reads one only where the phone tier made no 6x6 file of it.
+  const cookedRows = new Map([...cooked].map(([url, bytes]) => {
+    const hash = sha256(bytes);
+    sources.set(url, () => bytes);
+    return [url, {url, bytes: bytes.length, hash, wireBytes: wireBytes(url, bytes, hash)}] as const;
+  }));
+  /** A phone list names each trimmed target's phone files in its place, and the target too while a kept row still reads it. SF15:
+   *  an image mount brings its cooked files, the desktop's KTX2 on the desktop and the phone's 6x6 files on the phone. */
+  const tiered = (tier: CookTier, url: string): readonly string[] => {
+    if (tier === 'desktop') return [url, ...(images?.desktopTargets.get(url) ?? []).map(target => `cooked:${target}`)];
+    const own = !tierRows.has(url) ? [url] : phone?.kept.has(url) === true ? [url, `tier:${url}`] : [`tier:${url}`];
+    return [...own, ...(images?.phoneTargets.get(url) ?? []).map(target => (tierRows.has(target) ? `tier:${target}` : `cooked:${target}`))];
+  };
+  const ktx2Table = documentBytes === undefined ? EMPTY_COOKED_KTX2_TABLE : cookedKtx2TableOf(JSON.parse(new TextDecoder().decode(documentBytes)));
+  return {shard, header, ktx2Table, tierFiles: [...cookedRows.values(), ...[...tierRows.values()].flat(), ...layerRows.values()], discovery: discovery[0] === undefined || documentBytes === undefined ? undefined : {row: discovery[0], bytes: documentBytes},
     read: url => { const read = sources.get(url); if (read === undefined) throw new Error(`Spawn file has no source: ${url}`); return read(); },
     stableKey: url => stableKeys.get(url),
     mountBytes: row => (row.url === document?.url && documentBytes !== undefined ? documentBytes : shard.read(row.path)),
@@ -274,9 +305,10 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, folder: st
       const urls = wholeSet(tier, set) ? mounts.map(row => row.url).filter(url => onTier(url, tier)) : fence.mounts;
       // A phone file whose target no phone list names (a fence shard's file read past its fence) rides in the phone's whole
       // set: no other tier's part holds it, and it costs less than the target a phone read from a desktop part before.
-      const listed = new Set(urls), unlisted = tier === 'phone' && set === 'whole' ? [...tierRows.keys()].filter(url => !listed.has(url)).map(url => `tier:${url}`) : [];
+      const listed = new Set([...urls, ...urls.flatMap(url => images?.phoneTargets.get(url) ?? [])]), unlisted = tier === 'phone' && set === 'whole' ? [...tierRows.keys()].filter(url => !listed.has(url)).map(url => `tier:${url}`) : [];
       return [...[...urls.flatMap(url => tiered(tier, url)), ...unlisted].flatMap(url => {
         if (url.startsWith('tier:')) return tierRows.get(url.slice(5)) ?? [];
+        if (url.startsWith('cooked:')) { const row = cookedRows.get(url.slice(7)); return row === undefined ? [] : [row]; }
         const row = mountRow.get(url); return row === undefined ? [] : [row()];
       }), ...tier === 'phone' ? layerRows.values() : []];
     }};
@@ -375,6 +407,8 @@ export interface CookReport {
   readonly loose: readonly string[];
   readonly parts: {readonly count: number; readonly rawBytes: number; readonly wireBytes: number};
   readonly server: {readonly url: string; readonly index: string; readonly wireBytes: number; readonly files: number};
+  /** SF15: the KTX2 table this cook serves, for the cooked index (`cookedKtx2Table.ts`). */
+  readonly ktx2: CookedKtx2Table;
   /** J450: the top-down map the cook drew (`cookedMap.ts`), at `cookedMapPath`. */
   readonly map: {readonly full: number; readonly cell: number; readonly drawn: MapDrawn} & CookedMapStats;
 }
@@ -450,7 +484,7 @@ async function cookWith(tarball: Uint8Array, out: string, options: CookShardOpti
   }
   // J450: write both maps before the worker can publish the checked upload.
   const map = await writeCookedMap(half.shard, out, options.warn === undefined ? {} : {warn: options.warn});
-  return {slug: half.shard.slug, preparation: half.shard.preparation, seconds: (options.now() - started) / 1000, manifests, loose: loose.map(row => row.url), map, server: {url: server.url, index: `/${serverIndex}`, wireBytes: [server, ...server.more ?? []].reduce((sum, part) => sum + part.wireBytes, 0), files: [server, ...server.more ?? []].reduce((sum, part) => sum + part.files.length, 0)},
+  return {slug: half.shard.slug, preparation: half.shard.preparation, seconds: (options.now() - started) / 1000, manifests, loose: loose.map(row => row.url), map, ktx2: half.ktx2Table, server: {url: server.url, index: `/${serverIndex}`, wireBytes: [server, ...server.more ?? []].reduce((sum, part) => sum + part.wireBytes, 0), files: [server, ...server.more ?? []].reduce((sum, part) => sum + part.files.length, 0)},
     parts: {count: after.parts - before.parts, rawBytes: after.rawBytes - before.rawBytes, wireBytes: after.wireBytes - before.wireBytes}};
 }
 
