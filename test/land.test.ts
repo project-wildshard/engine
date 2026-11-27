@@ -58,12 +58,19 @@ test('the memory ledger (budgets.yml since BUDGET-CAPS BC9) restores and saves i
   const restore = producer.indexOf('uses: actions/cache/restore@');
   const build = producer.indexOf('name: Build every production pin');
   const archive = producer.indexOf('name: Archive the full pinned preview');
-  const save = producer.indexOf('uses: actions/cache/save@');
+  // The verified save comes after the archive; the partial save (QA 11-26 row 31) sits right after the build, as it runs
+  // only when the build failed or timed out, so the next run keeps the encodes it finished.
+  const save = producer.indexOf('uses: actions/cache/save@', producer.indexOf('name: Save verified full-ledger encodes'));
+  const partial = producer.indexOf('name: Save partial full-ledger encodes');
   const read = ledger.indexOf("name: Read every zone's memory ledger");
   expect(restore).toBeGreaterThan(0);
   expect(build).toBeGreaterThan(restore);
   expect(archive).toBeGreaterThan(build);
   expect(save).toBeGreaterThan(archive);
+  expect(partial).toBeGreaterThan(build);
+  expect(archive).toBeGreaterThan(partial);
+  expect(producer.slice(partial, archive)).toContain("steps.ledger-client.outcome != 'success'");
+  expect(producer.slice(partial, archive)).toContain('partial-${{ github.run_id }}-${{ github.run_attempt }}');
   expect(readFileSync('.github/workflows/budgets.yml', 'utf8')).toContain('workflows: [ci]');
   expect(native).toContain('workflows: [ci]');
   for (const consumer of [ledger, native]) {
@@ -75,7 +82,7 @@ test('the memory ledger (budgets.yml since BUDGET-CAPS BC9) restores and saves i
   expect(unpack).toBeGreaterThan(0);
   expect(digest).toBeGreaterThan(unpack);
   expect(read).toBeGreaterThan(digest);
-  expect(producer.match(/path: ~\/\.cache\/wildshard\/gen\/spawn-parts-br$/gmu)).toHaveLength(2);
+  expect(producer.match(/path: ~\/\.cache\/wildshard\/gen\/spawn-parts-br$/gmu)).toHaveLength(3);
   expect(producer).toContain('full-ledger-spawn-parts-br-v2-');
   expect(producer).toContain('$codec-$CODEC_INPUTS-');
   expect(producer).toContain('key=%s%s-parts-and-server');
