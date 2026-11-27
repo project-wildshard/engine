@@ -196,7 +196,8 @@ builds, uploads and aliases nothing.
 
 Release from `release/vX.Y.Z` (meta RELEASE-BRANCHES, J360/J362).
 Start with local QA on the exact green main commit chosen for the cut.
-Keep its verdict with the release. From main, run
+The phone leg uses muted, headless WebKit at 402×874 and checks world
+draw and touch-stick movement. Keep the full verdict with the release. From main, run
 `../repo-kit/release.sh vX.Y.Z --prepare --from <source-sha> --notes <file>`.
 The helper writes the version, changelog and stamps on the release branch.
 

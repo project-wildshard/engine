@@ -492,7 +492,10 @@ async function cli() {
           const errors = [];
           // ZE23: a page error, a faulted system, the error card or the glitch chip each fail the run (proof-faults.mjs)
           const faults = await watchFaults(page, errors);
-          await page.goto(way === 'deeplink' ? `${url}/slug/${card}` : `${url}/`, { waitUntil: 'commit' });
+          const entry = new URL(way === 'deeplink' ? `${url}/slug/${card}` : `${url}/`);
+          // WebKit uses the game's mute flag. Chromium mutes at browser launch.
+          if (name === 'webkit') entry.searchParams.set('mute', '1');
+          await page.goto(entry.href, { waitUntil: 'commit' });
           let n = 0;
           const dir = join(out, `${name}-${way}-${run}`);
           mkdirSync(dir, { recursive: true });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
-import { deployFrameProblem } from '../src/scripts/journey-proof.mjs';
+import { deployFrameProblem, PHONE } from '../src/scripts/journey-proof.mjs';
 import { gateLeg, holdLine, JOURNEY_CARD, mergeVerdict } from '../src/scripts/staging-qa.mjs';
 import { QA_RIG_SHARDS, tourFixture } from '../src/scripts/staging-qa-local.mjs';
 import { TOUR_FEATURED } from '../src/scripts/zone-entry-featured.mjs';
@@ -73,13 +73,14 @@ describe('staging QA deploy verdict', () => {
 });
 
 describe('staging QA budget (SQ16, J427)', () => {
-  it('fits every leg in about ten minutes, the iOS Simulator minutes inside them', () => {
+  it('fits the default headless phone journey within the local QA budget', () => {
     for (const [kind, steps] of Object.entries(LEGS)) {
       for (const id of steps) expect(STEPS[id]?.catches, `${kind} ${id}`).toBeTruthy();
       expect(nominalSeconds(steps), kind).toBeLessThanOrEqual(LEG_TARGET_S);
     }
-    expect(LEGS.local).toContain('ios-safari');
-    expect(STEPS['ios-safari']?.seconds).toBeGreaterThanOrEqual(60);
+    expect(LEGS.local).toContain('journey-webkit');
+    expect(LEGS.local).not.toContain('ios-safari');
+    expect(PHONE).toMatchObject({ viewport: { width: 402, height: 874 }, hasTouch: true });
     expect(nominalSeconds(LEGS.local) + nominalSeconds(LEGS.candidate) + nominalSeconds(LEGS.staging)).toBeLessThanOrEqual(2 * LEG_TARGET_S);
   });
 

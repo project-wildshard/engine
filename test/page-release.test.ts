@@ -25,7 +25,7 @@ const qaOn = (on: string = build, hold = false) => ({qa: true, kind: 'candidate'
 const source = 'b'.repeat(40);
 const localQa = {qa: true, kind: 'local', full: true, build: source, release: 'v0.1.10', url: 'http://127.0.0.1:4400', hold: false,
   scenarios: ['K3', 'K4', 'K5'].map(id => ({id, status: 'ran'})),
-  proofs: [{id: 'gate-chromium', pass: true}, {id: 'ios-safari', pass: true}]};
+  proofs: [{id: 'gate-chromium', pass: true}, {id: 'journey-webkit', pass: true}]};
 const candidateQa = (deploymentId = 'dpl_1') => ({...qaOn(), release: 'v0.1.10', deploymentId, roomsSerial: 7});
 const {publicKey, privateKey} = generateKeyPairSync('ed25519');
 const key = publicKey.export({format: 'der', type: 'spki'}).toString('hex');
@@ -140,8 +140,11 @@ test('staging go-live binds both complete QA verdicts to the source, deployment 
   await expect(runPhase('go-live', deps)).rejects.toThrow(/--local-qa/u);
   deps.localQa = {...localQa, build};
   await expect(runPhase('go-live', deps)).rejects.toThrow(/exact release source/u);
-  deps.localQa = {...localQa, proofs: []};
-  await expect(runPhase('go-live', deps)).rejects.toThrow(/ios-safari/u);
+  const gate = {id: 'gate-chromium', pass: true};
+  deps.localQa = {...localQa, proofs: [gate, {id: 'ios-safari', pass: true}]};
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/journey-webkit/u);
+  deps.localQa = {...localQa, proofs: [gate, {id: 'journey-webkit', pass: false}]};
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/journey-webkit/u);
   deps.localQa = localQa;
   await expect(runPhase('go-live', deps)).rejects.toThrow(/--qa=/u);
   deps.qa = {...candidateQa(), build: source};

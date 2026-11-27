@@ -187,9 +187,9 @@ async function cli() {
   if (requested?.some(id => !known.has(id))) throw new Error('Unknown staging QA step');
   // SQ16 (J427): each leg runs its budgeted steps; --only picks steps by hand
   const kind = local ? 'local' : candidateUrl === undefined ? 'staging' : 'candidate';
-  // FS29 uses the hosted browser legs. The release's local leg owns Simulator Safari.
+  // In preflight the headless WebKit crossing tour exercises the phone leg.
   /** @type {readonly string[]} */
-  const leg = !runQa ? [] : deployChecks ? DEPLOY_CHECKS : requested ?? (tourSeed === undefined ? LEGS[kind] : LEGS.local.filter(id => id !== 'ios-safari'));
+  const leg = !runQa ? [] : deployChecks ? DEPLOY_CHECKS : requested ?? (tourSeed === undefined ? LEGS[kind] : LEGS.local.filter(id => id !== 'journey-webkit'));
   const selected = DEPLOY_SCENARIOS.filter(id => leg.includes(id));
   const expected = JOURNEYS.filter(id => leg.includes(id));
   // SQ14: the Simulator's Safari uses the Mac's own network, which no route can point at the unaliased candidate

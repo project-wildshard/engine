@@ -1,5 +1,5 @@
-// Meta STAGING-QA SQ16, the budget every deploy check fits in. J427 (Jake 2026-11-18): "10 minutes local, and 10 minutes on
-// release candidate. Include ~5mins of iOS simulator". J428: only the most obvious, stable checks (loads, reaches play, the
+// Meta STAGING-QA SQ16, the budget every deploy check fits in. J427 set a ten-minute target for local and candidate QA.
+// J428 keeps the most obvious, stable checks (loads, reaches play, the
 // world drew, the stick moves, no error card, load in budget, deep link, gate crossing), nothing that breaks on a content or
 // feature change. Each leg lists its steps; each step names its cost on the MacBook and the one bug class only it catches.
 // A leg over LEG_CAP_S is a P2 finding against the runner, never a pass at a quieter cap (RULES section 11).
@@ -23,17 +23,16 @@ export const STEPS = Object.freeze({
   K5: { seconds: 30, catches: 'the Infinite Wildshard grid entry does not arrive in play' },
   K6: { seconds: 210, catches: 'one Shard Select card draws a black world or never plays on WebKit iPhone at phone Low' },
   'gate-chromium': { seconds: 90, catches: 'walking through a cell gate does not arrive in the next cell' },
+  'journey-webkit': { seconds: 120, catches: 'the headless WebKit phone does not reach a drawn world or move with the touch stick' },
   doctor: { seconds: 45, catches: 'the signed build connection Doctor cannot reach staging rooms' },
   'read-only-webkit': { seconds: 30, catches: 'a fresh WebKit phone cannot reach the deep-link loader without writes' },
   // measured 55 s on staging v0.1.44 with the Simulator's boot; J428 keeps it to the obvious checks, so it uses ~2 of J427's ~5 minutes
   'ios-safari': { seconds: 120, catches: 'real iOS Safari (Simulator, real touch) does not reach a drawn world or move' },
 });
 
-/** The steps each leg runs by default. `staging` is SQ8's short re-run on live staging after the flip. The Simulator runs on
- * the local leg: its Safari uses the Mac's own network, which reaches the loopback rig but cannot be routed to the unaliased
- * candidate; `--only ios-safari` runs it on live staging. */
+/** The default local phone journey runs in headless WebKit. `staging` reruns SQ8's short leg after the alias moves. */
 export const LEGS = Object.freeze(/** @type {const} */ ({
-  local: ['build', 'K3', 'K4', 'K5', 'gate-chromium', 'ios-safari'],
+  local: ['build', 'K3', 'K4', 'K5', 'gate-chromium', 'journey-webkit'],
   candidate: ['K1', 'K2', 'K5', 'K6'],
   staging: ['K3', 'K5'],
 }));
