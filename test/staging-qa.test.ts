@@ -7,6 +7,7 @@ import { TOUR_FEATURED } from '../src/scripts/zone-entry-featured.mjs';
 import { CHANNELS, qaGap, QA_LEGS } from '../src/scripts/page-release/flow.mjs';
 import { chromiumCandidateArgs } from '../src/scripts/staging-qa-browser.mjs';
 import { candidateTunnelTarget } from '../src/scripts/staging-qa-candidate.mjs';
+import { COOKED_ORIGIN } from '../src/shared/game/shardfile/cookedPackPaths';
 import { pickPhone, qaDevice } from '../src/scripts/staging-qa-sim.mjs';
 import { budgetFinding, LEG_CAP_S, LEG_TARGET_S, LEGS, nominalSeconds, STEPS } from '../src/scripts/staging-qa-budget.mjs';
 
@@ -24,6 +25,13 @@ it('tunnels the signed release origin from a checked staging candidate', () => {
   expect(candidateTunnelTarget('rooms-staging.wildshard.io:443', 9000)).toEqual({host:'rooms-staging.wildshard.io', port:443});
   expect(candidateTunnelTarget(`${releases}:8443`, 9000)).toBeUndefined();
   expect(candidateTunnelTarget('example.com:443', 9000)).toBeUndefined();
+});
+
+it('tunnels the cooked pack origin from a checked staging candidate', () => {
+  const cooked = new URL(COOKED_ORIGIN).hostname;
+  expect(candidateTunnelTarget(`${cooked}:443`, 9000)).toEqual({host:cooked, port:443});
+  expect(candidateTunnelTarget(`${cooked}:8443`, 9000)).toBeUndefined();
+  expect(candidateTunnelTarget(`${cooked}.example.com:443`, 9000)).toBeUndefined();
 });
 
 it('pins only the staging preview key in Chromium while preserving its launch flags', () => {

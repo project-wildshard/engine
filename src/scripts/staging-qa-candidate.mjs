@@ -16,7 +16,10 @@ import { certificateSpki } from './staging-qa-browser.mjs';
 const { origin, release, socket } = CHANNELS.staging;
 const staging = new URL(origin).hostname;
 const rooms = new URL(socket).hostname;
-const passThrough = new Set([rooms, new URL(release).hostname, new URL(API_ORIGIN).hostname, new URL(PACKS_ORIGIN).hostname]);
+const passThrough = new Set([
+  rooms, new URL(release).hostname, new URL(API_ORIGIN).hostname, new URL(PACKS_ORIGIN).hostname,
+  'cooked.wildshard.io', // PV25: the checked staging page reads versioned zone packs here.
+]);
 const loopback = '127.0.0.1';
 const fetchUnrouted = globalThis.fetch.bind(globalThis);
 
