@@ -38,7 +38,7 @@ import {createPartEncoder, packable, writeSpawnParts, type CookedMember, type Pa
 import {cookedMapPngs, type CookedMapOptions, type CookedMapStats, type MapDrawn} from './cookedMap';
 import {cookedMapPath} from '../../shared/game/shardfile/cookedMapPath';
 import {ENGINE_MUSIC_STYLE} from '@wildshard/engine/audio/bootAudio';
-import {zoneScoreSet} from '@wildshard/engine/boot/zoneAssets';
+import {audioManifestRow, zoneScoreSet} from '@wildshard/engine/boot/zoneAssets';
 
 export type CookTier = 'phone' | 'desktop';
 export type CookSet = 'entry' | 'whole';
@@ -167,6 +167,13 @@ function fenceHints(shard: OpenShardfile): {readonly hashes: ReadonlySet<string>
 
 /** SF4: a zone's own far view (`/assets/<slug>/baked/far.json`, `far.glb`, `far-impostor.png`), which the grid's far ring reads. */
 export const ownFarView = (url: string, slug: string): boolean => url.startsWith(`/assets/${slug.replace(/^_/u, '')}/baked/far`) && /\/baked\/far(?:-impostor)?\.(?:json|glb|png)$/u.test(url);
+/** SF11: a zone's own sound-effect set folders (`/assets/<slug>/sfx/<set>/`, each beside its `sfx.json`). With no pin
+ *  copying them under public/, the boot reads a set's manifest and default variants from the zone's own mounts only, so
+ *  a fence shard's phone whole set carries each folder as it carries an own score (Driftwood's 16 variants). */
+export const ownSfxDirs = (urls: readonly string[], slug: string): readonly string[] => urls.flatMap(url => {
+  const row = audioManifestRow(url);
+  return row?.kind === 'sfx' && row.dir?.startsWith(`/assets/${slug.replace(/^_/u, '')}/sfx/`) === true ? [row.dir] : [];
+});
 
 /** A mount's tier by its name: `.desktop`, `.phone` and a shard's `astc6/` overlay say so, and a file with a `.phone` sibling is the desktop's. */
 /** Which tiers carry a mount. SF7j (J525): a phone keeps a shard's original even beside a hand-made `.phone` copy. The client
@@ -356,8 +363,9 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, folder: st
         .filter(dir => dir.startsWith(`/assets/${shard.slug}/music/`));
       // Muted author preparation can read the score manifest without playing its recordings.
       const ownScore = (url: string): boolean => scoreDirs.some(dir => url.startsWith(dir));
+      const sfxDirs = ownSfxDirs(mounts.map(row => row.url), shard.slug), ownSfx = (url: string): boolean => sfxDirs.some(dir => url.startsWith(dir));
       const urls = wholeSet(tier, set) ? mounts.map(row => row.url).filter(url => onTier(url, tier))
-        : set === 'whole' ? [...new Set([...fence.mounts, ...mounts.map(row => row.url).filter(url => (ownFarView(url, shard.slug) || ownScore(url)) && onTier(url, tier))])] : fence.mounts;
+        : set === 'whole' ? [...new Set([...fence.mounts, ...mounts.map(row => row.url).filter(url => (ownFarView(url, shard.slug) || ownScore(url) || ownSfx(url)) && onTier(url, tier))])] : fence.mounts;
       // A phone file whose target no phone list names (a fence shard's file read past its fence) rides in the phone's whole
       // set: no other tier's part holds it, and it costs less than the target a phone read from a desktop part before.
       const textures = blobRows(tier, wholeSet(tier, set) ? undefined : fence.hashes);
