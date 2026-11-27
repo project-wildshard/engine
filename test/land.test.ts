@@ -90,7 +90,6 @@ test('the memory ledger (budgets.yml since BUDGET-CAPS BC9) restores and saves i
   expect(producer).toMatch(/restore-keys: \|\n[^\n]+\n +nightly-encodes-/u);
   expect(producer).toContain('astc6-1');
   expect(producer).toMatch(/name: Upload the full pinned preview\n +timeout-minutes: 4\n +uses: actions\/upload-artifact@/u);
-  expect(producer).toContain('timeout-minutes: 30');
   expect(producer).toContain('name: memory-pinned-client');
   expect(ledger).toContain('tmp/memory-ledger/spawn-parts.sha256');
   expect(producer).toContain("steps.ledger-client.outcome == 'success'");
@@ -291,10 +290,12 @@ describe('ci.yml on main', () => {
     const nine = jobs.get('nine-ring1-build') ?? '', memory = jobs.get('memory-client-build') ?? '';
     // "Build full pinned Nine" measured 7 to 8 min cold; at 8 min five of ten main runs were cancelled.
     expect(/^ {4}timeout-minutes: (\d+)$/mu.exec(nine)?.[1]).toBe('15');
-    expect(/^ {4}timeout-minutes: (\d+)$/mu.exec(memory)?.[1]).toBe('30');
+    expect(/^ {4}timeout-minutes: (\d+)$/mu.exec(memory)?.[1]).toBe('75');
     // Each build step stops inside its job, so the partial save after it still runs.
     expect(nine).toMatch(/name: Build full pinned Nine\n +id: nine-build\n +if: [^\n]+\n +timeout-minutes: 12\n/u);
-    expect(memory).toMatch(/name: Build every production pin\n +id: ledger-client\n +timeout-minutes: 26\n/u);
+    expect(memory).toMatch(/name: Build every production pin\n +id: ledger-client\n +timeout-minutes: 65\n/u);
+    // QA66: the heavy-lane default is 30 min; the inner build needs its own explicit ceiling.
+    expect(memory).toContain('python3 src/scripts/heavy-lane.py build --max 60 -- node src/scripts/build-app.mjs');
     // Nine restores ci's full ledger before it builds and saves a partial one after a failed or timed-out build.
     const restore = nine.indexOf('name: Restore full-ledger encodes'), build = nine.indexOf('name: Build full pinned Nine');
     const partial = nine.indexOf('name: Save partial Nine encodes');

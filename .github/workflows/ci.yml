@@ -558,7 +558,7 @@ jobs:
     needs: nine-ring1-build
     if: ${{ !cancelled() && needs.nine-ring1-build.outputs.code-run == 'true' && needs.nine-ring1-build.result == 'success' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 75
     outputs:
       armed: ${{ steps.memory-policy.outputs.armed }}
     env:
@@ -601,10 +601,12 @@ jobs:
           restore-keys: |
             ${{ steps.ledger-codec.outputs.prefix }}
             nightly-encodes-
-      # The step's own limit leaves the job time to save what it encoded; a job-level timeout cancels the save too.
+      # QA66: two images-only ledger builds hit 26 min despite restoring the same encode cache family.
+      # Reserve 5 min for pin install/input generation before the build and 10 min outside the step
+      # for setup and saving partial encodes or archiving/uploading the finished client.
       - name: Build every production pin
         id: ledger-client
-        timeout-minutes: 26
+        timeout-minutes: 65
         run: |
           node src/scripts/.kit/scratch-dir.mjs memory-ledger 'EM35 full pinned ledger'
           if ! node src/scripts/pins.ts install; then
@@ -612,7 +614,7 @@ jobs:
             node src/scripts/pins.ts install
           fi
           node src/scripts/gen.mjs --inputs-only
-          python3 src/scripts/heavy-lane.py build -- node src/scripts/build-app.mjs --mode preview --outDir tmp/memory-ledger/preview/dist
+          python3 src/scripts/heavy-lane.py build --max 60 -- node src/scripts/build-app.mjs --mode preview --outDir tmp/memory-ledger/preview/dist
       # QA 11-26 row 31: a build that fails or runs out of time keeps the encodes it finished (each one is written whole
       # the moment it is done) under a per-run key the next try restores through the prefix, so a cold run gets further
       # on every try instead of starting from nothing (run 45952914915 stopped at 30 min with nothing kept).
