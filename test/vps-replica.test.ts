@@ -7,13 +7,15 @@ import { createHash, createPublicKey, generateKeyPairSync, sign, verify } from '
 // oxlint-disable-next-line import/no-nodejs-modules -- A made-up box in the checkout's tmp/.
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 // oxlint-disable-next-line import/no-nodejs-modules -- As above.
-import { join, resolve } from 'node:path'
+import { delimiter, dirname, join, resolve } from 'node:path'
 
 import { afterEach, expect, test } from 'vitest'
 
 import { doorArgs, limits, RELEASE_PUBLIC_KEY, replicaRelease, SCRATCH_HBA, scratchUrl, stagingRelease, unitArgs } from '../src/scripts/vps/replica.mjs'
 
 const REPLICA = resolve('src/scripts/vps/replica.mjs'), CONFIG = resolve('src/scripts/vps/wildshard-config')
+// The fixtures use a minimal environment, so its Node must not depend on a gate wrapper's variables.
+const fixturePath = [dirname(process.execPath), process.env['PATH'] ?? ''].join(delimiter)
 const key = generateKeyPairSync('ed25519')
 const publicKey = key.publicKey.export({ type: 'spki', format: 'der' }).toString('hex')
 const build = 'c'.repeat(40)
@@ -109,7 +111,7 @@ function box(bundleSha?: string) {
     return join(bin, name)
   }
   const env = {
-    PATH: process.env['PATH'] ?? '', WILDSHARD_REPLICA_TEST: root, WILDSHARD_REPLICA_TEST_KEY: publicKey,
+    PATH: fixturePath, WILDSHARD_REPLICA_TEST: root, WILDSHARD_REPLICA_TEST_KEY: publicKey,
     WILDSHARD_REPLICA_TEST_SYSTEMCTL: stand('systemctl', '[ "$1" = is-active ] && exit "${ACTIVE:-3}"; exit 0'),
     WILDSHARD_REPLICA_TEST_TAILSCALE: stand('tailscale', 'echo 100.70.1.2'),
     WILDSHARD_REPLICA_TEST_SYSTEMD_RUN: stand('systemd-run', `[ "$1" = --unit=wildshard-replica-door ] && exit 0; cat "${root}/replica/release.json" > "${root}/seen-release.json"; ls -l "${root}/replica/release.json" | cut -c1-10 > "${root}/seen-mode"; ls "${root}/replica/server" > "${root}/seen-server"; echo '{"at":"worker","p95":1}'`),
@@ -172,7 +174,7 @@ test('wildshard-config replica passes only checked words to the root-owned helpe
   const root = scratch(), seen = join(root, 'seen'), helper = join(root, 'replica.mjs')
   writeFileSync(helper, `import { writeFileSync } from 'node:fs'\nwriteFileSync(${JSON.stringify(seen)}, process.argv.slice(2).join(' '))\n`)
   const config = (...args: string[]) => spawnSync('python3', [CONFIG, ...args], { encoding: 'utf8',
-    env: { PATH: process.env['PATH'] ?? '', WILDSHARD_CONFIG_TEST_ROOT: root, WILDSHARD_CONFIG_TEST_REPLICA: helper } })
+    env: { PATH: fixturePath, WILDSHARD_CONFIG_TEST_ROOT: root, WILDSHARD_CONFIG_TEST_REPLICA: helper } })
   expect(config('replica', 'start').status).toBe(0)
   expect(readFileSync(seen, 'utf8')).toBe('start 1800 4 32 driftwood-isle')
   expect(config('replica', 'start', '--seconds', '1900', '--cells', 'driftwood-isle,nalati-grasslands').status).toBe(0)
@@ -287,7 +289,7 @@ test('E7.4b.b: wildshard-config passes --saves and pg-restart through, and nothi
   const root = scratch(), seen = join(root, 'seen'), helper = join(root, 'replica.mjs')
   writeFileSync(helper, `import { writeFileSync } from 'node:fs'\nwriteFileSync(${JSON.stringify(seen)}, process.argv.slice(2).join(' '))\n`)
   const config = (...args: string[]) => spawnSync('python3', [CONFIG, ...args], { encoding: 'utf8',
-    env: { PATH: process.env['PATH'] ?? '', WILDSHARD_CONFIG_TEST_ROOT: root, WILDSHARD_CONFIG_TEST_REPLICA: helper } })
+    env: { PATH: fixturePath, WILDSHARD_CONFIG_TEST_ROOT: root, WILDSHARD_CONFIG_TEST_REPLICA: helper } })
   expect(config('replica', 'start', '--saves', 'postgres', '--workers', '2').status).toBe(0)
   expect(readFileSync(seen, 'utf8')).toBe('start 1800 2 32 driftwood-isle postgres')
   expect(config('replica', 'start', '--saves', 'memory').status).toBe(0)
