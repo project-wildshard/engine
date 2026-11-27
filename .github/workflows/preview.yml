@@ -99,7 +99,7 @@ jobs:
           echo "this build names itself $(git describe --tags --match 'v[0-9]*' 2>/dev/null || echo '(no version tag)')"
           live=$(curl -A "$WS_AGENT_UA" -fsS "https://preview.wildshard.io/version.json?t=$(date +%s)" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{console.log(String(JSON.parse(s).build).split('-')[0])}catch{console.log('')}})" || true)
           # every input of the client build: the game's code (the solo page bundles the server worker), its shards (the pins), the build tooling, the lockfile and the page host
-          inputs=(src/client src/shared src/server types vite vite.config.ts index.html public package.json pnpm-lock.yaml test/pins src/scripts/app-build src/scripts/build-app.mjs src/scripts/app-build-pipeline.mjs src/scripts/gen.mjs src/scripts/pins.ts pages src/scripts/page-release src/scripts/page-release.mjs src/scripts/preview-grid.ts)
+          inputs=(src/client src/shared src/server types vite vite.config.ts index.html public package.json pnpm-lock.yaml test/pins src/scripts/app-build src/scripts/build-app.mjs src/scripts/app-build-pipeline.mjs src/scripts/gen.mjs src/scripts/pins.ts pages src/scripts/page-release src/scripts/page-release.mjs src/scripts/preview-grid.ts src/cook/game/cook-version.json .github/workflows/preview.yml)
           if [ -n "$live" ] && git cat-file -e "$live^{commit}" 2>/dev/null && git diff --quiet "$live" HEAD -- "${inputs[@]}"; then
             # SA35: staging's grid is an input too. Node built-ins only (before install); it writes news=true|false.
             node src/scripts/preview-grid.ts --news || echo "::warning title=preview grid::the staging grid check failed: no grid-only deploy this time"
@@ -146,6 +146,10 @@ jobs:
         run: |
           if [ -f src/scripts/preview-grid.ts ]; then node --import ./src/scripts/bake-loader.mjs src/scripts/preview-grid.ts tmp/preview-grid/catalogue.json
           else echo "::warning title=preview grid::$(git rev-parse --short HEAD) predates SA35: the pinned grid"; fi
+      # PV2: verify staging's signed release and its cook version before building the zone-free page.
+      - name: Borrow staging's signed zone table
+        if: steps.changed.outputs.deploy == 'true'
+        run: node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/zone-table.mjs build tmp/preview-zones/zone-table.json
       # SENTRY-TRIAGE S5: the Workers host's package step sends the hidden maps to Sentry (release wildshard@<version>,
       # dist the build) with node src/scripts/sentry-maps.mjs dist --environment preview, then strips every map from dist/
       # (PZ1, OV4): a Sentry outage or a missing token never stops the preview, and no map reaches the CDN.
@@ -163,4 +167,4 @@ jobs:
         # staging. test/preview-workflow.test.ts pins it.
         run: |
           grid=(); [ -f tmp/preview-grid/catalogue.json ] && grid=(--catalogue=tmp/preview-grid/catalogue.json)
-          node src/scripts/page-release.mjs preview build,upload,check,go-live --host=workers "${grid[@]}"
+          node src/scripts/page-release.mjs preview build,upload,check,go-live --host=workers --zone-table=tmp/preview-zones/zone-table.json "${grid[@]}"

@@ -16,3 +16,13 @@ test('PV13: preview.yml passes no --content and holds no R2 key or R2 write', ()
     expect(line, line).not.toMatch(/\bR2_[A-Z_]+\b|wrangler\s+r2|\br2\s+object\b|aws\s+s3|releases\/preview\.json|page-release\/preview\.mjs/u);
   }
 });
+
+test('PV22: preview builds and checks the zone table borrowed from staging', () => {
+  const table = 'tmp/preview-zones/zone-table.json';
+  const prepareAt = lines.findIndex(line => line.includes(`page-release/zone-table.mjs build ${table}`));
+  const releaseAt = lines.findIndex(line => line.includes('page-release.mjs preview build,upload,check,go-live'));
+  expect(prepareAt).toBeGreaterThanOrEqual(0);
+  expect(releaseAt).toBeGreaterThan(prepareAt);
+  expect(lines[releaseAt]).toContain(`--zone-table=${table}`);
+  expect(lines.find(line => line.includes('inputs=('))).toContain('src/cook/game/cook-version.json');
+});
