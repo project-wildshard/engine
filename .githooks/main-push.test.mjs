@@ -111,7 +111,8 @@ printf '%s\\n' "$refs" | "$WS_TEST_FS18_NODE" "$WS_TEST_FS18_HOOK"
   write(a, 'test/pins/rings.json', '{"rings":1}\n');
   const result = spawnSync(process.execPath, [SCRIPT, '--wait', '0', '-m', 'fix(pins): record rings', 'test/pins/rings.json'], {
     cwd: a, encoding: 'utf8',
-    env: {...env, ...ID, ALLOW_PIN_PUSH: '', WS_TEST_FS18_LOG: markerLog, WS_TEST_FS18_NODE: process.execPath,
+    // The fixture simulates a local lane push even when the test itself runs on GitHub Actions.
+    env: {...env, ...ID, CI: '', GITHUB_ACTIONS: '', ALLOW_PIN_PUSH: '', WS_TEST_FS18_LOG: markerLog, WS_TEST_FS18_NODE: process.execPath,
       WS_TEST_FS18_HOOK: fileURLToPath(new URL('pin-provenance.mjs', import.meta.url))},
   });
   assert.equal(result.status, 0, result.stderr);
