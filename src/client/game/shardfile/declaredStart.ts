@@ -4,7 +4,7 @@ import { bindAudioCatalogue, type ShardManifest } from '../shard/manifest';
 
 type StartManifest = Pick<ShardManifest, 'spawn' | 'loadout' | 'audio' | 'ground'>;
 /** what a declared page's start is read from: its sections, and (a product built before OF9b3) its `ui/level` manifest */
-export type StartSource = Pick<Shardfile, 'spawn' | 'audio' | 'items' | 'manifest'>;
+export type StartSource = Pick<Shardfile, 'spawn' | 'audio' | 'items' | 'manifest'> & Partial<Pick<Shardfile, 'terrain'>>;
 
 /**
  * ONE-FORMAT OF9b3: where a declared page stands its player, what it arms and what it plays. A product built since OF9b3
@@ -15,11 +15,15 @@ export type StartSource = Pick<Shardfile, 'spawn' | 'audio' | 'items' | 'manifes
  * open plots, Mirror Salt, Mossgate) stands where its `world/spawn` says too, the discovery's spawn only when the product
  * never declared one; its loadout and audio are its sections' when it has them, else the discovery's.
  * A spawn on terrain has no height: the page stands the player on the ground (`manifest.ground.structures` keeps it).
+ * SF22: a product with terrain tiles whose `world/spawn` is the format's default (never declared: `y: 2` is no floor)
+ * stands on its ground too, as its server stands it (`nativeAssembly`: at least the terrain's height). Images-only Dunes
+ * (structures and terrain, default spawn) otherwise entered `wildshard dev` 16 m under its dunes and drew no near sand.
  */
 export function declaredStart(manifest: StartManifest, source: StartSource): Pick<ShardManifest, 'spawn'> & Pick<Partial<ShardManifest>, 'loadout' | 'audio'> {
-  const undeclared = source.manifest === undefined && sameSpawn(source.spawn, DEFAULT_SPAWN);
+  const defaulted = sameSpawn(source.spawn, DEFAULT_SPAWN), undeclared = source.manifest === undefined && defaulted;
   const level = undeclared ? { spawn: manifest.spawn } : source.manifest;
-  const start = levelStart({ spawn: source.spawn, audio: source.audio, items: source.items, ...(level === undefined ? {} : { manifest: level }) }, manifest.ground.structures === undefined);
+  const terrain = manifest.ground.structures === undefined || (defaulted && source.terrain !== undefined && source.terrain !== null);
+  const start = levelStart({ spawn: source.spawn, audio: source.audio, items: source.items, ...(level === undefined ? {} : { manifest: level }) }, terrain);
   const loadout = start.loadout ?? manifest.loadout;
   // the discovery's audio bindings (cues, preload) stay; the product's own words lie over them
   const audio = start.audio === undefined ? manifest.audio : { ...manifest.audio, ...start.audio };

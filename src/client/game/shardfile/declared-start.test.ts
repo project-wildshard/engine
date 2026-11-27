@@ -86,4 +86,17 @@ describe('declaredStart (OF9b3)', () => {
     expect(typeof page.boot?.audio).toBe('function');
     expect(page.clientPlanRuntime).toBe(true);
   });
+
+  // SF22: images-only Dunes on `wildshard dev` (structures and terrain tiles, the format's default `world/spawn`) stood its
+  // player at y 2 under 18 m of dune: from below, the near tiles' faces are culled and only an orange glow was drawn.
+  it('stands a product with terrain and an undeclared spawn on its ground; a declared spawn keeps its height (SF22)', () => {
+    const terrain = { family: 'pbr', collider: 'd'.repeat(64), tiles: [] };
+    const structures = { ...DISCOVERY, ground: { structures: true as const } };
+    const dunes = { ...OLDER, manifest: { name: 'Dunes' }, terrain } as unknown as StartSource;
+    expect(declaredStart(structures, dunes).spawn).toEqual({ x: 0, z: 0, yaw: 0 });
+    const deck = { ...dunes, spawn: { x: 1, y: 30, z: 2, yaw: 0 } } as unknown as StartSource;
+    expect(declaredStart(structures, deck).spawn).toEqual({ x: 1, y: 30, z: 2, yaw: 0 });
+    const built = { ...dunes, terrain: null } as unknown as StartSource;
+    expect(declaredStart(structures, built).spawn).toEqual({ x: 0, y: 2, z: 0, yaw: 0 });
+  });
 });

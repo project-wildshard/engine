@@ -267,8 +267,14 @@ const regionArea = (product: ShardFolder, authored: Bounds | undefined): PlayAre
 };
 
 const regionTransferWalls = (shell: RegionShell, radius: number): TransferWalls => new TransferWalls(() => shell.physics, [{ x: 0, z: 0 }], radius, 'exit', shell.scope);
-/** The live crossing for one grid page; disposed with the level scope. */
+/** A home spawn's feet. With no height: the highest surface there (`standing`), a deck included (E463). With one: at least on
+ *  the terrain, as its server stands it (at least the terrain's height): the format's default `world/spawn` (y 2) put
+ *  images-only Dunes' player 16 m under its dunes on `wildshard dev`, where the near tiles' faces are culled (SF22). */
+export function homeSpawnFeet(height: number | undefined, terrain: () => number, standing: () => number): number {
+  return height === undefined ? standing() + 0.5 : Math.max(height, terrain() + 0.1);
+}
 
+/** The live crossing for one grid page; disposed with the level scope. */
 export class LiveGridSession {
   readonly live: LiveGridHost;
   private crossing: GridCrossingSession;
@@ -747,7 +753,7 @@ export class LiveGridSession {
     const region = this.runtimeRegions.has(cell.instance) ? undefined : this.regions.get(cell.instance);
     if (region !== undefined) {
       const at = this.page.traveller.position;
-      this.page.traveller.position.y = spawn.y ?? this.standingHeight(region.queries, at.x, at.z, spawn.x, spawn.z) + 0.5;
+      this.page.traveller.position.y = this.spawnHeight(region.queries, at, spawn);
       return;
     }
     if (await this.activation !== true || !this.gameplayReady()) throw new Error('Initial owned home gameplay is not ready');
@@ -762,7 +768,7 @@ export class LiveGridSession {
     // with no height stands on the highest surface there, a deck included: terrain alone put Driftwood's pier spawn under
     // its deck at water level (E463).
     const at = this.page.traveller.position;
-    this.page.traveller.position.y = spawn.y ?? this.standingHeight(runtime.queries, at.x, at.z, spawn.x, spawn.z) + 0.5;
+    this.page.traveller.position.y = this.spawnHeight(runtime.queries, at, spawn);
     runtime.loadout.interior();
   }
 
@@ -1283,6 +1289,10 @@ export class LiveGridSession {
       return { x: start.at.x, y: Math.max(start.at.y, this.standingHeight(runtime.queries, start.at.x, start.at.z, start.at.x, start.at.z) + 0.05), z: start.at.z, yaw: start.yaw };
     }
     return this.regions.get(current)?.spawn ?? { x: 0, y: undefined, z: 0, yaw: 0 };
+  }
+  /** A home spawn's feet (`homeSpawnFeet`), in the region's local x / z. */
+  private spawnHeight(queries: PlayerFrameQueries, at: { readonly x: number; readonly z: number }, spawn: { readonly x: number; readonly y?: number; readonly z: number }): number {
+    return homeSpawnFeet(spawn.y, () => queries.heightAt(spawn.x, spawn.z), () => this.standingHeight(queries, at.x, at.z, spawn.x, spawn.z));
   }
   /** Where a spawn with no authored height stands: the region's terrain or water surface, its platform queries (decks,
    *  hulls), and a collider up to 2 m above that (a pier deck over the sea), never a roof overhead (physics x / z in the
