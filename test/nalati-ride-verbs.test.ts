@@ -6,9 +6,10 @@ import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {expect,test} from 'vitest';
 
+// The walk took 36 s at load 60 against the old 30 s cap (opus-pvpage land, 2026-11-26): room for a loaded gate.
 test('a real camp walk reaches a mount, rides through native reins and dismounts',()=>{
   const child=spawnSync(process.execPath,['--import',pathToFileURL(resolve('src/scripts/sim-node-loader.mjs')).href,
-    resolve('test/fixtures/headless/nalati-ride-run.ts')],{encoding:'utf8',timeout:30_000});
+    resolve('test/fixtures/headless/nalati-ride-run.ts')],{encoding:'utf8',timeout:90_000});
   if(child.error!==undefined)throw child.error;
   expect(child.status,child.stdout+child.stderr).toBe(0);expect(child.stdout).toContain('"story":"camp-ride"');
-},35_000);
+},95_000);
