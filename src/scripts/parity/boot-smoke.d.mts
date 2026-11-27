@@ -68,3 +68,5 @@ export interface GameplayEvidence {
 export function bootCase(browser:Browser,base:string,mode:"standalone"|"grid"|"public-policy"|"arrival"|"alone",out:string,shard?:string,developer?:boolean,afterGameplay?:((page:Page)=>Promise<void>)|null,configureContext?:((context:BrowserContext)=>Promise<void>)|null,gameplayEvidence?:GameplayEvidence|null):Promise<{elapsedMs:number;frame:number;gameplayFrames?:{initial:number|null;final:number|null};faults:string[];fatal:string[]}>;
 
 export function gameplayRenderer():{renderer:string;vendor:string;unmaskedRenderer:string|null;unmaskedVendor:string|null;version:string;lost:boolean};
+/** What the boot cases read each poll: fatal text, gameplay readiness, the grid reveal and the app state. */
+export function bootObservation(): {fatal: string[]; ready: boolean; revealing?: boolean; appState: string; entered?: boolean; playerValid: boolean; frame: number; renderFrame: number; shard: string; titlePreparation: unknown};

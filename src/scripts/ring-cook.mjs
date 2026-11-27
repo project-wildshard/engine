@@ -14,7 +14,7 @@ const { ringCookInputs } = await import('./ring-cook-inputs.ts');
 const { rendererRevision } = await import('./renderer-revision.mjs');
 const { shardfileValidationRevision } = await import('./shardfile-validation-revision.mjs');
 const { values } = parseArgs({ options: { out: {type:'string',default:'tmp/ring-cook'}, build: {type:'string',default:'ring-local'},
-  only: {type:'string'}, ring2: {type:'boolean',default:false}, 'timeout-ms': {type:'string',default:'120000'} } });
+  only: {type:'string'}, pins: {type:'string',default:'test/pins/shardfiles.json'}, ring2: {type:'boolean',default:false}, 'timeout-ms': {type:'string',default:'120000'} } });
 const timeout = Number(values['timeout-ms']);
 const maximumTimeout = DEFAULT_LIMITS.seconds * 1000;
 if (!Number.isFinite(timeout) || timeout <= 0 || timeout > maximumTimeout) {
@@ -27,7 +27,7 @@ const cache = process.env.WILDSHARD_PIN_CACHE ?? resolve(homedir(), '.cache/wild
 /** @type {{products: string[]}} */
 const { products } = JSON.parse(readFileSync('test/pins/rings.json','utf8'))['1'];
 /** @type {{shards: {slug: string,hash: string}[]}} */
-const { shards } = JSON.parse(readFileSync('test/pins/shardfiles.json','utf8'));
+const { shards } = JSON.parse(readFileSync(values.pins,'utf8'));
 const allowed = values.ring2 ? shards.map(row => row.slug) : products;
 const selected = values.only === undefined ? allowed : values.only.split(',');
 if (selected.length === 0 || new Set(selected).size !== selected.length || selected.some(slug => !allowed.includes(slug))) throw new Error('Cook selection must name distinct pinned products in this ring');
