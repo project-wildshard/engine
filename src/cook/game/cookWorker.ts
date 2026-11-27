@@ -19,7 +19,7 @@ import {existsSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, r
 // oxlint-disable-next-line import/no-nodejs-modules -- The notify endpoint is plain HTTP (J30).
 import {createServer, type IncomingMessage, type Server} from 'node:http';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
-import {dirname, join, relative, sep} from 'node:path';
+import {dirname, join, relative, resolve as resolvePath, sep} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- SP6: the poll waits between sweeps, and stop() cuts the wait short.
 import {setTimeout as delay} from 'node:timers/promises';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
@@ -203,15 +203,19 @@ export function runJob(launcher: JobLauncher, tarball: string, out: string, expe
   if (slots.some(value => !Number.isSafeInteger(value) || value < 1)) throw new Error('Invalid cook CPU grant');
   const cpuSlots = slots.length === 0 ? undefined : Math.min(...slots);
   const cache = join(dirname(work), 'cache');
+  // SF21: the texture encodes survive jobs too (`encodeCache.ts`), in the job's cache folder unless the caller names one
+  // that outlives it (`zone-cook-entry.mjs` keeps one across its runs).
+  const named = process.env['COOK_ENCODE_CACHE'], encodes = named === undefined || named === '' ? join(cache, 'encodes') : resolvePath(named);
   // Node takes a path that doesn't exist yet for a file, which would deny the folder.
-  mkdirSync(cache, {recursive: true});
-  const node = [execPath, '--permission', `--allow-fs-read=${root}`, ...installedRuntimeReads(launcher,root).map(path=>`--allow-fs-read=${path}`), `--allow-fs-read=${dirname(work)}`, `--allow-fs-write=${work}`, `--allow-fs-write=${cache}`, ...sidecar === undefined ? [] : [`--allow-fs-read=${sidecar}`], '--allow-worker',
+  mkdirSync(cache, {recursive: true}); mkdirSync(encodes, {recursive: true});
+  const outside = encodes.startsWith(cache + sep) ? [] : [`--allow-fs-read=${encodes}`, `--allow-fs-write=${encodes}`];
+  const node = [execPath, '--permission', `--allow-fs-read=${root}`, ...installedRuntimeReads(launcher,root).map(path=>`--allow-fs-read=${path}`), `--allow-fs-read=${dirname(work)}`, `--allow-fs-write=${work}`, `--allow-fs-write=${cache}`, ...outside, ...sidecar === undefined ? [] : [`--allow-fs-read=${sidecar}`], '--allow-worker',
     `--max-old-space-size=${limits.heapMB}`, '--stack-size=4000', '--no-warnings', '--import', loader, script, tarball, out, ...expectedSlug === undefined ? [] : [expectedSlug]];
   const [command = '', ...args] = [...wrap, ...node];
   return new Promise(resolve => {
-    // No credentials, no home: the cook's only inputs are its arguments. The encoder's cache survives jobs, and each entry
-    // is decoded against its hash before use, so one job can't poison the next.
-    const child = spawn(command, args, {cwd: work, env: {PATH: process.env['PATH'] ?? '', WILDSHARD_SPAWN_PART_CACHE: cache, NODE_ENV: 'production', ...(launcher.versionedOutput === true ? {COOK_VERSIONED_OUTPUT: '1'} : {}), COOK_MAX_SHARDFILE_BYTES: String(limits.maxBytes ?? MAX_SHARDFILE_BYTES),
+    // No credentials, no home: the cook's only inputs are its arguments. The encoders' caches survive jobs: a spawn part is
+    // decoded against its hash before use, and a texture is read only as a whole KTX2 under a key naming its settings.
+    const child = spawn(command, args, {cwd: work, env: {PATH: process.env['PATH'] ?? '', WILDSHARD_SPAWN_PART_CACHE: cache, COOK_ENCODE_CACHE: encodes, NODE_ENV: 'production', ...(launcher.versionedOutput === true ? {COOK_VERSIONED_OUTPUT: '1'} : {}), COOK_MAX_SHARDFILE_BYTES: String(limits.maxBytes ?? MAX_SHARDFILE_BYTES),
       ...(cpuSlots === undefined ? {} : {COOK_CPU_SLOTS: String(cpuSlots)}), ...(launcher.renderer === undefined ? {} : {COOK_RENDERER: launcher.renderer}), ...(sidecar === undefined ? {} : {COOK_SIDECAR: sidecar}), ...(armed === undefined ? {} : {COOK_ARMED: String(armed)}), ...(metadata?.shardVersion === undefined ? {} : {COOK_SHARD_VERSION: metadata.shardVersion}), ...(metadata?.expected === undefined ? {} : {COOK_EXPECTED_CHAIN: metadata.expected.chainId, COOK_EXPECTED_DIGEST: metadata.expected.digest})}, stdio: ['ignore', 'pipe', 'pipe']});
     let stdout = '', stderr = '', peak = 0, why: string | undefined;
     const take = (text: string, kept: string): string => (kept + text).slice(-CAPTURE_BYTES);

@@ -14,11 +14,11 @@
  * `flipY = true`, and a compressed texture can't be flipped at upload); a GLB's images and a texture-array layer are not.
  *
  * `encode` is synchronous, as `shardHalf` calls it; `record` and `flush` run the same encodes on worker threads first, as
- * `wasmAstc6` does, and a cache folder keeps them across cooks by input hash. */
+ * `wasmAstc6` does, and a cache folder keeps them across cooks and cook jobs (SF21, `encodeCache.ts`). */
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {createHash} from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
-import {existsSync, mkdirSync, readFileSync, renameSync, writeFileSync} from 'node:fs';
+import {mkdirSync, readFileSync, renameSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {createRequire} from 'node:module';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
@@ -28,6 +28,7 @@ import {join} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {Worker} from 'node:worker_threads';
 import {BASISU_WASM_BUILD} from './astc6Wasm.ts';
+import {encodeCacheDir, encodeKey, readKeptKtx2} from './encodeCache.ts';
 import {encodeBudget, runLanes} from './encodeLanes.ts';
 import type {TextureRole} from './tierTextures';
 
@@ -38,7 +39,8 @@ export type ImageKtx2Encode = (image: Uint8Array, as: ImageEncodeAs) => Uint8Arr
 
 /** The encode's settings, in every cache key: a change is a new key, so no cook reads a file made with other settings. */
 export const IMAGE_KTX2_SETTINGS = 'uastc-ldr-4x4 level 2, no rdo, box mips, zstd';
-const KEY_PREFIX = `image-ktx2-wasm/1|${BASISU_WASM_BUILD}|${IMAGE_KTX2_SETTINGS}|`;
+/** SF21: every key names the encoder and its tier, the build and the settings (`encodeCache.ts` adds the cook version). */
+const KEY_PARTS = ['image-ktx2-wasm/2', 'desktop', BASISU_WASM_BUILD, IMAGE_KTX2_SETTINGS] as const;
 const MAX_LANES = 6;
 /** A UASTC encode's heap per texel (measured 2026-11-26: a 2048 JPG grew a heap by about 230 MB). */
 const IMAGE_HEAP_PER_TEXEL = 60, HEAP_FLOOR = 32 << 20;
@@ -170,16 +172,12 @@ export interface WasmImageKtx2 {
 
 /** The cook's image encoder: `lanes` worker threads for `flush`, this thread for anything `flush` didn't see. */
 export async function wasmImageKtx2(options: {readonly cacheDir?: string; readonly lanes?: number} = {}): Promise<WasmImageKtx2> {
-  const {cacheDir} = options, lanes = Math.max(1, Math.min(MAX_LANES, options.lanes ?? availableParallelism() - 2));
+  const cacheDir = encodeCacheDir(options.cacheDir), lanes = Math.max(1, Math.min(MAX_LANES, options.lanes ?? availableParallelism() - 2));
   if (cacheDir !== undefined) mkdirSync(cacheDir, {recursive: true});
   const stats = {encoded: 0, reused: 0, failed: 0};
-  const keyOf = (image: Uint8Array, as: ImageEncodeAs): string => createHash('sha256').update(`${KEY_PREFIX}${as.role}|${as.flip ? 'flip' : 'keep'}|`).update(image).digest('hex');
+  const keyOf = (image: Uint8Array, as: ImageEncodeAs): string => encodeKey([...KEY_PARTS, as.role, as.flip ? 'flip' : 'keep'], image);
   const done = new Map<string, Uint8Array | null>(), pending = new Map<string, {bytes: Uint8Array; as: ImageEncodeAs}>();
-  const stored = (key: string): Uint8Array | undefined => {
-    if (cacheDir === undefined) return undefined;
-    const path = join(cacheDir, `${key}.ktx2`);
-    return existsSync(path) ? new Uint8Array(readFileSync(path)) : undefined;
-  };
+  const stored = (key: string): Uint8Array | undefined => cacheDir === undefined ? undefined : readKeptKtx2(join(cacheDir, `${key}.ktx2`));
   const keep = (key: string, out: Uint8Array | undefined): void => {
     done.set(key, out ?? null);
     if (out === undefined) { stats.failed++; return; }
@@ -199,7 +197,10 @@ export async function wasmImageKtx2(options: {readonly cacheDir?: string; readon
   };
   const record: ImageKtx2Encode = (image, as) => {
     const key = keyOf(image, as);
-    if (!done.has(key) && stored(key) === undefined) pending.set(key, {bytes: new Uint8Array(image), as});
+    if (done.has(key)) return undefined;
+    const hit = stored(key);
+    if (hit === undefined) pending.set(key, {bytes: new Uint8Array(image), as});
+    else { stats.reused++; done.set(key, hit); }
     return undefined;
   };
   const flush = async (): Promise<void> => {

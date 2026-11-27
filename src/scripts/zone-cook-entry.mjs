@@ -8,6 +8,7 @@
 //     [--reuse <work dir>]   skip the page build and the cook a kept run already made (its work dir)
 //     [--keep]               keep the work dir (tree, build, cook) for --reuse
 //     [--tiers desktop,phone] [--settle ms]
+// The cook's texture encodes are kept in <out>/.encode-cache across runs (SF21; COOK_ENCODE_CACHE names another folder).
 // The proof is `<out>/<slug>.json`: per tier, the gameplay time, every request by origin, and `zoneFromPage`, the page
 // origin's answers for zone art. Exit 1 when either tier misses gameplay or `zoneFromPage` is not empty.
 // Zone art on the page origin: a URL the tarball names or carries, a path naming the slug, or (once SF1's
@@ -104,7 +105,7 @@ try{
     // The cook runs from this checkout (its renderer and validator revisions read git), over this tarball's pin row.
     const {build}=readJson(join(pristine,'version.json'));rmSync(cooked,{recursive:true,force:true});
     execFileSync(process.execPath,['src/scripts/ring-cook.mjs','--ring2',`--only=${slug}`,`--pins=${table}`,`--out=${cooked}`,`--build=${build}`,'--timeout-ms=1500000'],
-      {cwd:root,stdio:'inherit',timeout:1800000,env:{COOK_CPU_SLOTS:'4',...process.env,WILDSHARD_PIN_CACHE:cache}});
+      {cwd:root,stdio:'inherit',timeout:1800000,env:{COOK_CPU_SLOTS:'4',COOK_ENCODE_CACHE:join(out,'.encode-cache'),...process.env,WILDSHARD_PIN_CACHE:cache}});
   }
   const dist=join(tree,'dist'),receipt=readJson(join(cooked,'receipt.json'));
   if(receipt.heads.length!==1||receipt.heads[0].hash!==hash)throw new Error('The kept cook is of another tarball');

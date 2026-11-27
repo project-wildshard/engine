@@ -8,12 +8,10 @@
  *
  * `encode` is synchronous, as `phoneTier` calls it. `record` and `flush` let a cook run the same encodes on worker
  * threads first: a recording pass collects every input, `flush` encodes them `lanes` at a time, and the real pass then
- * reads them back. A cache folder, when given, keeps encodes across cooks by input hash (C4); the box's job passes none,
- * because a cook job's files can't be relied on by the next one. */
+ * reads them back. A cache folder keeps encodes across cooks (C4) and cook jobs (SF21, `encodeCache.ts`): its key covers
+ * the tier, the settings, the role and the cook version, and a hit is used only when it is a whole KTX2. */
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
-import {createHash} from 'node:crypto';
-// oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
-import {existsSync, mkdirSync, readFileSync, renameSync, utimesSync, writeFileSync} from 'node:fs';
+import {mkdirSync, readFileSync, renameSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {createRequire} from 'node:module';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
@@ -22,12 +20,14 @@ import {availableParallelism} from 'node:os';
 import {join} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {Worker} from 'node:worker_threads';
+import {encodeCacheDir, encodeKey, readKeptKtx2} from './encodeCache.ts';
 import {encodeBudget, runLanes} from './encodeLanes.ts';
 import type {Astc6Encode, TextureRole} from './tierTextures';
 
 /** The vendored build; a new build is a new cache key. */
 export const BASISU_WASM_BUILD = '32c7b74';
-const KEY_PREFIX = `astc6-wasm/1|${BASISU_WASM_BUILD}|ASTC_LDR_6x6 effort 4|`;
+/** SF21: every key names the encoder and its tier, the build and the settings (`encodeCache.ts` adds the cook version). */
+const KEY_PARTS = ['astc6-wasm/2', 'phone', BASISU_WASM_BUILD, 'ASTC_LDR_6x6 effort 4'] as const;
 const MAX_LANES = 6;
 /** A 6x6 encode's heap per texel of its top level (measured 2026-11-26: a 2048 grew a heap by about 1.9 GB). */
 const ASTC6_HEAP_PER_TEXEL = 470, HEAP_FLOOR = 32 << 20;
@@ -116,24 +116,12 @@ export interface WasmAstc6 {
 /** The cook's 6×6 encoder: `lanes` worker threads for `flush`, this thread for anything `flush` didn't see. */
 export async function wasmAstc6(options: {readonly cacheDir?: string; readonly lanes?: number} = {}): Promise<WasmAstc6> {
   // Each lane holds its own WebAssembly heap; six keep a cook well inside the job's resident limit.
-  const {cacheDir} = options, lanes = Math.max(1, Math.min(MAX_LANES, options.lanes ?? availableParallelism() - 2));
+  const cacheDir = encodeCacheDir(options.cacheDir), lanes = Math.max(1, Math.min(MAX_LANES, options.lanes ?? availableParallelism() - 2));
   if (cacheDir !== undefined) mkdirSync(cacheDir, {recursive: true});
   const stats = {encoded: 0, reused: 0, failed: 0};
-  const keyOf = (ktx2: Uint8Array, role: TextureRole): string => createHash('sha256').update(`${KEY_PREFIX}${role}|`).update(ktx2).digest('hex');
+  const keyOf = (ktx2: Uint8Array, role: TextureRole): string => encodeKey([...KEY_PARTS, role], ktx2);
   const done = new Map<string, Uint8Array | null>(), pending = new Map<string, {bytes: Uint8Array; role: TextureRole}>();
-  const stored = (key: string): Uint8Array | undefined => {
-    if (cacheDir === undefined) return undefined;
-    const path = join(cacheDir, `${key}.ktx2`);
-    if (!existsSync(path)) return undefined;
-    // A hit marks the file in use, so CI's cache keeps only what its builds read (ci.yml prunes by age).
-    try {
-      const now = new Date();
-      utimesSync(path, now, now);
-    } catch {
-      // A read-only cache still serves.
-    }
-    return new Uint8Array(readFileSync(path));
-  };
+  const stored = (key: string): Uint8Array | undefined => cacheDir === undefined ? undefined : readKeptKtx2(join(cacheDir, `${key}.ktx2`));
   const keep = (key: string, out: Uint8Array | undefined): void => {
     done.set(key, out ?? null);
     if (out === undefined) { stats.failed++; return; }
@@ -153,7 +141,10 @@ export async function wasmAstc6(options: {readonly cacheDir?: string; readonly l
   };
   const record: Astc6Encode = (ktx2, role) => {
     const key = keyOf(ktx2, role);
-    if (!done.has(key) && stored(key) === undefined) pending.set(key, {bytes: new Uint8Array(ktx2), role});
+    if (done.has(key)) return ktx2;
+    const hit = stored(key);
+    if (hit === undefined) pending.set(key, {bytes: new Uint8Array(ktx2), role});
+    else { stats.reused++; done.set(key, hit); }
     return ktx2;
   };
   const flush = async (): Promise<void> => {
