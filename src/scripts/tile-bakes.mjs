@@ -1,8 +1,11 @@
 // @ts-check
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import * as v from 'valibot';
+import { cookedFileCost } from './cooked-image-cost.mjs';
 import { outputFormat } from './node-format.mjs';
 import { parseTileBakePolicy, TILE_BAKE_POLICY } from './tile-bake-policy.mjs';
 
@@ -26,13 +29,39 @@ const sum = rows => rows.reduce((total, row) => {
 /** Inspect every lattice coordinate and every full interior 5x5 window. Costs are
  * declarations, not a live-memory claim. Shared file dependencies are counted once
  * in each window's separate closure census; row caps retain their existing law.
+ * SF20 (J525): `cooked` gives a file's cost once the cook has made its KTX2 (`cookedFileCost`); a tile is charged its
+ * declared cost moved by each closure file's cooked difference, so a PNG counts as the KTX2 the runtime reads.
  * @param {import('@wildshard/format/shardSchema').Shardfile['tiles']} input
- * @param {readonly {hash:string,commons?:true,dependencies:readonly string[],decoded:number,gpu:number,compressed:number,triangles:number,draws:number}[]} files */
-export function tileBakeCensus(input, files) {
+ * @param {readonly {hash:string,commons?:true,kind?:string,dependencies:readonly string[],decoded:number,gpu:number,compressed:number,triangles:number,draws:number}[]} files
+ * @param {(file: {hash:string,commons?:true,kind?:string,decoded:number,gpu:number,compressed:number}) => {decoded:number,gpu:number,compressed:number}|undefined} [cooked] */
+export function tileBakeCensus(input, files, cooked) {
   const tiles = v.parse(TilesSchema, input), addresses = new Set(), windows = [];
   /** @type {Record<string,number>} */
   const debt = {};
-  const inventory = new Map(files.map(file => [`${file.commons === true ? 'commons:' : ''}${file.hash}`, file]));
+  /** @type {Map<string, (typeof files)[number]>} */
+  const inventory = new Map();
+  /** @type {Map<string, {resident:number,compressed:number}>} */
+  const shift = new Map();
+  for (const file of files) {
+    const ref = `${file.commons === true ? 'commons:' : ''}${file.hash}`, next = cooked?.(file);
+    inventory.set(ref, next === undefined ? file : { ...file, ...next });
+    if (next !== undefined) shift.set(ref, { resident: next.decoded + next.gpu - file.decoded - file.gpu, compressed: next.compressed - file.compressed });
+  }
+  /** A tile's declared cost moved by its closure's cooked differences.
+   * @param {{files:readonly string[],decoded:number,gpu:number,compressed:number,triangles:number,draws:number}} tile */
+  const charged = tile => {
+    const own = cost(tile);
+    if (shift.size === 0) return own;
+    const seen = new Set(), pending = [...tile.files];
+    while (pending.length > 0) {
+      const ref = pending.pop();
+      if (ref === undefined || seen.has(ref)) continue;
+      seen.add(ref); pending.push(...(inventory.get(ref)?.dependencies ?? []));
+      const move = shift.get(ref);
+      if (move !== undefined) { own.resident += move.resident; own.compressed += move.compressed; }
+    }
+    return own;
+  };
   /** @param {readonly string[]} roots */
   const closure = roots => {
     const seen = new Set(), pending = [...roots], costs = [];
@@ -56,7 +85,7 @@ export function tileBakeCensus(input, files) {
     if (tile.bounds.min[0] !== -250 + tile.x * width || tile.bounds.max[0] !== -250 + (tile.x + 1) * width
       || tile.bounds.min[2] !== -250 + tile.z * width || tile.bounds.max[2] !== -250 + (tile.z + 1) * width) throw new Error(`Tile bounds differ from lattice: ${key}`);
     closure(tile.files);
-    check(`tile/${key}`, cost(tile), tile.lod === 0 ? caps.l0 : caps.l1);
+    check(`tile/${key}`, charged(tile), tile.lod === 0 ? caps.l0 : caps.l1);
   }
   for (const lod of [0, 1]) for (let x = 0; x < (lod === 0 ? 8 : 4); x++) for (let z = 0; z < (lod === 0 ? 8 : 4); z++) {
     const key = `${lod}/${x}/${z}`;
@@ -64,7 +93,7 @@ export function tileBakeCensus(input, files) {
   }
   for (let x = 2; x <= 5; x++) for (let z = 2; z <= 5; z++) {
     const rows = tiles.filter(tile => tile.lod === 0 && Math.abs(tile.x - x) <= 2 && Math.abs(tile.z - z) <= 2);
-    const declared = sum(rows.map(cost)), unique = closure(rows.flatMap(tile => tile.files));
+    const declared = sum(rows.map(charged)), unique = closure(rows.flatMap(tile => tile.files));
     check(`window/${x}/${z}`, declared, { resident: 25 * caps.l0.resident, compressed: 25 * caps.l0.compressed,
       triangles: 25 * caps.l0.triangles, draws: 25 * caps.l0.draws });
     windows.push({ x, z, tiles: rows.length, declared, unique });
@@ -72,10 +101,24 @@ export function tileBakeCensus(input, files) {
   return { l0: tiles.filter(tile => tile.lod === 0).length, l1: tiles.filter(tile => tile.lod === 1).length, debt, windows };
 }
 
+/** SF20: the cook's KTX2 size of each image in a built product, measured by the cook's own encoder in a child (it is
+ * TypeScript and asynchronous; this census is neither), its encodes cached by input hash across builds and cooks.
+ * @param {string} folder @returns {import('./cooked-image-cost.mjs').Ktx2Bytes} */
+export function measuredKtx2Bytes(folder) {
+  /** @type {{files: {kind?: string}[]}} */
+  const index = JSON.parse(readFileSync(resolve(folder, 'shard.json'), 'utf8'));
+  if (!index.files.some(file => file.kind === 'image' || file.kind === 'glb')) return () => undefined;
+  const loader = fileURLToPath(new URL('./bake-loader.mjs', import.meta.url)), script = fileURLToPath(new URL('./cooked-ktx2-sizes.ts', import.meta.url));
+  /** @type {Record<string, number>} */
+  const sizes = JSON.parse(execFileSync(process.execPath, ['--import', loader, script, folder], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'inherit'] }));
+  return image => sizes[hash(image)];
+}
+
 /** Verify the exact product envelope and tile bytes before applying bake policy.
- * No producer, build, cache mutation or live readiness latch is invoked.
- * @param {string} folder @param {string} product */
-export function readTileBakeCensus(folder, product) {
+ * No producer, build, cache mutation or live readiness latch is invoked. `ktx2Bytes` is the cook's encoder, measured
+ * (SF20): with it an image's download is its cooked KTX2's; without it, the image's own bytes.
+ * @param {string} folder @param {string} product @param {import('./cooked-image-cost.mjs').Ktx2Bytes} [ktx2Bytes] */
+export function readTileBakeCensus(folder, product, ktx2Bytes) {
   const bytes = readFileSync(resolve(folder, 'shard.json')), index = outputFormat.parseOutputIndex(JSON.parse(bytes.toString('utf8')));
   if (index.identity.slug !== product) throw new Error(`${product}: tile product identity differs`);
   const receipt = JSON.parse(readFileSync(resolve(folder, 'validation.json'), 'utf8'));
@@ -85,15 +128,27 @@ export function readTileBakeCensus(folder, product) {
   const wire = readFileSync(resolve(folder, section.path));
   if (wire.length !== section.bytes || hash(wire) !== section.hash) throw new Error(`${product}: tile section hash/size differs`);
   const rows = outputFormat.parseOutputSection(section.name, JSON.parse(wire.toString('utf8')));
-  return tileBakeCensus(v.parse(TilesSchema, Reflect.get(rows, 'tiles')), index.files);
+  // SF20: an image, or a GLB holding images, counts as the KTX2 the cook makes of it; its bytes must be the ones named.
+  /** @param {{hash:string,commons?:true,kind?:string,decoded:number,gpu:number,compressed:number}} file */
+  const cooked = file => {
+    const path = Reflect.get(file, 'path');
+    if ((file.kind !== 'image' && file.kind !== 'glb') || file.commons === true || typeof path !== 'string') return undefined;
+    const at = resolve(folder, path);
+    if (!existsSync(at)) return undefined;
+    const body = readFileSync(at);
+    if (hash(body) !== file.hash) throw new Error(`${product}: tile file ${file.hash} bytes differ`);
+    return cookedFileCost(file, new Uint8Array(body.buffer, body.byteOffset, body.byteLength), ktx2Bytes);
+  };
+  return tileBakeCensus(v.parse(TilesSchema, Reflect.get(rows, 'tiles')), index.files, cooked);
 }
 
-/** A normal build or reuse cannot introduce new/more costly debt. Existing
+/** A normal build or reuse cannot introduce new/more costly debt; an image counts as the KTX2 the cook makes of it,
+ * measured by the cook's encoder unless the caller passes its own (SF20). Existing
  * exceptions are exact product/coordinate/metric rows, never whole-shard waivers.
- * @param {string} root @param {string} product @param {string} folder */
-export function checkTileBake(root, product, folder) {
+ * @param {string} root @param {string} product @param {string} folder @param {import('./cooked-image-cost.mjs').Ktx2Bytes} [ktx2Bytes] */
+export function checkTileBake(root, product, folder, ktx2Bytes = measuredKtx2Bytes(folder)) {
   const policy = parseTileBakePolicy(JSON.parse(readFileSync(resolve(root, TILE_BAKE_POLICY), 'utf8')));
-  const census = readTileBakeCensus(folder, product), allowed = policy.products[product] ?? {};
+  const census = readTileBakeCensus(folder, product, ktx2Bytes), allowed = policy.products[product] ?? {};
   const failures = Object.entries(census.debt).filter(([key, value]) => value > (allowed[key] ?? 0));
   if (failures.length > 0) throw new Error(`${product}: tile bake refused: ${failures.map(([key, value]) => `${key} ${value} > ${allowed[key] ?? 0}`).join('; ')}`);
   return census;
