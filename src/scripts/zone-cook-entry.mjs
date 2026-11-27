@@ -64,7 +64,10 @@ const engineList=existsSync(join(root,'src/scripts/public-engine.json'))?new Set
 const zoneArt=path=>{
   const file=path.replace(/-[0-9a-f]{16}(\.[a-z0-9]+)$/u,'$1');
   if(file.startsWith('/assets/title/')||!existsSync(join(tree,'public',file))||!statSync(join(tree,'public',file)).isFile()||!isArt(file.slice(1)))return false;
-  return named.has(file)||file.includes(slug)||(engineList!==undefined&&!engineList.has(file.slice(1)));
+  // SF5d: a file on SF1's engine list stays when SF12 cuts public/ (the water's baked ripples), even where a zone's cook
+  // record names it: Pine Hollow's cook.json reads /assets/baked/common/water-ripples.bin
+  if(engineList?.has(file.slice(1)))return false;
+  return named.has(file)||file.includes(slug)||engineList!==undefined;
 };
 
 const live=readJson(join(root,'test/pins/catalogue.json'));
