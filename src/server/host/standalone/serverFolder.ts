@@ -1,3 +1,4 @@
+import type {CookedPartMember} from '@wildshard/engine/boot/tables';
 import type { Rapier } from '@wildshard/engine/physics/rapier';
 import { bootTask, bootProgress, bootTiming } from '@wildshard/engine/boot/timing';
 import { adoptBuffer } from '@wildshard/engine/core/ownedBuffer';
@@ -10,7 +11,7 @@ import { carryOutputDescriptor, isBuildValidatedOutput, outputDescriptor, resolv
 import { serverReadsFile } from '@wildshard/format/serverReads';
 import { shardFolderData } from '@wildshard/engine/game/shardfile/folderData';
 import { GRID_COLLISION_BODY, GRID_COLLISION_HEADER, readGridCollision, type GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
-import { COOKED_ORIGIN, cookedIndexKey, cookedObjectKey, readCookedIndexAddress, type CookedShardRef } from '@wildshard/engine/game/shardfile/cookedPackPaths';
+import { checkedCookedMember, COOKED_ORIGIN, cookedIndexKey, cookedObjectKey, readCookedIndexAddress, type CookedShardRef } from '@wildshard/engine/game/shardfile/cookedPackPaths';
 import { cookIndexPath, readCookedServerIndex, readServerPack, readServerPackBook, serverPackBookPath, serverPackFile, serverPackPart, type ServerPack, type ServerPackBook, type ServerPackPart } from '@wildshard/engine/game/shardfile/serverPack';
 import type { HeadlessRuntimeInput } from '../headlessRuntime';
 import type { HeldRead } from '../../../shared/host/standalone/heldReads';
@@ -24,6 +25,10 @@ const cookedObjects = new Map<string, string>();
 export function installWorkerCookedObjects(rows: readonly (readonly [string, string])[]): void {
   for (const [path, url] of rows) if (typeof path === 'string' && typeof url === 'string' && /^https?:\/\//u.test(url) && !cookedObjects.has(path)) cookedObjects.set(path, url);
 }
+const cookedMembers = new Map<string, CookedPartMember>();
+export function installWorkerCookedMembers(rows: readonly (readonly [string, CookedPartMember])[]): void {
+  for (const [path, member] of rows) if (!cookedMembers.has(path)) cookedMembers.set(path, member);
+}
 /** A page-origin URL a cooked zone maps, read where the cook stored it; anything else as is. */
 const cookedURL = (url: URL): URL => {
   const at = url.origin === globalThis.location.origin ? cookedObjects.get(url.pathname) : undefined;
@@ -33,8 +38,16 @@ const cookedURL = (url: URL): URL => {
 export type ServerRead = (url: URL, path: string, hash?: string) => Promise<Uint8Array>;
 /** The network's answer, or offline what the device holds: a level the player has been to boots with no link. Every byte is verified after this. */
 async function serverBytes(url: URL, path: string): Promise<Uint8Array> {
-  const response = await bootTask(`server:fetch-headers:${path}`, () => fetch(cookedURL(url))).catch(() => undefined);
-  const usable = response?.ok === true ? response : await heldBytes(url);
+  const member = url.origin === globalThis.location.origin ? cookedMembers.get(url.pathname) : undefined;
+  if (member !== undefined) {
+    const part = new URL(member.part);
+    return checkedCookedMember(await serverObjectBytes(part, member.part, part), member);
+  }
+  return serverObjectBytes(cookedURL(url), path, url);
+}
+async function serverObjectBytes(url: URL, path: string, held: URL): Promise<Uint8Array> {
+  const response = await bootTask(`server:fetch-headers:${path}`, () => fetch(url)).catch(() => undefined);
+  const usable = response?.ok === true ? response : (await heldBytes(url) ?? await heldBytes(held));
   if (usable === undefined) throw new Error(`Missing server input ${path}`);
   const body = usable.body;
   if (body === null || bootTiming() === undefined) return new Uint8Array(await usable.arrayBuffer());

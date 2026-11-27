@@ -188,7 +188,7 @@ export async function runCookJob(tarball: Uint8Array, out: string, ports: CookJo
   const proof = check.proof === 'refused' ? 'unmeasured' : check.proof;
   const client = join(out, 'client');
   const renderer = ports.renderer === undefined ? {} : {renderer: ports.renderer};
-  const cook = await cookShard(cooked, client, {wireBytes: ports.wireBytes, now: ports.now, onPhase: phase, ...renderer, ...(ports.encoder === undefined ? {} : {encoder: ports.encoder}), ...(ports.warn === undefined ? {} : {warn: ports.warn}), ...(ports.sidecar === undefined ? {} : {sidecar: ports.sidecar})});
+  const cook = await cookShard(cooked, client, {wireBytes: ports.wireBytes, now: ports.now, onPhase: phase, ...renderer, ...(ports.versionedOutput === true ? {versionedOutput: true} : {}), ...(ports.encoder === undefined ? {} : {encoder: ports.encoder}), ...(ports.warn === undefined ? {} : {warn: ports.warn}), ...(ports.sidecar === undefined ? {} : {sidecar: ports.sidecar})});
   phase('server-files');
   // Each manifest names the header at its product URL, and no part holds it (DL18); its `?v=` is what caches it.
   const shard = openShardfile(cooked, renderer), header = `shardfiles/${shard.slug}/shard.json`, file = join(client, header);
@@ -205,7 +205,7 @@ export async function runCookJob(tarball: Uint8Array, out: string, ports: CookJo
   }
   const raw = ports.versionedOutput === true ? readTar(tarball) : undefined;
   const objects = raw === undefined ? undefined
-    : classifyCookObjects(raw, out, shard.slug, cook.manifests.map(row => row.url), cook.server.index, shard.cook?.mounts ?? []);
+    : classifyCookObjects(raw, out, shard.slug, cook.manifests.map(row => row.url), cook.server.index, shard.cook?.mounts ?? [], shard.read);
   return {slug: product.index.identity.slug, hash: sha256(tarball), proof, check, cook, header, server: writeServerPack(shard, join(out, 'server')), seconds: (ports.now() - started) / 1000,
     ...(receipt === undefined ? {} : {receipt}), ...(provenance === undefined ? {} : {provenance}),
     ...(objects === undefined ? {} : {objects}), ...(rawShardVersion === undefined ? {} : {rawShardVersion})};

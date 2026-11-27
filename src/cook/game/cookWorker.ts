@@ -742,7 +742,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     parkServer(work, report.slug, head.hash);
     try {
       await publishCooked({store: versioned.store, headers: objectHeaders, parallel, reserve: objects => reserveVersioned(versioned, objects)},
-        ref, indexOf(report, head.hash, []), cookOutputDigest(out), out, files);
+        ref, indexOf(report, head.hash, []), cookOutputDigest(out), out, files, report.objects.members);
     } catch (error) {
       versionedUsage = undefined;
       throw error;

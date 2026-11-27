@@ -1,3 +1,4 @@
+import type {CookedPartMember} from '@wildshard/engine/boot/tables';
 // oxlint-disable-next-line import/no-unassigned-import -- The sim's Math goes in before any module body runs.
 import '@wildshard/engine/core/portableMathFirst';
 import { loadRapier, type Rapier } from '@wildshard/engine/physics/rapier';
@@ -6,7 +7,7 @@ import { RAPIER_WASM_URL } from '@wildshard/engine/physics/wasmUrl';
 import { isWasmModule } from '@wildshard/engine/physics/rapierModule';
 import { askHeldReads, type HeldRead } from '../../../shared/host/standalone/heldReads';
 import { runStandaloneServer } from './serverHost';
-import { fetchGridCollision, fetchServerFolder, installWorkerCookedObjects } from './serverFolder';
+import { fetchGridCollision, fetchServerFolder, installWorkerCookedMembers, installWorkerCookedObjects } from './serverFolder';
 import { bootMark, bootTask } from '@wildshard/engine/boot/timing';
 import { warmRapier } from '@wildshard/engine/physics/rapierWarm';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
@@ -28,6 +29,7 @@ export interface ServerWorkerStart {
   /** Fix preview PV4: the page's cooked object table (page path, cooked URL), so the server reads a zone's files where the cook
    *  stored them, as the page does; empty on a page with no zone table. */
   readonly cooked?: readonly (readonly [string, string])[] | null;
+  readonly cookedMembers?: readonly (readonly [string, CookedPartMember])[];
 }
 
 /** Launch only on the first save. Rapier's detached snapshot bytes cross the port by transfer. */
@@ -105,6 +107,7 @@ export function runServerWorker(event: MessageEvent<unknown>): void {
   const start = event.data as ServerWorkerStart;
   if (start.catalogue !== null) installCatalogue(start.catalogue);
   if (Array.isArray(start.cooked)) installWorkerCookedObjects(start.cooked);
+  if (start.cookedMembers !== undefined) installWorkerCookedMembers(start.cookedMembers);
   // The bare names `@wildshard/format/validationReceipt` reads: this worker's bundle leaves them to its realm.
   if (typeof start.validator === 'string' && Array.isArray(start.verdicts)) Object.assign(globalThis, { __SHARDFILE_VALIDATOR__: start.validator, __SHARDFILE_VERDICTS__: start.verdicts });
   const [control, game, harness, reads] = event.ports;

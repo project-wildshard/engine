@@ -15,6 +15,14 @@ export interface PackPart { readonly url: string; readonly bytes: number; readon
 /** a level's boot pack for one tier, in content-addressed parts (src/client/engine/boot/pack.ts) */
 export interface PackDef { readonly parts: readonly PackPart[]; readonly bytes: number; readonly files: readonly PackFile[] }
 
+/** A byte-verified file held at an offset inside a cooked part. */
+export interface CookedPartMember {
+  readonly part: string;
+  readonly offset: number;
+  readonly bytes: number;
+  readonly hash: string;
+}
+
 export interface AssetTables {
   /** every file under public/assets: URL path → bytes */
   readonly bytes: Readonly<Record<string, number>>;

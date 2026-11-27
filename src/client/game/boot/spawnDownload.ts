@@ -1,3 +1,5 @@
+import type {CookedPartMember} from '@wildshard/engine/boot/tables';
+import {checkedCookedMember} from '../../../shared/game/shardfile/cookedPackPaths';
 import {joinSpawnManifest, packsBookPath, readSpawnCodeList, readSpawnManifest, readSpawnManifestAddress, type SpawnManifest, type SpawnManifestAddress, type SpawnPart} from '../../../shared/game/shardfile/spawnManifest';
 import {assetCacheName} from '@wildshard/engine/pwa/cacheNames';
 import {jsonSlot} from '@wildshard/engine/saves/slots';
@@ -6,7 +8,7 @@ import { beginLoadingWait, finishLoadingWait } from '@wildshard/engine/boot/load
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { Scope } from '@wildshard/engine/app/scope';
 import { clearFailure, showFailure } from '@wildshard/engine/telemetry/runtime';
-import {bootBankText, contentBase, contentURL, cookedObjectURL, isContentOrigin, pageURL} from '@wildshard/engine/boot/contentBase';
+import {bootBankText, contentBase, contentURL, cookedMember, cookedObjectURL, isContentOrigin, pageURL} from '@wildshard/engine/boot/contentBase';
 import { clearDownloadGiveUp, noteDownloadGiveUp } from '@wildshard/engine/boot/downloadGiveUp';
 import { readByDefault, scratchReader } from '@wildshard/engine/boot/scratchReader';
 import { lentResponse, loadGc } from '@wildshard/engine/boot/lentBody';
@@ -203,7 +205,13 @@ function installMemberLayer(): boolean {
     if (method !== 'GET' || own) return network(input, init);
     // PZ13: a read of the content base's copy stands for its page URL, whatever folder the base has
     const url = new URL(pageURL(new URL(input instanceof Request ? input.url : input instanceof URL ? input.href : input, location.href).href), location.href);
-    if (!isContentOrigin(url.origin) || !url.pathname.startsWith('/shardfiles/')) return network(input, init);
+    if (!isContentOrigin(url.origin)) return network(input, init);
+    const member = cookedMember(url.pathname);
+    if (member !== undefined) {
+      return readCookedResponse(url, member, native(member.part, {credentials: 'omit',
+        ...(signal === undefined || signal === null ? {} : {signal}), ...(cache === undefined ? {} : {cache})}));
+    }
+    if (!url.pathname.startsWith('/shardfiles/')) return network(input, init);
     const held = await heldPartMember(url);
     if (held !== null) return held;
     // SA48: a slug placed after the build keeps its loose files (its header, DL18) in the cook's store, under its upload
@@ -233,7 +241,7 @@ let partTier: 'phone' | 'desktop' = 'phone';
 async function partTable(slug: string): Promise<PartMembers | null> {
   const selected = spawnSelection(slug, 'client', partTier, '000');
   if (selected === null || typeof selected.cacheName !== 'string' || typeof caches === 'undefined') return null;
-  const address = packsSelection(await readPacksBook(), slug, 'client', partTier, '000');
+  const address = await packsSelection(slug, 'client', partTier, '000');
   if (address === null) return null;
   const [response, code] = await Promise.all([downloadFetch()(onPacks(address.url, selected.base)),
     address.code === undefined ? undefined : downloadFetch()(contentURL(new URL(address.code.url, document.baseURI).href))]);
@@ -297,6 +305,12 @@ function readMembersOf(part: SpawnPart, table: PartMembers): Promise<PartFallbac
 function memberResponse(url: URL, bytes: Uint8Array<ArrayBuffer>): Response {
   if (loadGc()) return lentResponse(bytes.slice(), typeOf(url.pathname)); // IP31: one copy, the reader's
   return new Response(bytes, { headers: { 'content-type': typeOf(url.pathname), 'content-length': String(bytes.byteLength) } });
+}
+async function readCookedResponse(url: URL, member: CookedPartMember, pending: Promise<Response>): Promise<Response> {
+  const response = await pending;
+  if (!response.ok) return response;
+  const part = adoptBuffer(await response.arrayBuffer(), {owner: 'cooked-member', asset: member.part, kind: 'wire'});
+  return memberResponse(url, await checkedCookedMember(new Uint8Array(part, 0, part.byteLength), member));
 }
 async function heldPartMember(url: URL): Promise<Response | null> {
   const memory = memoryPartMembers.get(url.pathname);
@@ -670,6 +684,8 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
                 // this manifest lives beside its parts, including authored mounts.
                 // PZ3: on the content base only content moves; code and rapier stay with the page (a J138 home holds all of it).
                 const source = new URL(url), page = new URL(base);
+                const member = source.origin === page.origin ? cookedMember(source.pathname) : undefined;
+                if (member !== undefined) return readCookedResponse(source, member, ports.fetch(member.part, signal));
                 // SA48: a slug placed after the build reads its loose files from its upload's own folder in the store
                 const target = source.origin !== page.origin ? url : cookedObjectURL(source.pathname, source.search) ?? manifestLoose(source.pathname, source.search, manifest.shard) ?? (packs === contentBase() ? contentURL(url)
                   : new URL(source.pathname + source.search, packs).href);
@@ -927,9 +943,9 @@ function bookSelection(book: unknown, slug: string, flow: 'client' | 'grid', tie
   return pair === undefined ? null : readSpawnManifestAddress(pair);
 }
 /** The packs book's row, or SA48's whole-level row for a slug placed after the build (`placedSpawn.ts`): the book never has one. */
-function packsSelection(book: unknown, slug: string, flow: 'client' | 'grid', tier: 'phone' | 'desktop', mode: string): SpawnManifestAddress | null {
+async function packsSelection(slug: string, flow: 'client' | 'grid', tier: 'phone' | 'desktop', mode: string): Promise<SpawnManifestAddress | null> {
   // NB2 (J494): an installed rooms' copy wins over the build's own row
-  return placedSpawn(slug)?.whole[tier] ?? bookSelection(book, slug, flow, tier, mode);
+  return placedSpawn(slug)?.whole[tier] ?? bookSelection(await readPacksBook(), slug, flow, tier, mode);
 }
 /** A book's page path (`/assets/spawn/…`) on the packs base. The content base mirrors page paths under its own folder (PZ13:
  * `content/<set>/`), so a path keeps that folder; a J138 home or the page resolves it as a URL path, as it always did. */
@@ -1092,7 +1108,7 @@ export async function spawnHeld(slug: string, flow: 'client' | 'grid', tier: 'ph
   if (typeof caches === 'undefined') return false;
   try {
     const selected = spawnSelection(slug, flow, tier, mode); if (selected === null) return false;
-    const address = packsOn ? packsSelection(await readPacksBook(), slug, flow, tier, mode) : selected.address;
+    const address = packsOn ? await packsSelection(slug, flow, tier, mode) : selected.address;
     if (address === null) return false;
     const held = await caches.match(onPacks(address.url, selected.base), {ignoreVary: true});
     if (held === undefined || !held.ok) return false;
@@ -1200,7 +1216,7 @@ function spawnDownload(slug: string, flow: 'client' | 'grid', tier: 'phone' | 'd
   // reports it complete, which would break the whole-level rule (sp-x9's review of 40bc516d5c).
   const download = !packsOn ? downloadSpawnManifest(selected.address, downloadPorts(selected.cacheName, false), document.baseURI, selected.base, bareSlug(slug))
     : lateDownload(async signal => {
-      const address = packsSelection(await readPacksBook(), slug, flow, tier, mode);
+      const address = await packsSelection(slug, flow, tier, mode);
       signal.throwIfAborted();
       if (address === null) throw new Error(`Packs book has no ${flow} entry for ${slug} (${tier}, ${mode})`);
       if (address.url === selected.address.url) throw new Error('Packs book names the default manifest');

@@ -1,17 +1,23 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The test owns a small folder store.
-import {mkdirSync, writeFileSync, readFileSync, rmSync, mkdtempSync} from 'node:fs';
+import {mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync, mkdtempSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- The tests stage files in one folder of their own.
 import {join, dirname, resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Compare the exact bytes in the shardfile, not their names.
 import {createHash} from 'node:crypto';
+// oxlint-disable-next-line import/no-nodejs-modules -- Compare the bytes inside real cooked parts with loose files.
+import {brotliDecompressSync} from 'node:zlib';
 import {afterAll, expect, test, vi} from 'vitest';
 import {folderStore} from '../src/cook/game/packStore';
+import {folderTarball} from '../src/cook/game/folderTarball';
+import {runCookJob} from '../src/cook/game/cookJob';
+import {checkShardfile} from '../src/server/host/checkShardfile';
+import {readServerPack} from '../src/shared/game/shardfile/serverPack';
 import {publishCooked, readVersionedCook, verifyCookReuse} from '../src/cook/game/publishCooked';
 import {sourceOnlyParts} from '../src/cook/game/cookObjectProvenance';
 import type {CookIndex} from '../src/cook/game/cookWorker';
-import {cookedIndexKey, cookedObjectKey} from '../src/shared/game/shardfile/cookedPackPaths';
+import {checkedCookedMember, cookedIndexKey, cookedObjectKey} from '../src/shared/game/shardfile/cookedPackPaths';
 import {releaseCookedPack} from '../src/server/host/dedicated/packReader';
-import type {SpawnManifest} from '../src/shared/game/shardfile/spawnManifest';
+import {readSpawnManifest, type SpawnManifest} from '../src/shared/game/shardfile/spawnManifest';
 import {legacyDouble} from '@wildshard/engine/test/FakeGame';
 
 const scratch = resolve('tmp/codex-cookkeys');
@@ -82,4 +88,42 @@ test('a room reads the signed cook address and accepts the placement version for
   const advanced = {hash: 'e'.repeat(64), shardVersion: '0.3.0-candidate.1'};
   expect(releaseCookedPack(release, identity.slug, advanced)).toEqual({ref: {...identity, shardVersion: advanced.shardVersion}, hash: advanced.hash});
   expect(() => releaseCookedPack(release, identity.slug, {hash: advanced.hash})).toThrow('Signed cook address is incomplete');
+});
+
+test('a versioned cook stores no loose bytes that already belong to a client or server part', {timeout: 120_000}, async () => {
+  const out = join(root, 'single-copy'), client = join(out, 'client');
+  const report = await runCookJob(folderTarball(resolve('test/fixtures/made-up-old')), out, {
+    check: (shard, assets, sections) => checkShardfile(shard, assets, {sections}),
+    versionedOutput: true, wireBytes: (_url, bytes) => bytes.length, now: () => 0,
+  });
+  const packed = new Set<string>(), parts = new Set<string>();
+  const partBody = (url: string): Buffer => {
+    const file = join(client, url.slice(1)); parts.add(file);
+    return brotliDecompressSync(readFileSync(file));
+  };
+  for (const row of report.cook.manifests) {
+    const manifest = readSpawnManifest(JSON.parse(readFileSync(join(client, row.url.slice(1)), 'utf8')));
+    for (const part of manifest.parts ?? []) {
+      const bytes = partBody(part.url);
+      for (const [index, offset] of part.members) {
+        const file = manifest.files[index];
+        if (file === undefined) throw new Error('Missing part member');
+        packed.add(digest(bytes.subarray(offset, offset + file.bytes)));
+      }
+    }
+  }
+  const server = readServerPack(JSON.parse(readFileSync(join(client, report.cook.server.index.slice(1)), 'utf8')));
+  for (const part of [server, ...server.more ?? []]) {
+    const bytes = partBody(part.url);
+    for (const [, offset, size] of part.files) packed.add(digest(bytes.subarray(offset, offset + size)));
+  }
+  for (const dirent of readdirSync(client, {recursive: true, withFileTypes: true})) {
+    const path = join(dirent.parentPath, dirent.name);
+    if (dirent.isFile() && !parts.has(path)) expect(packed.has(digest(readFileSync(path))), path).toBe(false);
+  }
+  const alias = report.objects?.members?.[report.header];
+  expect(alias).toBeDefined();
+  if (alias === undefined) throw new Error('The unchanged header should use its server part');
+  expect(JSON.parse(new TextDecoder().decode(await checkedCookedMember(partBody(`/${alias.part}`), alias))))
+    .toMatchObject({identity: {slug: report.slug}});
 });

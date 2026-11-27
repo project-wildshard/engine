@@ -6,6 +6,9 @@
 import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Confine the scratch root to this checkout.
 import {join, resolve} from 'node:path';
+// oxlint-disable-next-line import/no-nodejs-modules -- Lay out a compressed cooked part like the real file store.
+import {brotliCompressSync} from 'node:zlib';
+import {contentHash} from '../src/shared/game/shardfile/contentHash.ts';
 import {afterEach, expect, test} from 'vitest';
 import {cookedFixture} from '../src/scripts/cooked-fixture.mjs';
 import {cookedReader} from '../src/scripts/cooked-reads.mjs';
@@ -46,4 +49,25 @@ test('a zone whose index is missing or is another cook\'s refuses the bake by na
   const index = join(dir, 'cooked', row.index);
   writeFileSync(index, JSON.stringify({...JSON.parse(readFileSync(index, 'utf8')), cookVersion: '2.0.0'}));
   await expect(cookedReader(table, {origin})).rejects.toThrow();
+});
+
+test('a packed road input is recovered from its part and verified before use', async () => {
+  const dir = root(), bucket = join(dir, 'cooked'), {table, origin} = cookedFixture(dir, bucket, {slugs: ['isle-one']});
+  const [row] = table.zones;
+  if (row === undefined) throw new Error('no zone');
+  const file = join(bucket, row.index), index = JSON.parse(readFileSync(file, 'utf8')) as {objects: Record<string, string>};
+  const logical = 'shardfiles/isle-one/sections/world-edge.json', part = 'assets/spawn/server/cooked.pack.br';
+  const originalKey = index.objects[logical];
+  if (originalKey === undefined) throw new Error('no edge');
+  const bytes = readFileSync(join(bucket, originalKey)), prefix = Buffer.from('padding');
+  const key = `shards/isle-one/${row.shardVersion}/common/cooked.pack.br`;
+  writeFileSync(join(bucket, key), brotliCompressSync(Buffer.concat([prefix, bytes])));
+  delete index.objects[logical];
+  index.objects[part] = key;
+  const address = {part, offset: prefix.length, bytes: bytes.length, hash: await contentHash(bytes)};
+  writeFileSync(file, JSON.stringify({...index, members: {[logical]: address}}));
+  const reader = await cookedReader(table, {origin});
+  expect(await (await reader.fetchFile(`/${logical}?v=1`)).text()).toBe(bytes.toString());
+  writeFileSync(join(bucket, key), brotliCompressSync(Buffer.concat([prefix, Buffer.alloc(bytes.length)])));
+  await expect(reader.fetchFile(`/${logical}`)).rejects.toThrow('Cooked member digest differs');
 });

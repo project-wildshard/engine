@@ -166,7 +166,7 @@ function learnCookedZonesOnce(): Promise<void> {
       const table = bakedZoneTable();
       if (table === undefined) return;
       const validator: unknown = Reflect.get(globalThis, '__WS_SHARDFILE_VALIDATOR__');
-      const answer = await bootTask('app:cooked-zones', () => learnCookedZones(table, { fetch, signal: new AbortController().signal,
+      const answer = await bootTask('app:cooked-zones', () => learnCookedZones(table, { fetch: (input, init) => fetch(input, init), signal: new AbortController().signal,
         validator: typeof validator === 'string' ? validator : null }));
       console.info(`[grid] cooked zones from ${table.from.channel} serial ${String(table.from.serial)}, cook ${table.cookVersion}: ${String(answer.installed.length)} installed${answer.missing.length === 0 ? '' : `, missing ${answer.missing.join(', ')}`}`);
     } catch (error) { console.warn('[grid] cooked zones not read:', error); }

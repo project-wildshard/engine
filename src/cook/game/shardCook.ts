@@ -447,6 +447,7 @@ export interface CookShardOptions {
   readonly encoder?: PartEncoder;
   readonly warn?: (line: string) => void;
   readonly onPhase?: (phase: CookShardPhase) => void;
+  readonly versionedOutput?: boolean;
   /** The renderer fingerprint to cook for; this engine's own unless a build names it. */
   readonly renderer?: string;
   /** S12b: per-tier texture files; `defaultCookTiers()` (the phone tier, 6×6) unless a cook names its own. `{}` turns them off. */
@@ -474,7 +475,11 @@ async function cookWith(tarball: Uint8Array, out: string, options: CookShardOpti
   const before = encoder.stats();
   const table = COOK_TIERS.flatMap(tier => COOK_SETS.map(set => ({tier, set, rows: [...half.folderRows(tier, set), ...half.mountRows(tier, set)]})));
   const whole = table.filter(row => row.set === 'whole');
-  const parts = await writeSpawnParts(out, whole.map(row => ({rows: row.rows, public: row.tier === 'phone'})), half.read, half.stableKey, encoder);
+  // The title needs the UI images' URLs before it has a fetch layer.
+  const ui = new Set(options.versionedOutput === true
+    ? half.shard.index.files.filter(row => row.name?.startsWith('ui/images/') === true).map(row => row.hash)
+    : []);
+  const parts = await writeSpawnParts(out, whole.map(row => ({rows: row.rows, public: row.tier === 'phone', looseHashes: ui})), half.read, half.stableKey, encoder);
   const after = encoder.stats(), manifests: CookReport['manifests'][number][] = [];
   mkdirSync(join(out, 'assets/spawn'), {recursive: true});
   for (const row of table) {

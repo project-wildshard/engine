@@ -4,7 +4,8 @@
 // is read at the object key the index maps it to. The origin is the cooked bucket, or a `file:` folder laid out like it (a local cook,
 // or `cooked-fixture.mjs`'s copy of the installed pins, for the byte-for-byte proof).
 import {readFile} from 'node:fs/promises';
-import {COOKED_ORIGIN, cookedObjectKey, readCookedIndexAddress} from '../shared/game/shardfile/cookedPackPaths.ts';
+import {brotliDecompressSync} from 'node:zlib';
+import {checkedCookedMember, COOKED_ORIGIN, cookedMemberAddresses, cookedObjectKey, readCookedIndexAddress} from '../shared/game/shardfile/cookedPackPaths.ts';
 import {zoneRef} from '../shared/game/grid/zoneTable.ts';
 import {agentFetch} from './agent-requests.mjs';
 
@@ -31,6 +32,7 @@ async function readObject(url) {
 export async function cookedReader(table, {origin = COOKED_ORIGIN} = {}) {
   const root = origin.endsWith('/') ? origin : `${origin}/`;
   /** @type {Map<string, string>} */ const objects = new Map();
+  /** @type {Map<string, import('../shared/engine/boot/tables.ts').CookedPartMember>} */ const members = new Map();
   /** @type {Map<string, string>} */ const headers = new Map();
   for (const row of table.zones) {
     const ref = zoneRef(table, row), body = await readObject(new URL(row.index, root).href);
@@ -38,6 +40,9 @@ export async function cookedReader(table, {origin = COOKED_ORIGIN} = {}) {
     const index = JSON.parse(new TextDecoder().decode(body)), address = readCookedIndexAddress(index);
     if (address.slug !== ref.slug || address.shardVersion !== ref.shardVersion || address.cookVersion !== ref.cookVersion || address.cookHash !== ref.cookHash) throw new Error(`${row.index} is not ${row.slug}'s index under the table's cook`);
     if (typeof index.header === 'string') headers.set(row.slug, `/${index.header}`);
+    for (const [path, member] of cookedMemberAddresses(address, key => new URL(key, root).href)) {
+      if (!members.has(path)) members.set(path, member);
+    }
     for (const path of Object.keys(address.objects)) {
       const key = cookedObjectKey(ref, address.objects, path);
       if (key !== undefined && !objects.has(`/${path}`)) objects.set(`/${path}`, new URL(key, root).href);
@@ -45,9 +50,17 @@ export async function cookedReader(table, {origin = COOKED_ORIGIN} = {}) {
   }
   return {
     fetchFile: async path => {
-      const url = new URL(path, 'https://build.invalid/'), at = objects.get(decodeURIComponent(url.pathname));
-      const bytes = at === undefined ? null : await readObject(at);
-      return bytes === null ? new Response(null, {status: 404}) : new Response(bytes);
+      const pathname = decodeURIComponent(new URL(path, 'https://build.invalid/').pathname);
+      const at = objects.get(pathname), member = members.get(pathname);
+      if (at !== undefined) {
+        const bytes = await readObject(at);
+        return bytes === null ? new Response(null, {status: 404}) : new Response(bytes);
+      }
+      if (member === undefined) return new Response(null, {status: 404});
+      const part = await readObject(member.part);
+      if (part === null) return new Response(null, {status: 404});
+      const decoded = member.part.startsWith('file:') ? brotliDecompressSync(part) : part;
+      return new Response(await checkedCookedMember(decoded, member));
     },
     header: slug => headers.get(slug.replace(/^_/u, '')),
     zones: table.zones.length, objects: objects.size,

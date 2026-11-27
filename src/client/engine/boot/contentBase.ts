@@ -1,3 +1,4 @@
+import type {CookedPartMember} from '@wildshard/engine/boot/tables';
 /**
  * PAGE-SIZE PZ3 (J276): where a page reads shard content and engine art. The boot bank (`#boot-module-files`) carries one
  * field, `contentBase`: an origin such as `https://packs.wildshard.io/`, or one with a folder path such as PZ2's
@@ -87,7 +88,13 @@ export function installCookedObjects(objects: Iterable<readonly [string, string]
     cooked.set(page, at.href); cookedBack.set(at.href, page); cookedOrigins.add(at.origin);
   }
 }
-export function clearCookedObjects(): void { cooked.clear(); cookedBack.clear(); cookedOrigins.clear(); }
+const packed = new Map<string, CookedPartMember>();
+export function installCookedMembers(rows: Iterable<readonly [string, CookedPartMember]>): void {
+  for (const [path, member] of rows) if (!packed.has(path)) packed.set(path, member);
+}
+export function cookedMember(path: string): CookedPartMember | undefined { return packed.get(path); }
+export function cookedMembers(): readonly (readonly [string, CookedPartMember])[] { return [...packed]; }
+export function clearCookedObjects(): void { cooked.clear(); cookedBack.clear(); cookedOrigins.clear(); packed.clear(); }
 /** Where the cook stores a page path (`/assets/spawn/parts/…`), with `search` kept; undefined for a path no installed zone maps. */
 /** PV4: the installed table, page path to cooked URL, for a worker with no document (the in-page server). */
 export function cookedObjects(): readonly (readonly [string, string])[] { return [...cooked]; }

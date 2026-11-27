@@ -1,3 +1,4 @@
+import type {CookedPartMember} from '@wildshard/engine/boot/tables';
 // Fix preview PV4 (meta docs/plans/MULTI-REPO-SAGA/2026-11-26-opus-fix-preview-PLAN.md; Jake, 2026-11-26: "preview should be getting the
 // cooked packs from R2"): a page that bakes a zone table (PV2, `zoneTable.ts`) loads every zone from the cook. Each zone's index is read
 // at `cooked.wildshard.io/<the table's key>` and checked against the table's row (slug, shard version, cook version, cook hash), never
@@ -7,9 +8,9 @@
 // zone's spawn rows, as SA48 does for a placed slug. Anything else (no index, a 404, junk, another zone's index) gives nothing, and the
 // zone's entry reports it (`COOKED_ZONE_MISSING`) for PV11's "Wildshard was updated" card instead of a silent 404.
 import * as v from 'valibot';
-import { installCookedObjects } from '@wildshard/engine/boot/contentBase';
+import { installCookedMembers, installCookedObjects } from '@wildshard/engine/boot/contentBase';
 import { readSpawnManifest, readSpawnManifestAddress, type SpawnManifestAddress } from '../../../shared/game/shardfile/spawnManifest';
-import { COOKED_ORIGIN, cookedIndexKey, cookedObjectKey, readCookedIndexAddress, type CookedShardRef } from '../../../shared/game/shardfile/cookedPackPaths';
+import { COOKED_ORIGIN, cookedIndexKey, cookedMemberAddresses, cookedObjectKey, readCookedIndexAddress, type CookedShardRef } from '../../../shared/game/shardfile/cookedPackPaths';
 import { cookedMapPath } from '../../../shared/game/shardfile/cookedMapPath';
 import { readZoneTable, ZONE_TABLE_ELEMENT_ID, zoneRef, type ZoneTable, type ZoneTableRow } from '../../../shared/game/grid/zoneTable';
 import { installPlacedContent, type PlacedContent, type PlacedHero } from './placedContent';
@@ -39,6 +40,7 @@ export interface CookedZone {
   readonly content: PlacedContent;
   /** Page path (leading `/`) to the absolute URL that holds it. */
   readonly objects: ReadonlyMap<string, string>;
+  readonly members: readonly (readonly [string, CookedPartMember])[];
 }
 
 async function bounded(response: Response, cap: number): Promise<ArrayBuffer> {
@@ -85,15 +87,16 @@ export async function cookedZone(table: ZoneTable, row: ZoneTableRow, ports: Coo
     }));
     const pick = (set: 'entry' | 'whole'): Partial<Record<'phone' | 'desktop', SpawnManifestAddress>> =>
       Object.fromEntries(addresses.filter(({ manifest }) => manifest.set === set).map(({ manifest, address: picked }) => [manifest.tier, picked]));
+    const members = cookedMemberAddresses(address, at);
     const entry = pick('entry');
     if (entry.phone === undefined || entry.desktop === undefined) return undefined;
     const page = new URL('/', location.href).href;
     const card = await cookedCard(row.slug, objects, async url => bounded(await ports.fetch(url, init), DISCOVERY_BYTES));
-    const content: PlacedContent = { spawn: { slug: row.slug, entry, whole: pick('whole'), base: page, loose: page, listed: new Set(objects.keys()),
+    const content: PlacedContent = { spawn: { slug: row.slug, entry, whole: pick('whole'), base: page, loose: page, listed: new Set([...objects.keys(), ...members.map(([path]) => path)]),
       programs: objects.has(`/programs/${row.slug}.json`),
       maps: objects.has(`/${cookedMapPath(row.slug, 'full')}`) && objects.has(`/${cookedMapPath(row.slug, 'cell')}`) },
     verdict: rest.verdict === undefined ? null : { ...rest.verdict, path: `/${rest.header}` }, ...(card === undefined ? {} : { card }) };
-    return { content, objects };
+    return { content, objects, members };
   } catch { return undefined; }
 }
 
@@ -118,6 +121,7 @@ export async function learnCookedZones(table: ZoneTable, ports: CookedZonePorts)
   for (const { row, zone } of read) {
     if (zone === undefined) { missing.push(row.slug); continue; }
     installCookedObjects(zone.objects);
+    installCookedMembers(zone.members);
     installPlacedContent(zone.content);
     installed.push(row.slug);
   }

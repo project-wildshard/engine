@@ -40,7 +40,7 @@ export const WHOLE_PART_LIMITS: PartLimits = {max: PART_BYTES, target: PART_TARG
 export const PART_LIMITS: PartLimits = {max: 4 << 20, target: 3 << 20};
 /** Under `readSpawnManifest`'s 128 parts, with room for the key boundaries' spread around their average. */
 const MANIFEST_PARTS = 96;
-export interface SpawnPartInput {readonly rows: readonly SpawnFile[]; readonly public: boolean; readonly desktop?: boolean}
+export interface SpawnPartInput {readonly rows: readonly SpawnFile[]; readonly public: boolean; readonly desktop?: boolean; readonly looseHashes?: ReadonlySet<string>}
 /** `desktop`: a desktop list holds these files too. S3: it never shares a part with a phone's own, or it fetches them all. */
 interface Group {readonly key: string; readonly members: ReadonlySet<number>; readonly desktop: boolean; readonly urls: string[]; bytes: number}
 
@@ -59,7 +59,7 @@ export function spawnPartGroups(manifests: readonly SpawnPartInput[]): Group[] {
   const need = new Map<string, Set<number>>(), size = new Map<string, number>(), order: string[] = [];
   manifests.forEach((manifest, index) => {
     for (const row of manifest.rows) {
-      if (!packable(row.url)) continue;
+      if (!packable(row.url) || manifest.looseHashes?.has(row.hash) === true) continue;
       const previous = size.get(row.url);
       if (previous !== undefined && previous !== row.bytes) throw new Error(`Spawn file sizes differ: ${row.url}`);
       if (previous === undefined) { size.set(row.url, row.bytes); order.push(row.url); }
@@ -212,7 +212,7 @@ export async function writeSpawnParts(outDir: string, manifests: readonly SpawnP
   return manifests.map(manifest => {
     const parts = new Map<string, {url: string; bytes: number; hash: string; members: [number, number][]; wireBytes: number}>();
     manifest.rows.forEach((row, index) => {
-      if (!packable(row.url)) return;
+      if (!packable(row.url) || manifest.looseHashes?.has(row.hash) === true) return;
       const at = placed.get(row.url); if (at === undefined) throw new Error(`Spawn file outside every part: ${row.url}`);
       let part = parts.get(at.url);
       if (part === undefined) { part = {url: at.url, bytes: at.bytes, hash: at.hash, members: [], wireBytes: wire.get(at.url) ?? 0}; parts.set(at.url, part); }

@@ -248,7 +248,11 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
   // entry bake wrote leave before the service worker lists the bundle, and no product folder is copied in below
   const zoneless = (process.env.WS_ZONE_TABLE ?? "") !== "";
   const keep = process.env.WS_ZONE_FILES_OUT;
-  if (zoneless) console.log(`zoneless page: ${dropZoneFiles(outDir, keep === undefined || keep === "" ? {} : { keep: resolve(keep) }).length} zone files ${keep ? `moved to ${keep}` : "dropped"}`);
+  if (zoneless) {
+    checkBakedTextures(process.cwd(), outDir);
+    const dropped = dropZoneFiles(outDir, keep === undefined || keep === "" ? {} : { keep: resolve(keep) });
+    console.log(`zoneless page: ${dropped.length} zone files ${keep ? `moved to ${keep}` : "dropped"}`);
+  }
   // the service worker over the bundle as written (was vite/pwa-plugin.ts): sw.js and its content-named core
   step([
     "--import",
@@ -272,7 +276,7 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
   if (!zoneless) copyOutputFolders(process.cwd(), outDir);
   // DL20: the deploy drops the loose copies nothing reads by URL
   const dropped = pruneLooseCopies(outDir);
-  checkBakedTextures(process.cwd(), outDir);
+  if (!zoneless) checkBakedTextures(process.cwd(), outDir);
   console.log(
     `Loose copies dropped: ${dropped.files} files, ${(dropped.bytes / 1e6).toFixed(1)} MB`,
   );

@@ -11,6 +11,9 @@ import { createReadStream, readFileSync, realpathSync, statSync } from 'node:fs'
 import { createServer } from 'node:http';
 import { extname, join, resolve, sep } from 'node:path';
 import { chromium, webkit } from '../src/scripts/browser-playwright.mjs';
+import { KEYCHAIN_ARGS } from '../src/scripts/.kit/chromium-keychain.mjs';
+import { enterZone } from '../src/scripts/zone-entry.mjs';
+import { bootObservation } from '../src/scripts/parity/boot-smoke.mjs';
 import { isZoneFile } from '../src/scripts/app-build/zoneless.mjs';
 import { shardNames } from '../src/scripts/page-size.mjs';
 
@@ -20,7 +23,7 @@ const BROWSERS = (process.env['WS_PV4_BROWSERS'] ?? 'chromium,webkit').split(','
 const table = JSON.parse(readFileSync(join(DIST, 'zone-table.json'), 'utf8'));
 const origin = new URL(table.origin ?? 'https://cooked.wildshard.io/');
 /** Sound off and no keychain dialog (Jake, 2026-11-13 and 11-24). */
-const CHROMIUM_ARGS = ['--mute-audio', '--use-mock-keychain', '--password-store=basic', '--use-angle=metal'];
+const CHROMIUM_ARGS = [...KEYCHAIN_ARGS, '--use-angle=metal'];
 /** @type {Readonly<Record<string, string>>} */
 const TYPES = { '.json': 'application/json', '.br': 'application/octet-stream', '.glb': 'model/gltf-binary', '.jpg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.ktx2': 'image/ktx2', '.wasm': 'application/wasm' };
 
@@ -34,7 +37,7 @@ function bucket() {
     let size = -1;
     if (file.startsWith(`${root}${sep}`)) try { size = statSync(file).size; } catch { /* a 404 */ }
     if (size < 0) { response.writeHead(404, headers).end(); return; }
-    response.writeHead(200, { ...headers, 'content-type': TYPES[extname(file)] ?? 'application/octet-stream', 'content-length': String(size) });
+    response.writeHead(200, { ...headers, 'content-type': TYPES[extname(file)] ?? 'application/octet-stream', 'content-length': String(size), ...(file.endsWith('.pack.br') ? {'content-encoding': 'br'} : {}) });
     if (request.method === 'HEAD') response.end(); else createReadStream(file).pipe(response);
   });
 }
@@ -63,19 +66,33 @@ test(`${ZONE} enters from the cook and again offline, at 402x874`, { timeout: 90
           if (url.origin === origin.origin) cooked++;
           else if (url.port === String(PAGE_PORT) && isZoneFile(url.pathname.slice(1), shards)) fromPage.push(url.pathname);
         });
+        const pageOrigin = `http://127.0.0.1:${String(PAGE_PORT)}`;
+        if (name === 'chromium') await context.grantPermissions(['local-network-access'], {origin: pageOrigin});
         const tab = await context.newPage();
-        tab.on('console', message => { if (/\[grid\] cooked zones|cooked zones not read/u.test(message.text())) console.log(`[pv4] ${name} console: ${message.text()}`); });
+        tab.on('console', message => {
+          if (message.type() === 'error' || /\[grid\] cooked zones|cooked zones not read/u.test(message.text()))
+            console.log(`[pv4] ${name} console: ${message.text()}`);
+        });
+        tab.on('requestfailed', request => {
+          if (request.url().startsWith(origin.origin)) console.log(`[pv4] ${name} ${request.failure()?.errorText}: ${request.url()}`);
+        });
         const enter = async (/** @type {string} */ how) => {
-          await tab.waitForFunction(zone => /** @type {any} */ (globalThis).__wildshard?.area()?.slug === zone, ZONE, { timeout: 300_000 });
-          await tab.locator('#hud.intro,.ws-reveal').first().waitFor({ state: 'detached', timeout: 60_000 }).catch(() => undefined);
+          await enterZone(tab, {zone: ZONE, base: pageOrigin, flags: 'mute=1&nolock=1&skipintro=1&agent=pv4-cooked-zones', waitUntil: 'commit'});
+          const deadline = Date.now() + 120_000;
+          for (;;) {
+            const seen = await tab.evaluate(bootObservation).catch(() => null);
+            if (seen?.fatal.length) throw new Error(seen.fatal.join(' | '));
+            if (seen?.ready && seen.shard.replace(/^_/u, '') === ZONE) break;
+            if (seen?.revealing) await tab.locator('.ws-grid-reveal').dispatchEvent('pointerdown');
+            if (Date.now() >= deadline) throw new Error(`no ${how} gameplay: ${seen?.appState ?? 'no world'} ${seen?.shard ?? ''}`);
+            await tab.waitForTimeout(350);
+          }
           console.log(`[pv4] ${name} ${how}: in ${ZONE}; ${String(cooked)} cooked reads, ${String(fromPage.length)} zone reads from the page`);
         };
-        await tab.goto(`http://127.0.0.1:${String(PAGE_PORT)}/slug/${ZONE}?mute=1&nolock=1&agent=pv4-cooked-zones`);
         await enter('online');
         await tab.evaluate(async () => { await navigator.serviceWorker.ready; });
         await context.setOffline(true);
         cooked = 0;
-        await tab.reload();
         await enter('offline');
         assert.deepEqual(fromPage, [], `${name}: zone files read from the page origin`);
         await context.close();

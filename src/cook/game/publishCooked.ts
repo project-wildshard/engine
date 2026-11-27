@@ -43,7 +43,7 @@ export interface PublishCookedOptions {
 }
 
 export async function publishCooked(options: PublishCookedOptions, ref: CookedShardRef, base: CookIndex, digestOfOutput: string,
-  out: string, files: readonly CookObject[]): Promise<VersionedCookIndex> {
+  out: string, files: readonly CookObject[], members?: CookedIndexAddress['members']): Promise<VersionedCookIndex> {
   const cook = cookedVersionPrefix(ref), common = `${cookedShardPrefix(ref)}common/`;
   const objects = new Map<string, string>(), mounts = new Map<string, string>();
   const plan = files.map(file => {
@@ -53,13 +53,14 @@ export async function publishCooked(options: PublishCookedOptions, ref: CookedSh
     if (file.mount === true) mounts.set(`/${file.path}`, key);
     return {at, key, path: file.path, bytes: statSync(at).size};
   });
+  const ordered = (rows: ReadonlyMap<string, string>): Record<string, string> => Object.fromEntries([...rows].sort(([a], [b]) => a.localeCompare(b, 'en')));
+  const index: VersionedCookIndex = {...base, ...ref, keys: [...new Set(objects.values())].sort(), objects: ordered(objects),
+    outputDigest: digestOfOutput, ...(members === undefined ? {} : {members}), ...(mounts.size === 0 ? {} : {mounts: ordered(mounts)})};
+  readCookedIndexAddress(index);
   await options.reserve?.(plan);
   await options.parallel(plan, async ({key, at, path}) => {
     await options.store.putImmutable(key, readFileSync(at), options.headers(path));
   });
-  const ordered = (rows: ReadonlyMap<string, string>): Record<string, string> => Object.fromEntries([...rows].sort(([a], [b]) => a.localeCompare(b, 'en')));
-  const index: VersionedCookIndex = {...base, ...ref, keys: [...new Set(objects.values())].sort(), objects: ordered(objects),
-    outputDigest: digestOfOutput, ...(mounts.size === 0 ? {} : {mounts: ordered(mounts)})};
   await writeVersionedCook(options.store, ref, index);
   return index;
 }

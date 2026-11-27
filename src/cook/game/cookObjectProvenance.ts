@@ -1,7 +1,8 @@
+import type {CookedPartMember} from '@wildshard/engine/boot/tables';
 // oxlint-disable-next-line import/no-nodejs-modules -- The bounded cook child checks its own output files.
 import {createHash} from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- The bounded cook child checks its own output files.
-import {existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- The bounded cook child resolves its own output files.
 import {dirname, join, relative} from 'node:path';
 import {readSpawnManifest, type SpawnManifest} from '../../shared/game/shardfile/spawnManifest';
@@ -10,6 +11,7 @@ import {readServerPack} from '../../shared/game/shardfile/serverPack';
 export interface CookObjectProvenance {
   readonly common: readonly string[];
   readonly mounts: readonly string[];
+  readonly members?: Readonly<Record<string, CookedPartMember>>;
 }
 
 const hash = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
@@ -53,7 +55,8 @@ export function sourceOnlyParts(manifests: readonly SpawnManifest[], source: (ur
 
 /** Record pass-through objects in the bounded child. The publisher gets paths and its own output bytes only. */
 export function classifyCookObjects(raw: ReadonlyMap<string, Uint8Array>, out: string, slug: string, manifestUrls: readonly string[],
-  serverIndex: string, mounts: readonly {readonly url: string; readonly path: string}[]): CookObjectProvenance {
+  serverIndex: string, mounts: readonly {readonly url: string; readonly path: string}[],
+  serverRead: (path: string) => Uint8Array): CookObjectProvenance {
   const client = join(out, 'client'), prefix = `shardfiles/${slug}/`;
   const mountPaths = new Map(mounts.map(mount => [logicalPath(mount.url), mount.path]));
   const original = (url: string): Uint8Array | undefined => {
@@ -63,25 +66,54 @@ export function classifyCookObjects(raw: ReadonlyMap<string, Uint8Array>, out: s
   };
   const manifests = manifestUrls.map(url => readSpawnManifest(json(join(client, logicalPath(url)))));
   const common = new Set(sourceOnlyParts(manifests, original));
+  const parts = new Set<string>(), packed = new Map<string, CookedPartMember>();
+  for (const manifest of manifests) for (const part of manifest.parts ?? []) {
+    const key = logicalPath(part.url);
+    parts.add(key);
+    for (const [index, offset] of part.members) {
+      const file = manifest.files[index];
+      if (file !== undefined && !packed.has(file.hash)) packed.set(file.hash, {part: key, offset, bytes: file.bytes, hash: file.hash});
+    }
+  }
   const server = readServerPack(json(join(client, logicalPath(serverIndex))));
-  for (const part of [server, ...server.more ?? []]) common.add(logicalPath(part.url));
+  for (const part of [server, ...server.more ?? []]) {
+    const key = logicalPath(part.url);
+    common.add(key);
+    parts.add(key);
+    for (const [path, offset, bytes] of part.files) {
+      const digest = hash(serverRead(path));
+      if (!packed.has(digest)) packed.set(digest, {part: key, offset, bytes, hash: digest});
+    }
+  }
+
+  const members = new Map<string, CookedPartMember>(), publishedMounts: string[] = [];
+  const useMember = (path: string, bytes: Uint8Array): boolean => {
+    const member = packed.get(hash(bytes));
+    if (member === undefined || member.bytes !== bytes.byteLength) return false;
+    members.set(path, member);
+    return true;
+  };
   for (const file of readdirSync(client, {recursive: true, withFileTypes: true})) {
     if (!file.isFile()) continue;
-    const path = relative(client, join(file.parentPath, file.name)), source = original(path);
-    if (source !== undefined && equal(readFileSync(join(client, path)), source)) common.add(path);
+    const path = relative(client, join(file.parentPath, file.name));
+    if (parts.has(path)) continue;
+    const full = join(client, path), bytes = readFileSync(full);
+    if (useMember(path, bytes)) { unlinkSync(full); continue; }
+    const source = original(path);
+    if (source !== undefined && equal(bytes, source)) common.add(path);
   }
-  const publishedMounts: string[] = [];
   for (const [url, source] of mountPaths) {
     if (!safePath(url)) throw new Error(`Invalid cooked mount URL: ${url}`);
-    const bytes = raw.get(source);
-    if (bytes === undefined) {
-      if (existsSync(join(client, url))) publishedMounts.push(url);
-      continue;
+    if (members.has(url)) continue;
+    const bytes = raw.get(source), file = join(client, url);
+    if (!existsSync(file)) {
+      if (bytes === undefined || useMember(url, bytes)) continue;
+      mkdirSync(dirname(file), {recursive: true});
+      writeFileSync(file, bytes);
+      common.add(url);
     }
-    const file = join(client, url);
-    // A produced stand-in at this URL keeps its own bytes. Unchanged mount bytes are kept even when also in a part.
-    if (!existsSync(file)) { mkdirSync(dirname(file), {recursive: true}); writeFileSync(file, bytes); common.add(url); }
     publishedMounts.push(url);
   }
-  return {common: [...common].sort(), mounts: publishedMounts.sort()};
+  return {common: [...common].sort(), mounts: publishedMounts.sort(),
+    ...(members.size === 0 ? {} : {members: Object.fromEntries([...members].sort(([a], [b]) => a.localeCompare(b, 'en')))})};
 }
