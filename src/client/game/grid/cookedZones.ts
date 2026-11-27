@@ -8,7 +8,6 @@ import type {CookedPartMember} from '@wildshard/engine/boot/tables';
 // zone's spawn rows, as SA48 does for a placed slug. Anything else (no index, a 404, junk, another zone's index) gives nothing, and the
 // zone's entry reports it (`COOKED_ZONE_MISSING`) for PV11's "Wildshard was updated" card instead of a silent 404.
 import * as v from 'valibot';
-import { installCookedMembers, installCookedObjects } from '@wildshard/engine/boot/contentBase';
 import { readSpawnManifest, readSpawnManifestAddress, type SpawnManifestAddress } from '../../../shared/game/shardfile/spawnManifest';
 import { COOKED_ORIGIN, cookedIndexKey, cookedMemberAddresses, cookedObjectKey, readCookedIndexAddress, type CookedShardRef } from '../../../shared/game/shardfile/cookedPackPaths';
 import { cookedMapPath } from '../../../shared/game/shardfile/cookedMapPath';
@@ -35,6 +34,8 @@ export interface CookedZonePorts {
   readonly origin?: string;
   /** This page's validator revision; null admits by no row (as `placedContent.ts`). */
   readonly validator: string | null;
+  /** A signed placement pins the raw upload as well as its canonical version. */
+  readonly rawHash?: string;
 }
 export interface CookedZone {
   readonly content: PlacedContent;
@@ -68,6 +69,7 @@ export async function cookedZone(table: ZoneTable, row: ZoneTableRow, ports: Coo
     const body = decode(await bounded(await read(at(row.index), init), INDEX_BYTES));
     const address = readCookedIndexAddress(body), rest = v.parse(IndexRest, body);
     if (!same(address, ref)) return undefined;
+    if (ports.rawHash !== undefined && address.hash !== ports.rawHash) return undefined;
     if (ports.validator !== null && rest.verdict?.revision !== ports.validator) return undefined;
     const objects = new Map<string, string>();
     for (const path of Object.keys(address.objects)) {
@@ -123,9 +125,7 @@ export async function learnCookedZones(table: ZoneTable, ports: CookedZonePorts)
   const installed: string[] = [], missing: string[] = [];
   for (const { row, zone } of read) {
     if (zone === undefined) { missing.push(row.slug); continue; }
-    installCookedObjects(zone.objects);
-    installCookedMembers(zone.members);
-    installPlacedContent(zone.content);
+    installPlacedContent({...zone.content,cooked:zone});
     installed.push(row.slug);
   }
   if (missing.length > 0 && typeof dispatchEvent === 'function') dispatchEvent(new CustomEvent(COOKED_ZONE_MISSING, { detail: { slugs: missing, cook: `${table.cookVersion}/${table.cookHash.slice(0, 12)}` } }));

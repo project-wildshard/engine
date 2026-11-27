@@ -77,22 +77,34 @@ export function contentCacheOrigins(): readonly string[] {
  * Its index's `objects` table is installed here, page path to absolute URL, so every content read below resolves through it first.
  */
 const cooked = new Map<string, string>(), cookedBack = new Map<string, string>(), cookedOrigins = new Set<string>();
-/** Install page paths (with or without the leading `/`) and the absolute URLs that hold their bytes. A path already installed keeps
- *  its first URL: parts and blobs are content-named, so any zone's copy is the same bytes. */
-export function installCookedObjects(objects: Iterable<readonly [string, string]>): void {
+const packed = new Map<string, CookedPartMember>();
+/** A path normally keeps its first URL. A newer signed placement replaces the baked copies of its paths. */
+export function installCookedObjects(objects: Iterable<readonly [string, string]>, replace = false): void {
   for (const [path, url] of objects) {
     const page = path.startsWith('/') ? path : `/${path}`;
-    if (cooked.has(page)) continue;
+    const prior = cooked.get(page);
+    if (!replace && prior !== undefined) continue;
     const at = new URL(url);
     if (at.search !== '' || at.hash !== '' || (at.protocol !== 'https:' && at.protocol !== 'http:')) throw new Error(`Invalid cooked object URL: ${url}`);
+    if (replace) {
+      packed.delete(page);
+      if (prior !== undefined && cookedBack.get(prior) === page) cookedBack.delete(prior);
+    }
     cooked.set(page, at.href); cookedBack.set(at.href, page); cookedOrigins.add(at.origin);
   }
   const held = typeof document === 'undefined' ? undefined : document.documentElement.dataset['wsLoadArt'];
   if (held !== undefined && cooked.has(held)) loadPortrait(held);
 }
-const packed = new Map<string, CookedPartMember>();
-export function installCookedMembers(rows: Iterable<readonly [string, CookedPartMember]>): void {
-  for (const [path, member] of rows) if (!packed.has(path)) packed.set(path, member);
+export function installCookedMembers(rows: Iterable<readonly [string, CookedPartMember]>, replace = false): void {
+  for (const [path, member] of rows) {
+    if (!replace && packed.has(path)) continue;
+    if (replace) {
+      const prior = cooked.get(path);
+      cooked.delete(path);
+      if (prior !== undefined && cookedBack.get(prior) === path) cookedBack.delete(prior);
+    }
+    packed.set(path, member);
+  }
 }
 export function cookedMember(path: string): CookedPartMember | undefined { return packed.get(path); }
 export function cookedMembers(): readonly (readonly [string, CookedPartMember])[] { return [...packed]; }

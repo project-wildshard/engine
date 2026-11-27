@@ -8,6 +8,8 @@ import { helloMessage } from '@wildshard/engine/net/wireMessages';
 import { closeReason, decodePong, encodePing, framed, SOCKET_COUNTDOWN, SOCKET_PONG, SOCKET_RELIABLE, SOCKET_RESUME } from '@wildshard/engine/net/socketFrames';
 import { readSignedRelease } from './release';
 import { packsOriginForRelease } from '@wildshard/engine/app/releaseAddress';
+import { COOKED_ORIGIN, cookedIndexKey, cookedObjectKey, readCookedIndexAddress } from '@wildshard/engine/game/shardfile/cookedPackPaths';
+import { readServerPackBook, serverPackBookPath } from '@wildshard/engine/game/shardfile/serverPack';
 import type { ReleaseFile } from '../../../shared/host/releaseRows';
 
 /** The links, in the order a phone needs them. */
@@ -136,9 +138,40 @@ async function checkRelease(config: DoctorConfig, learned: Learned, ms: number):
   }
 }
 
+/** PV25: the signed build's road and one room's versioned server part both answer from the cooked origin. */
+async function checkCookedPacks(config: DoctorConfig, learned: Learned, release: ReleaseFile, cook: NonNullable<ReleaseFile['cook']>, ms: number): Promise<Outcome> {
+  const room = release.shards.find(({slug:name}) => name === config.cell) ?? release.shards[0];
+  try {
+    if (room?.shardVersion === undefined) throw new Error('The release names no versioned room');
+    const slug = room.slug.replace(/^_/u, ''), key = cookedIndexKey({slug, shardVersion:room.shardVersion, cookVersion:cook.version, cookHash:cook.hash});
+    await limited(learned.scope, ms, async signal => {
+      const read = async (path: string, method = 'GET'): Promise<Response> => {
+        const response = await fetch(new URL(path, COOKED_ORIGIN), {cache:'no-store', redirect:'error', method, signal});
+        if (response.status === 404) learned.packsMissing = true;
+        if (!response.ok) throw new Error(`${path} · HTTP ${String(response.status)}`);
+        return response;
+      };
+      const [book, index] = await Promise.all([
+        read(serverPackBookPath(release.engineBuild)).then(async response => readServerPackBook(await response.json())),
+        read(key).then(async response => readCookedIndexAddress(await response.json())),
+      ]);
+      if (book.build !== release.engineBuild || book.grid === undefined) throw new Error('The road book does not match this build');
+      if (cookedIndexKey(index) !== key) throw new Error(`The ${slug} index names another cook`);
+      const part = Object.keys(index.objects).find(path => /^assets\/spawn\/server\/[a-f0-9]{16}\.pack\.br$/u.test(path));
+      const sample = part === undefined ? undefined : cookedObjectKey(index, index.objects, part);
+      if (sample === undefined) throw new Error(`The ${slug} index has no server part`);
+      await Promise.all([read(book.grid.url, 'HEAD'), read(sample, 'HEAD')]);
+    });
+    return pass(`cooked road · ${slug} part ok`);
+  } catch (error) {
+    return fail(errorText(error), 'The cooked origin did not serve the road or room pack. Run the check again in a minute. If it stays, tell Jake.');
+  }
+}
+
 async function checkPacks(config: DoctorConfig, learned: Learned, ms: number): Promise<Outcome> {
   const release = learned.release, world = config.world;
   if (release === undefined || world === undefined) return skip('needs the release file');
+  if (release.cook !== undefined) return checkCookedPacks(config, learned, release, release.cook, ms);
   const origin = packsOriginForRelease(world.release), book = new URL(`/assets/spawn/server-${release.engineBuild}.json`, origin);
   try {
     const shards = await limited(learned.scope, ms, async signal => {

@@ -7,7 +7,7 @@
 import { generateKeyPairSync, sign, type KeyObject } from 'node:crypto';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { installCatalogue, installedCatalogue } from '../src/shared/game/grid/catalogueSlot';
-import { PLACEMENT_PUBLIC_KEY, placementsURL } from '../src/shared/game/grid/placementRows';
+import { PLACEMENT_PUBLIC_KEY, placementsURL, type PlacementFile } from '../src/shared/game/grid/placementRows';
 import { readPlacementFile } from '../src/server/host/dedicated/placementFile';
 import { placementSlots } from '../src/server/host/dedicated/gridCells';
 import { PLACEMENT_PUBLIC_KEY as PREVIEW_GRID_KEY } from '../src/scripts/preview-grid';
@@ -16,6 +16,8 @@ import { installTitleManifests, titleManifests, type TitleManifest } from '../sr
 import { titleCards } from '../src/client/game/titleDeck';
 import { oneWayIn, shardCell } from '../src/client/game/grid/oneWayIn';
 import { GridAssembly } from '../src/shared/game/grid/assembly';
+import { cookedObjectURL, clearCookedObjects } from '../src/client/engine/boot/contentBase';
+import { cookedIndexKey, cookedShardPrefix } from '../src/shared/game/shardfile/cookedPackPaths';
 import type { PlacedContent } from '../src/client/game/grid/placedContent';
 import { catalogueBeforePlacements } from './fixtures/catalogue-before-placements';
 
@@ -25,7 +27,7 @@ const pair = (): { readonly privateKey: KeyObject; readonly hex: string } => {
   return { privateKey: key.privateKey, hex: key.publicKey.export({ type: 'spki', format: 'der' }).toString('hex') };
 };
 const api = pair();
-type Cells = readonly { readonly instance: string; readonly slug: string; readonly cell: readonly [number, number] }[];
+type Cells = PlacementFile['cells'];
 const THIN_ICE: Cells = [{ instance: 'open-plot-thin-ice', slug: 'open-plot-thin-ice', cell: [0, 3] }];
 const signed = (cells: Cells = THIN_ICE, serial = 1, channel = 'staging', key: KeyObject = api.privateKey): string => {
   const body = JSON.stringify({ kind: 'placement', channel, serial, cells });
@@ -131,6 +133,36 @@ test('the split release origin still checks the channel of a signed placement fi
     keep: device, fetch: answering(signed(THIN_ICE, 1, 'production')), publicKey: api.hex,
   });
   expect(result).toEqual({ kept: 'a production placement file at the staging address' });
+});
+
+test('PV25: a zone-table page follows the signed placed upload at its cooked address', async () => {
+  const slug = 'new-author-shard', shardVersion = '1.2.0', hash = 'b'.repeat(64);
+  const ref = {slug,shardVersion,cookVersion:'1.17.0',cookHash:'c'.repeat(64)}, at = 'https://cooked.example/';
+  const build = 'a'.repeat(40), existing = {...ref,slug:'driftwood-isle'}, index = cookedIndexKey(ref);
+  const header = `shardfiles/${slug}/shard.json`, prefix = cookedShardPrefix(ref) + 'common/';
+  const manifests = (['phone','desktop'] as const).map(tier => ({url:`/assets/spawn/${slug}-entry-${tier}-0123456789abcdef.json`,
+    tier,set:'entry',files:1,totalBytes:12,wireBytes:0}));
+  const objects = Object.fromEntries(manifests.map(row => [row.url.slice(1),prefix+row.tier+'.json']));
+  objects[header] = prefix+'header.json';
+  const responses: Record<string,() => Response> = {[ENTRY_AT]:() => json(ENTRY),
+    [`${at}${index}`]:() => json({...ref,hash,header,manifests,objects})};
+  for (const row of manifests) responses[`${at}${prefix}${row.tier}.json`] = () => json({version:1,shard:slug,tier:row.tier,flow:'client',totalBytes:12,
+    files:[{url:`/${header}`,bytes:12,hash:'d'.repeat(64)}]});
+  const read = routes(responses,signed([{instance:slug,slug,cell:[1,3],hash,shardVersion}]));
+  const beforeDocument = Reflect.getOwnPropertyDescriptor(globalThis,'document');
+  const globals = {document:{documentElement:{dataset:{}},getElementById:() => ({textContent:JSON.stringify({version:1,from:{channel:'staging',serial:1,engineBuild:build},
+    cookVersion:ref.cookVersion,cookHash:ref.cookHash,origin:at,zones:[{slug:existing.slug,shardVersion,index:cookedIndexKey(existing)}]})})}};
+  Object.defineProperty(globalThis,'document',{value:globals.document,configurable:true});
+  try {
+    const result = await learnPlacedCells(URL_AT,{keep:device,fetch:read,publicKey:api.hex,api:API});
+    expect(result).toMatchObject({carded:[slug]});
+    expect(read.asked.sort()).toEqual([URL_AT,ENTRY_AT,`${at}${index}`,`${at}${prefix}phone.json`,`${at}${prefix}desktop.json`].sort());
+    expect(cookedObjectURL(`/${header}`)).toBe(`${at}${prefix}header.json`);
+  } finally {
+    clearCookedObjects();
+    if (beforeDocument === undefined) Reflect.deleteProperty(globalThis,'document');
+    else Object.defineProperty(globalThis,'document',beforeDocument);
+  }
 });
 
 test('cells the box would refuse are left out, and the build\'s own cell is kept once', () => {

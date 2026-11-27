@@ -4,7 +4,7 @@
 // resolves page paths (parts, manifests, loose files, programs) to where the cook stored them.
 import { afterEach, expect, test } from 'vitest';
 import { bakedZoneTable, COOKED_ZONE_MISSING, cookedZone, learnCookedZones } from '../src/client/game/grid/cookedZones';
-import { clearCookedObjects, contentURL, cookedObjectURL, loadPortrait, pageURL } from '@wildshard/engine/boot/contentBase';
+import { clearCookedObjects, contentURL, cookedMember, cookedObjectURL, installCookedMembers, installCookedObjects, loadPortrait, pageURL } from '@wildshard/engine/boot/contentBase';
 import { clearPlacedSpawns, placedSpawn } from '../src/client/game/boot/placedSpawn';
 import { entryProgramsURL } from '../src/client/game/boot/spawnDownload';
 import { readZoneTable, type ZoneTable } from '../src/shared/game/grid/zoneTable';
@@ -46,6 +46,18 @@ const ports = (read: typeof fetch) => ({ fetch: read, signal: new AbortControlle
 
 afterEach(() => { clearCookedObjects(); clearPlacedSpawns(); document.body.innerHTML = ''; });
 
+test('a newer placed copy replaces the baked path across loose and packed forms', () => {
+  const member = {part:`${ORIGIN}part`,offset:0,bytes:4,hash:'e'.repeat(64)};
+  installCookedObjects([[HEADER,`${ORIGIN}old-header`]]);
+  installCookedMembers([['/placed.json',member]]);
+  installCookedObjects([['/placed.json',`${ORIGIN}new-placed`]],true);
+  installCookedMembers([[HEADER,member]],true);
+  expect(cookedObjectURL(HEADER)).toBeUndefined();
+  expect(cookedMember(HEADER)).toEqual(member);
+  expect(cookedMember('/placed.json')).toBeUndefined();
+  expect(cookedObjectURL('/placed.json')).toBe(`${ORIGIN}new-placed`);
+});
+
 test('a zone is read through the table\'s index key and its objects, never the page origin or its build', async () => {
   const read = store();
   const zone = await cookedZone(table, table.zones[0] ?? table.zones[1] ?? (() => { throw new Error('no zone'); })(), ports(read));
@@ -63,6 +75,7 @@ test('another cook\'s index, a 404 or an object outside the shard version gives 
   if (row === undefined) throw new Error('no zone');
   const other = served(); other.set(cookedIndexKey(ref), { ...INDEX, cookHash: 'f'.repeat(64) });
   expect(await cookedZone(table, row, ports(store(other)))).toBeUndefined();
+  expect(await cookedZone(table, row, {...ports(store()),rawHash:'f'.repeat(64)})).toBeUndefined();
   const gone = served(); gone.delete(cookedIndexKey(ref));
   expect(await cookedZone(table, row, ports(store(gone)))).toBeUndefined();
   const stray = served(); stray.set(cookedIndexKey(ref), { ...INDEX, objects: { ...OBJECTS, 'x.json': 'shards/pine-hollow/1.2.0/common/x' } });

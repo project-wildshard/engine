@@ -22,7 +22,10 @@ import { clearBehindRooms, markBehindRooms } from '../boot/placedSpawn';
 import { noteFollowed, sessionHints, type RoomsHints } from './roomsRevision';
 import { findTitleManifest, installTitleManifests, titleManifests, type TitleManifest } from '../shard/titleList';
 import { catalogueCards } from './placedCards';
+import { bakedZoneTable, cookedZone } from './cookedZones';
 import { installPlacedContent, placedContent, type PlacedContent } from './placedContent';
+import { zoneRef } from '../../../shared/game/grid/zoneTable';
+import { cookedIndexKey } from '../../../shared/game/shardfile/cookedPackPaths';
 import { parseGridCatalogue } from '../../../shared/game/grid/catalogue';
 
 /** How long a page's boot waits for the file: GO4's 3 s, the world word's own deadline. A slower answer leaves the build's grid. */
@@ -149,6 +152,8 @@ export interface PlacedPorts {
   /** SA48: a carded slug's content from the cook (`placedContent.ts`), by the hash its cell names; default: this page's build's index in
    *  the store at the placement file's origin. A slug with none stays out. */
   readonly content?: (slug: string, hash: string | undefined, signal: AbortSignal) => Promise<PlacedContent | undefined>;
+  /** Let the baked zone objects install before a newer signed placement replaces one. */
+  readonly cookedReady?: Promise<void>;
   /** NB2: the door's world word this tab heard for this build (default: the tab's session storage, `roomsRevision.ts`) */
   readonly hints?: RoomsHints;
   /** OF20: where the last believed file is kept (default: the device, `devicePlacedKeep`) */
@@ -158,12 +163,27 @@ export interface PlacedPorts {
   /** The fresh file is kept this long after it is believed (default `KEEP_WRITE_AFTER_MS`; the default keep only). */
   readonly keepWriteAfterMs?: number;
 }
-/** The cook's content for a placed slug, from the packs store for this page's build under its own validator. */
-const cookContent = (url: string, read: typeof fetch): NonNullable<PlacedPorts['content']> => (slug, hash, signal) => {
-  const build: unknown = Reflect.get(globalThis, '__WS_BUILD_ID__'), validator: unknown = Reflect.get(globalThis, '__WS_SHARDFILE_VALIDATOR__');
-  return hash === undefined || typeof build !== 'string' ? Promise.resolve(undefined)
-    : placedContent(slug, hash, { fetch: read, signal, packs: packsOriginForRelease(url), build, validator: typeof validator === 'string' ? validator : null });
-};
+/** The same cook as the baked zones, by the version and raw hash from the signed placement. */
+function cookContent(url: string, read: typeof fetch, file: PlacementFile, cookedReady: Promise<void> | undefined): NonNullable<PlacedPorts['content']> {
+  const table = typeof document === 'undefined' ? undefined : bakedZoneTable();
+  const revision: unknown = Reflect.get(globalThis, '__WS_SHARDFILE_VALIDATOR__'), validator = typeof revision === 'string' ? revision : null;
+  return async (slug, hash, signal) => {
+    if (hash === undefined) return undefined;
+    if (table === undefined) {
+      const build: unknown = Reflect.get(globalThis, '__WS_BUILD_ID__');
+      return typeof build === 'string' ? placedContent(slug, hash, {fetch:read, signal, packs:packsOriginForRelease(url), build, validator}) : undefined;
+    }
+    const name = bareSlug(slug);
+    const placed = file.cells.find(row => bareSlug(row.slug) === name && row.hash === hash);
+    if (placed?.shardVersion === undefined) return undefined;
+    const identity = {slug:name,shardVersion:placed.shardVersion};
+    const index = cookedIndexKey(zoneRef(table, identity));
+    const zone = await cookedZone(table, {...identity,index}, {fetch:read, signal, validator, rawHash:hash});
+    if (zone === undefined) return undefined;
+    await cookedReady;
+    return signal.aborted ? undefined : {...zone.content,cooked:zone};
+  };
+}
 /** HERO-GATE HG4: a carded slug wears the hero its upload carried (`placedContent.ts`); one with none keeps its cell and its
  *  way in (a harness's), but its plain card is Developer only (`hidden`): a player never sees a zone without its picture. */
 const heroed = (row: TitleManifest, content: PlacedContent | undefined): TitleManifest =>
@@ -240,7 +260,7 @@ export async function learnPlacedCells(url: string, ports: PlacedPorts = {}): Pr
     // SA46: a cell the box would open whose slug this build has no card for (an upload after the build) is carded from its catalogue
     // entry, after the build's own cells are in, so a slow or absent API costs them nothing; a slug it does not card stays out
     const unknown = addPlacedCells(placed.document, file).added.map(cell => cell.slug);
-    const content = ports.content ?? cookContent(url, ports.fetch ?? fetch);
+    const content = ports.content ?? cookContent(url, ports.fetch ?? fetch, file, ports.cookedReady);
     // NB2 (J494): a slug the build baked whose rooms run another upload: until that upload's own copy is in, entering it refuses
     // with Reload (`spawnDownload.ts`). The cook's index for this build and those bytes is what the rooms preloaded (activation).
     const follow = roomsRevisions(document, file, (ports.hints ?? sessionHints()).read().revisions), followed: string[] = [], behind: string[] = [];
@@ -252,7 +272,7 @@ export async function learnPlacedCells(url: string, ports: PlacedPorts = {}): Pr
     const following = Promise.all([...follow].map(async ([slug, hash]) => {
       const found = await content(slug, hash, abort.signal).catch(() => undefined);
       if (found === undefined) { behind.push(slug); return; }
-      installPlacedContent(found); clearBehindRooms(slug); noteFollowed(slug, hash); followed.push(slug);
+      installPlacedContent(found, true); clearBehindRooms(slug); noteFollowed(slug, hash); followed.push(slug);
     }));
     const outcome = (): { readonly followed?: readonly string[]; readonly behind?: readonly string[] } =>
       follow.size === 0 ? {} : { followed: [...followed].sort(), behind: [...behind].sort() };

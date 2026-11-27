@@ -96,8 +96,8 @@ installTitleManifests(titleRows);
 // catalogue before anything reads the grid; `enterPage` waits for it (3 s at most), and any failure keeps the build's grid.
 // Fix preview PV4: a page that bakes a zone table (preview) loads every zone from the cook, beside the placement read and on its deadline;
 // a late answer still installs (it only adds the zones' spawn rows and object table).
-const cookedZones = learnCookedZonesOnce();
-const placedCells = Promise.all([learnPlacedCellsOnce(), cookedZones]).then(() => undefined);
+const {wait:cookedZones, settled:bakedCooks} = learnCookedZonesOnce();
+const placedCells = Promise.all([learnPlacedCellsOnce(bakedCooks), cookedZones]).then(() => undefined);
 // G727 / I9: Settings' "Download everything"; the prefetch loads only when the player opens or presses it
 installOfflineDownload({
   size: async owner => (await import('@wildshard/engine/game/grid/prefetch')).remainingDownloadBytes(owner),
@@ -141,7 +141,7 @@ function serverSites(): Promise<readonly { readonly site: string | null | undefi
 /** The page's placement file read, started at once; it never rejects and settles inside `PLACED_DEADLINE_MS` (3 s) of the entry's
  *  start, chunk import included. Past that the boot goes on with the build's grid and a late answer installs nothing. A page with no
  *  world (preview, solo) reads none. */
-function learnPlacedCellsOnce(): Promise<void> {
+function learnPlacedCellsOnce(cookedReady: Promise<void>): Promise<void> {
   const late = new AbortController();
   const read = (async (): Promise<void> => {
     try {
@@ -151,7 +151,7 @@ function learnPlacedCellsOnce(): Promise<void> {
       const { learnPlacedCells, placementsOf } = await import('@wildshard/engine/game/grid/placedCells');
       const url = placementsOf(globalThis as { __WS_WORLD__?: unknown; __WS_PLACEMENTS__?: unknown });
       if (url === null || late.signal.aborted) return;
-      const answer = await bootTask('app:placed-cells', () => learnPlacedCells(url, { signal: late.signal }));
+      const answer = await bootTask('app:placed-cells', () => learnPlacedCells(url, { signal: late.signal, cookedReady }));
       if ('kept' in answer) console.info(`[grid] build's grid kept: ${answer.kept}`);
       else console.info(`[grid] placement serial ${String(answer.serial)}: ${answer.added.map(cell => `${cell.instance} at (${cell.cell.join(',')})`).join(', ') || 'no new cell'}${answer.carded.length === 0 ? '' : `; carded from the catalogue ${answer.carded.join(', ')}`}${answer.left.length === 0 ? '' : `; left out ${answer.left.join('; ')}`}${answer.followed === undefined ? '' : `; rooms' revision for ${answer.followed.join(', ') || 'none'}${answer.behind?.length ? `, behind the rooms ${answer.behind.join(', ')}` : ''}`}`);
     } catch (error) { console.warn('[grid] placement file not read:', error); }
@@ -160,8 +160,11 @@ function learnPlacedCellsOnce(): Promise<void> {
   return Promise.race([read, deadline]);
 }
 /** PV4: every zone of the page's baked zone table, read from the cooked bucket; a page with none reads nothing and imports nothing. */
-function learnCookedZonesOnce(): Promise<void> {
-  if (document.getElementById('ws-zone-table') === null) return Promise.resolve();
+function learnCookedZonesOnce(): {wait: Promise<void>; settled: Promise<void>} {
+  if (document.getElementById('ws-zone-table') === null) {
+    const done = Promise.resolve();
+    return {wait:done, settled:done};
+  }
   const read = (async (): Promise<void> => {
     try {
       const { bakedZoneTable, learnCookedZones } = await import('@wildshard/engine/game/grid/cookedZones');
@@ -174,7 +177,7 @@ function learnCookedZonesOnce(): Promise<void> {
     } catch (error) { console.warn('[grid] cooked zones not read:', error); }
   })();
   const deadline = new Promise<void>(resolve => { entryScope.timeout(PLACED_DEADLINE_MS, resolve); });
-  return Promise.race([read, deadline]);
+  return {wait:Promise.race([read, deadline]), settled:read};
 }
 async function enterPage(): Promise<unknown> {
   if (exploreIndex) return showExploreIndex();

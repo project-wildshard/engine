@@ -14,6 +14,8 @@ import { bareSlug } from '../../../shared/game/grid/catalogueSlot';
 import { readSpawnManifest, readSpawnManifestAddress, type SpawnManifestAddress } from '../../../shared/game/shardfile/spawnManifest';
 import { cookIndexPath } from '../../../shared/game/shardfile/serverPack';
 import { cookedMapPath } from '../../../shared/game/shardfile/cookedMapPath';
+import { installCookedMembers, installCookedObjects } from '@wildshard/engine/boot/contentBase';
+import type { CookedZone } from './cookedZones';
 import { installPlacedSpawn, type PlacedSpawn } from '../boot/placedSpawn';
 
 /** An index is a few KB; a manifest is at most `readSpawnManifestAddress`'s 2 MB. */
@@ -30,7 +32,8 @@ const IndexSchema = v.object({ version: v.literal(1), build: v.string(), slug: v
 /** HG4: a hero's three images, by address. */
 export interface PlacedHero { readonly thumb: string; readonly portrait: string; readonly landscape: string }
 /** What a placed slug needs to enter: its spawn rows and its header's admission row; and its hero (HG4), when the upload carried one. */
-export interface PlacedContent { readonly spawn: PlacedSpawn; readonly verdict: Readonly<Record<string, unknown>> | null; readonly card?: PlacedHero }
+export interface PlacedContent { readonly spawn: PlacedSpawn; readonly verdict: Readonly<Record<string, unknown>> | null; readonly card?: PlacedHero;
+  readonly cooked?: Pick<CookedZone, 'objects' | 'members'> }
 export interface PlacedContentPorts {
   readonly fetch: typeof fetch;
   readonly signal: AbortSignal;
@@ -105,7 +108,11 @@ export async function placedContent(slug: string, hash: string, ports: PlacedCon
 }
 
 /** Make a placed slug's content this page's: its spawn rows for the download, and its admission row beside the build's own. */
-export function installPlacedContent(content: PlacedContent): void {
+export function installPlacedContent(content: PlacedContent, replaceCooked = false): void {
+  if (content.cooked !== undefined) {
+    installCookedObjects(content.cooked.objects, replaceCooked);
+    installCookedMembers(content.cooked.members, replaceCooked);
+  }
   installPlacedSpawn(content.spawn);
   const verdicts: unknown = Reflect.get(globalThis, '__WS_SHARDFILE_VERDICTS__');
   if (content.verdict === null || !Array.isArray(verdicts)) return;

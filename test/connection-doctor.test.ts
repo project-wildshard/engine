@@ -7,6 +7,7 @@ import { createServer as createTcpServer, type AddressInfo, type Server as TcpSe
 import { afterEach, expect, test } from 'vitest';
 import { Scope } from '../src/shared/engine/app/scope';
 import { doctorReport, healthIsPrivate, healthUrl, runDoctor, type DoctorConfig, type DoctorRow } from '../src/client/host/online/doctor';
+import { COOKED_ORIGIN, cookedIndexKey, cookedShardPrefix } from '../src/shared/game/shardfile/cookedPackPaths';
 import { roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
 
 // E7.5 prep: the Connection doctor against a real door on a real socket, and a real origin for the page, the release file and the packs.
@@ -88,6 +89,33 @@ test('RL10: the doctor reads the release and the server book from their respecti
     expect(rows['release']?.state).toBe('pass');
     expect(rows['packs']?.state).toBe('pass');
     expect(calls).toEqual([`GET ${release}`, `GET ${book}`, `HEAD ${part}`]);
+  } finally { globalThis.fetch = read; }
+});
+
+test('PV25: the doctor checks the versioned shard and road on the cooked host', { timeout: 30_000 }, async () => {
+  bench = await roomBench(); answerHealth(bench);
+  const ref = {slug:SHARD,shardVersion:'1.2.3',cookVersion:'1.17.0',cookHash:'a'.repeat(64)};
+  const page = await serveOrigin(signed({...releaseFor(bench.url),channel:'staging',
+    shards:[{slug:SHARD,revision:1,shardVersion:ref.shardVersion}],cook:{version:ref.cookVersion,hash:ref.cookHash}}));
+  const book = new URL('assets/spawn/server-bench.json',COOKED_ORIGIN).href, index = new URL(cookedIndexKey(ref),COOKED_ORIGIN).href;
+  const part = PART.slice(1), shardPart = `${cookedShardPrefix(ref)}common/${part}`;
+  const road = {url:PART, bytes:1, hash:'b'.repeat(64), wireBytes:1, files:[['grid',0,1]]};
+  const read = globalThis.fetch, calls: string[] = [];
+  globalThis.fetch = (input, init) => {
+    const url = String(input);
+    if (url === book || url === index || url.startsWith(COOKED_ORIGIN)) {
+      calls.push(`${init?.method ?? 'GET'} ${url}`);
+      if (url === book) return Promise.resolve(Response.json({book:'server',build:'bench',shards:{},grid:road}));
+      if (url === index) return Promise.resolve(Response.json({...ref,hash:'c'.repeat(64),objects:{[part]:shardPart}}));
+      return Promise.resolve(new Response(null,{status:init?.method === 'HEAD' ? 200 : 405}));
+    }
+    if (url.startsWith('https://packs.wildshard.io') || url === `${page}/assets/spawn/server-bench.json`) throw new Error('Unexpected legacy pack read');
+    return read(input, init);
+  };
+  try {
+    const rows = await run(config(page));
+    expect(rows['packs']?.state, rows['packs']?.value).toBe('pass');
+    expect(calls.sort()).toEqual([`GET ${book}`,`GET ${index}`,`HEAD ${new URL(part,COOKED_ORIGIN).href}`,`HEAD ${new URL(shardPart,COOKED_ORIGIN).href}`].sort());
   } finally { globalThis.fetch = read; }
 });
 
