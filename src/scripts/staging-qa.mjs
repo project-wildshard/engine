@@ -258,7 +258,8 @@ async function cli() {
       }
     } finally {
       try {
-        if (fresh) keepReleaseProof(out, proof, ['verdict.json', 'zone-entry/zone-entry.json', 'zone-entry-retry/zone-entry.json']);
+        if (fresh) keepReleaseProof(out, proof, ['verdict.json', 'local/page-zone-table.log', 'local/page-build.log', 'local/page-join.log',
+          'zone-entry/zone-entry.json', 'zone-entry-retry/zone-entry.json']);
         if (fresh && existsSync(proof)) console.log(`staging QA evidence ${proof}`);
       } finally { scratch.close(); }
     }

@@ -1,12 +1,13 @@
 // SQ5: build the source and exercise a real signed world on loopback.
 import { execFileSync, spawn } from 'node:child_process';
 import { generateKeyPairSync, sign } from 'node:crypto';
-import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { makeGateCopy } from './push-gate-copy.mjs';
 import { importRigAt, reserveRigPorts } from './rig-ports.mjs';
 import { TOUR_FEATURED } from './zone-entry-featured.mjs';
+import { buildEnv, CHANNELS } from './page-release/flow.mjs';
 
 /** @param {string} root @param {string} file @param {string[]} args @param {NodeJS.ProcessEnv} env @param {string} log */
 async function run(root, file, args, env, log) {
@@ -62,6 +63,18 @@ export const QA_RIG_HOME = 'driftwood-isle';
 export const QA_RIG_MORE = Object.freeze(TOUR_FEATURED.filter(slug => slug !== QA_RIG_HOME));
 export const QA_RIG_SHARDS = Object.freeze([QA_RIG_HOME, ...QA_RIG_MORE]);
 
+/** PV17: exercise the signed-channel page build and strict join before building the loopback play fixture.
+ * @param {string} checkout @param {string} build @param {string} work */
+async function checkStagingPageLayout(checkout, build, work) {
+  const zoneTable = join(work, 'page-zone-table.json');
+  await run(checkout, process.execPath, ['--import', './src/scripts/bake-loader.mjs', 'src/scripts/page-release/zone-table.mjs',
+    'own', zoneTable, '--channel=staging', `--build=${build}`], process.env, join(work, 'page-zone-table.log'));
+  const env = buildEnv(CHANNELS.staging, {build, ...(existsSync(zoneTable) ? {zoneTable} : {})});
+  await run(checkout, 'pnpm', ['build:game'], {...process.env, ...env}, join(work, 'page-build.log'));
+  await run(checkout, process.execPath, ['src/scripts/app-build/splitOutput.mjs', 'dist', '--join', '--no-shard-content'],
+    process.env, join(work, 'page-join.log'));
+}
+
 /** @param {{root: string, build: string, out: string, tourSeed?: number}} options */
 export async function openQaRig({ root, build, out, tourSeed }) {
   const work = join(out, 'local'), dist = join(work, 'dist'), keyFile = join(work, 'fixture-key.json');
@@ -74,6 +87,7 @@ export async function openQaRig({ root, build, out, tourSeed }) {
   // QA 11-25 row 130: a free block per run (two lanes' rigs held one fixed 19476 block); an explicit WS_RIG_PORTS still wins
   const ports = await reserveRigPorts().catch((/** @type {unknown} */ error) => { source.remove(); throw error; });
   try {
+    await checkStagingPageLayout(checkout, build, work);
     writeFileSync(keyFile, JSON.stringify({ private: pair.privateKey.export({ type: 'pkcs8', format: 'pem' }), public: key }), { mode: 0o600, flag: 'wx' });
     // Both the app and server are built using this source checkout's tools.
     const { RELEASE_PORT, WORLD_PORT, openRig } = await importRigAt(checkout, ports.base);

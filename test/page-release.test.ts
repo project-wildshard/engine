@@ -177,7 +177,7 @@ test('PV17: staging and production publish no content set, and their build joins
     dry.deps.dryRun = true;
     for (const phase of ['build', 'upload'] as const) await runPhase(phase, dry.deps);
     expect(dry.lines.some(line => /(?<![-\w])content\/|content set's base/u.test(line))).toBe(false);
-    expect(dry.lines.some(line => line.includes('refusing any shard content (S1 to S7)'))).toBe(true);
+    expect(dry.lines.some(line => line.includes('join build-owned files and engine art into dist/, refusing zone payloads'))).toBe(true);
   }
 });
 
