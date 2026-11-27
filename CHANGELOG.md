@@ -13,6 +13,11 @@ it into main while other lanes continue landing.
 `src/scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.98 (2026-11-26)
+
+- Serve signed release metadata, placements and item catalogues from the release domain.
+- Move the rooms and pages together to the new release storage.
+
 ## v0.1.97 (2026-11-26)
 
 - Nine Dragon no longer shows a false "World not drawn" reload card after it loads.
