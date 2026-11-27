@@ -7,6 +7,10 @@ import { parseManifest } from '../../../shared/engine/audio/bootAudio';
 import type { AacCodecFactory } from './aacPull';
 import { Scope } from '../../../shared/engine/app/scope';
 
+// SF23: the engine's piano style keeps only its title (stereo). Its mono twin is a made-up fixture, the title
+// downmixed (`ffmpeg -ac 1 -b:a 16k`), so the pair shares one loop as the retired island calm and tension did.
+const MONO = 'test/fixtures/aac-pair/title-mono.m4a';
+
 class Pcm {
   readonly sampleRate = 48000;
   readonly length: number;
@@ -25,10 +29,11 @@ it('bounds paired stereo/mono preparation on the same rounded loop without whole
   vi.stubGlobal('AudioBuffer', Pcm);
   let closed = 0;
   const raw: unknown = JSON.parse(readFileSync('public/assets/music/piano/music.json', 'utf8'));
-  const spec = parseManifest(raw)?.slots['island'];
-  if (!spec?.tension) throw new Error('Missing paired island score');
+  const title = parseManifest(raw)?.slots['title'];
+  if (!title) throw new Error('Missing tracked title score');
+  const spec = { ...title, tension: MONO };
   const prepare = (file: string) => {
-    const bytes = new Uint8Array(readFileSync(`public/assets/music/piano/${file}`));
+    const bytes = new Uint8Array(readFileSync(file === MONO ? MONO : `public/assets/music/piano/${file}`));
     const channels = indexRecordingAac(bytes).channels;
     let packet = 0;
     const factory: AacCodecFactory = output => ({
