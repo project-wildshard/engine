@@ -16,6 +16,9 @@ import { parseFamilyMaterial } from '@wildshard/format/materialFamilies';
 import { clientMaterials } from '../src/client/game/shardfile/clientMaterials';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 
+// The stub parses only KTX2 inputs. The identifier routes these bytes to the stubbed transcoder.
+const KTX2_IDENTIFIER = [0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a] as const;
+
 function fixture(mode: 'success' | 'decode' | 'pending' | 'missing' = 'success', raw = false) {
   const scope = new Scope('material-loader'), source = emptyShardfile({ slug: 'loader-fixture', name: 'Loader', author: 'Test', seed: 1, revision: 1 });
   source.look.materials['first'] = parseFamilyMaterial({ family: 'painterly', map: 'first' });
@@ -37,7 +40,8 @@ function fixture(mode: 'success' | 'decode' | 'pending' | 'missing' = 'success',
     if (mode === 'pending') complete = () => { loaded?.(texture); };
     else loaded?.(texture);
   });
-  const assets = new Map([['first', new Uint8Array([1])], ...(mode === 'missing' ? [] : [['second', new Uint8Array([2])] as const])]);
+  const assets = new Map([['first', new Uint8Array([...KTX2_IDENTIFIER, 1])]]);
+  if (mode !== 'missing') assets.set('second', new Uint8Array([...KTX2_IDENTIFIER, 2]));
   const start = () => clientMaterials(source, assets, legacyDouble<Renderer>({}), scope, { graphs: false });
   return { scope, textures, loaders, binaries, failure, start, finish: () => { complete(); }, disposed: () => disposed,
     restore: () => { parse.mockRestore();dispose.mockRestore();detect.mockRestore(); } };
@@ -67,7 +71,12 @@ test.each(['decode', 'missing'] as const)('one-shot transcoder retires on %s ref
 test('scope cancellation retires a pending loader once and refuses its late texture', async () => {
   const f = fixture('pending');
   try {
-    const pending = f.start(), late = f.textures[0];if (late === undefined) throw new Error('Missing pending texture');
+    const pending = f.start();
+    const late = await vi.waitFor(() => {
+      const texture = f.textures[0];
+      if (texture === undefined) throw new Error('Missing pending texture');
+      return texture;
+    });
     const released = vi.spyOn(late, 'dispose');
     f.scope.dispose();expect(f.disposed()).toBe(1);f.finish();
     await expect(pending).rejects.toThrow('Material scope unloaded during transcode');
