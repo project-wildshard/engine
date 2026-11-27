@@ -82,10 +82,12 @@ try{
     rmSync(tree,{recursive:true,force:true});
     const archive=execFileSync('git',['archive','HEAD'],{maxBuffer:1024*1024*1024});
     mkdirSync(tree);execFileSync('tar',['-x','-C',tree],{input:archive});linkNodeModules(root,tree);
-    // The page bakes Dunes only (cook-to-play's build): the zone reaches it from its cook alone.
-    node(['src/scripts/pins.ts','install','sunscar-dunes']);
-    const dunes={...catalogue,shards:catalogue.shards.filter((/** @type {{slug:string}} */ shard)=>shard.slug==='sunscar-dunes'),
-      placements:catalogue.placements.filter((/** @type {{slug:string}} */ place)=>place.slug.replace(/^_/u,'')==='sunscar-dunes')};
+    // The page bakes one other zone only (Dunes, cook-to-play's build; Brasscap Mesa when Dunes is under proof, since a
+    // baked zone is not attached from a store): the zone reaches it from its cook alone.
+    const baked=slug==='sunscar-dunes'?'brasscap-mesa':'sunscar-dunes';
+    node(['src/scripts/pins.ts','install',baked]);
+    const dunes={...catalogue,shards:catalogue.shards.filter((/** @type {{slug:string}} */ shard)=>shard.slug===baked),
+      placements:catalogue.placements.filter((/** @type {{slug:string}} */ place)=>place.slug.replace(/^_/u,'')===baked)};
     writeFileSync(join(work,'catalogue.json'),JSON.stringify(dunes));
     const list=join(work,'tree-files.json'),sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
     writeFileSync(list,JSON.stringify({root:realpathSync(tree),files:execFileSync('git',['ls-tree','-r','--name-only','-z','HEAD'],{encoding:'utf8',maxBuffer:16*1024*1024}).split('\0').filter(file=>file!=='')}));

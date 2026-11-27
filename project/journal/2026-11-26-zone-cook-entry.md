@@ -2,7 +2,8 @@
 
 - `src/scripts/zone-cook-entry.mjs --slug <zone> --tarball <shardfile>`
   is the local proof the re-pack rows (SF5 to SF9) close on: it builds a
-  preview page that bakes Dunes only, cooks the tarball with ring-cook
+  preview page that bakes Dunes only (Brasscap Mesa when Dunes is the
+  zone under proof), cooks the tarball with ring-cook
   (one cook per tarball hash), attaches the cook from a local pack
   origin, and enters the zone alone on a headless desktop (1280x800)
   and phone (402x874, pixel density 3), muted.
