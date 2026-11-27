@@ -231,7 +231,7 @@ function installMemberLayer(): boolean {
 /** DL20: a level file whose loose copy left the deploy. Files a home reads in play or past a road crossing are in the home's
  *  whole-level parts and nowhere else, so a page read of one that answers 404 finds its part in the shard's whole manifest,
  *  reads the part once, and keeps its members in the asset cache; the rest of the shard's reads of that part answer there. */
-interface PartMembers {readonly base: string; readonly store: Promise<Cache>; readonly files: ReadonlyMap<string, {readonly file: SpawnManifest['files'][number]; readonly part: SpawnPart; readonly offset: number}>}
+interface PartMembers {readonly base: string; readonly store: Promise<Cache>; readonly files: ReadonlyMap<string, {readonly file: SpawnManifest['files'][number]; readonly part?: SpawnPart; readonly offset: number}>}
 type PartFallback = ReadonlyMap<string, Uint8Array<ArrayBuffer>>;
 const partTables = new ResidentByteCache<string, PartMembers>(CACHE_BYTE_LIMITS.packedIndexes);
 const partTableReads = new Map<string, Promise<PartMembers | null>>(), partReads = new Map<string, Promise<PartFallback>>();
@@ -248,7 +248,9 @@ async function partTable(slug: string, tier: 'phone' | 'desktop'): Promise<PartM
   const [response, code] = await Promise.all([downloadFetch()(onPacks(address.url, selected.base)),
     address.code === undefined ? undefined : downloadFetch()(contentURL(new URL(address.code.url, document.baseURI).href))]);
   if (!response.ok || code?.ok === false) { void response.body?.cancel().catch(() => undefined); void code?.body?.cancel().catch(() => undefined); return null; }
-  const manifest = joinSpawnManifest(readSpawnManifest(await response.json()), code === undefined ? undefined : readSpawnCodeList(await code.json())), files = new Map<string, {file: SpawnManifest['files'][number]; part: SpawnPart; offset: number}>();
+  const manifest = joinSpawnManifest(readSpawnManifest(await response.json()), code === undefined ? undefined : readSpawnCodeList(await code.json())), files = new Map<string, {file: SpawnManifest['files'][number]; part?: SpawnPart; offset: number}>();
+  // a file no part holds (a fence file the entry reads loose: Pine's sky, Nalati's cover textures) sits beside the parts
+  for (const file of manifest.files) files.set(new URL(file.url, document.baseURI).pathname, {file, offset: 0});
   for (const part of manifest.parts ?? []) for (const [index, offset] of part.members) {
     const file = manifest.files[index]; if (file !== undefined) files.set(new URL(file.url, document.baseURI).pathname, {file, part, offset});
   }
@@ -281,19 +283,6 @@ async function partRow(slug: string, path: string): Promise<{table: PartMembers;
   }
   return null;
 }
-let zoneBank: {readonly text: string; readonly slugs: ReadonlySet<string>} | undefined;
-/** Whether `/assets/<slug>/` names a cooked zone this page can download (a placed one or one its bank lists), not an engine
- *  folder (`/assets/tex/`): only a zone's reads look in its parts. The bank is parsed once per text. */
-function cookedZoneSlug(slug: string): boolean {
-  if (slug === 'spawn' || typeof document === 'undefined') return false;
-  if (placedSpawn(slug) !== undefined) return true;
-  const text = bootBankText() ?? '';
-  if (zoneBank?.text !== text) {
-    const client = text === '' ? undefined : get(get(JSON.parse(text) as unknown, 'spawnManifests'), 'client');
-    zoneBank = {text, slugs: new Set(typeof client === 'object' && client !== null ? Object.keys(client).map(bareSlug) : [])};
-  }
-  return zoneBank.slugs.has(bareSlug(slug));
-}
 function readMembersOf(part: SpawnPart, table: PartMembers): Promise<PartFallback> {
   const held = partReads.get(part.url);
   if (held !== undefined) return held;
@@ -304,7 +293,7 @@ function readMembersOf(part: SpawnPart, table: PartMembers): Promise<PartFallbac
     if (body.length !== part.bytes) throw new Error(`Spawn part size differs: ${part.url}`);
     let quotaDenied = false;
     const fallback = new Map<string, Uint8Array<ArrayBuffer>>();
-    await Promise.all([...table.files].filter(([, row]) => row.part.url === part.url).map(async ([path, {file, offset}]) => {
+    await Promise.all([...table.files].filter(([, row]) => row.part?.url === part.url).map(async ([path, {file, offset}]) => {
       const member = body.slice(offset, offset + file.bytes);
       if (await sha256(member) !== file.hash) throw new Error(`Spawn part member differs: ${part.url}`);
       if (!quotaDenied) {
@@ -353,9 +342,19 @@ async function partMember(url: URL): Promise<Response | null> {
     const slug = url.pathname.split('/')[2] ?? '';
     const held = await partRow(slug, url.pathname);
     if (held === null) return null;
+    if (held.row.part === undefined) return await looseMember(url, held.row.file, held.table, slug);
     const fallback = (await readMembersOf(held.row.part, held.table)).get(url.pathname);
     return fallback === undefined ? await heldPartMember(url) : memberResponse(url, fallback);
   } catch { return null; }
+}
+/** A manifest file no part holds: read where its download reads it (beside the parts, PV4's object or the zone's upload),
+ *  served only as the manifest's exact bytes. */
+async function looseMember(url: URL, file: SpawnManifest['files'][number], table: PartMembers, slug: string): Promise<Response | null> {
+  const listed = new URL(file.url, document.baseURI), base = new URL(table.base, document.baseURI).href;
+  const target = cookedObjectURL(listed.pathname, listed.search) ?? manifestLoose(listed.pathname, listed.search, slug)
+    ?? (base === contentBase() ? contentURL(listed.href) : new URL(listed.pathname + listed.search, base).href);
+  const body = await exactCopy({url: target, bytes: file.bytes, hash: file.hash, read: address => downloadFetch()(address)});
+  return body === null ? null : memberResponse(url, body);
 }
 async function sha256(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
   return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), byte => byte.toString(16).padStart(2, '0')).join('');
@@ -975,6 +974,20 @@ export function prefetchSpawnDownload(slug: string, tier: 'phone' | 'desktop', f
   }};
 }
 const get = (value: unknown, key: string): unknown => typeof value === 'object' && value !== null ? Reflect.get(value, key) : undefined;
+let zoneBank: {readonly text: string; readonly slugs: ReadonlySet<string>} | undefined;
+/** Whether `/assets/<slug>/` names a cooked zone this page can download (a placed one or one its bank lists), not an engine
+ *  folder (`/assets/tex/`): only a zone's reads look in its parts. The bank is parsed once per text. */
+function cookedZoneSlug(slug: string): boolean {
+  // `/assets/spawn/` is no zone: no placed row or bank key names it
+  if (typeof document === 'undefined') return false;
+  if (placedSpawn(slug) !== undefined) return true;
+  const text = bootBankText() ?? '';
+  if (zoneBank?.text !== text) {
+    const client = text === '' ? undefined : get(get(JSON.parse(text) as unknown, 'spawnManifests'), 'client');
+    zoneBank = {text, slugs: new Set(typeof client === 'object' && client !== null ? Object.keys(client).map(bareSlug) : [])};
+  }
+  return zoneBank.slugs.has(bareSlug(slug));
+}
 function bookSelection(book: unknown, slug: string, flow: 'client' | 'grid', tier: 'phone' | 'desktop', mode: string): SpawnManifestAddress | null {
   // Stored cooks name the product (`proto`); its authored route can be
   // `_proto`. Preserve exact build rows, then use that product's cook row.
