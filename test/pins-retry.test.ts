@@ -109,3 +109,32 @@ test('a pinned shardfile: a mirror 503 is tried again, a mirror 404 falls back t
   const stderr = await pinsTool(tree.root, tree.env, 'keep', 'kept');
   expect(stderr).toContain(`neither the mirror nor the API holds ${tree.hash}: could not fetch ${tree.base}/mirror/${tree.hash}.tar (404), then ${tree.base}/api/shardfiles/${tree.hash} (503 after 3 tries)`);
 }, 60_000);
+
+test('a pinned shardfile: a mirror that stops sending bytes is cut at the stall limit and the API serves the pin (QA 11-26 row 29)', async () => {
+  const body = Buffer.from('a pinned tarball'), hash = createHash('sha256').update(body).digest('hex');
+  const seen: string[] = [];
+  // The mirror sends its headers and half the body, then nothing: the read a gate copy waited 44 minutes on.
+  const server = createServer((request, response) => {
+    const path = (request.url ?? '').split('?')[0] ?? '';
+    seen.push(path);
+    if (path === `/mirror/${hash}.tar`) { response.writeHead(200, { 'content-length': String(body.length) }); response.write(body.subarray(0, 8)); return; }
+    response.statusCode = path === `/api/shardfiles/${hash}` ? 200 : 404;
+    response.end(response.statusCode === 200 ? body : '');
+  });
+  servers.push(server);
+  await new Promise<void>(done => { server.listen(0, '127.0.0.1', () => { done(); }); });
+  const address = server.address();
+  if (address === null || typeof address === 'string') throw new Error('No fixture port');
+  const base = `http://127.0.0.1:${String(address.port)}`, root = mkdtempSync(join(tmpdir(), 'pins-stall-'));
+  folders.push(root);
+  mkdirSync(join(root, 'test/pins'), { recursive: true });
+  writeFileSync(join(root, 'test/pins/shardfiles.json'), JSON.stringify({ api: 'local', shards: [{ slug: 'nalati', uploadNumber: 1, hash, bytes: body.length }] }));
+  const env = { ...process.env, WILDSHARD_API: base, WILDSHARD_PIN_MIRROR: `${base}/mirror`, WILDSHARD_PIN_CACHE: join(root, 'cache'), WILDSHARD_PIN_RETRY_MS: '1', WILDSHARD_PIN_STALL_MS: '300' };
+  const began = performance.now(), stderr = await pinsTool(root, env, 'keep', 'kept');
+  server.closeAllConnections();
+  expect(stderr).toContain('stalled: no bytes for 0.3 s');
+  expect(kept(root, hash)).toBe(hash);
+  expect(seen).toEqual([`/mirror/${hash}.tar`, `/mirror/${hash}.tar`, `/mirror/${hash}.tar`, `/api/shardfiles/${hash}`]);
+  // three stalled reads at 0.3 s and the backoff, never the minutes a stall used to take
+  expect(performance.now() - began).toBeLessThan(15_000);
+}, 30_000);

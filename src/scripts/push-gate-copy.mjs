@@ -20,7 +20,8 @@ import {execFileSync,spawn,spawnSync} from 'node:child_process';
 import {existsSync,lstatSync,mkdirSync,readFileSync,readdirSync,renameSync,rmSync} from 'node:fs';
 import {dirname,join,resolve} from 'node:path';
 import {clonePaths} from './.kit/apfs-clone.mjs';
-import {verifiedPinsOutputs} from './pins-reuse.mjs';
+import {gateStep} from './gate-step.mjs';
+import {manifestMounts,verifiedPinsOutputs} from './pins-reuse.mjs';
 import {checkedTreeDirt} from './push-proof-cache.mjs';
 import {cloneTrackedFiles,withStoreUse} from './.kit/worktree.mjs';
 
@@ -37,6 +38,9 @@ function git(cwd,args){
  const env=Object.fromEntries(Object.entries(process.env).filter(([key])=>!key.startsWith('GIT_')));
  return execFileSync('git',args,{cwd,env,encoding:'utf8',stdio:['ignore','pipe','pipe'],maxBuffer:256<<20}).trim();
 }
+
+/** The environment without GIT_* keys, for a step run inside the copy. @param {NodeJS.ProcessEnv} env */
+const gitless=env=>Object.fromEntries(Object.entries(env).filter(([key])=>!key.startsWith('GIT_')));
 
 /** The one commit a push publishes, or null for a delete-only push. Publishing refs with different trees keep the
  * old refusal: one gate proves one tree. @param {string} root @param {string|undefined} refs @returns {string|null} */
@@ -139,7 +143,10 @@ export function makeGateCopy(root,sha,{say=line=>process.stderr.write(`${line}\n
    const pairs=/** @type {[string,string][]} */([]);
    for(const dir of installIsolated?['out']:BUILD_STATE)if(existsSync(join(root,dir))&&!existsSync(join(path,dir))){mkdirSync(dirname(join(path,dir)),{recursive:true});pairs.push([join(root,dir),join(path,dir)]);}
    // The pins mounts this checkout's own install published (verified against its manifest), file by file.
-   for(const mount of verifiedPinsOutputs(root).paths)if(!existsSync(join(path,mount))){mkdirSync(dirname(join(path,mount)),{recursive:true});pairs.push([join(root,mount),join(path,mount)]);}
+   // QA 11-26 row 29: with the checkout's pins key moved (the pushed commit moves a pin), the mounts its last install
+   // published still come along, so the copy's `pins` keeps every unchanged pin instead of fetching and unpacking all
+   const verified=verifiedPinsOutputs(root).paths,mounts=verified.size>0?verified:manifestMounts(root);
+   for(const mount of mounts)if(!existsSync(join(path,mount))){mkdirSync(dirname(join(path,mount)),{recursive:true});pairs.push([join(root,mount),join(path,mount)]);}
    return `${pairs.length} paths, ${clonePaths(pairs)}`;
   });
   // The cloned packages are the checkout's install, which another lane's uncommitted `pnpm add` may have changed: the
@@ -149,13 +156,14 @@ export function makeGateCopy(root,sha,{say=line=>process.stderr.write(`${line}\n
   if(installIsolated&&existsSync(lock)){
    timed('isolated install',()=>{
     const args=['install','--frozen-lockfile','--offline','--config.enableGlobalVirtualStore=false','--config.packageImportMethod=clone-or-copy'];
-    const child=withStoreUse(env,'isolated land install',()=>spawnSync('pnpm',args,{cwd:path,env:Object.fromEntries(Object.entries(env).filter(([key])=>!key.startsWith('GIT_'))),stdio:['ignore','pipe','pipe'],encoding:'utf8',maxBuffer:64<<20}));
-    if(child.status!==0)throw new Error(`pnpm install in the isolated land gate failed: ${(child.error?.message??`${child.stderr}${child.stdout}`).trim().split('\n').slice(-3).join(' | ')}`);
+    // QA 11-26 row 29: every copy step runs to a limit and fails with its name and last output (gate-step.mjs)
+    try{withStoreUse(env,'isolated land install',()=>gateStep('isolated install','pnpm',args,{cwd:path,env:gitless(env)}));}
+    catch(error){throw new Error(`pnpm install in the isolated land gate failed: ${error instanceof Error?error.message:String(error)}`);}
    });
   }else if(existsSync(lock)&&existsSync(join(path,'node_modules'))&&(lockMoved?syncLock:brokenLink(join(path,'node_modules')))){
    timed('install',()=>{
-    const child=spawnSync('pnpm',['install','--frozen-lockfile','--offline'],{cwd:path,env:Object.fromEntries(Object.entries(env).filter(([key])=>!key.startsWith('GIT_'))),stdio:['ignore','ignore','pipe'],encoding:'utf8'});
-    if(child.status!==0)throw new Error(`pnpm install in the gate copy exited ${String(child.status)}: ${child.stderr.trim().split('\n').slice(-3).join(' | ')}`);
+    try{gateStep('install','pnpm',['install','--frozen-lockfile','--offline'],{cwd:path,env:gitless(env)});}
+    catch(error){throw new Error(`pnpm install in the gate copy failed: ${error instanceof Error?error.message:String(error)}`);}
     return lockMoved?'pushed lockfile differs from the checkout\'s install':'cloned package links do not resolve';
    });
   }
@@ -167,8 +175,8 @@ export function makeGateCopy(root,sha,{say=line=>process.stderr.write(`${line}\n
    // lends none: publish this tree's own, once, or gen:inputs stamps the missing mounts out of the boot tables.
    timed('pins',()=>{
     const args=['--silent','pins'];
-    const child=spawnSync('pnpm',args,{cwd:path,env:Object.fromEntries(Object.entries(env).filter(([key])=>!key.startsWith('GIT_'))),stdio:['ignore','ignore','pipe'],encoding:'utf8'});
-    if(child.status!==0)throw new Error(`pnpm pins in the gate copy exited ${String(child.status)}: ${child.stderr.trim().split('\n').slice(-3).join(' | ')}`);
+    try{gateStep('pins','pnpm',args,{cwd:path,env:gitless(env)});}
+    catch(error){throw new Error(`pnpm pins in the gate copy failed: ${error instanceof Error?error.message:String(error)}`);}
     return dirt.length>0?`${dirt.length} unclean path(s)`:'no verified pins outputs cloned';
    });
    dirt=checkedTreeDirt(path);

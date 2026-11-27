@@ -141,20 +141,37 @@ async function fetched(url: string, slug: string, hash: string, options?: Reques
   return (await fetchedOnce(url, slug, hash, options)).bytes;
 }
 
-/** `fetched`, saying whether a miss may pass: no response, a 5xx, or a body cut short. A 4xx is a definite miss. */
+/** Meta QA 11-26 row 29: a pin read that sends no byte for this long has stalled (an engine push gate sat 44 minutes in
+ *  `pins install`, 11-27). The read is aborted and counts as a miss that may pass, so it is tried again and then names
+ *  its URL; a slow read that keeps sending bytes is never cut. */
+const STALL_MS = Number(process.env.WILDSHARD_PIN_STALL_MS ?? '60000');
+
+/** `fetched`, saying whether a miss may pass: no response, a 5xx, a body cut short or a stalled read. A 4xx is a
+ *  definite miss. */
 async function fetchedOnce(url: string, slug: string, hash: string, options?: RequestInit): Promise<{ readonly bytes?: Uint8Array; readonly transient: boolean; readonly status: string }> {
-  const response = await fetch(url, options).catch(() => undefined);
-  if (response === undefined) return { transient: true, status: 'no response' };
-  if (!response.ok) return { transient: response.status >= 500, status: String(response.status) };
-  // A connection can close after headers, before the immutable body is complete.
-  const body = await response.arrayBuffer().catch(() => {
-    console.warn(`${slug}: could not finish reading a pin source`);
-    return undefined;
-  });
-  if (body === undefined) return { transient: true, status: 'body cut short' };
-  const bytes = new Uint8Array(body);
-  if (sha256(bytes) !== hash) throw new Error(`${slug}: ${url} is not the pin`);
-  return { bytes, transient: false, status: String(response.status) };
+  const stall = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const arm = (): void => { clearTimeout(timer); timer = setTimeout(() => { stall.abort(); }, STALL_MS); };
+  const stalled = (): string => `stalled: no bytes for ${String(STALL_MS / 1000)} s`;
+  arm();
+  try {
+    const signal = options?.signal === undefined || options.signal === null ? stall.signal : AbortSignal.any([options.signal, stall.signal]);
+    const response = await fetch(url, { ...options, signal }).catch(() => undefined);
+    if (response === undefined) return { transient: true, status: stall.signal.aborted ? stalled() : 'no response' };
+    if (!response.ok) { await response.body?.cancel().catch(() => undefined); return { transient: response.status >= 500, status: String(response.status) }; }
+    // A connection can close after headers, before the immutable body is complete, or stop sending bytes.
+    const chunks: Uint8Array[] = [], reader = response.body?.getReader();
+    try {
+      for (let read = await reader?.read(); read !== undefined && !read.done; read = await reader?.read()) { chunks.push(read.value); arm(); }
+    } catch {
+      console.warn(`${slug}: could not finish reading a pin source${stall.signal.aborted ? ` (${stalled()})` : ''}`);
+      return { transient: true, status: stall.signal.aborted ? stalled() : 'body cut short' };
+    }
+    const bytes = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.length, 0));
+    chunks.reduce((at, chunk) => { bytes.set(chunk, at); return at + chunk.length; }, 0);
+    if (sha256(bytes) !== hash) throw new Error(`${slug}: ${url} is not the pin`);
+    return { bytes, transient: false, status: String(response.status) };
+  } finally { clearTimeout(timer); }
 }
 
 /** Meta QA 11-25 row 39 (J505): the base of the retry waits, so a miss that may pass gets 3 tries over about 30 s. */

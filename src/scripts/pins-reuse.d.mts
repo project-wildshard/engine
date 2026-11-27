@@ -38,6 +38,8 @@ export function dropManifest(root: string): void;
 export function stalePinFolders(root: string, hashes?: readonly string[]): { folder: string; uploadNumber: unknown }[];
 export function pruneStalePinProducts(root: string, hashes?: readonly string[]): { folder: string; uploadNumber: unknown }[];
 export function verifiedPinsOutputs(root: string): { paths: Set<string>; key: string };
+/** Meta QA 11-26 row 29: the ledger mounts whose bytes still hash to the manifest, whatever its key (a gate copy borrows them). */
+export function manifestMounts(root: string, manifest?: Manifest): Set<string>;
 export function writeManifest(root: string, key: string, products: Manifest['products'], mounts: Manifest['mounts'], incremental?: Incremental): void;
 export function lockPins(root: string, options?: { wait?: boolean }): (() => void) | undefined;
 export function hashFiles(files: readonly { path: string; bytes: number }[]): Promise<string[]>;

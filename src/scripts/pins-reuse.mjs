@@ -133,11 +133,23 @@ function readManifest(root){
  * @param {string} root @returns {{paths:Set<string>,key:string}}
  */
 export function verifiedPinsOutputs(root){
- /** @type {Set<string>} */const paths=new Set();
  const manifest=readManifest(root);
- if(manifest===undefined||manifest.key!==pinsKey(root,shardfileValidationRevision(root)))return {paths,key:''};
+ if(manifest===undefined||manifest.key!==pinsKey(root,shardfileValidationRevision(root)))return {paths:new Set(),key:''};
+ return {paths:manifestMounts(root,manifest),key:manifest.key};
+}
+
+/**
+ * Meta QA 11-26 row 29: the untracked mounts `root`'s last full install published that still hash to its manifest,
+ * whatever pins `root` names now. A push gate copy of a commit that moves one pin clones them, so its `pins` install
+ * keeps every unchanged pin (reuseUnchangedPins) rather than unpacking and fetching all of them again; that install
+ * verifies or replaces each one, so a mount cloned here is never trusted unchecked.
+ * @param {string} root @param {Manifest|undefined} [manifest] @returns {Set<string>}
+ */
+export function manifestMounts(root,manifest=readManifest(root)){
+ /** @type {Set<string>} */const paths=new Set();
+ if(manifest===undefined)return paths;
  /** @type {unknown} */let ledger;
- try{ledger=JSON.parse(readFileSync(join(root,LEDGER),'utf8')).published;}catch{return {paths,key:''};}
+ try{ledger=JSON.parse(readFileSync(join(root,LEDGER),'utf8')).published;}catch{return paths;}
  for(const path of Array.isArray(ledger)?ledger:[]){
   if(typeof path!=='string'||!mountPath(path)||!Object.hasOwn(manifest.mounts,path))continue;
   try{
@@ -146,7 +158,7 @@ export function verifiedPinsOutputs(root){
    if(createHash('sha256').update(readFileSync(join(root,path))).digest('hex')===manifest.mounts[path])paths.add(path);
   }catch{/* Missing or outside: it stays untracked dirt. */}
  }
- return {paths,key:manifest.key};
+ return paths;
 }
 
 /** Forget the last full install: out/ is about to change. @param {string} root */

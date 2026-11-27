@@ -8,7 +8,7 @@ import {tmpdir} from 'node:os';
 import {dirname, join, resolve} from 'node:path';
 import {afterEach, describe, expect, test} from 'vitest';
 import {clonePaths} from '../scripts/.kit/apfs-clone.mjs';
-import {KEY_EXEMPT, KEY_SOURCES, MANIFEST, hashFiles, lockPins, pinsCompatibilityKey, pinsKey, reusePins, reuseUnchangedPins, staleReceipt, writeManifest} from '../scripts/pins-reuse.mjs';
+import {KEY_EXEMPT, KEY_SOURCES, MANIFEST, hashFiles, lockPins, manifestMounts, pinsCompatibilityKey, pinsKey, reusePins, reuseUnchangedPins, staleReceipt, verifiedPinsOutputs, writeManifest} from '../scripts/pins-reuse.mjs';
 
 /** @type {string[]} */
 const roots = [];
@@ -264,6 +264,36 @@ describe('pins reuse', () => {
     put(root, 'public/assets/new.ktx2', 'shared');
     git(root, ['add', 'public/assets/new.ktx2']);
     expect(pinsCompatibilityKey(root, 'r1')).not.toBe(changedInstallerInputs);
+  });
+
+  test('QA 11-26 row 29: a commit that moves a pin still lends a gate copy its checkout\'s mounts, so unchanged pins stay', async () => {
+    const {root} = repos();
+    const first = {slug: 'dunes', hash: PIN, uploadNumber: 1, bytes: 100}, second = {slug: 'pine', hash: 'c'.repeat(64), uploadNumber: 2, bytes: 200};
+    const shared = 'public/assets/a/m.bin', tracked = 'public/assets/a/tracked.bin', pineMount = 'public/assets/a/pine.bin';
+    const hashes = (/** @type {Record<string,string>} */ files) => Object.fromEntries(Object.entries(files).map(([path, body]) => [path, sha(body)]));
+    const dunes = {...PRODUCT, 'validation.json': JSON.stringify({pin: first})}, pine = {...PRODUCT, 'validation.json': JSON.stringify({pin: second})};
+    for (const [path, body] of Object.entries(dunes)) put(root, `out/dunes/${path}`, body);
+    for (const [path, body] of Object.entries(pine)) put(root, `out/pine/${path}`, body);
+    put(root, pineMount, 'pine');
+    put(root, 'out/.pins.json', JSON.stringify({revision: 'r1', published: [shared, pineMount]}));
+    const inputs = pinsCompatibilityKey(root, 'r1');
+    writeManifest(root, KEY, {dunes: hashes(dunes), pine: hashes(pine)}, hashes({...MOUNTS, [pineMount]: 'pine'}), {inputs, owners: {
+      dunes: {descriptor: sha(JSON.stringify(first)), folder: 'dunes', mounts: [shared, tracked]},
+      pine: {descriptor: sha(JSON.stringify(second)), folder: 'pine', mounts: [shared, pineMount]},
+    }});
+    // the checkout's key is not its committed pins' (KEY is made up), as after a pull or a commit that moves a pin:
+    // nothing is "verified", but the mounts its last install published still hash to its manifest
+    expect(verifiedPinsOutputs(root).paths.size).toBe(0);
+    expect([...manifestMounts(root)].sort()).toEqual([shared, pineMount]);
+    put(root, pineMount, 'corrupt');
+    expect([...manifestMounts(root)]).toEqual([shared]);
+    put(root, pineMount, 'pine');
+    // the gate copy clones out/ whole and those mounts (push-gate-copy.mjs), and its install keeps the unchanged pin
+    const copy = join(root, '.worktrees/p');
+    clonePaths([[join(root, 'out'), join(copy, 'out')], ...[...manifestMounts(root)].map(path => /** @type {[string,string]} */([join(root, path), join(copy, path)]))]);
+    const changed = {...second, hash: 'd'.repeat(64), uploadNumber: 3};
+    const retained = await reuseUnchangedPins(copy, pinsCompatibilityKey(copy, 'r1'), [first, changed]);
+    expect(Object.keys(retained?.products ?? {})).toEqual(['dunes']);
   });
 
   test('every local module the installer loads is in the key or says why its bytes cannot change out/', () => {
