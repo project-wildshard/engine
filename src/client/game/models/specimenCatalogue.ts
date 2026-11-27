@@ -5,6 +5,9 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import { SpecimenCatalogueSchema, SpecimenAssetSchema, PackedSpecimenSchema, SpecimenMaterialSchema, assertSpecimenJson as jsonData, type SpecimenLocationRows, type SpecimenAtlasRows } from '@wildshard/format/specimenCatalogue';
 import { parseKtx2 } from '@wildshard/format/ktx2Cost';
 import { parseKtx2Bytes } from '@wildshard/engine/core/ktx2';
+import { blobGpuFile } from '@wildshard/engine/boot/gpuFiles';
+import { cookedBlobBytes, imageTexture, textureKind } from '../shardfile/blobTextures';
+import { contentHash } from '../../../shared/game/shardfile/contentHash';
 import { gpuOnlyTexture } from '@wildshard/engine/core/gpuOnly';
 import * as THREE from 'three';
 import * as v from 'valibot';
@@ -178,6 +181,19 @@ function atlasBytes(row: SpecimenAtlasRows, input?: Uint8Array | ReadonlyMap<str
   return bytes;
 }
 const ownedAtlases = new WeakMap<Uint8Array, Map<string, Promise<THREE.Texture>>>();
+/** SF6 (J525): an atlas a shard carries as a PNG or JPEG, read through the cook's KTX2 of it when the table names one
+ *  (under the image's hash, as every image blob is) and this page loads KTX2; else the image is decoded. Keyed by the
+ *  image's own prepared bytes, filled once in preparation. */
+const cookedAtlases = new WeakMap<Uint8Array, Uint8Array>();
+/** The KTX2 bytes an atlas draws from, or the image it decodes (`image`). Refuses bytes that are neither. */
+async function preparedAtlas(bytes: Uint8Array, file: (hash: string) => string | undefined = hash => blobGpuFile(hash)): Promise<'ktx2' | 'image'> {
+  const kind = textureKind(bytes);
+  if (kind === undefined) throw new Error('Specimen atlas is neither KTX2 nor a PNG or JPEG');
+  if (kind === 'ktx2') { parseKtx2(bytes); return kind; }
+  const hash = await contentHash(bytes), cooked = (await cookedBlobBytes([hash], new Map([[hash, bytes]]), file)).get(hash);
+  if (cooked === undefined) return 'image';
+  parseKtx2(cooked); cookedAtlases.set(bytes, cooked); return 'ktx2';
+}
 const atlasIdentities = new WeakMap<Uint8Array, number>();
 let atlasSequence = 0;
 function atlasKey(row: SpecimenAtlasRows, bytes: Uint8Array): string {
@@ -192,7 +208,8 @@ function loadAtlas(row: SpecimenAtlasRows, bytes: Uint8Array): Promise<THREE.Tex
   if (memo === undefined) { memo = new Map(); ownedAtlases.set(bytes, memo); }
   const key = JSON.stringify(row), known = memo.get(key);
   if (known !== undefined) return known;
-  const pending = parseKtx2Bytes(bytes).then(texture => {
+  const cooked = cookedAtlases.get(bytes), image = cooked === undefined && textureKind(bytes) === 'image';
+  const pending = (image ? imageTexture(bytes) : parseKtx2Bytes(cooked ?? bytes)).then(texture => {
     try {
       const gpuMips = row.minFilter >= 9984 && texture.mipmaps.length <= 1;
       if (gpuMips && texture instanceof THREE.CompressedTexture) throw new Error('Specimen atlas requires its declared mip chain');
@@ -426,7 +443,7 @@ function specimenPreparation(product:BinaryFileReader,input:unknown,scope:Scope|
     const checked=new Set<Uint8Array>();
     for(const asset of assets){const bytes=assetBytes(asset,files);if(bytes!==undefined&&!checked.has(bytes)){selfContainedSpecimen(bytes);checked.add(bytes);}}
     const checkedAtlases = new Set<Uint8Array>();
-    for (const atlas of atlases) { const bytes = atlasBytes(atlas, files); if (!checkedAtlases.has(bytes)) { parseKtx2(bytes); checkedAtlases.add(bytes); } }
+    for (const atlas of atlases) { const bytes = atlasBytes(atlas, files); if (!checkedAtlases.has(bytes)) { checkedAtlases.add(bytes); await preparedAtlas(bytes); live(); } }
     const decoded=new Map<string,Uint8Array>();
     for(const pack of packs)if(typeof pack.bin!=='string'){
       let bytes=decoded.get(pack.bin.file);

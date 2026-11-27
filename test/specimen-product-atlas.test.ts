@@ -10,6 +10,8 @@ import type { Renderer } from '../src/client/engine/render/renderer';
 import { TIER, initializeTier } from '../src/client/engine/core/tier';
 import * as ktx2 from '../src/client/engine/core/ktx2';
 import * as gpuFiles from '../src/client/engine/boot/gpuFiles';
+import * as blobTextures from '../src/client/game/shardfile/blobTextures';
+import { contentHash } from '../src/shared/game/shardfile/contentHash';
 import { SkyRig } from '../src/client/engine/world/skyRig';
 import { WorldRegistry } from '../src/client/engine/world/registry';
 import { modelContext } from '../src/client/engine/models/model';
@@ -199,4 +201,43 @@ test(lifetime, async () => {
     expect(result.asset.geometry.getAttribute('position').count).toBe(24); expect(pixelBytes(result.asset.map).length).toBe(32);
     result.asset.geometry.dispose(); result.asset.material.dispose(); result.asset.map?.dispose();
   });
+});
+
+/** SF6 (J525): a shard carries its atlas as a PNG; the cook names a KTX2 of it in the table under the image's hash. */
+function pngAtlasFixture() {
+  const f = fixture(), png = Uint8Array.from({ length: 96 }, (_, at) => [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52][at] ?? at);
+  const asset = { ...f.asset, atlas: { ...f.asset.atlas, file: 'textures/crate.png', bytes: png.length } };
+  const rows = [{ ...f.rows[0], source: { kind: 'asset', asset } }];
+  return { ...f, png, asset, rows, files: new Map([[asset.url.file, f.model], [asset.atlas.file, png]]) };
+}
+
+test('a PNG atlas draws the cook\'s KTX2 the table names under its hash', async () => {
+  initializeTier('desktop'); const f = pngAtlasFixture(), sky = skyFixture(), hash = await contentHash(f.png);
+  const cooked = vi.spyOn(blobTextures, 'cookedBlobBytes').mockResolvedValue(new Map([[hash, f.atlas]]));
+  const decode = vi.spyOn(blobTextures, 'imageTexture');
+  try {
+    const files = await prepareSpecimenCatalogue({ file: name => { const bytes = f.files.get(name); if (bytes === undefined) throw new Error('Undeclared fixture file'); return Promise.resolve(bytes); } }, f.rows);
+    expect(cooked).toHaveBeenCalledTimes(1);
+    expect([...(cooked.mock.calls[0]?.[0] ?? [])]).toEqual([hash]);
+    const asset = await loadBoundSpecimen(sky, f.asset, files);
+    try {
+      expect(Buffer.compare(pixelBytes(asset.map), Buffer.from(f.pixels))).toBe(0);
+      expect(decode).not.toHaveBeenCalled();
+    } finally { asset.geometry.dispose(); asset.material.dispose(); asset.map?.dispose(); }
+  } finally { cooked.mockRestore(); decode.mockRestore(); }
+});
+
+test('a PNG atlas with no cooked row decodes the image, sampled as its KTX2 would be', async () => {
+  initializeTier('desktop'); const f = pngAtlasFixture(), sky = skyFixture();
+  const cooked = vi.spyOn(blobTextures, 'cookedBlobBytes').mockResolvedValue(new Map());
+  const decode = vi.spyOn(blobTextures, 'imageTexture').mockImplementation(() => Promise.resolve(new THREE.Texture()));
+  try {
+    const files = await prepareSpecimenCatalogue({ file: name => { const bytes = f.files.get(name); if (bytes === undefined) throw new Error('Undeclared fixture file'); return Promise.resolve(bytes); } }, f.rows);
+    const asset = await loadBoundSpecimen(sky, f.asset, files);
+    try {
+      expect(decode).toHaveBeenCalledWith(f.png);
+      expect(asset.map).toMatchObject({ wrapS: THREE.RepeatWrapping, wrapT: THREE.ClampToEdgeWrapping, minFilter: THREE.LinearMipmapLinearFilter,
+        anisotropy: 4, colorSpace: THREE.SRGBColorSpace, flipY: false, generateMipmaps: true });
+    } finally { asset.geometry.dispose(); asset.material.dispose(); asset.map?.dispose(); }
+  } finally { cooked.mockRestore(); decode.mockRestore(); }
 });
