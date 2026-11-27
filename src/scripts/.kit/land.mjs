@@ -522,7 +522,7 @@ class Landing{
   if(!refreshPublication&&existsSync(join(this.root,PINS_LEDGER))&&stale.length===0)return false;
   this.say('pins',refreshPublication?'full pin publication is stale or missing; running pnpm pins before gen:inputs'
    :stale.length===0?`no ${PINS_LEDGER}: this worktree never ran pnpm pins; running it before gen:inputs`
-   :`out/ holds pins main no longer names (${stale.map(row=>`${row.folder} revision ${String(row.revision)}`).join(', ')}); running pnpm pins before gen:inputs`);
+   :`out/ holds pins main no longer names (${stale.map(row=>`${row.folder} upload ${String(row.uploadNumber)}`).join(', ')}); running pnpm pins before gen:inputs`);
   const ran=spawnSync('pnpm',['--silent','pins'],{cwd:this.root,env:this.env,encoding:'utf8',stdio:['ignore','pipe','pipe'],maxBuffer:256<<20});
   if(ran.status!==0){
    const why=`${ran.stderr??''}${ran.stdout??''}`.trim().split('\n').slice(-3).join(' | ')||String(ran.error??`exit ${String(ran.status)}`);

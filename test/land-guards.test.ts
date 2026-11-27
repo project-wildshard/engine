@@ -37,7 +37,7 @@ describe('land (J422): the guards around the main push, and Git retries', () => 
     const f = fixture(), calls = plantPnpm(f, null);
     const wt = f.worktree('foo');
     f.commit(wt, 'package.json', '{"scripts":{"pins":"node src/scripts/pins.ts"}}\n', 'chore: a pins script');
-    f.commit(wt, 'test/pins/shardfiles.json', `${JSON.stringify({ shards: [{ slug: 'dunes', revision: 2, hash: 'b'.repeat(64) }] })}\n`, 'test(pins): dunes rev 2');
+    f.commit(wt, 'test/pins/shardfiles.json', `${JSON.stringify({ shards: [{ slug: 'dunes', uploadNumber: 2, hash: 'b'.repeat(64) }] })}\n`, 'test(pins): dunes upload 2');
     writeFileSync(join(f.repo, '.git/info/exclude'), 'out/\n');
     mkdirSync(join(wt, 'out/dunes'), { recursive: true });
     writeFileSync(join(wt, PINS_LEDGER), '{}\n');
@@ -45,7 +45,7 @@ describe('land (J422): the guards around the main push, and Git retries', () => 
     const result = f.land(wt);
     expect(result.status, result.stdout).toBe(0);
     expect(calls()[0]).toBe('--silent pins');
-    expect(result.stdout).toContain('out/ holds pins main no longer names (dunes revision 1); running pnpm pins before gen:inputs');
+    expect(result.stdout).toContain('out/ holds pins main no longer names (dunes upload 1); running pnpm pins before gen:inputs');
   }, 60_000);
 
   test('a gen:inputs stop names the thrown error, not the stack\'s tail', () => {
