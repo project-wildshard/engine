@@ -138,14 +138,8 @@ export async function enterDeclaredAudioPhase(ctx: ShardContext, phase: 'kit' | 
   await adoptCookedMusic(ctx.product.slug, music.source);
   if (ctx.scope.disposed || ctx.scope.disposing) return;
  }
- const samples = runtimeAudio(ctx, ctx.product.shardfile.audio).samples;
- if (samples?.set !== undefined) {
-  // SF11: the zone's own cue bank and its credit, read from its parts on a page whose tables list only engine-wide sets
-  const {adoptCookedSfx} = await import('../shardfile/audioCatalogue');
-  await adoptCookedSfx(ctx.product.slug, samples.set);
-  if (ctx.scope.disposed || ctx.scope.disposing) return;
- }
  if (entry.scene === true) { await enterClientAudioScene(ctx); return; }
+ if (!await adoptSceneSfx(ctx)) return;
  const audio = ctx.app.audio;
  if (audio === null) throw new Error('Audio entry requires its native mixer');
  installRuntimeAudioEntry(ctx, phase, { audio, ...(audio.music === null ? {} : { music: audio.music }) });
@@ -200,7 +194,17 @@ function gameplayAudioEnvironment(ctx:ShardContext,row:NonNullable<NonNullable<A
 }
 /** Bind the admitted director to the actual page's native audio and cue owners.
  * Re-entry restores the same subscriptions without any content callback ports. */
+/** SF11: the zone's own cue bank and its credit, read from its parts on a page whose tables list only engine-wide sets.
+ *  False when the scope ended while it read. */
+async function adoptSceneSfx(ctx: ShardContext): Promise<boolean> {
+ const samples = runtimeAudio(ctx, ctx.product.shardfile.audio).samples;
+ if (samples?.set === undefined) return true;
+ const {adoptCookedSfx} = await import('../shardfile/audioCatalogue');
+ await adoptCookedSfx(ctx.product.slug, samples.set);
+ return !ctx.scope.disposed && !ctx.scope.disposing;
+}
 export async function enterClientAudioScene(ctx:ShardContext):Promise<void>{
+ if(!await adoptSceneSfx(ctx))return;
  const data=runtimeAudio(ctx,ctx.product.shardfile.audio);
  if(data.sampledScene!==undefined){await installSampledAudioScene(ctx,data);return;}
  if(data.scene===undefined&&data.gameplay!==undefined){
