@@ -21,6 +21,14 @@ import {openShardfile, shardHalf, type OpenShardfile} from '../src/cook/game/sha
 import {folderTarball} from '../src/cook/game/folderTarball';
 import {mkdirSync} from 'node:fs';
 
+import {readTar, writeTar} from '@wildshard/format/tar';
+
+import {validationSourceBytes} from '@wildshard/format/validationReceipt';
+
+import {runCookJob} from '../src/cook/game/cookJob';
+
+import {checkShardfile} from '../src/server/host/checkShardfile';
+
 const ASTC_6X6 = new Set([165, 166]);
 /** The phone trim at a test's size: small images keep CI's file under its 60 s budget (J295). */
 const small = (source: string): number | undefined => (phoneTierSize(source) === undefined ? undefined : 64);
@@ -35,6 +43,34 @@ beforeAll(async () => {
   jpg = new Uint8Array(await sharp(noise(128, 1), {raw: {width: 128, height: 128, channels: 3}}).jpeg({quality: 90}).toBuffer());
   png = new Uint8Array(await sharp(noise(64, 2), {raw: {width: 64, height: 64, channels: 3}}).png().toBuffer());
   odd = new Uint8Array(await sharp(noise(30, 3), {raw: {width: 30, height: 30, channels: 3}}).png().toBuffer());
+}, 60_000);
+
+it('still admits and cooks a stored shardfile carrying legacy KTX2', async () => {
+  const files = new Map(readTar(folderTarball('test/fixtures/made-up-old')));
+  const digest = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
+  const url = '/assets/cli-fixture/legacy.ktx2', path = `mounts${url}`;
+  const texture = encode(png, {role: 'srgb', flip: false});
+  if (texture === undefined) throw new Error('Test image did not encode');
+  files.set(path, texture);
+  const cook = validationSourceBytes({version: 1, mounts: [{url, path, hash: digest(texture), bytes: texture.length}]});
+  files.set('cook.json', cook);
+  const header: unknown = JSON.parse(new TextDecoder().decode(files.get('shard.json')));
+  if (header === null || typeof header !== 'object') throw new Error('Missing fixture header');
+  files.set('shard.json', validationSourceBytes({...header, cook: {path: 'cook.json', hash: digest(cook), bytes: cook.length}}));
+  const fixture = writeTar(files);
+  const out = mkdtempSync(join(tmpdir(), 'legacy-ktx2-cook-'));
+  try {
+    const report = await runCookJob(fixture, out, {
+      check: (shard, assets, sections) => checkShardfile(shard, assets, {judged: 'stored', sections}),
+      wireBytes: (_url, bytes) => bytes.length,
+      now: () => 0,
+    });
+    expect(report.hash).toBe(digest(fixture));
+    expect(report.cook.manifests).toHaveLength(4);
+    expect(existsSync(join(out, 'client', report.header))).toBe(true);
+  } finally {
+    rmSync(out, {recursive: true, force: true});
+  }
 }, 60_000);
 
 it('lists a fetched phone texture blob once and still carries a texture outside the fence', () => {
@@ -66,6 +102,22 @@ it('lists a fetched phone texture blob once and still carries a texture outside 
   expect(urls('whole').filter(url => url === insideUrl)).toHaveLength(1);
   expect(urls('whole')).toContain(outsideUrl);
 });
+
+it('lists the phone ARM texture once when the ground layer has two aliases', async () => {
+  const shard = openShardfile(folderTarball('test/fixtures/corpus/brasscap-mesa'), {preparationOnly: true});
+  const arm = `/assets/${shard.slug}/tex/forest_ground_04/arm.png`;
+  const pixels = new Uint8Array(await sharp(png).resize(16, 16).png().toBuffer());
+  const inputs = new Map([[`/shardfiles/${shard.slug}/discovery.json`, pageTable()], [arm, pixels]]);
+  const mounts = [...inputs].map(([url, bytes]) => ({url, path: url, bytes: bytes.length, hash: createHash('sha256').update(bytes).digest('hex')}));
+  const fixture: OpenShardfile = {...shard, preparationOnly: false, cook: {version: 1, mounts}, read: path => inputs.get(path) ?? shard.read(path)};
+  const half = shardHalf(fixture, (_url, bytes) => bytes.length, undefined, {phone: true, encode: astc6, images: encode});
+  const phone = half.ktx2Table.phone, target = phone[arm];
+  expect(target).toMatch(/\.t512-[a-f0-9]{8}\.ktx2$/u);
+  expect(phone[arm.replace('.png', '_1k.png')]).toBe(target);
+  const urls = half.mountRows('phone', 'whole').map(row => row.url);
+  expect(urls.filter(url => url === target)).toHaveLength(1);
+  expect(urls).toContain(phone[`${arm}#layer`]);
+}, 60_000);
 
 describe('SF15: the encode per map kind', () => {
   it('reads colour as sRGB, normal maps and numeric planes as linear, by the hand-made sets\' names', () => {

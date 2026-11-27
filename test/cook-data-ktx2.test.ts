@@ -55,6 +55,32 @@ describe('SF17: a data map cooks losslessly', () => {
     expect(uses.get(hash(5))).toEqual({role: 'srgb', layer: false});
   });
 
+  it('cooks data parameters from a packed graph file losslessly, even when also used as colour', () => {
+    const graph = {params: {
+      noise: {type: 'texture', role: 'data', value: hash(9)},
+      sharedColour: {type: 'texture', role: 'colour', value: hash(9)},
+      paint: {type: 'texture', value: hash(10)},
+      lent: {type: 'texture', role: 'lent'},
+    }};
+    const fileHash = hash(11);
+    const graphBytes = new TextEncoder().encode(JSON.stringify(graph));
+    const look = {materials: {storm: {family: 'graph', file: fileHash}}};
+    const uses = blobTextureUses(look, null, [], ref => ref === fileHash ? graphBytes : undefined);
+    const data = uses.get(hash(9)), colour = uses.get(hash(10));
+    expect(data).toEqual({role: 'data', layer: false});
+    expect(colour).toEqual({role: 'srgb', layer: false});
+    if (data === undefined) throw new Error('Missing graph data texture use');
+    const url = `/shardfiles/z/blobs/image/${hash(9)}.png`;
+    const cooked = blobKtx2(page(), 'z', [{hash: hash(9), url, bytes: rgba, use: data}], encode);
+    if (cooked === undefined) throw new Error('Missing cooked graph data texture');
+    const file = cooked.files.get(hash(9));
+    if (file === undefined) throw new Error('Missing lossless graph data file');
+    const table = cookedKtx2TableOf(JSON.parse(new TextDecoder().decode(cooked.discovery)));
+    expect(table.desktop[dataMapKey(url)]).toBe(file.url);
+    expect(table.phone[dataMapKey(url)]).toBe(file.url);
+    expect(Buffer.from(level0(file.bytes)).equals(rgbaTexels)).toBe(true);
+  });
+
   it('names a data map under its #data key on both tiers, a skin map and an atlas under their URLs, and the phone keeps the data file', () => {
     const data = `/shardfiles/z/blobs/image/${hash(1)}.png`, coat = `/shardfiles/z/blobs/image/${hash(5)}.png`, atlas = `/shardfiles/z/blobs/image/${hash(6)}.png`;
     const cooked = blobKtx2(page(), 'z', [

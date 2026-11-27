@@ -11,6 +11,7 @@
  */
 // oxlint-disable-next-line import/no-nodejs-modules -- the cook runs in Node.
 import {createHash} from 'node:crypto';
+import {graphFileJson} from '@wildshard/format/materials';
 import {propMaterialsOf, propMaterialSlots, propSlotUse} from '@wildshard/format/propMaterials';
 import {splatTerrainOf} from '@wildshard/format/splatTerrain';
 import {splatLayerKey} from '@wildshard/engine/boot/splatLayerRows';
@@ -40,7 +41,8 @@ function mapRole(key: string): TextureRole {
 /** Per blob hash a texture rule names, how the page samples it. A hash two rules name takes the stricter role (data over
  *  colour over normal over linear) and is a layer if either is. Unknown shapes are colour: the hand-made bake's own default.
  *  `skins` are the skin looks' textures (format `skinLookTextureRefs`, SF17): a creature's coat, colour. */
-export function blobTextureUses(look: unknown, props: unknown, skins: readonly string[] = []): ReadonlyMap<string, BlobTextureUse> {
+export function blobTextureUses(look: unknown, props: unknown, skins: readonly string[] = [],
+  graphBytes?: (hash: string) => Uint8Array | undefined): ReadonlyMap<string, BlobTextureUse> {
   const out = new Map<string, BlobTextureUse>();
   const note = (hash: unknown, role: BlobTextureRole, layer = false): void => {
     if (typeof hash !== 'string' || !HASH.test(hash)) return;
@@ -54,9 +56,14 @@ export function blobTextureUses(look: unknown, props: unknown, skins: readonly s
     const ground = isMap(material['ground']) ? material['ground'] : {};
     // SF17: the ground's grain, trail and key-shadow maps are data the shader reads byte for byte (Dunes' sand)
     for (const part of ['grain', 'trail', 'keyShadow']) { const row = ground[part]; if (isMap(row)) note(row['map'], 'data'); }
-    if (material['family'] === 'graph' && isMap(material['graph']) && isMap(material['graph']['params'])) {
-      // a graph reads every texture param in the colour role (clientGraphs)
-      for (const param of Object.values(material['graph']['params'])) if (isMap(param) && param['type'] === 'texture') note(param['value'], 'srgb');
+    if (material['family'] === 'graph') {
+      const file = material['file'];
+      // The SDK lowers authored graphs to JSON blobs in the packed product.
+      const bytes = typeof file === 'string' ? graphBytes?.(file) : undefined;
+      const graph = bytes !== undefined && typeof file === 'string' ? graphFileJson(file, () => bytes) : material['graph'];
+      if (isMap(graph) && isMap(graph['params'])) for (const param of Object.values(graph['params'])) {
+        if (isMap(param) && param['type'] === 'texture' && param['role'] !== 'lent') note(param['value'], param['role'] === 'data' ? 'data' : 'srgb');
+      }
     }
     note(material['map'], 'srgb');
   }

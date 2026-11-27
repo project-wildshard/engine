@@ -346,18 +346,31 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, folder: st
       const listedTextures = new Set(textures.map(row => row.url));
       const unlisted = tier === 'phone' && set === 'whole' ? [...tierRows].flatMap(([url, files]) =>
         listed.has(url) ? [] : files.filter(row => !listedTextures.has(row.url))) : [];
-      return [...urls.flatMap(url => tiered(tier, url)).flatMap(url => {
+      const selected = [...urls.flatMap(url => tiered(tier, url)).flatMap(url => {
         if (url.startsWith('tier:')) return tierRows.get(url.slice(5)) ?? [];
         if (url.startsWith('cooked:')) { const row = cookedRows.get(url.slice(7)); return row === undefined ? [] : [row]; }
         const row = mountRow.get(url); return row === undefined ? [] : [row()];
       }), ...unlisted, ...tier === 'phone' ? layerRows.values() : [], ...textures];
+      // Different texture aliases and fallbacks can select the same cooked file.
+      const hashes = new Map<string, string>();
+      return selected.filter(({url, hash}) => {
+        const previous = hashes.get(url);
+        if (previous !== undefined && previous !== hash) throw new Error(`Cook selected different bytes at ${url}: ${previous} and ${hash}`);
+        if (previous !== undefined) return false;
+        hashes.set(url, hash);
+        return true;
+      });
     }};
 }
 
 /** SF16: each PNG or JPEG product blob, with how the page samples it (`blobTextureUses`); SF17: a blob no rule names (a posed
  *  atlas, say) is a colour texture, the hand-made bake's own default. */
 function textureBlobs(shard: OpenShardfile, prefix: string): readonly TextureBlob[] {
-  const uses = blobTextureUses(shard.source.look, shard.source.props, skinLookTextureRefs(shard.source));
+  const byHash = new Map(shard.index.files.filter(row => row.kind === 'json').map(row => [row.hash, row.path]));
+  const uses = blobTextureUses(shard.source.look, shard.source.props, skinLookTextureRefs(shard.source), hash => {
+    const path = byHash.get(hash);
+    return path === undefined ? undefined : shard.read(path);
+  });
   return shard.index.files.flatMap(row => {
     const use = uses.get(row.hash) ?? {role: 'srgb', layer: false};
     return row.kind !== 'image' || row.commons === true ? [] : [{hash: row.hash, url: `${prefix}${row.path}`, bytes: shard.read(row.path), use}];
