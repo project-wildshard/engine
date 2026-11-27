@@ -4,6 +4,7 @@
 import { expect, test } from 'vitest';
 import { folderTarball } from '../src/cook/game/folderTarball';
 import { openShardfile, ownSfxDirs, shardHalf, type OpenShardfile } from '../src/cook/game/shardCook';
+import { GOLDEN_FIXTURES } from '../src/scripts/cookVersion';
 
 test("a zone's own sfx set folders, and nothing else, are its own", () => {
   const urls = ['/assets/isle/sfx/isle/sfx.json', '/assets/isle/sfx/isle/gull-1-00000000.m4a', '/assets/isle/sfx/night/sfx.json',
@@ -31,4 +32,15 @@ test("a fence shard's phone whole set carries its own sfx folder, not another zo
   expect(listed('phone', 'whole')).toEqual([fenced, ...own]);
   // a desktop's whole set already lists the whole level
   expect(listed('desktop', 'whole')).toEqual(mounts.map(row => row.url));
+});
+
+// The guard behind the cook version: the golden cook takes a prepared fence shard with its own sfx set (made-up-fence), so
+// a change to what a fence shard's phone whole set carries moves the golden digest (44ab5ec53 left made-up-old's unmoved).
+test('the golden cook takes a fence shard whose phone whole set carries its own sfx', () => {
+  expect(GOLDEN_FIXTURES).toContain('made-up-fence');
+  const half = shardHalf(openShardfile(folderTarball('test/fixtures/made-up-fence')), (_url, bytes) => bytes.length);
+  const listed = (set: 'entry' | 'whole'): string[] => half.mountRows('phone', set).map(row => row.url.split('?')[0] ?? '');
+  expect(listed('entry')).toEqual(['/assets/cli-fixture/props/fenced.bin']);
+  expect(listed('whole')).toEqual(['/assets/cli-fixture/props/fenced.bin', '/assets/cli-fixture/sfx/cli-fixture/sfx.json',
+    '/assets/cli-fixture/sfx/cli-fixture/gull-1-1a358b4e.m4a']);
 });

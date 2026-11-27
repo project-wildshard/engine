@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -6,6 +7,8 @@ import { cookHash } from './cookHash.ts';
 
 const ROOT = resolve(import.meta.dirname, '../..');
 const LOCK = 'src/cook/game/cook-version.json';
+/** The golden cook's inputs, in order (folders under test/fixtures). */
+export const GOLDEN_FIXTURES = ['made-up-old', 'made-up-fence'] as const;
 const DIGEST = /^[a-f0-9]{64}$/u;
 const VERSION = /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/u;
 
@@ -94,13 +97,20 @@ async function goldenCook(): Promise<string> {
   const { folderTarball } = await import('../cook/game/folderTarball.ts');
   const scratch = resolve(process.env['COOK_VERSION_SCRATCH'] ?? join(ROOT, 'tmp/cook-version'));
   mkdirSync(scratch, {recursive: true});
-  const work = mkdtempSync(join(scratch, 'golden-')), tar = join(work, 'input.tar'), out = join(work, 'out');
+  const work = mkdtempSync(join(scratch, 'golden-'));
   try {
-    writeFileSync(tar, folderTarball(join(ROOT, 'test/fixtures/made-up-old')));
-    const result = await runJob({ root: ROOT, execPath: process.execPath, loader: join(ROOT, 'src/scripts/bake-loader.mjs'),
-      script: join(ROOT, 'src/scripts/cook-job.mjs'), limits: DEFAULT_LIMITS, wrap: [] }, tar, out, 'cli-fixture');
-    if (result.kind !== 'cooked') throw new Error(`Golden cook ${result.kind}: ${result.reason}`);
-    return cookOutputDigest(out);
+    // made-up-old: an old draft through the migration chain. made-up-fence (SF11): a prepared fence shard with its own sfx
+    // set, so a change to what a fence shard's sets carry moves the golden (44ab5ec53 changed it with made-up-old alone unmoved).
+    const digests: string[] = [];
+    for (const fixture of GOLDEN_FIXTURES) {
+      const tar = join(work, `${fixture}.tar`), out = join(work, fixture);
+      writeFileSync(tar, folderTarball(join(ROOT, 'test/fixtures', fixture)));
+      const result = await runJob({ root: ROOT, execPath: process.execPath, loader: join(ROOT, 'src/scripts/bake-loader.mjs'),
+        script: join(ROOT, 'src/scripts/cook-job.mjs'), limits: DEFAULT_LIMITS, wrap: [] }, tar, out, 'cli-fixture');
+      if (result.kind !== 'cooked') throw new Error(`Golden cook of ${fixture} ${result.kind}: ${result.reason}`);
+      digests.push(cookOutputDigest(out));
+    }
+    return digests.length === 1 ? digests[0] ?? '' : createHash('sha256').update(digests.join('\n')).digest('hex');
   } finally { rmSync(work, {recursive: true, force: true}); }
 }
 
