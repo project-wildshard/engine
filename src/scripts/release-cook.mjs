@@ -30,6 +30,7 @@ import {pathToFileURL} from 'node:url';
 
 const HOST = 'wildshard-agent';
 const RELEASES = 'https://releases.wildshard.io';
+const PREPARATION_RELEASES = 'https://github.com/project-wildshard/engine/releases/download';
 const TAG = /^v\d{1,4}\.\d{1,4}\.\d{1,4}$/u;
 const SIGNED_TAG = /^(?:v\d{1,4}\.\d{1,4}\.\d{1,4}|server-(?:staging|production)-[0-9a-f]{40})$/u, COMMIT = /^[0-9a-f]{40}$/u;
 const MARK = 'cook <tag>';
@@ -74,6 +75,22 @@ function carries(commit, staging = false) {
   return shown.status === 0 && shown.stdout.includes(MARK) && (!staging || shown.stdout.includes('|server-staging-'));
 }
 
+/** The VPS uses the exact staging tag's archive for either cook channel.
+ * @param {string} build @param {typeof globalThis.fetch} [read] */
+export async function preparationClientGap(build, read = fetch) {
+  const tag = `server-staging-${build}`;
+  const asset = `${tag}/preparation-client.tar.gz`;
+  try {
+    const response = await read(`${PREPARATION_RELEASES}/${asset}`, {
+      method: 'HEAD', cache: 'no-store', signal: AbortSignal.timeout(15_000),
+    });
+    if (response.ok) return null;
+    return `${asset} returned HTTP ${response.status}; wait for the release's devserver-client job before moving the cook`;
+  } catch {
+    return `could not verify ${asset}; check the release's devserver-client job before moving the cook`;
+  }
+}
+
 async function main() {
   const args = process.argv.slice(2), dry = args.includes('--dry-run'), stagingMove = args.includes('--staging');
   const expected = args.find(arg => arg.startsWith('--build='))?.slice('--build='.length);
@@ -83,6 +100,8 @@ async function main() {
   const staging = await served('staging'), production = stagingMove ? staging : await served('production');
   const tag = selectCookRelease(staging, production, stagingMove ? {build: expected ?? ''} : {tag: requested ?? ''}).tag;
   say('ok', `${stagingMove ? 'staging' : 'production and staging'} serve ${tag} (${production.build.slice(0, 8)})`);
+  const archiveGap = await preparationClientGap(production.build);
+  if (archiveGap !== null) stop(archiveGap);
 
   const shown = box('sudo -n /usr/local/sbin/wildshard-config show cook');
   say('now', shown.status === 0 ? shown.out.trim().replaceAll('\n', ', ') : 'the box has no cook verb yet');

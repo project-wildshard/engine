@@ -1,7 +1,7 @@
 // @vitest-environment node
-import {expect, test} from 'vitest';
+import {expect, test, vi} from 'vitest';
 import {readFileSync} from 'node:fs';
-import {cookUnitGap, expectedCookUnit, hardenDue, hardenGateOf, selectCookRelease} from '../src/scripts/release-cook.mjs';
+import {cookUnitGap, expectedCookUnit, hardenDue, hardenGateOf, preparationClientGap, selectCookRelease} from '../src/scripts/release-cook.mjs';
 
 // v0.1.95: a pending reboot (VH5) held the harden that refreshes the box's rebuild.sh, so the cook move ran the pre-lean
 // copy and rolled back. Only rows whose fix could touch sshd, ufw or Tailscale hold an unattended apply.
@@ -14,6 +14,20 @@ test('a pending reboot does not hold the release harden; an ssh row still does',
 });
 
 const build = 'a'.repeat(40), staging = {tag: `server-staging-${build}`, build};
+
+test('the cook move requires the exact preparation client before touching the box', async () => {
+  const read = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(null, {status: 404}))
+    .mockResolvedValueOnce(new Response(null, {status: 200})).mockRejectedValueOnce(new Error('network timeout'));
+  const url = `https://github.com/project-wildshard/engine/releases/download/${staging.tag}/preparation-client.tar.gz`;
+  expect(await preparationClientGap(build, read)).toContain('returned HTTP 404; wait for');
+  expect(await preparationClientGap(build, read)).toBeNull();
+  expect(await preparationClientGap(build, read)).toContain('could not verify');
+  expect(read).toHaveBeenCalledWith(url, expect.objectContaining({method: 'HEAD', cache: 'no-store'}));
+  const cook = readFileSync('src/scripts/release-cook.mjs', 'utf8');
+  const main = cook.slice(cook.indexOf('async function main()'), cook.indexOf('\n}\n', cook.indexOf('async function main()')));
+  expect(main.indexOf('stop(archiveGap)')).toBeGreaterThan(main.indexOf('await preparationClientGap'));
+  expect(main.indexOf('stop(archiveGap)')).toBeLessThan(main.indexOf("const shown = box("));
+});
 
 test('staging moves the cook from its signed server tag before a production tag exists', () => {
   expect(selectCookRelease(staging, {tag: 'v0.1.32', build: 'b'.repeat(40)}, {build})).toEqual(staging);

@@ -5,3 +5,4 @@ export interface CookUnit { AllowedCPUs: string; CPUWeight: string; MemoryMax: s
 export function expectedCookUnit(rebuild: string): CookUnit;
 export function cookUnitGap(expected: CookUnit, shown: string): string | null;
 export function hardenGateOf(out: string): string | null;
+export function preparationClientGap(build: string, read?: typeof fetch): Promise<string | null>;
