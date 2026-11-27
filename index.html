@@ -700,8 +700,10 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
       // The loader uses a small, already-approved portrait of the selected shard from its first paint.
       // Whitelist the filename: the zone is a shard selector, never an arbitrary asset path.
       const loadShard = homeZone || oneCellZone || 'driftwood-isle';
-      if (['driftwood-isle', 'pine-hollow', 'nalati-grasslands', 'nine-dragon-stack'].includes(loadShard)) {
-        document.documentElement.style.setProperty('--ws-load-portrait', 'url("' + titleAssetURLs['/assets/title/' + loadShard + '-portrait.jpg'] + '")');
+      // SF12: a zone's portrait left public/ for its shardfile, so only a portrait the title table still names is set here
+      const loadPortrait = titleAssetURLs['/assets/title/' + loadShard + '-portrait.jpg'];
+      if (loadPortrait !== undefined && ['driftwood-isle', 'pine-hollow', 'nalati-grasslands', 'nine-dragon-stack'].includes(loadShard)) {
+        document.documentElement.style.setProperty('--ws-load-portrait', 'url("' + loadPortrait + '")');
       }
       // Developer mode controls the hold switch, frame meter and build id.
       // Loading progress stays detailed for everyone (G846). No URL switch (E162).

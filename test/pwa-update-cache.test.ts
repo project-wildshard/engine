@@ -46,8 +46,11 @@ test('document bytes remain data even when they contain worker marker text', asy
   const literal = /^\s*(?:const|var) DOCUMENT = (.+);$/mu.exec(core)?.[1];
   if (literal === undefined) throw new Error('Missing document literal');
   expect(JSON.parse(literal)).toBe(html);
-  // No bundle file here, so the only rows left are the deck portraits a worker fetches after control.
-  expect(/^\s*(?:const|var) FILES = JSON\.parse\("\[(.*)\]"\);$/mu.exec(core)?.[1]?.split(',').every(row => row.includes('-portrait-'))).toBe(true);
+  // No bundle file here, so the only rows left are the deck portraits a worker fetches after control (none since SF12
+  // moved the zone portraits into their shardfiles)
+  const files = /^\s*(?:const|var) FILES = JSON\.parse\("\[(.*)\]"\);$/mu.exec(core)?.[1];
+  expect(files).toBeDefined();
+  expect(files?.split(',').filter(row => row !== '').every(row => row.includes('-portrait-'))).toBe(true);
 });
 
 test('worker updates revalidate unchanged bytes and fetch a changed script in full', async () => {

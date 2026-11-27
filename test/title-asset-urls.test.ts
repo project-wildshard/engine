@@ -11,7 +11,7 @@ import {serviceWorkerCore} from '../src/scripts/app-build/serviceWorker';
 
 test('every title URL names its exact original bytes and shell/runtime use the same URL',async()=>{
   const root=process.cwd(),urls=titleAssetURLs(root),tables=titleAssetTables(root);
-  expect(Object.keys(urls)).toHaveLength(9); // PZ19: the two heroes' ~30 kB first cuts
+  expect(Object.keys(urls)).toHaveLength(5); // PZ19: the two heroes' ~30 kB first cuts; SF12: the zone portraits left public/
   expect(tables['index.html']).toBe(readFileSync('index.html','utf8'));
   expect(tables['src/scripts/title-assets.generated.json']).toBe(readFileSync('src/scripts/title-assets.generated.json','utf8'));
   mkdirSync('tmp',{recursive:true});const out=mkdtempSync(resolve('tmp/title-assets-'));

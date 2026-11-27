@@ -10,7 +10,7 @@ import {parseOutputIndex} from '@wildshard/format/outputIndex';
 import {createHash} from 'node:crypto';
 import {readSpawnManifest, type SpawnFile, type SpawnManifest, type SpawnManifestAddress} from '../../shared/game/shardfile/spawnManifest';
 import {assetIdentities, audioTableRefs, bundlerSources as manifestSources, identityFiles, joinRefs, standInRefs, packMembers, readFenceReads, resolveFenceReads, sectionRefs, type PackPart} from './fenceReads';
-import {createPartEncoder, writeSpawnManifestFiles, writeSpawnParts, type CookedMember, type SpawnPartEncoding} from './spawnParts';
+import {createPartEncoder, packable, writeSpawnManifestFiles, writeSpawnParts, type CookedMember, type SpawnPartEncoding} from './spawnParts';
 import {cookPreparedLine, sidecarIn} from './cookSidecar';
 import {cookParts, cookShardServerPack, openShardfile, preparedShardHalf, servedAsIs, stalePreparationLine, type CookTiers, type PreparationState, type ShardHalf} from './shardCook';
 import type {ServerPack} from '../../shared/game/shardfile/serverPack';
@@ -281,8 +281,21 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
     (preparations[half.shard.preparation] ??= []).push(directory);
     if (half.shard.preparation === 'stale') console.warn(stalePreparationLine(directory));
     if (half.shard.preparation === 'cook') console.warn(cookPreparedLine(directory));
-    const shardRows = {phone: {entry: half.folderRows('phone', 'entry'), whole: half.folderRows('phone', 'whole')},
-      desktop: {entry: half.folderRows('desktop', 'entry'), whole: half.folderRows('desktop', 'whole')}};
+    // SF11: no pin copies a zone's mounts under public/, so a home-baked page lists them as the shard's cook does
+    // (cookShard: its folder rows and its mount rows per set), and what no part may hold serves loose at its URL below
+    const zoneRows = (tier: 'phone' | 'desktop', set: 'entry' | 'whole'): readonly SpawnFile[] => {
+      const rows = new Map<string, SpawnFile>();
+      for (const row of [...half.folderRows(tier, set), ...half.mountRows(tier, set)]) rows.set(row.url, row);
+      return [...rows.values()];
+    };
+    const shardRows = {phone: {entry: zoneRows('phone', 'entry'), whole: zoneRows('phone', 'whole')},
+      desktop: {entry: zoneRows('desktop', 'entry'), whole: zoneRows('desktop', 'whole')}};
+    for (const table of [shardRows.phone, shardRows.desktop]) for (const row of [...table.entry, ...table.whole]) if (!sources.has(row.url)) sources.set(row.url, () => half.read(row.url));
+    // DL14: `<img>` and module loads pass any fetch layer, so a mount no part may hold is written at its URL
+    for (const row of half.shard.cook?.mounts ?? []) {
+      if (packable(row.url) && row.url.startsWith('/assets/')) continue;
+      const file = join(output, row.url.slice(1)); mkdirSync(dirname(file), {recursive: true}); writeFileSync(file, half.mountBytes(row));
+    }
     if (build.filesOnly !== true) {
       for (const [url, member] of await cookParts(output, half, [{tier: 'phone', rows: shardRows.phone.whole}, {tier: 'desktop', rows: shardRows.desktop.whole}], encoder)) cooked.set(url, member);
       serverPacks[directory] = await cookShardServerPack(half.shard, output, encoder);
