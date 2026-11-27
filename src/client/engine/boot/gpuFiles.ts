@@ -82,12 +82,6 @@ export function blobGpuFile(hash: string, tex?: TexMode): string | undefined {
   return tex === undefined ? gpuFile(key) : standIn(key, tex);
 }
 
-/** SF7c: whether this tier's registered table keys `url` as a source: a cooked shard names its own files (a hand-made
- *  `.phone.webp` among them) only there, never in the page's byte table. */
-export function isGpuTableSource(url: string): boolean {
-  return Object.hasOwn(GPU_FILES[TIER], url);
-}
-
 /** Whether this tier's registered KTX2 mappings name a URL, including shard overlays outside /assets/gpu/. */
 export function isRegisteredGpuFile(url: string): boolean {
   return registered[TIER].has(url.replace(/[?#].*$/u, ''));

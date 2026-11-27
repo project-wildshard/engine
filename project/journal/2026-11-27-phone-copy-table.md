@@ -1,4 +1,4 @@
-# A phone reads the copy the cooked table names (SF7c)
+# A phone reads the copy its cooked download lists (SF7c)
 
 Nine Dragon on SDK 0.9.1, prepared and cooked, entered the 402x874 phone
 with 12 misses: `paint/*.jpg`, each a 404 then an abort. The product's
@@ -13,8 +13,10 @@ asked `concrete.jpg`, which the fence left out.
 The earlier Nine proof (SF7j) cooked an unprepared shardfile, whose phone
 set is the whole shard, so the jpg was there and nothing missed.
 
-`phoneUrl` now also counts a copy the tier's registered KTX2 table keys:
-the cooked discovery document names every shard file there, hand-made
-phone copies among them. Pages that still hold zone files see no change.
+`phoneUrl` now also counts a copy the zone's cooked download lists
+(`zoneFileListed`, SF4's listing that `spawnListed` lends the engine).
+The first try, the tier's KTX2 table, failed the cook entry: that table
+is not registered yet when the product layers read. Pages that still
+hold zone files see no change.
 Proof: `test/phone-copy-table.test.ts`, and Nine's cook entry on both
 tiers with missing 0.
