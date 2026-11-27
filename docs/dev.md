@@ -129,7 +129,12 @@ not the gate.
 
 A pins install takes every zone's art from its shardfile and fetches
 nothing from a shard repo (SF10): `test/pins/assets.json` and its fetcher
-are gone, and `test/no-pinned-art.test.ts` keeps them gone. The app build
+are gone, and `test/no-pinned-art.test.ts` keeps them gone. It writes
+`out/<folder>` and nothing under `public/` (SF11): a page reads every zone
+from the cook, and an install removes what an earlier one published. A
+zoneless build refuses any file under `public/` or in `dist/` holding a
+pinned blob's or mount's bytes (`src/scripts/pin-public-leaks.mjs`,
+`test/pin-public-leaks.test.ts`). The app build
 checks every declared baked texture mode before bundling and again in
 final output, including the native image fallback. Native model-map source
 keys are checked as well as the boot file lists; CPU model fallbacks must

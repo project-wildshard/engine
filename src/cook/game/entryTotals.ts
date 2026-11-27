@@ -21,6 +21,7 @@ import {folderTarball} from './folderTarball';
 import {BrotliSizeCache} from './brotliSizeCache.mjs';
 import {defaultBootAudio, ENGINE_MUSIC_STYLE, missingEngineMusic, musicDir} from '@wildshard/engine/audio/bootAudio';
 import {withAssetTables, type AssetTables} from '@wildshard/engine/boot/tables';
+import {ZONE_DIR, audioManifestRow} from '@wildshard/engine/boot/zoneAssets';
 import type {AudioData} from '@wildshard/format/audio';
 import {audioReport, audioReportTable, isAudioUrl} from './audioReport';
 
@@ -35,6 +36,22 @@ interface Address {readonly url: string; readonly bytes: number}
 /** AUDIO AU1 (J299): the recordings a shard's LOAD reads, so DOWNLOAD fetches, counts and caches them: a new player's
  *  boot set (the default music style and sound-effect set, through the client's own selection) and the audio its
  *  recorded fence names. `tables` is the build's common boot table, the one the page installs. */
+/** Standalone shardfiles SF11 (J525): no pin publishes a zone's mounts under public/, so a build's tables list engine files only.
+ *  A shard's own mounts join them for its own selection, as the client adopts a zone's (client/app/assetTables.ts
+ *  adoptInlineMounts): their bytes, and their music and sfx manifests without provenance; the shard's copy wins. */
+export function withShardMounts(tables: AssetTables, rows: readonly {readonly url: string; readonly bytes: number}[], read: (url: string) => Uint8Array): AssetTables {
+  const bytes: Record<string, number> = {...tables.bytes}, music: Record<string, unknown> = {...tables.music}, sfx: Record<string, unknown> = {...tables.sfx};
+  for (const row of rows) {
+    const url = row.url.split('?')[0] ?? row.url, audio = audioManifestRow(url);
+    bytes[url] = row.bytes;
+    if (audio === null) continue;
+    const manifest: unknown = JSON.parse(new TextDecoder().decode(read(row.url)));
+    if (typeof manifest !== 'object' || manifest === null || Array.isArray(manifest)) throw new Error(`${url} is not a manifest`);
+    (audio.kind === 'music' ? music : sfx)[audio.key] = {...Object.fromEntries(Object.entries(manifest).filter(([key]) => key !== 'provenance' && key !== 'synth_keeps')),
+      ...(audio.dir === undefined ? {} : {[ZONE_DIR]: audio.dir})};
+  }
+  return {...tables, bytes, music, sfx};
+}
 export function shardBootAudio(sections: ReadonlyMap<string, unknown>, tables: AssetTables, fenceMounts: readonly string[], shard = 'shard'): readonly string[] {
   const row = sections.get('audio/audio'), data = typeof row === 'object' && row !== null && 'audio' in row ? row.audio as AudioData : undefined;
   // A level with no music or sample rows boots with no recordings (NO_AUDIO); anything else must select, as on the page.
@@ -294,8 +311,10 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
         + `(${unresolved.slice(0, 3).join(', ')}); re-record with src/scripts/record-fence-reads.mjs`);
     }
     // AUDIO AU1: the same recordings on every tier and flow: LOAD reads them before control on all of them.
-    const bootAudio = assetTables === undefined ? [] : shardBootAudio(sections, assetTables, half.mountRows('phone', 'entry').map(row => row.url), directory);
-    if (assetTables !== undefined && sections.has('audio/audio')) console.info(engineMusicLine(directory, bootAudio, assetTables));
+    const entryMounts = half.mountRows('phone', 'entry');
+    const shardTables = assetTables === undefined ? undefined : withShardMounts(assetTables, [...entryMounts, ...half.mountRows('phone', 'whole')], url => half.read(url));
+    const bootAudio = shardTables === undefined ? [] : shardBootAudio(sections, shardTables, entryMounts.map(row => row.url), directory);
+    if (shardTables !== undefined && sections.has('audio/audio')) console.info(engineMusicLine(directory, bootAudio, shardTables));
     const write = (tier: 'phone' | 'desktop', flow: 'client' | 'grid', addresses: readonly Address[] = [], mode = '000', whole = false): number => {
       const selected = new Map<string, SpawnFile>(), add = (row: SpawnFile): void => {selected.set(row.url, row);};
       for (const row of shardRows[tier][whole ? 'whole' : 'entry']) add(row);

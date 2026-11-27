@@ -8,7 +8,7 @@ import type { AudioData } from '@wildshard/format/audio';
 import { createCatalogueAudio } from '../src/client/engine/audio/levelAudio';
 import { bootFiles } from '../src/client/engine/boot/extras';
 import * as settings from '../src/client/engine/ui/Settings';
-import { shardBootAudio } from '../src/cook/game/entryTotals';
+import { shardBootAudio, withShardMounts } from '../src/cook/game/entryTotals';
 import { openShardfile, shardHalf } from '../src/cook/game/shardCook';
 import { folderTarball } from '../src/cook/game/folderTarball';
 import { defaultBootAudio } from '../src/shared/engine/audio/bootAudio';
@@ -67,8 +67,9 @@ function bootTables(): AssetTables {
 for (const [shard, pageAudio] of [['driftwood-isle', 91], ['pine-hollow', 1], ['nalati-grasslands', 1], ['nine-dragon-stack', 1]] as const) {
   const product = `out/${shard}`;
   test.skipIf(!existsSync(`${product}/shard.json`))(`${shard}: its fence audio and its default boot set are on the download`, async () => {
-    const common = bootTables();
     const half = shardHalf(openShardfile(folderTarball(product)), (_url, bytes) => bytes.length);
+    // SF11: the build's tables list engine files only; the zone's own mounts join them, as the client adopts a zone's
+    const common = withShardMounts(bootTables(), [...half.mountRows('phone', 'entry'), ...half.mountRows('phone', 'whole')], url => half.read(url));
     const mounts = half.mountRows('phone', 'entry').map(row => row.url);
     // A recording, not a set's `music.json` / `sfx.json` manifest that mounts beside them (QA-FEEDBACK-2026-11-23-b).
     const audioPath = /^\/assets\/(?:[a-z0-9-]+\/)?(?:music|sfx)\/.+\.(?!json$)[a-z0-9]+$/u;

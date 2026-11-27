@@ -33,6 +33,7 @@ import { assertAssetLimits, describeAssetLimits } from "./app-build/assetLimits.
 import { shardfileValidationRevision } from "./shardfile-validation-revision.mjs";
 import { checkBakedTextures } from "./app-build/bakedTextures.mjs";
 import { checkZoneless, dropZoneFiles, isZoneFile } from "./app-build/zoneless.mjs";
+import { assertNoPinPublicLeaks } from "./pin-public-leaks.mjs";
 
 import { assertHeavyLease } from "./heavy-lane-lease.mjs";
 
@@ -329,6 +330,8 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
 
   checkServerOutput(outDir, solo);
   if (zoneless) checkZoneless(outDir);
+  // SF11: no pinned blob or mount reaches public/ or this page; a zone's art lives only in its shardfile
+  if (zoneless) assertNoPinPublicLeaks(process.cwd(), { dist: outDir });
   // QA 11-26 row 14: no video and no measuring rig in a page build
   checkNoJunk(outDir);
   // fix-preview PV9: code under builds/<engineVersion>/<build>/ and builds/shared/, the page under 20,000 files

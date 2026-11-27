@@ -3,7 +3,7 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve as resolvePath } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
@@ -42,13 +42,9 @@ test('every pin names a live head by its hash, and the catalogue holds the same 
   }
 });
 
-test('every asset mount of an installed head is published', () => {
-  for (const folder of existsSync('out') ? readdirSync('out') : []) {
-    const file = join('out', folder, 'cook.json');
-    if (!existsSync(file)) continue;
-    const { mounts } = JSON.parse(readFileSync(file, 'utf8')) as { mounts?: readonly { url: string }[] };
-    expect((mounts ?? []).map(row => row.url).filter(url => /^\/(?:assets|programs)\//u.test(url) && !existsSync(`public${url}`))).toEqual([]);
-  }
+test('no asset mount of an installed head is published under public/ (SF11: the page reads zones from the cook)', () => {
+  const ledger = existsSync('out/.pins.json') ? (JSON.parse(readFileSync('out/.pins.json', 'utf8')) as { published?: readonly string[] }).published ?? [] : [];
+  expect(ledger).toEqual([]);
 });
 
 test('bytes that are not the pin never reach the cache or out/', async () => {

@@ -34,7 +34,7 @@ import {shardfileValidationRevision} from './shardfile-validation-revision.mjs';
 import {trackedPublic} from './tracked-public.mjs';
 
 export const MANIFEST='out/.pins-manifest.json';
-const VERSION=2,KEY_VERSION='pins-reuse/3',LEDGER='out/.pins.json',LOCK='out/.pins.lock',PINS='test/pins/shardfiles.json';
+const VERSION=2,KEY_VERSION='pins-reuse/4',LEDGER='out/.pins.json',LOCK='out/.pins.lock',PINS='test/pins/shardfiles.json';
 const HEX=/^[a-f0-9]{64}$/u;
 /** Every tracked file whose bytes decide what a full install writes. A local module `pins.ts` or `bake-loader.mjs`
  * imports is here unless KEY_EXEMPT says why its bytes can't change out/ or public/ (pins-reuse.test.mjs checks). */

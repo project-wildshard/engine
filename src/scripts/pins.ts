@@ -5,7 +5,7 @@
 //   node src/scripts/pins.ts refresh            re-pin to the live heads (read only: GETs); refuses while a pin, the default
 //                                           release pair or a set E7_*_SHARDS names a slug GET /api/catalogue no longer
 //                                           lists (DEL9); `--drop <slug>` lets refresh drop a deleted pin
-//   node src/scripts/pins.ts install [slug...]  fetch, check, validate, then write out/<folder> and publish its mounts
+//   node src/scripts/pins.ts install [slug...]  fetch, check, validate, then write out/<folder>
 //   node src/scripts/pins.ts install --staging  install the reviewed staging snapshot for a public dev build
 //   node src/scripts/pins.ts install --ring 1   Ring 1: pinned Brasscap Mesa and Dunes (J434), and server slices
 //   node src/scripts/pins.ts install --ring-slices 1  add Ring 1 server slices beside installed full pins
@@ -23,9 +23,9 @@
 //      grid bake read what they would from a build. Its receipt is issued under this tree's validator revision, by this file, only
 //      after step 2 passed, as `folderVerdict` earns one for a head a build never made. The cost numbers stay the
 //      tarball's: a receipt is static build evidence, never authority (G491).
-//   4. Its mounts, under `mounts/` or as `cook.json` rows over a blob, are published at their URLs under `public/`, because
-//      the cook and the page read `/assets/<shard>/...`.
-//      They are excluded in Git's `info/exclude`, so a pinned tree stays clean.
+//   4. Nothing reaches `public/` (standalone shardfiles SF11, J525): a page reads every zone from the cook (fix preview PV4),
+//      and the cook reads a zone's mounts from its shardfile. An install removes what an earlier one published there (the
+//      ledger `out/.pins.json` names it) and clears its `info/exclude` lines; `test/pin-public-leaks.test.ts` guards it.
 //
 // Build with WILDSHARD_CATALOGUE=test/pins/catalogue.json: the tarball hashes a page sees are then the pins'.
 //
@@ -250,13 +250,6 @@ function folderOf(files: ReadonlyMap<string, Uint8Array>): string | undefined {
   return DISCOVERY.exec([...files.keys()].find(path => DISCOVERY.test(path)) ?? '')?.[1];
 }
 
-interface CookMount { readonly url: string; readonly path: string }
-const PUBLISHED = /^\/(?:assets|programs)\//u;
-function cookMounts(files: ReadonlyMap<string, Uint8Array>): readonly CookMount[] {
-  const body = files.get('cook.json');
-  return body === undefined ? [] : (JSON.parse(decoder.decode(body)) as { readonly mounts?: readonly CookMount[] }).mounts ?? [];
-}
-
 /** J262: `current` when the author preparation names this engine's renderer fingerprint, `stale` for another (or when this
  *  tree can't compute its own), `none` without one. The same verdict `openShardfile` reaches; validation already
  *  refused a preparation that doesn't match its own inputs. SP1b4: a stale one with a sidecar in `WILDSHARD_COOK_SIDECARS`
@@ -277,22 +270,6 @@ async function preparationOf(files: ReadonlyMap<string, Uint8Array>, root: strin
   return shard.preparation === 'cook' ? 'cook' : 'stale';
 }
 
-
-/** The public paths an installed product published: its files under mounts/assets|programs and its cook.json rows. */
-function mountsOf(folder: string): Set<string> {
-  const paths = new Set<string>(), mounts = join(folder, 'mounts');
-  if (!existsSync(folder)) return paths;
-  for (const top of ['assets', 'programs']) {
-    const base = join(mounts, top);
-    if (!existsSync(base)) continue;
-    for (const entry of readdirSync(base, { recursive: true, withFileTypes: true })) {
-      if (entry.isFile()) paths.add(`public/${top}/${join(entry.parentPath, entry.name).slice(base.length + 1)}`);
-    }
-  }
-  const cook = join(folder, 'cook.json');
-  if (existsSync(cook)) for (const row of cookMounts(new Map([['cook.json', readFileSync(cook)]]))) if (PUBLISHED.test(row.url)) paths.add(`public${row.url}`);
-  return paths;
-}
 
 /** A full install leaves no out/ product the pins don't name, so land's gen:inputs has nothing stale to refuse (pins-reuse.mjs). */
 function pruneStale(root: string): void {
@@ -323,20 +300,20 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
   if (canReuse) {
     const reused = await reusePins(root, key, { log: line => { console.log(line); } });
     if (reused !== undefined) {
-      const paths = [...reused.published].sort((a, b) => a.localeCompare(b));
-      writeFileSync(LEDGER, json({ revision, published: paths } satisfies Ledger));
-      excludePublished(paths);
+      if (reused.published.length > 0) throw new Error(`pins reuse published ${reused.published.length} mounts under public/; SF11 publishes none`);
+      writeFileSync(LEDGER, json({ revision, published: [] } satisfies Ledger));
+      excludePublished([]);
       await installSaves(trackedPins.map(row => row.slug));
       pruneStale(root);
       clearLocalCandidates(root);
       const from = reused.source === root ? 'this tree, unchanged' : `${reused.mode} of ${reused.source}`;
-      console.log(`pins reused: ${from}; ${reused.files} files, ${(reused.bytes / 2 ** 20).toFixed(0)} MiB verified by sha256 (clone ${reused.seconds.clone.toFixed(1)}s, verify ${reused.seconds.verify.toFixed(1)}s), ${paths.length} mounts published`);
+      console.log(`pins reused: ${from}; ${reused.files} files, ${(reused.bytes / 2 ** 20).toFixed(0)} MiB verified by sha256 (clone ${reused.seconds.clone.toFixed(1)}s, verify ${reused.seconds.verify.toFixed(1)}s), nothing published under public/`);
       return trackedPins;
     }
     retained = await reuseUnchangedPins(root, inputs, trackedPins);
   }
   dropManifest(root);
-  const folderHashes = new Map(Object.entries(retained?.products ?? {})), mountHashes = new Map(Object.entries(retained?.mounts ?? {}));
+  const folderHashes = new Map(Object.entries(retained?.products ?? {}));
   const owners = new Map<string, PinOwner>(Object.entries(retained?.owners ?? {}));
   // The validator hashes most members already; the manifest reuses those digests rather than hashing twice.
   const digests = new WeakMap<Uint8Array, string>();
@@ -357,114 +334,75 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
   if (toAdmit.length > 0) await prepareAssetDecoders();
   const unknown = only.filter(slug => !shards.some(row => row.slug === slug));
   if (unknown.length > 0) throw new Error(`Not pinned: ${unknown.join(', ')}`);
-  // T2E-1: --from-format adds Template 2 beside whatever is installed, so `pnpm test:e2e` never strips a worktree's other
-  // pins (their public assets feed the committed boot tables); only the Template 2 it replaces leaves. Every other
-  // install replaces the whole set.
-  const replaced = dependency === undefined || !overlay ? new Set<string>() : mountsOf(resolve('out', local?.folder ?? dependency.pin.slug));
-  for (const path of local?.preservedMounts ?? []) replaced.delete(path);
-  const before = existsSync(LEDGER) ? (readJson(LEDGER) as Ledger).published : [];
   const shared = trackedPublic();
-  const published = new Set([...mountHashes.keys()].filter(path => !shared.has(path)));
   // Mark before writing: a failed local install must still prevent publication.
   if (local !== undefined) recordLocalCandidate(root, {slug: local.pin.slug, ...local.source});
-  // Only plain public/ paths, under folders that are this tree's own: a ledger or a linked folder never reaches outside.
-  for (const path of before) {
-    if (overlay && !replaced.has(path)) continue;
-    if (!mountPath(path) || shared.has(path) || published.has(path)) continue;
+  // SF11: what an earlier install published under public/ goes, on every install (an overlay's too), with its ledger rows
+  // and its info/exclude lines. Only plain public/ paths Git doesn't track, under folders that are this tree's own.
+  for (const path of existsSync(LEDGER) ? (readJson(LEDGER) as Ledger).published : []) {
+    if (!mountPath(path) || shared.has(path)) continue;
     insideTree(root, dirname(path));
-    rmSync(path, { force: true });
+    if (lstatSync(path, {throwIfNoEntry: false})?.isFile() === true) rmSync(path, { force: true });
   }
-  const publish = (url: string, body: Uint8Array): void => {
-    if (!mountPath(url)) throw new Error(`A pin publishes ${url}, outside public/`);
-    const hash = digest(body), held = mountHashes.get(url);
-    if (held !== undefined) {
-      if (held !== hash) throw new Error(`Two pins publish different ${url}`);
-      return;
-    }
-    insideTree(root, dirname(url), !shared.has(url));
-    mountHashes.set(url, hash);
-    if (shared.has(url)) {
-      if (!lstatSync(url).isFile() || sha256(readFileSync(url)) !== hash) throw new Error(`${url} differs from engine's tracked file`);
-      return;
-    }
-    // Never write through a link at a publication path, even if the old ledger did not name it.
-    const existing = lstatSync(url, {throwIfNoEntry: false});
-    if (existing !== undefined && !existing.isFile()) throw new Error(`${url} is not a regular file`);
-    published.add(url);
-    writeFileSync(url, body);
-  };
+  writeFileSync(LEDGER, json({ revision, published: [] } satisfies Ledger));
+  excludePublished([]);
   let failed = 0;
-  let paths: string[];
-  try {
-    for await (const [pin, bytes] of inOrder(toAdmit, 6, dependency === undefined ? undefined : new Map([[dependency.pin.hash, dependency.bytes]]))) {
-      const started = performance.now();
-      let files: ReadonlyMap<string, Uint8Array> = readTar(bytes), applied: readonly string[] = [];
-      const fileNamed = (path: string): Uint8Array => { const body = files.get(path); if (body === undefined) throw new Error(`${pin.slug}: no ${path}`); return body; };
-      try {
-        // FE9b: a pin this validator refuses installs as the chain's validated copy, as the cook admits it (pin-admit.ts).
-        const admitted = admitPin(files, digest, rows => validateShardfileFolder(
-          { read: (path, maximum) => { const body = rows.get(path); if (body === undefined) throw new Error(`${pin.slug}: no ${path}`); if (body.length > maximum) throw new Error(`${path} is over its cap`); return body; }, paths: () => rows.keys() },
-          { hash: digest, ...STORED },
-        ));
-        ({ files, applied } = admitted);
-        if (applied.length > 0) console.warn(`migrated ${pin.slug}: ${applied.join(', ')}`);
-        // SS12: a grandfathered product (Pine's page.life, SERVER-PARITY SS11) is admitted with a warning; say it.
-        for (const warning of admitted.warnings) console.warn(`warning ${pin.slug}: ${warning}`);
-        // S11: every target of the KTX2 table is in the product, a tracked engine file or a pinned public asset.
-        assertKtx2TableTargets({ paths: () => files.keys(), read: fileNamed }, url => shared.has(`public${url}`));
-      } catch (error) {
-        failed++;
-        console.error(`refused ${pin.slug}: ${error instanceof Error ? error.message : String(error)}`);
-        continue;
-      }
-      // A migrated copy carries no build receipt: the chain drops it with the old source hash.
-      const receipt = applied.length > 0 ? undefined : JSON.parse(decoder.decode(fileNamed('validation.json'))) as { readonly indexHash: string };
-      if (receipt !== undefined && receipt.indexHash !== sha256(fileNamed('shard.json'))) throw new Error(`${pin.slug}: its receipt names another index`);
-      const folder = folderOf(files);
-      if (folder === undefined) { failed++; console.error(`refused ${pin.slug}: no discovery document`); continue; }
-      if (!folderName(folder)) { failed++; console.error(`refused ${pin.slug}: product folder ${folder}`); continue; }
-      if (folderHashes.has(folder)) throw new Error(`Two pins publish out/${folder}`);
-      insideTree(root, output, true);
-      const target = resolve(output, folder);
-      rmSync(target, { recursive: true, force: true });
-      const written = new Map<string, string>(), mounts = new Set<string>();
-      const publishMount = (url: string, body: Uint8Array): void => { publish(url, body); mounts.add(url); };
-      const beforeMounts = published.size;
-      for (const [path, body] of files) {
-        if (path.endsWith('/') || path === 'validation.json') continue;
-        const out = join(target, path);
-        mkdirSync(dirname(out), { recursive: true });
-        writeFileSync(out, body);
-        written.set(path, digest(body));
-        const mounted = /^mounts\/((?:assets|programs)\/.+)$/u.exec(path)?.[1];
-        if (mounted !== undefined) publishMount(`public/${mounted}`, body);
-      }
-      // A thin head keeps one copy of a file: most of its mounts are `cook.json` rows, a URL over a blob, and no path under mounts/.
-      for (const row of cookMounts(files)) if (PUBLISHED.test(row.url)) publishMount(`public${row.url}`, fileNamed(row.path));
-      // Thin heads (C0) list packs they don't carry, and step 2 proved each one from its members.
-      const index = JSON.parse(decoder.decode(fileNamed('shard.json'))) as PackedIndex;
-      for (const [path, body] of restorePacks(index, files)) {
-        mkdirSync(dirname(join(target, path)), { recursive: true });
-        writeFileSync(join(target, path), body);
-        written.set(path, digest(body));
-      }
-      const validation = `${JSON.stringify({ ...receipt, revision, pin: { hash: pin.hash, uploadNumber: pin.uploadNumber }, ...(pin.slug === dependency?.pin.slug ? {source: dependency.source} : {}) })}\n`;
-      writeFileSync(join(target, 'validation.json'), validation);
-      written.set('validation.json', sha256(Buffer.from(validation)));
-      folderHashes.set(folder, Object.fromEntries(written));
-      owners.set(pin.slug, {folder, descriptor: pinDescriptor(pin), mounts: [...mounts].sort()});
-      // J262 (SP1a): a preparation from another renderer installs and cooks as it is; say so, as the cook does.
-      const preparation = await preparationOf(files, root, pin, bytes);
-      console.log(`${pin.slug}: admitted in ${((performance.now() - started) / 1000).toFixed(1)}s, ${files.size} files, ${published.size - beforeMounts} mounts published${preparation === 'none' ? '' : `, ${preparation} preparation`}`);
-      if (preparation === 'stale') console.warn(`stale preparation: ${pin.slug}`);
-      if (preparation === 'cook') console.warn(`prepared by cook: ${pin.slug}`);
+  for await (const [pin, bytes] of inOrder(toAdmit, 6, dependency === undefined ? undefined : new Map([[dependency.pin.hash, dependency.bytes]]))) {
+    const started = performance.now();
+    let files: ReadonlyMap<string, Uint8Array> = readTar(bytes), applied: readonly string[] = [];
+    const fileNamed = (path: string): Uint8Array => { const body = files.get(path); if (body === undefined) throw new Error(`${pin.slug}: no ${path}`); return body; };
+    try {
+      // FE9b: a pin this validator refuses installs as the chain's validated copy, as the cook admits it (pin-admit.ts).
+      const admitted = admitPin(files, digest, rows => validateShardfileFolder(
+        { read: (path, maximum) => { const body = rows.get(path); if (body === undefined) throw new Error(`${pin.slug}: no ${path}`); if (body.length > maximum) throw new Error(`${path} is over its cap`); return body; }, paths: () => rows.keys() },
+        { hash: digest, ...STORED },
+      ));
+      ({ files, applied } = admitted);
+      if (applied.length > 0) console.warn(`migrated ${pin.slug}: ${applied.join(', ')}`);
+      // SS12: a grandfathered product (Pine's page.life, SERVER-PARITY SS11) is admitted with a warning; say it.
+      for (const warning of admitted.warnings) console.warn(`warning ${pin.slug}: ${warning}`);
+      // S11: every target of the KTX2 table is in the product, a tracked engine file or a pinned public asset.
+      assertKtx2TableTargets({ paths: () => files.keys(), read: fileNamed }, url => shared.has(`public${url}`));
+    } catch (error) {
+      failed++;
+      console.error(`refused ${pin.slug}: ${error instanceof Error ? error.message : String(error)}`);
+      continue;
     }
-  } finally {
-    // The install lock has created out/. Keep cleanup information even if publication stopped midway.
-    const kept = overlay ? before.filter(path => !replaced.has(path) && existsSync(path)) : [];
-    paths = [...new Set([...kept, ...published])].sort((a, b) => a.localeCompare(b));
-    writeFileSync(LEDGER, json({ revision, published: paths } satisfies Ledger));
-    excludePublished(paths);
+    // A migrated copy carries no build receipt: the chain drops it with the old source hash.
+    const receipt = applied.length > 0 ? undefined : JSON.parse(decoder.decode(fileNamed('validation.json'))) as { readonly indexHash: string };
+    if (receipt !== undefined && receipt.indexHash !== sha256(fileNamed('shard.json'))) throw new Error(`${pin.slug}: its receipt names another index`);
+    const folder = folderOf(files);
+    if (folder === undefined) { failed++; console.error(`refused ${pin.slug}: no discovery document`); continue; }
+    if (!folderName(folder)) { failed++; console.error(`refused ${pin.slug}: product folder ${folder}`); continue; }
+    if (folderHashes.has(folder)) throw new Error(`Two pins publish out/${folder}`);
+    insideTree(root, output, true);
+    const target = resolve(output, folder);
+    rmSync(target, { recursive: true, force: true });
+    const written = new Map<string, string>();
+    for (const [path, body] of files) {
+      if (path.endsWith('/') || path === 'validation.json') continue;
+      const out = join(target, path);
+      mkdirSync(dirname(out), { recursive: true });
+      writeFileSync(out, body);
+      written.set(path, digest(body));
+    }
+    // Thin heads (C0) list packs they don't carry, and step 2 proved each one from its members.
+    const index = JSON.parse(decoder.decode(fileNamed('shard.json'))) as PackedIndex;
+    for (const [path, body] of restorePacks(index, files)) {
+      mkdirSync(dirname(join(target, path)), { recursive: true });
+      writeFileSync(join(target, path), body);
+      written.set(path, digest(body));
+    }
+    const validation = `${JSON.stringify({ ...receipt, revision, pin: { hash: pin.hash, uploadNumber: pin.uploadNumber }, ...(pin.slug === dependency?.pin.slug ? {source: dependency.source} : {}) })}\n`;
+    writeFileSync(join(target, 'validation.json'), validation);
+    written.set('validation.json', sha256(Buffer.from(validation)));
+    folderHashes.set(folder, Object.fromEntries(written));
+    owners.set(pin.slug, {folder, descriptor: pinDescriptor(pin), mounts: []});
+    // J262 (SP1a): a preparation from another renderer installs and cooks as it is; say so, as the cook does.
+    const preparation = await preparationOf(files, root, pin, bytes);
+    console.log(`${pin.slug}: admitted in ${((performance.now() - started) / 1000).toFixed(1)}s, ${files.size} files${preparation === 'none' ? '' : `, ${preparation} preparation`}`);
+    if (preparation === 'stale') console.warn(`stale preparation: ${pin.slug}`);
+    if (preparation === 'cook') console.warn(`prepared by cook: ${pin.slug}`);
   }
   if (failed > 0) process.exitCode = 1;
   // the saves of every pin this install took from the API (a --from-format product brings none)
@@ -474,12 +412,12 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
   if (source === 'staging') pruneStalePinProducts(root, pins.map(pin => pin.hash));
   // The manifest certifies these bytes only for the inputs the install read: a pin or source edited meanwhile changes the key.
   if (full && failed === 0 && pinsKey(root, shardfileValidationRevision(root)) === key) {
-    writeManifest(root, key, Object.fromEntries(folderHashes), Object.fromEntries(mountHashes), {inputs, owners: Object.fromEntries(owners)});
+    writeManifest(root, key, Object.fromEntries(folderHashes), {}, {inputs, owners: Object.fromEntries(owners)});
   }
   if (full && failed === 0) clearLocalCandidates(root);
   const keptProducts = pins.length - toAdmit.length;
   if (keptProducts > 0) console.log(`pins: retained ${keptProducts} verified products`);
-  console.log(`${pins.length - failed} of ${pins.length} pins admitted, ${paths.length} mounts published`);
+  console.log(`${pins.length - failed} of ${pins.length} pins admitted, nothing published under public/`);
   return pins;
 }
 
