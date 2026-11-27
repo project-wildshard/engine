@@ -24,3 +24,9 @@ hold, and names a leftover split when there is one.
 Headless, the game never reaches control (`ws:control-ready`) on this page, and the probe never installs, so the page never asks
 its worker for the precache (DL1) and the offline visit has no title code. Asked by hand, the worker precaches the build in under a
 second. The proof now logs control, page errors and the boot trace while that is open.
+
+The entry proof (codex-cookkeys' tap-and-observe version) now passes in both headless browsers at 402x874: online, a warm return
+visit and offline all enter Driftwood with 0 zone files from the page. Three fixes to it: on the grid the session's shard stays
+the road (`platform.grid`), so the zone is the cell the player stands in (`grid.inside`); a first visit is uncontrolled, so a warm
+visit through the worker comes before offline, and the proof waits for the worker's precache book; and the road's own server part
+(PV8 keeps it) is not a zone read.

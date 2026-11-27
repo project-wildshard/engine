@@ -14,7 +14,7 @@ import { chromium, webkit } from '../src/scripts/browser-playwright.mjs';
 import { KEYCHAIN_ARGS } from '../src/scripts/.kit/chromium-keychain.mjs';
 import { enterZone } from '../src/scripts/zone-entry.mjs';
 import { bootObservation } from '../src/scripts/parity/boot-smoke.mjs';
-import { isZoneFile } from '../src/scripts/app-build/zoneless.mjs';
+import { isZoneFile, roadServerParts } from '../src/scripts/app-build/zoneless.mjs';
 import { shardNames } from '../src/scripts/page-size.mjs';
 
 const DIST = resolve(process.env['WS_PV4_DIST'] ?? 'dist'), COOKED = resolve(process.env['WS_PV4_COOKED'] ?? 'tmp/cooked');
@@ -52,7 +52,7 @@ test(`${ZONE} enters from the cook and again offline, at 402x874`, { timeout: 90
   const server = bucket();
   await new Promise(done => { server.listen(Number(origin.port), origin.hostname, () => { done(null); }); });
   const page = spawn(process.execPath, ['src/scripts/preview-server.mjs', '--port', String(PAGE_PORT), '--outDir', DIST], { stdio: ['ignore', 'pipe', 'inherit'] });
-  const shards = shardNames(DIST);
+  const shards = shardNames(DIST), road = roadServerParts(DIST); // the road's server part (PV8) stays in the page
   try {
     await ready(page, `:${String(PAGE_PORT)}/`);
     for (const name of BROWSERS) {
@@ -64,7 +64,7 @@ test(`${ZONE} enters from the cook and again offline, at 402x874`, { timeout: 90
         context.on('request', request => {
           const url = new URL(request.url());
           if (url.origin === origin.origin) cooked++;
-          else if (url.port === String(PAGE_PORT) && isZoneFile(url.pathname.slice(1), shards)) fromPage.push(url.pathname);
+          else if (url.port === String(PAGE_PORT) && isZoneFile(url.pathname.slice(1), shards, road)) fromPage.push(url.pathname);
         });
         const pageOrigin = `http://127.0.0.1:${String(PAGE_PORT)}`;
         if (name === 'chromium') await context.grantPermissions(['local-network-access'], {origin: pageOrigin});
@@ -82,15 +82,28 @@ test(`${ZONE} enters from the cook and again offline, at 402x874`, { timeout: 90
           for (;;) {
             const seen = await tab.evaluate(bootObservation).catch(() => null);
             if (seen?.fatal.length) throw new Error(seen.fatal.join(' | '));
-            if (seen?.ready && seen.shard.replace(/^_/u, '') === ZONE) break;
+            // on the grid the session's shard stays the road (`platform.grid`); the cell the player stands in names the zone
+            if (seen?.ready && (seen.shard.replace(/^_/u, '') === ZONE || seen.grid?.inside === ZONE)) break;
             if (seen?.revealing) await tab.locator('.ws-grid-reveal').dispatchEvent('pointerdown');
-            if (Date.now() >= deadline) throw new Error(`no ${how} gameplay: ${seen?.appState ?? 'no world'} ${seen?.shard ?? ''}`);
+            if (Date.now() >= deadline) throw new Error(`no ${how} gameplay: ${seen?.appState ?? 'no world'} ${seen?.shard ?? ''} ${JSON.stringify({ ...seen, states: undefined, titlePreparation: undefined }).slice(0, 900)}`);
             await tab.waitForTimeout(350);
           }
-          console.log(`[pv4] ${name} ${how}: in ${ZONE}; ${String(cooked)} cooked reads, ${String(fromPage.length)} zone reads from the page`);
+          console.log(`[pv4] ${name} ${how}: in ${ZONE}; ${String(cooked)} cooked reads, ${String(fromPage.length)} zone reads from the page${fromPage.length === 0 ? '' : ` (${fromPage.slice(0, 6).join(', ')})`}`);
         };
         await enter('online');
         await tab.evaluate(async () => { await navigator.serviceWorker.ready; });
+        // the first visit installs the worker (a fresh page isn't controlled, so the worker saw none of its reads); the second reads
+        // through it, as a returning player's does, and keeps the cooked reads (sw.js cookedRead)
+        cooked = 0;
+        await enter('warm');
+        // a returning player's device holds the build whole: the precache the page asked for at control finished (the worker's book
+        // for the build, sw.js precacheGeneration; its id is the page's build plus a digest, so any book but `previous`)
+        for (const until = Date.now() + 180_000; ; await tab.waitForTimeout(2000)) {
+          const books = await tab.evaluate(async () => (await (await caches.open('ws-preview-builds-v1')).keys()).map(key => new URL(key.url).pathname)
+            .filter(path => path.startsWith('/__ws_build__/') && path !== '/__ws_build__/previous'));
+          if (books.length > 0) break;
+          assert.ok(Date.now() < until, `${name}: the worker's precache never finished`);
+        }
         await context.setOffline(true);
         cooked = 0;
         await enter('offline');
