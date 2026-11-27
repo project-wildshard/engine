@@ -4,7 +4,7 @@ import {spawn, spawnSync} from 'node:child_process';
 import {existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
 import {dirname, join, resolve} from 'node:path';
 import {afterEach, describe, expect, test} from 'vitest';
-import {ENDED_IDLE_MS, INSTALLED_LOCK, MAX_WORKTREES, SLUG, endedList, endedWorktrees, followMain, parseArgs, refreshCanonicalInstall, withStoreUse} from '../scripts/.kit/worktree.mjs';
+import {ENDED_IDLE_MS, INSTALLED_LOCK, MAX_WORKTREES, PARKED_IDLE_MS, SLUG, endedList, endedWorktrees, followMain, parseArgs, refreshCanonicalInstall, withStoreUse} from '../scripts/.kit/worktree.mjs';
 
 const SCRIPT = resolve(import.meta.dirname, '../../src/scripts/.kit/worktree.mjs');
 /** @type {string[]} */
@@ -408,6 +408,23 @@ describe('a full cap lists ended worktrees', () => {
       expect(spawnSync('git', ['rev-parse', '--verify', '--quiet', `refs/heads/plan/${slug}`], {cwd: canonical, env: ENV}).status).toBe(0);
     }
     expect(endedList([{slug: 'full-1', idleHours: 2}])).toMatch(/node src\/scripts\/\.kit\/keep-copy\.mjs \.worktrees\/full-1 && git worktree remove \.worktrees\/full-1 && git branch -d plan\/full-1 /u);
+  });
+
+  test('meta QA 11-26 row 23: a clean unlanded worktree is listed after 12 h idle, its branch kept; nothing is removed', () => {
+    const {canonical} = repos();
+    writeFileSync(join(canonical, '.git/info/exclude'), '/.owner\n');
+    expect(worktree(canonical, ['new', 'unlanded', '--no-install']).status).toBe(0);
+    const tree = join(canonical, '.worktrees/unlanded');
+    put(tree, 'src/work.ts', 'export const work = 1;\n');
+    git(tree, ['add', 'src/work.ts']);
+    git(tree, ['commit', '-q', '-m', 'work', '--', 'src/work.ts']);
+    expect(endedWorktrees(canonical, ENV, Date.now() + ENDED_IDLE_MS + 60_000)).toEqual([]);
+    expect(endedWorktrees(canonical, ENV, Date.now() + PARKED_IDLE_MS + 60_000)).toEqual([expect.objectContaining({slug: 'unlanded', landed: false, merged: false})]);
+    expect(existsSync(tree)).toBe(true);
+    const kept = endedList([{slug: 'unlanded', idleHours: 13, landed: false, merged: false}, {slug: 'rebased', idleHours: 1, landed: true, merged: false}]);
+    expect(kept).toMatch(/node src\/scripts\/\.kit\/keep-copy\.mjs \.worktrees\/unlanded && git worktree remove \.worktrees\/unlanded   # unlanded: not landed, clean, idle 13\.0 h, nothing running; branch plan\/unlanded kept/u);
+    expect(kept).toMatch(/worktree remove \.worktrees\/rebased   # rebased: landed by patch \(a rebased land\)/u);
+    expect(kept).not.toMatch(/git branch -d/u);
   });
 
   test('the canonical refresh installs when pnpm\'s installed lockfile disagrees with a matching record', () => {

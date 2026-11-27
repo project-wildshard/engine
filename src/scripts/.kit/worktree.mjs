@@ -93,6 +93,18 @@ export function withStoreUse(env,what,fn){
 export const MAX_WORKTREES=10;
 /** J358: how long a landed, clean worktree sits untouched before a full cap lists it as ended (it never removes it). */
 export const ENDED_IDLE_MS=30*60_000;
+/** Meta QA 11-26 row 23: a clean worktree idle this long is listed at a full cap even with work not on main; its command
+ *  keeps the branch, so removing the folder loses no commit. */
+export const PARKED_IDLE_MS=12*3_600_000;
+
+/** Landed: the tip is on origin/main, or every commit's patch is (a rebased land leaves the old tip off main by ancestry;
+ *  J511's test). @param {string} canonical @param {string} tip */
+export function landedOnMain(canonical,tip){
+ if(onMain(canonical,tip))return true;
+ if(tip==='')return false;
+ const cherry=spawnSync('git',['cherry','origin/main',tip],{cwd:canonical,encoding:'utf8',maxBuffer:64<<20});
+ return cherry.status===0&&cherry.stdout.split('\n').filter(Boolean).every(line=>line.startsWith('- '));
+}
 /** Meta REPO-DISK DK9: refuse a new worktree when the repo's volume has less free than this, in GiB. */
 export const MIN_FREE_GIB=60;
 
@@ -110,11 +122,12 @@ export function freeGib(path,env){
 
 /**
  * J358 (Jake, 2026-11-15: "No fucking auto delete in scripts"; coordinator 11-24 reverts the cap reaper): the plan
- * worktrees that have clearly ended: landed (tip on origin/main), clean, idle ENDED_IDLE_MS, with no process or pidfile
- * inside. Report only: a full cap names them with the commands that remove them, a keep-copy first, for an agent to run.
- * Only `land` removes a worktree itself (its own, just landed).
+ * worktrees that have clearly ended, clean with no process or pidfile inside: landed (landedOnMain, so a rebased land
+ * counts) and idle ENDED_IDLE_MS, or idle PARKED_IDLE_MS whatever their branch holds (meta QA 11-26 row 23). Report
+ * only: a full cap names them with the commands that remove them, a keep-copy first, for an agent to run; an unlanded
+ * one keeps its branch. Only `land` removes a worktree itself (its own, just landed).
  * @param {string} canonical @param {NodeJS.ProcessEnv} env @param {number} [now]
- * @returns {{slug:string,idleHours:number}[]} oldest first
+ * @returns {{slug:string,idleHours:number,landed:boolean,merged:boolean}[]} oldest first
  */
 export function endedWorktrees(canonical,env,now=Date.now()){
  const roots=new Set([join(canonical,WORKTREES),join(realpathSync(canonical),WORKTREES)]);
@@ -122,21 +135,29 @@ export function endedWorktrees(canonical,env,now=Date.now()){
  const directories=processDirectories(),cwds=directories===undefined?null:[...directories.values()];
  return live.flatMap(tree=>{
   const slug=basename(tree.path);
-  if(tree.branch!==`refs/heads/plan/${slug}`||!onMain(canonical,tree.head))return [];
+  if(tree.branch!==`refs/heads/plan/${slug}`)return [];
   const at=lastActivity(tree.path,git(tree.path,['rev-parse','--absolute-git-dir']).trim());
   if(now-at<ENDED_IDLE_MS)return [];
+  // On main by ancestry, `git branch -d` takes the branch; landed by patch only, it stays for J521's landed-branch sweep.
+  const merged=onMain(canonical,tree.head),landed=merged||landedOnMain(canonical,tree.head);
+  if(!landed&&now-at<PARKED_IDLE_MS)return [];
   const dirty=spawnSync('git',['--no-optional-locks','status','--porcelain','--untracked-files=all'],{cwd:tree.path,encoding:'utf8',maxBuffer:64<<20});
   if(dirty.status!==0||dirty.stdout.trim()!=='')return [];
   // A process or pidfile inside keeps it off the list; an owner session that has gone quiet, or no owner file, does not.
   if(laneLive(tree.path,{cwds,sessionLive:false,activeHours:Number.POSITIVE_INFINITY,receipts:env.WS_LANE_RECEIPTS}).state==='live')return [];
-  return [{slug,at}];
- }).sort((a,b)=>a.at-b.at).map(({slug,at})=>({slug,idleHours:(now-at)/3_600_000}));
+  return [{slug,at,landed,merged}];
+ }).sort((a,b)=>a.at-b.at).map(({slug,at,landed,merged})=>({slug,idleHours:(now-at)/3_600_000,landed,merged}));
 }
 
-/** The refusal's list: each ended worktree and the one command that removes it, copy first. @param {{slug:string,idleHours:number}[]} ended */
+/** The refusal's list: each ended worktree and the one command that removes it, copy first; an unlanded one keeps its
+ *  branch, and so does one landed by patch only (J521's sweep takes it). @param {{slug:string,idleHours:number,landed?:boolean,merged?:boolean}[]} ended */
 export function endedList(ended){
  if(ended.length===0)return '';
- const rows=ended.map(({slug,idleHours})=>`\n  node src/scripts/.kit/keep-copy.mjs ${WORKTREES}/${slug} && git worktree remove ${WORKTREES}/${slug} && git branch -d plan/${slug}   # ${slug}: landed, clean, idle ${idleHours.toFixed(1)} h, nothing running`);
+ const rows=ended.map(({slug,idleHours,landed=true,merged=landed})=>merged
+  ?`\n  node src/scripts/.kit/keep-copy.mjs ${WORKTREES}/${slug} && git worktree remove ${WORKTREES}/${slug} && git branch -d plan/${slug}   # ${slug}: landed, clean, idle ${idleHours.toFixed(1)} h, nothing running`
+  :landed
+  ?`\n  node src/scripts/.kit/keep-copy.mjs ${WORKTREES}/${slug} && git worktree remove ${WORKTREES}/${slug}   # ${slug}: landed by patch (a rebased land), clean, idle ${idleHours.toFixed(1)} h, nothing running; branch plan/${slug} kept`
+  :`\n  node src/scripts/.kit/keep-copy.mjs ${WORKTREES}/${slug} && git worktree remove ${WORKTREES}/${slug}   # ${slug}: not landed, clean, idle ${idleHours.toFixed(1)} h, nothing running; branch plan/${slug} kept`);
  return `\nended worktrees (J358: nothing removes them for you; copy first, then remove, from the canonical checkout):${rows.join('')}`;
 }
 
@@ -158,7 +179,7 @@ export function capRefusal(canonical,env){
  ].join(', and ');
  const parked=live.flatMap(tree=>{
   const slug=basename(tree.path);
-  if(tree.branch!==`refs/heads/plan/${slug}`||!onMain(canonical,tree.head))return [];
+  if(tree.branch!==`refs/heads/plan/${slug}`||!landedOnMain(canonical,tree.head))return [];
   // Activity first, and a status that takes no optional lock: a plain `git status` may rewrite the index and so
   // make every worktree look active now.
   const at=lastActivity(tree.path,git(tree.path,['rev-parse','--absolute-git-dir']).trim());
