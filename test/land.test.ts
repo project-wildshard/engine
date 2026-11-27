@@ -285,6 +285,27 @@ describe('ci.yml on main', () => {
     expect(Math.max(571, finish('nine-ring1'))).toBeLessThanOrEqual(11 * 60);
   });
 
+  test('QA 11-26 row 31: Nine and the memory build have time to finish and keep their encodes when they do not', () => {
+    const text = readFileSync('.github/workflows/ci.yml', 'utf8');
+    const jobs = new Map([...text.slice(text.indexOf('\njobs:')).matchAll(/^ {2}([a-z0-9-]+):\n((?: {4}.*\n|\n)*)/gmu)].map(([, name, body]) => [name, body ?? '']));
+    const nine = jobs.get('nine-ring1-build') ?? '', memory = jobs.get('memory-client-build') ?? '';
+    // "Build full pinned Nine" measured 7 to 8 min cold; at 8 min five of ten main runs were cancelled.
+    expect(/^ {4}timeout-minutes: (\d+)$/mu.exec(nine)?.[1]).toBe('15');
+    expect(/^ {4}timeout-minutes: (\d+)$/mu.exec(memory)?.[1]).toBe('30');
+    // Each build step stops inside its job, so the partial save after it still runs.
+    expect(nine).toMatch(/name: Build full pinned Nine\n +id: nine-build\n +if: [^\n]+\n +timeout-minutes: 12\n/u);
+    expect(memory).toMatch(/name: Build every production pin\n +id: ledger-client\n +timeout-minutes: 26\n/u);
+    // Nine restores ci's full ledger before it builds and saves a partial one after a failed or timed-out build.
+    const restore = nine.indexOf('name: Restore full-ledger encodes'), build = nine.indexOf('name: Build full pinned Nine');
+    const partial = nine.indexOf('name: Save partial Nine encodes');
+    expect(restore).toBeGreaterThan(nine.indexOf('uses: ./.github/actions/full-ledger-key'));
+    expect(build).toBeGreaterThan(restore);
+    expect(partial).toBeGreaterThan(build);
+    expect(nine.slice(restore, build)).toContain('key: ${{ steps.ledger-key.outputs.linux-key }}');
+    expect(nine.slice(partial)).toContain("steps.nine-build.outcome != 'success'");
+    expect(nine.slice(partial)).toContain('partial-nine-${{ github.run_id }}-${{ github.run_attempt }}');
+  });
+
   test('J400 reserves T1 time on share nine and covers each existing unit once', () => {
     // ci.yml's kinds (boundaries has its own job), at run 43315969089's measured shard seconds: alone, products left its
     // job 2-4 min short while one of jobs 1-5 ran four shards deep.

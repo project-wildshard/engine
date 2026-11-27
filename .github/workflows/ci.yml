@@ -433,7 +433,10 @@ jobs:
     # slice. Preserve the standalone props check and measured street workload
     # policy without promoting or rewriting any pin or NB8/NB23 target.
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    # Meta QA 11-26 row 31: "Build full pinned Nine" took 7 to 8 min (63 spawn parts encoded cold in 322 s, no cache),
+    # so the old 8 min limit cancelled five of ten main runs (45958005007 to 45964884652). 15 min is real headroom;
+    # the full-ledger restore below makes a warm build far shorter.
+    timeout-minutes: 15
     outputs:
       code-run: ${{ steps.code.outputs.run }}
     env:
@@ -461,9 +464,37 @@ jobs:
       - name: Own the benchmark scratch folder
         if: steps.code.outputs.run == 'true'
         run: node src/scripts/.kit/scratch-dir.mjs nine-ring1 'NB6 pinned Nine load and street ratchet'
-      - name: Build full pinned Nine
+      # FS30: Nine's spawn parts and texture encodes are a subset of ci's content-addressed full ledger, which
+      # memory-client-build saves, so this job restores it rather than encode every part cold.
+      - name: Key the full-ledger encodes
+        id: ledger-key
         if: steps.code.outputs.run == 'true'
+        uses: ./.github/actions/full-ledger-key
+      - name: Restore full-ledger encodes
+        if: steps.code.outputs.run == 'true'
+        continue-on-error: true
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/wildshard/gen/spawn-parts-br
+          key: ${{ steps.ledger-key.outputs.linux-key }}
+          restore-keys: |
+            ${{ steps.ledger-key.outputs.linux-prefix }}
+            nightly-encodes-
+      # The step's own limit leaves the job time to save what it encoded; a job-level timeout cancels the save too.
+      - name: Build full pinned Nine
+        id: nine-build
+        if: steps.code.outputs.run == 'true'
+        timeout-minutes: 12
         run: node src/scripts/nine-ring1.mjs build
+      # As memory-client-build's (row 31): a build that fails or runs out of time keeps the encodes it finished under a
+      # per-run key the next try restores through the ledger prefix.
+      - name: Save partial Nine encodes
+        if: ${{ always() && steps.ledger-key.outputs.linux-prefix != '' && steps.nine-build.outcome != 'success' && steps.nine-build.outcome != 'skipped' }}
+        continue-on-error: true
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/wildshard/gen/spawn-parts-br
+          key: ${{ steps.ledger-key.outputs.linux-prefix }}partial-nine-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Archive the exact measured client
         if: steps.code.outputs.run == 'true'
         run: tar -cf tmp/nine-ring1/client.tar -C tmp/nine-ring1/preview dist
@@ -570,8 +601,10 @@ jobs:
           restore-keys: |
             ${{ steps.ledger-codec.outputs.prefix }}
             nightly-encodes-
+      # The step's own limit leaves the job time to save what it encoded; a job-level timeout cancels the save too.
       - name: Build every production pin
         id: ledger-client
+        timeout-minutes: 26
         run: |
           node src/scripts/.kit/scratch-dir.mjs memory-ledger 'EM35 full pinned ledger'
           if ! node src/scripts/pins.ts install; then
