@@ -13,6 +13,13 @@ it into main while other lanes continue landing.
 `src/scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.99 (2026-11-27)
+
+- Refresh the Nalati Grasslands and Nine Dragon Stack shard builds.
+- Serve releases, placements and the item catalogue from the new release origin.
+- Preserve graph data textures and deduplicate phone texture entries.
+- Reuse texture encodes across cook jobs and update shard format to 0.82.3.
+
 ## v0.1.97 (2026-11-26)
 
 - Nine Dragon no longer shows a false "World not drawn" reload card after it loads.
