@@ -86,7 +86,7 @@ export const CHECKED_DOCUMENTS: readonly ['version.json', 'index.html', 'sw.js',
 export const CHANNELS: { staging: WorldChannelConfig; production: WorldChannelConfig; preview: SoloChannelConfig; explore: SoloChannelConfig };
 export class RefusedError extends Error { constructor(message: string) }
 export function runPhase(phase: Phase, deps: Deps): Promise<{ refusals: string[] }>;
-export function buildEnv(channel: ChannelConfig, deps: Deps): Record<string, string>;
+export function buildEnv(channel: ChannelConfig, deps: Pick<Deps, 'build' | 'catalogue' | 'zoneTable' | 'releaseKey'>): Record<string, string>;
 /** PV13: whether a channel waits on a signed release file of its own (every channel but preview). */
 export function ownGate(channel: ChannelConfig): boolean;
 /** PV16: where a staging or production build writes its own zone table, one per build. */

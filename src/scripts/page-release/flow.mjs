@@ -225,7 +225,7 @@ export async function runPhase(phase, deps) {
     // content (--content, PZ6) stamps the set's base into the page and keeps the split; one that doesn't joins the two, so
     // the page serves its own content.
     if (deps.content === undefined && zonesFromCook) {
-      plan('join dist-content/ back into dist/, refusing any shard content (S1 to S7): the zones come from the cook (PV17)');
+      plan('join build-owned files and engine art into dist/, refusing zone payloads (PV17)');
       if (!dry) deps.run('node', ['src/scripts/app-build/splitOutput.mjs', 'dist', '--join', '--no-shard-content'], {});
     } else if (deps.content === undefined) {
       plan('join dist-content/ back into dist/ (no content base: the page serves its own content)');
@@ -387,7 +387,7 @@ function heldFile(deps, path) {
   try { deps.readFile(path); return true; } catch { return false; }
 }
 
-/** @param {ChannelConfig} channel @param {Deps} deps @returns {Record<string, string>} */
+/** @param {ChannelConfig} channel @param {Pick<Deps, 'build' | 'catalogue' | 'zoneTable' | 'releaseKey'>} deps @returns {Record<string, string>} */
 export function buildEnv(channel, deps) {
   const common = {
     // SA35: preview bakes the grid it borrowed from staging when the workflow names one; staging and production bake the pin.

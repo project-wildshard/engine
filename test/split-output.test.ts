@@ -207,3 +207,36 @@ test('PV17: shardContent names the shard content a content tree holds, never eng
     expect(shardContent(dist, content)).toEqual([]);
   }
 });
+
+test('PV17 joins the signed staging build files and refuses zone packs', () => {
+  const dist = fixture(), content = contentDirOf(dist);
+  const build = '1cd1d5c481705b5dcd4b43ea5cb5752ce8799b5f';
+  const book = `assets/spawn/server-${build}.json`, road = 'assets/spawn/server/5b551a3e1b4cdab7.pack.br';
+  const buildFiles = [
+    'assets/boot-tables-4101cd17.json', 'assets/grid-seam-plans-2b331589.json', 'assets/grid-seams-48ae9018.json',
+    'assets/grid-strip-book-bd600c74.json', 'assets/grid-strip-page-9e5ee723.json', 'assets/grid-strip-mesh-28e4c5bc.bin',
+    'assets/world-map-7b71b9dea5ca7165.webp', `assets/spawn/engine-${build}.json`,
+    'assets/spawn/engine-client-phone-e947bb6806f834d2.json', 'assets/spawn/engine-grid-desktop-741ebc58ff3f3fb0.json',
+    book, road,
+  ];
+  for (const path of buildFiles) { mkdirSync(dirname(join(content, path)), {recursive: true}); writeFileSync(join(content, path), path); }
+  const grid = {url: `/${road}`, files: [['grid/shapes.bin', 0, 1]]};
+  writeFileSync(join(content, book), JSON.stringify({book: 'server', build, shards: {}, grid}));
+  expect(shardContent(dist)).toEqual([]);
+
+  const zone = 'assets/spawn/server/fedcba9876543210.pack.br', zoneArt = 'assets/pine-hollow/baked/a.glb';
+  writeFileSync(join(content, zone), 'zone');
+  mkdirSync(dirname(join(content, zoneArt)), {recursive: true}); writeFileSync(join(content, zoneArt), 'zone art');
+  expect(shardContent(dist)).toEqual([zoneArt, zone]);
+  writeFileSync(join(content, book), JSON.stringify({book: 'server', build, shards: {'pine-hollow': {url: `/${zone}`}}, grid}));
+  expect(shardContent(dist)).toEqual([zoneArt, book, road, zone].sort());
+  const refused = spawnSync(process.execPath, ['src/scripts/app-build/splitOutput.mjs', dist, '--join', '--no-shard-content'], {encoding: 'utf8'});
+  expect(refused.status).toBe(1);
+  expect(tree(content)).toEqual([...buildFiles, zone, zoneArt].sort());
+
+  rmSync(join(content, zone)); rmSync(join(content, zoneArt));
+  writeFileSync(join(content, book), JSON.stringify({book: 'server', build, shards: {}, grid}));
+  const joined = spawnSync(process.execPath, ['src/scripts/app-build/splitOutput.mjs', dist, '--join', '--no-shard-content'], {encoding: 'utf8'});
+  expect(joined.status, joined.stderr).toBe(0);
+  expect(buildFiles.every(path => existsSync(join(dist, path)))).toBe(true);
+});

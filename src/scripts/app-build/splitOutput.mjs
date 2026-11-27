@@ -5,8 +5,8 @@
 // `--join` moves it back, for a host that serves one tree: until a channel stamps a `contentBase` (PZ8), page-release
 // joins before it packages, and the jobs that serve the whole game from dist (nightly, hover contract) join too.
 //
-// Fix preview PV17: `--join --no-shard-content` (staging and production, which publish no content set) joins engine art
-// only, and refuses a content tree that holds shard content: their zones come from the cook (PV16), never the page.
+// Fix preview PV17: the strict join for staging and production allows engine art and build-owned world files.
+// Zone payloads still come from the cook (PV16).
 //
 //   node src/scripts/app-build/splitOutput.mjs [dist] [--join [--no-shard-content]]
 import {constants, copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, rmdirSync, writeFileSync} from 'node:fs';
@@ -125,12 +125,49 @@ export function contentGaps(dist, held) {
   return files(root).filter(row => row.path !== SPLITTING && isContent(row.path, shards) && !held.has(row.path)).map(row => row.path).sort();
 }
 
-/** PV17: the shard content (S1 to S7) a content tree holds, by page path. A page that publishes no content set joins its
- *  content back; for staging and production that must be engine art only, since their zones come from the cook (PV16).
+// The size report groups world files with shard content because both used to go in the content set (PZ4).
+// These files describe the whole build or the engine's own spawn downloads, even on a page with no zones baked in.
+const BUILD_WORLD_PATHS = [
+  /^assets\/(?:boot-tables|grid-seams|grid-seam-plans|grid-strip-(?:book|page))-[a-f0-9]{8}\.json$/u,
+  /^assets\/grid-strip-mesh-[a-f0-9]{8}\.bin$/u,
+  /^assets\/world-map-[a-f0-9]{16}\.webp$/u,
+  /^assets\/spawn\/engine-(?:[a-f0-9]{40}|(?:client|grid)-(?:phone|desktop)-[a-f0-9]{16})\.json$/u,
+];
+const SERVER_BOOK = /^assets\/spawn\/server-([a-f0-9]{40})\.json$/u;
+const ROAD_PART = /^\/assets\/spawn\/server\/[a-f0-9]{16}\.pack\.br$/u;
+
+/** A zone-free server book may still name the build's road. Only its grid part is eligible for the strict join.
+ * @param {string} root @param {readonly {path: string}[]} rows */
+function gridServerPaths(root, rows) {
+  /** @type {Set<string>} */
+  const paths = new Set();
+  for (const {path} of rows) {
+    const match = SERVER_BOOK.exec(path);
+    if (match === null) continue;
+    try {
+      /** @type {{book?: string, build?: string, shards?: object, grid?: {url?: string, files?: readonly unknown[]}} | null} */
+      const book = JSON.parse(readFileSync(join(root, path), 'utf8'));
+      const {shards, grid} = book ?? {};
+      if (book?.book !== 'server' || book.build !== match[1] || typeof shards !== 'object' || shards === null ||
+          Array.isArray(shards) || Object.keys(shards).length !== 0) continue;
+      if (grid !== undefined) {
+        if (typeof grid?.url !== 'string' || !ROAD_PART.test(grid.url) || !Array.isArray(grid.files) ||
+            !grid.files.every(row => Array.isArray(row) && typeof row[0] === 'string' && row[0].startsWith('grid/'))) continue;
+        paths.add(grid.url.slice(1));
+      }
+      paths.add(path);
+    } catch { /* The strict join refuses an unreadable book. */ }
+  }
+  return paths;
+}
+
+/** PV17: the zone payloads a content tree holds. Staging and production join their build-owned files with engine art.
  * @param {string} dist @param {string} [content] @returns {string[]} */
 export function shardContent(dist, content = contentDirOf(dist)) {
   const from = resolve(content), shards = new Set([...shardNames(resolve(dist)), ...shardNames(from)]);
-  return files(from).filter(row => classify(row.path, shards).kind === 'shard content').map(row => row.path).sort();
+  const rows = files(from), grid = gridServerPaths(from, rows);
+  return rows.map(row => row.path).filter(path => classify(path, shards).kind === 'shard content' &&
+    !grid.has(path) && !BUILD_WORLD_PATHS.some(pattern => pattern.test(path))).sort();
 }
 
 /** Put the content back into the page, one tree again, and remove dist-content.
