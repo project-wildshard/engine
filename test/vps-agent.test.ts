@@ -245,10 +245,11 @@ test('setup migrates exact legacy placement URLs in both room configuration file
 });
 
 /** Signed channel files, as server-release signs them, with a test key. */
-function releases(rows: readonly { readonly tag: string; readonly commit: string; readonly tamper?: boolean }[]) {
+function releases(rows: readonly { readonly tag: string; readonly commit: string; readonly tamper?: boolean; readonly versioned?: boolean }[]) {
   const dir = scratch(), { privateKey, publicKey } = generateKeyPairSync('ed25519');
   rows.forEach((row, index) => {
-    const body = JSON.stringify({ channel: 'staging', serial: index + 1, engineBuild: row.commit, saveEpoch: 1, shards: [], bundle: { name: `${row.tag}/engine-server-${row.commit}.tar.gz`, sha256: 'a'.repeat(64) }, socket: 'wss://x' });
+    const cooked = row.versioned === true ? {cook:{version:'1.17.0',hash:'b'.repeat(64)},shards:[{slug:'fixture',revision:1,shardVersion:'0.0.1'}]} : {shards:[]};
+    const body = JSON.stringify({ channel: 'staging', serial: index + 1, engineBuild: row.commit, saveEpoch: 1, ...cooked, bundle: { name: `${row.tag}/engine-server-${row.commit}.tar.gz`, sha256: 'a'.repeat(64) }, socket: 'wss://x' });
     const signature = sign(null, Buffer.from(body), privateKey).toString('hex');
     writeFileSync(join(dir, `${String(index)}.json`), JSON.stringify({ body: row.tamper === true ? body.replace('"serial":', '"serial": ') : body, signature }));
   });
@@ -292,10 +293,10 @@ test('AUTO-RELEASE AR2: wildshard-apply verify prints the signed commit and runs
 });
 
 /** A made-up box for the cook verb: a signed v0.1.20 and v0.1.21, the real wildshard-apply behind a wrapper, a fake rebuild. */
-function cookBox(rebuildText = '#!/bin/bash\n[ "$1" = --cook ] || exit 9\nset -eu\ngrep -q v0.1.21 "$WILDSHARD_CONFIG_TEST_ROOT/etc/wildshard/cook.settings" 2>/dev/null && exit "${WILDSHARD_CONFIG_TEST_REBUILD_EXIT:-0}"\necho "rebuild $1"\n') {
+function cookBox(rebuildText = '#!/bin/bash\n[ "$1" = --cook ] || exit 9\nset -eu\ngrep -q v0.1.21 "$WILDSHARD_CONFIG_TEST_ROOT/etc/wildshard/cook.settings" 2>/dev/null && exit "${WILDSHARD_CONFIG_TEST_REBUILD_EXIT:-0}"\necho "rebuild $1"\n', versioned = false) {
   const root = etc(), one = 'e'.repeat(40), two = 'f'.repeat(40);
   writeFileSync(join(root, 'etc/wildshard/cook.env'), 'COOK_ENGINE_REF=v0.1.18\nWILDSHARD_BUILD=0000000000000000000000000000000000000000\nCOOK_NOTIFY_TOKEN=planted-cook-secret\n');
-  const { dir, key } = releases([{ tag: 'v0.1.20', commit: one }, { tag: 'v0.1.21', commit: two }, {tag: `server-staging-${two}`, commit: two}]);
+  const { dir, key } = releases([{ tag: 'v0.1.20', commit: one }, { tag: 'v0.1.21', commit: two }, {tag: `server-staging-${two}`, commit: two, versioned}]);
   const wrapper = join(root, 'apply'), rebuild = join(root, 'rebuild.sh');
   // The test's own Node, never PATH's: the push gate's gate-bin/node shim needs WS_GATE_NODE, which configWith drops.
   writeFileSync(wrapper, `#!/bin/bash\nexec ${JSON.stringify(process.execPath)} ${JSON.stringify(APPLY)} "$@"\n`, { mode: 0o755 });
@@ -468,6 +469,35 @@ test('cook-store stages only scoped R2 credentials without switching or restarti
   expect(run({...keys, COOK_VERSIONED_STORE: '1'}).status).toBe(1);
   expect(run({...keys, R2_COOKED_SECRET_ACCESS_KEY: 'invalid'}).status).toBe(1);
   expect(read(root, 'cook.env')).toBe(staged);
+});
+
+test('PV25 only a signed versioned staging tag can switch the store, and health failure restores both settings', () => {
+  const rebuild = '#!/bin/bash\n[ "$1" = --cook ] || exit 9\n' +
+    'if grep -q "^COOK_VERSIONED_STORE=1$" "$WILDSHARD_CONFIG_TEST_ROOT/etc/wildshard/cook.settings"; then exit "${WILDSHARD_CONFIG_TEST_REBUILD_EXIT:-0}"; fi\n';
+  const legacy = cookBox(rebuild);
+  expect(legacy.run({}, 'cook-store', 'enable', `server-staging-${legacy.two}`).out).toContain('no signed staging cook address');
+  const {root,two,run} = cookBox(rebuild, true), tag = `server-staging-${two}`;
+  expect(run({}, 'cook', 'v0.1.20').status).toBe(0);
+  const settings = read(root, 'cook.settings');
+  expect(run({}, 'cook-store', 'enable', tag).out).toContain('stage the scoped cooked bucket credentials');
+  expect(run({}, 'cook-store', 'enable', 'v0.1.20').status).toBe(1);
+  expect(read(root, 'cook.settings')).toBe(settings);
+
+  const id = 'b'.repeat(32), secret = 'c'.repeat(64);
+  const env = read(root, 'cook.env') + `R2_COOKED_ACCESS_KEY_ID=${id}\nR2_COOKED_SECRET_ACCESS_KEY=${secret}\n`;
+  writeFileSync(join(root, 'etc/wildshard/cook.env'), env);
+  const failed = run({WILDSHARD_CONFIG_TEST_REBUILD_EXIT:'1'}, 'cook-store', 'enable', tag);
+  expect(failed.status, failed.out).toBe(1);
+  expect(read(root, 'cook.settings')).toBe(settings);
+  const enabled = run({}, 'cook-store', 'enable', tag);
+  expect(enabled.status, enabled.out).toBe(0);
+  expect(enabled.out).not.toContain(secret);
+  expect(read(root, 'cook.settings')).toContain(`COOK_ENGINE_REF=${tag}\nWILDSHARD_BUILD=${two}\nCOOK_VERSIONED_STORE=1\n`);
+  expect(run({}, 'cook', tag).status).toBe(0);
+  expect(read(root, 'cook.settings')).toContain('COOK_VERSIONED_STORE=1\n');
+  expect(run({}, 'cook-store', 'legacy', 'v0.1.20').status).toBe(0);
+  expect(read(root, 'cook.settings')).toContain('COOK_VERSIONED_STORE=0\n');
+  expect(read(root, 'cook.env')).toBe(env);
 });
 
 test('OB11: cook-sentry puts one Sentry DSN from stdin into cook.env, never prints it, and rolls back on a failed cook', () => {

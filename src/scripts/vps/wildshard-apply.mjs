@@ -2,6 +2,7 @@
 // MMO-SERVER-PLAN MS3.5 (J266): the agents' way to rerun harden.sh or setup.sh as root, from a signed, landed release only.
 //   wildshard-apply <tag> harden|setup|rebuild
 //   wildshard-apply <tag> verify    AUTO-RELEASE AR2 (J355): print `commit  <sha>` for a signed tag GitHub agrees on; runs nothing
+//   wildshard-apply <tag> verify-cook    same check, for staging's signed versioned cook only
 // <tag> is a release tag a signed channel file names: `vX.Y.Z` (production) or `server-staging-<sha>` (staging). The file is
 // checked exactly as pull.mjs checks it (Ed25519 over `body`, the release public key embedded below and in setup.sh), and its
 // `bundle.name` must sit under that tag. Its `engineBuild` commit is fetched from GitHub by hash, the tag must point at the
@@ -18,6 +19,8 @@ import { join } from 'node:path';
 const RELEASE_PUBLIC_KEY = '302a300506032b657003210012e17122631777e2a6ad68e2fb4883d856def46f812aa9a3e49d701ed44ad17b';
 const ENGINE_GIT = 'https://github.com/project-wildshard/engine.git';
 const TAG = /^(?:v\d{1,4}\.\d{1,4}\.\d{1,4}|server-(?:staging|production)-[0-9a-f]{40})$/u, COMMIT = /^[0-9a-f]{40}$/u;
+const COOK_VERSION = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;
+const COOK_HASH = /^[0-9a-f]{64}$/u;
 const SCRIPTS = { harden: 'harden.sh', setup: 'setup.sh', rebuild: 'rebuild.sh' };
 const WORK = '/var/lib/wildshard-apply';
 // `<commit> <tag>` of the last harden that exited 0; root-written, world-readable (release-cook.mjs reads it, FR-A11).
@@ -33,10 +36,10 @@ function say(what, message) { console.info(`${what.padEnd(7)} ${message}`); }
 
 /**
  * The commit a signed file names for this tag, or null. A bad signature is never believed (pull.mjs `readRelease`).
- * @param {string} text @param {string} tag @param {string} key
+ * @param {string} text @param {string} tag @param {string} key @param {boolean} [versioned]
  * @returns {string | null}
  */
-export function signedCommit(text, tag, key) {
+export function signedCommit(text, tag, key, versioned = false) {
   let signed;
   try { signed = JSON.parse(text); } catch { return null; }
   if (typeof signed?.body !== 'string' || typeof signed?.signature !== 'string' || !/^(?:[0-9a-f]{2})+$/u.test(signed.signature)) return null;
@@ -46,6 +49,12 @@ export function signedCommit(text, tag, key) {
   try { release = JSON.parse(signed.body); } catch { return null; }
   if (!['production', 'staging'].includes(release?.channel) || typeof release.engineBuild !== 'string' || !COMMIT.test(release.engineBuild)) return null;
   if (typeof release.bundle?.name !== 'string' || !release.bundle.name.startsWith(`${tag}/`)) return null;
+  if (versioned && (release.channel !== 'staging' || tag !== `server-staging-${release.engineBuild}`
+    || typeof release.cook?.version !== 'string' || !COOK_VERSION.test(release.cook.version)
+    || typeof release.cook.hash !== 'string' || !COOK_HASH.test(release.cook.hash)
+    || !Array.isArray(release.shards) || release.shards.length === 0
+    || release.shards.some((/** @type {{shardVersion?: unknown} | null} */ row) =>
+      typeof row?.shardVersion !== 'string' || row.shardVersion.length === 0))) return null;
   return release.engineBuild;
 }
 
@@ -92,15 +101,17 @@ async function main() {
       { stdio: 'inherit', env: { PATH: '/usr/sbin:/usr/bin:/sbin:/bin', HOME: '/root', LANG: 'C.UTF-8', WILDSHARD_APPLY_LOCKED: '1' } });
     process.exit(locked.status ?? 1);
   }
-  if (tag === undefined || which === undefined || rest.length > 0 || !(Object.hasOwn(SCRIPTS, which) || which === 'verify')) stop('usage: wildshard-apply <tag> harden|setup|rebuild|verify');
+  const versioned = which === 'verify-cook', verifyOnly = versioned || which === 'verify';
+  if (tag === undefined || which === undefined || rest.length > 0 || !(Object.hasOwn(SCRIPTS, which) || verifyOnly)) stop('usage: wildshard-apply <tag> harden|setup|rebuild|verify|verify-cook');
   if (!TAG.test(tag)) stop(`${tag} is not a release tag (vX.Y.Z or server-staging-<sha>)`);
   const key = test !== undefined ? process.env.WILDSHARD_APPLY_TEST_KEY ?? '' : RELEASE_PUBLIC_KEY;
-  const commits = new Set((await signedFiles()).map(text => signedCommit(text, tag, key)).filter(commit => commit !== null));
-  if (commits.size === 0) stop(`no signed release names ${tag}: only a tag a channel has published can be applied`);
+  const commits = new Set((await signedFiles()).map(text => signedCommit(text, tag, key, versioned)).filter(commit => commit !== null));
+  if (commits.size === 0) stop(versioned ? `no signed staging cook address names ${tag}`
+    : `no signed release names ${tag}: only a tag a channel has published can be applied`);
   if (commits.size > 1) stop(`signed releases name ${tag} with different commits`);
   const [commit] = commits;
   say('ok', `${tag} is signed: engine ${commit}`);
-  if (test !== undefined && which === 'verify') { say('commit', commit); return; }
+  if (test !== undefined && verifyOnly) { say('commit', commit); return; }
   if (test !== undefined) { say('would', `fetch ${commit} and run src/scripts/vps/${SCRIPTS[/** @type {'harden' | 'setup' | 'rebuild'} */ (which)]}`); return; }
 
   // The tag on GitHub must point at the signed commit (a peeled annotated tag, or a lightweight one).
@@ -108,7 +119,7 @@ async function main() {
   const pointed = (refs.find(([, ref]) => ref === `refs/tags/${tag}^{}`) ?? refs.find(([, ref]) => ref === `refs/tags/${tag}`))?.[0];
   if (pointed !== commit) stop(`GitHub's ${tag} points at ${pointed ?? 'nothing'}, not the signed ${commit}`);
   // verify: wildshard-config's cook verb reads this line and moves the cook to exactly this commit (AUTO-RELEASE AR4).
-  if (which === 'verify') { say('commit', commit); return; }
+  if (verifyOnly) { say('commit', commit); return; }
 
   // A fresh root-only folder for this commit: fetched by hash, unpacked from git's own objects, never a working copy.
   mkdirSync(WORK, { recursive: true, mode: 0o700 });

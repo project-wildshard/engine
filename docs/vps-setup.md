@@ -97,6 +97,15 @@ one of Jake's inputs; it names each one, and a rerun picks up from there:
   runs `rebuild.sh --cook` (step 4 alone) and rolls back if `/health`
   does not answer. `wildshard-config show cook` says what it names; the
   secrets remain in `cook.env`.
+- PV25 stages the scoped cooked bucket pair through
+  `wildshard-config cook-store stage` on stdin. After SF14 passes and
+  the signed staging release's cooked indexes read back, run
+  `wildshard-config cook-store enable <server-staging-tag>`. It checks
+  the live signature and the exact GitHub tag before selecting the
+  store, and restores the previous tag and store if health fails.
+  `wildshard-config cook-store legacy <vX.Y.Z>` restores the legacy
+  store using the live signed production tag. The staging room reader
+  moves through `wildshard-config set staging ROOMS_VERSIONED_COOK 1`.
 - `passwd raynos`, printed as `next`, for sudo and the console.
 
 Caddy's package would serve a page on port 80, so it is installed with

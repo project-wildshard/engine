@@ -98,13 +98,16 @@ test('the hard stop runs before any other step, in both modes', () => {
 test('the cook worker waits for its credentials and exactly one kind of store', () => {
   const root = scratch(),
     file = join(root, 'cook.env')
-  const complete = (text: string): number | null => {
+  const settings = join(root, 'cook.settings')
+  const complete = (text: string, choice = ''): number | null => {
     writeFileSync(file, text)
+    writeFileSync(settings, choice)
     return spawnSync('bash', [
       '-c',
-      `${definition('env_value')}\n${definition('cook_env_complete')}\ncook_env_complete "$1"`,
+      `COOK_SETTINGS="$2"\n${definition('env_value')}\n${definition('cook_value')}\n${definition('cook_env_complete')}\ncook_env_complete "$1"`,
       'cook',
       file,
+      settings,
     ]).status
   }
   const base = 'COOK_NOTIFY_TOKEN=0123456789abcdef0123\n'
@@ -135,6 +138,8 @@ test('the cook worker waits for its credentials and exactly one kind of store', 
     'R2_ACCOUNT_ID=a\nR2_COOKED_ACCESS_KEY_ID=k\nR2_COOKED_SECRET_ACCESS_KEY=s\n'
   const versioned = 'COOK_VERSIONED_STORE=1\n'
   expect(complete(base + versioned + cooked)).toBe(0)
+  expect(complete(base + cooked, versioned)).toBe(0)
+  expect(complete(base + versioned + cooked, 'COOK_VERSIONED_STORE=0\n')).not.toBe(0)
   expect(complete(base + versioned + r2)).not.toBe(0)
   expect(complete(base + cooked)).not.toBe(0)
   // The template rebuild.sh writes is incomplete as written, so a fresh box waits rather than starting a worker.

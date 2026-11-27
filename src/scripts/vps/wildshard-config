@@ -9,6 +9,8 @@
 #                                                                   the build a signed release names for it; roll back on failure
 #   wildshard-config show cook                                      print the cook worker's tag and build
 #   wildshard-config cook-store stage < credentials.json             stage the cooked bucket's scoped credentials
+#   wildshard-config cook-store enable <server-staging-tag>           move to the signed versioned cook
+#   wildshard-config cook-store legacy <vX.Y.Z>                       move back to the signed production cook
 #   wildshard-config replica start [--seconds S] [--workers N] [--seats N] [--cells a,b] [--saves memory|postgres]
 #                                   | replica pg-restart [--checkpoint] | replica stop
 #                                                                   MP1.2.d: the cap bench's replica on staging's CPUs, tailnet only;
@@ -192,6 +194,8 @@ def restart(channel):
 # release that names the tag, after checking GitHub's tag points at it. rebuild.sh --cook then moves the checkout, installs,
 # restarts the worker and waits for its /health.
 COOK_KEYS = ('COOK_ENGINE_REF', 'WILDSHARD_BUILD')
+COOK_STORE_KEY = 'COOK_VERSIONED_STORE'
+COOK_STORE_CREDENTIALS = {'R2_COOKED_ACCESS_KEY_ID': 32, 'R2_COOKED_SECRET_ACCESS_KEY': 64}
 COOK_TAG = r'(?:v[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}|server-staging-[0-9a-f]{40})'
 COOK_HEADER = ['# AUTO-RELEASE AR4 (J355): the cook worker\'s engine tag and build, read after cook.env. Change them with',
                '# `sudo wildshard-config cook <tag>`; the secrets stay in cook.env.']
@@ -230,7 +234,7 @@ def say(line, error=False):
 
 
 def show_cook():
-    rows = [row for row in read_rows(f'{ETC}/cook.settings') if key_of(row) in COOK_KEYS]
+    rows = [row for row in read_rows(f'{ETC}/cook.settings') if key_of(row) in (*COOK_KEYS, COOK_STORE_KEY)]
     for row in rows:
         print(row)
     if not rows:
@@ -238,7 +242,7 @@ def show_cook():
     return 0
 
 
-def cook(args):
+def cook(args, store_mode=None):
     if len(args) != 2 or re.fullmatch(COOK_TAG, args[1]) is None:
         stop('usage: wildshard-config cook vX.Y.Z | server-staging-<sha>')
     tag, rebuild = args[1], helper('rebuild')
@@ -249,7 +253,8 @@ def cook(args):
         knows = False
     if not knows:
         stop(f'{rebuild} has no --cook yet: apply a signed tag that carries it first (wildshard-apply <tag> harden)')
-    checked = subprocess.run([helper('apply'), tag, 'verify'], cwd='/', env=helper_env(), capture_output=True, text=True)
+    verify = 'verify-cook' if store_mode == '1' else 'verify'
+    checked = subprocess.run([helper('apply'), tag, verify], cwd='/', env=helper_env(), capture_output=True, text=True)
     found = re.search(r'^commit\s+([0-9a-f]{40})$', checked.stdout, re.M)
     if checked.returncode != 0 or found is None:
         reason = ((checked.stderr or checked.stdout).strip().splitlines() or ['no commit'])[-1]
@@ -265,8 +270,15 @@ def cook(args):
     signal.signal(signal.SIGPIPE, signal.SIG_IGN)
     path = f'{ETC}/cook.settings'
     before = read_rows(path)
-    rows = [row for row in (list(before) or list(COOK_HEADER)) if key_of(row) not in COOK_KEYS]
+    keys = COOK_KEYS if store_mode is None else (*COOK_KEYS, COOK_STORE_KEY)
+    if store_mode == '1':
+        credentials = effective(read_rows(f'{ETC}/cook.env'), tuple(COOK_STORE_CREDENTIALS))
+        if not valid_cook_store_credentials(credentials):
+            stop('stage the scoped cooked bucket credentials before enabling the versioned store')
+    rows = [row for row in (list(before) or list(COOK_HEADER)) if key_of(row) not in keys]
     rows += [f'COOK_ENGINE_REF={tag}', f'WILDSHARD_BUILD={commit}']
+    if store_mode is not None:
+        rows += [f'{COOK_STORE_KEY}={store_mode}']
     try:
         if rows == before:
             say(f'ok      cook.settings already names {tag}')
@@ -275,6 +287,8 @@ def cook(args):
             say(f'doing   cook {tag} at {commit}')
         if cook_rebuild():
             say(f'ok      the cook worker runs {tag} ({commit[:8]})')
+            if store_mode is not None:
+                say(f'ok      {COOK_STORE_KEY}={store_mode}')
             return 0
     except BaseException:
         pass
@@ -520,19 +534,19 @@ def async_upload(args):
     return 2
 
 
-def stage_cook_store(args):
+def valid_cook_store_credentials(values):
+    return (isinstance(values, dict) and set(values) == set(COOK_STORE_CREDENTIALS)
+            and all(isinstance(values[key], str) and re.fullmatch(f'[0-9a-f]{{{size}}}', values[key]) is not None
+                    for key, size in COOK_STORE_CREDENTIALS.items()))
+
+
+def stage_cook_store():
     """Write the two scoped R2 rows once, leaving the running cook on its configured bucket."""
-    if args != ['cook-store', 'stage']:
-        stop('usage: wildshard-config cook-store stage < credentials.json')
     import json
-    keys = {'R2_COOKED_ACCESS_KEY_ID': 32, 'R2_COOKED_SECRET_ACCESS_KEY': 64}
     try:
         payload = sys.stdin.read(1025)
         values = json.loads(payload)
-        if len(payload) > 1024 or not isinstance(values, dict) or set(values) != set(keys):
-            raise ValueError()
-        if any(not isinstance(values[key], str) or re.fullmatch(f'[0-9a-f]{{{size}}}', values[key]) is None
-               for key, size in keys.items()):
+        if len(payload) > 1024 or not valid_cook_store_credentials(values):
             raise ValueError()
     except (ValueError, TypeError):
         stop('invalid cooked bucket credential document')
@@ -541,11 +555,24 @@ def stage_cook_store(args):
         before = read_rows(path)
         if not before:
             stop('cook-store stage needs the installed cook env')
-        rows = [row for row in before if key_of(row) not in keys] + [f'{key}={values[key]}' for key in keys]
+        rows = [row for row in before if key_of(row) not in COOK_STORE_CREDENTIALS]
+        rows += [f'{key}={values[key]}' for key in COOK_STORE_CREDENTIALS]
         if rows != before:
             write_secret_rows(path, rows)
     say('ok      cooked bucket credentials staged')
     return 0
+
+
+def cook_store(args):
+    if args == ['cook-store', 'stage']:
+        return stage_cook_store()
+    if len(args) == 3:
+        _, action, tag = args
+        if action == 'enable' and re.fullmatch(r'server-staging-[0-9a-f]{40}', tag):
+            return cook(['cook', tag], '1')
+        if action == 'legacy' and re.fullmatch(COOK_TAG, tag) and tag.startswith('v'):
+            return cook(['cook', tag], '0')
+    stop('usage: wildshard-config cook-store stage | enable <server-staging-tag> | legacy <vX.Y.Z>')
 
 
 # MMO-OBSERVABILITY OB11 (QA 11-24 rows 62 and 63): the cook's alarms reach Sentry only when cook.env names SENTRY_DSN. A DSN
@@ -624,7 +651,7 @@ def main(argv):
     if args and args[0] == 'async-upload':
         return async_upload(args)
     if args and args[0] == 'cook-store':
-        return stage_cook_store(args)
+        return cook_store(args)
     if args and args[0] == 'cook-sentry':
         return cook_sentry(args)
     if args and args[0] == 'saves':
