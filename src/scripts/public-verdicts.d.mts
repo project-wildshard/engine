@@ -15,3 +15,6 @@ export function verdicts(input: {
 export function totals(rows: readonly Verdict[]): Record<'engine' | 'zone' | 'delete' | 'unlisted', {files: number; mb: number}>;
 export function readList(file: string): Set<string>;
 export function publicVerdicts(root: string): Verdict[];
+export const ENGINE_LIST: string;
+export function isRuntime(path: string): boolean;
+export function publicCut(root: string): string[];

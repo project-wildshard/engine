@@ -4,9 +4,10 @@
 // `public-delete.json`: read by nothing, SF13) or `zone` (the slugs whose art it is), with its source: engine git, a
 // shardfile mount a pin published, or a cook's output.
 // A zone file is one a pin published or a tracked file a pinned product names or whose
-// path names a pinned slug. A file on no list, and no pin's, has no owner: `--check` fails on it, as the test does.
+// path names a pinned slug. SF12: `public/` holds engine front-end art only, so `--check` fails on any file that is not on
+// the engine or delete list and not the build's runtime (`isRuntime`), as the test does; `--cut` lists the tracked ones.
 //
-//   node src/scripts/public-verdicts.mjs [--root .] [--out <file.json>] [--check]
+//   node src/scripts/public-verdicts.mjs [--root .] [--out <file.json>] [--check] [--cut]
 // Prints the three totals (files, MB) for the art (`public/assets/` but the runtime's physics and the cook's spawn packs,
 // and `public/programs/`), then every file's verdict to --out.
 import {execFileSync} from 'node:child_process';
@@ -21,6 +22,22 @@ import {pathToFileURL} from 'node:url';
  * @param {string} path a path under public/ */
 export function isArt(path) {
   return (path.startsWith('assets/') && !path.startsWith('assets/physics/') && !path.startsWith('assets/spawn/')) || path.startsWith('programs/');
+}
+
+/** The committed engine list: what `public/` holds after SF12, and all a page build copies from it. */
+export const ENGINE_LIST = 'src/scripts/public-engine.json';
+/** What the build itself writes under public/ (no art, never committed): the physics runtime, the Basis transcoder, the
+ *  cook's spawn packs and boot packs. @param {string} path a path under public/ */
+export function isRuntime(path) {
+  return /^(?:assets\/(?:physics|spawn|packs)\/|basis\/)/u.test(path);
+}
+
+/** SF12: the tracked files under public/ on neither list, which leave engine git (`git rm` them; their zones carry them).
+ * @param {string} root @returns {string[]} paths under public/, with the `public/` prefix */
+export function publicCut(root) {
+  const engine = readList(join(root, ENGINE_LIST)), remove = readList(join(root, 'src/scripts/public-delete.json'));
+  const tracked = execFileSync('git', ['ls-files', '-z', 'public'], {cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024}).split('\0').filter(Boolean);
+  return tracked.filter(path => { const at = path.slice('public/'.length); return !engine.has(at) && !remove.has(at) && !isRuntime(at); }).sort();
 }
 
 /** Each file's verdict.
@@ -135,23 +152,26 @@ export function publicVerdicts(root) {
   const writes = existsSync(ledger) ? JSON.parse(readFileSync(ledger, 'utf8')).published ?? [] : [];
   for (const row of writes) { const path = String(row).replace(/^public\//u, ''); const slug = carried.get(path); if (slug !== undefined) published.set(path, slug); }
   /** @type {Map<string, string>} */ const fetched = new Map();
-  const engine = readList(join(root, 'src/scripts/public-engine.json')), remove = readList(join(root, 'src/scripts/public-delete.json'));
+  const engine = readList(join(root, ENGINE_LIST)), remove = readList(join(root, 'src/scripts/public-delete.json'));
   for (const path of engine) if (remove.has(path)) throw new Error(`${path} is on both the engine and the delete list`);
   return verdicts({files: files.sort((a, b) => a.path.localeCompare(b.path)), tracked, published, fetched, named, slugs: slugs.sort(), engine, remove});
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const {values} = parseArgs({options: {root: {type: 'string', default: '.'}, out: {type: 'string'}, check: {type: 'boolean', default: false}}});
+  const {values} = parseArgs({options: {root: {type: 'string', default: '.'}, out: {type: 'string'}, check: {type: 'boolean', default: false}, cut: {type: 'boolean', default: false}}});
+  // SF12: print what leaves engine git, one path a line, for `node src/scripts/public-verdicts.mjs --cut | xargs git rm --`
+  if (values.cut) { for (const path of publicCut(values.root)) console.log(path); process.exit(0); }
   const rows = publicVerdicts(values.root), sum = totals(rows);
   for (const [verdict, total] of Object.entries(sum)) console.log(`${verdict.padEnd(8)} ${String(total.files).padStart(5)} files ${total.mb.toFixed(1).padStart(7)} MB`);
   /** @type {Record<string, number>} */ const byZone = {};
   for (const row of rows) if (row.verdict === 'zone' && isArt(row.path)) for (const zone of row.zones) byZone[zone] = (byZone[zone] ?? 0) + row.bytes / 1e6 / row.zones.length;
   console.log(`zone MB by slug (shared files split evenly): ${Object.entries(byZone).sort((a, b) => b[1] - a[1]).map(([zone, mb]) => `${zone} ${mb.toFixed(1)}`).join(', ')}`);
   if (values.out !== undefined) { const {writeFileSync} = await import('node:fs'); writeFileSync(values.out, `${JSON.stringify({totals: sum, files: rows}, null, 1)}\n`); }
-  const unlisted = rows.filter(row => row.verdict === 'unlisted');
-  if (unlisted.length > 0) {
-    console.error(`${unlisted.length} file(s) under public/ are on no list and no pin's: put each on src/scripts/public-engine.json or public-delete.json, or in its zone's shardfile`);
-    for (const row of unlisted.slice(0, 40)) console.error(`  ${row.path} (${row.source})`);
+  // SF12: public/ holds engine front-end art only, so a zone's file fails as an unlisted one does (the delete list until SF13)
+  const strays = rows.filter(row => row.verdict !== 'engine' && row.verdict !== 'delete' && !isRuntime(row.path));
+  if (strays.length > 0) {
+    console.error(`${strays.length} file(s) under public/ are not engine art: a zone's art lives in its shardfile, so remove each (\`--cut\` lists the tracked ones) or put engine art on src/scripts/public-engine.json`);
+    for (const row of strays.slice(0, 40)) console.error(`  ${row.path} (${row.verdict}${row.zones.length > 0 ? ` ${row.zones.join(',')}` : ''}, ${row.source})`);
     if (values.check) process.exitCode = 1;
   }
 }

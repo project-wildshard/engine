@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs';
 import { basename, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { ENGINE_LIST, isRuntime, readList } from '../public-verdicts.mjs';
 
 /** The app publishes its data products, never their temporary TypeScript sources: each built product's folder under
  *  `<root>/out` (one with a shard.json) goes to `<outDir>/shardfiles`, without its runtime sources or its build key.
@@ -149,6 +150,15 @@ export function deferredPublicCopy(root, outDir, args) {
 export function copyDeferredPublic(root, outDir) {
   const source = resolve(root, 'public'), destination = resolve(outDir);
   if (!existsSync(source)) return;
+  // Standalone shardfiles SF12 (J525): the page carries engine front-end art only. It copies the engine list
+  // (`src/scripts/public-engine.json`, SF1) and the runtime the build writes under public/ (physics, Basis, spawn packs), not
+  // the folder: a zone's art is its shardfile's, read from the cook. A tree with no list (a test's made-up root) copies all.
+  const listFile = resolve(root, ENGINE_LIST), engine = existsSync(listFile) ? readList(listFile) : undefined;
+  const copied = (/** @type {string} */ input) => {
+    if (engine === undefined) return true;
+    const path = relative(source, input).split(sep).join('/');
+    return engine.has(path) || isRuntime(path);
+  };
   // One directory enumeration avoids an existence syscall for every public file.
   const emitted = new Set(existsSync(destination)
     ? readdirSync(destination, {recursive: true, withFileTypes: true}).map(row => join(row.parentPath, row.name)) : []);
@@ -159,6 +169,7 @@ export function copyDeferredPublic(root, outDir) {
       if (top && name === 'shardfiles') continue;
       const input = join(from, name), output = join(to, name);
       if (statSync(input).isDirectory()) copy(input, output, false);
+      else if (!copied(input)) continue;
       else if (!emitted.has(output)) copyFileSync(input, output);
       else if (!statSync(output).isFile()) throw new Error(`Public file collides with bundle directory: ${name}`);
     }

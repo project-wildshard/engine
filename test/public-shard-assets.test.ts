@@ -5,18 +5,9 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 
-const DEBT: Readonly<Record<string, string>> = {
-  'public/assets/baked/driftwood-isle': 'C0c: far and near from the product',
-  'public/assets/baked/far-reach': 'C0c: far and near from the product',
-  'public/assets/baked/nalati-grasslands': 'C0c: far and near from the product',
-  'public/assets/baked/nine-dragon-stack': 'C0c: far and near from the product',
-  'public/assets/baked/pine-hollow': 'C0c: far and near from the product',
-  'public/assets/baked/sunscar-dunes': 'C0c: far and near from the product',
-  'public/assets/title/driftwood-isle-portrait.jpg': "C0c: the title screen's portraits",
-  'public/assets/title/nalati-grasslands-portrait.jpg': "C0c: the title screen's portraits",
-  'public/assets/title/nine-dragon-stack-portrait.jpg': "C0c: the title screen's portraits",
-  'public/assets/title/pine-hollow-portrait.jpg': "C0c: the title screen's portraits",
-};
+// SF12 (J525): public/ holds engine front-end art only, so the debt is paid: the far and near views and the title portraits
+// are their zones' (each shardfile carries its own), and a new row may not come back.
+const DEBT: Readonly<Record<string, string>> = {};
 
 const slugs = (JSON.parse(readFileSync('test/pins/shardfiles.json', 'utf8')) as { shards: { slug: string }[] }).shards.map(row => row.slug);
 const named = (segment: string) => slugs.some(slug => segment === slug || segment.startsWith(`${slug}-`) || segment.startsWith(`${slug}.`));

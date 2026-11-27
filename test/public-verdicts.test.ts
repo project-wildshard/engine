@@ -1,9 +1,9 @@
 // @vitest-environment node
 // STANDALONE-SHARDFILES SF1: every file under public/ is engine, delete or a zone's; a file on no list fails.
-// oxlint-disable-next-line import/no-nodejs-modules -- The tree check reads this checkout's pins ledger.
-import {existsSync} from 'node:fs';
+// oxlint-disable-next-line import/no-nodejs-modules -- Read the committed engine KTX2 map.
+import {readFileSync} from 'node:fs';
 import {expect, test} from 'vitest';
-import {isArt, publicVerdicts, readList, setId, totals, verdicts} from '../src/scripts/public-verdicts.mjs';
+import {isArt, isRuntime, publicCut, publicVerdicts, readList, setId, totals, verdicts} from '../src/scripts/public-verdicts.mjs';
 
 const none = new Map<string, string>();
 const base = {tracked: new Set<string>(), published: none, fetched: none, named: new Map<string, ReadonlySet<string>>(), slugs: ['moss-vale'], engine: new Set<string>(), remove: new Set<string>()};
@@ -34,10 +34,17 @@ test('a set is named by its id, and only art is counted', () => {
   expect([isArt('assets/tex/a/b.jpg'), isArt('programs/a.json'), isArt('assets/physics/rapier.wasm'), isArt('assets/spawn/parts/a.pack.br'), isArt('fonts/a.woff2')]).toEqual([true, true, false, false, false]);
 });
 
-// After a pins install (the build's first step), every file under this tree's public/ has an owner.
-test.skipIf(!existsSync('out/.pins.json'))('every file under public/ is on a list or a zone\'s', () => {
-  const unlisted = publicVerdicts('.').filter(row => row.verdict === 'unlisted').map(row => row.path);
-  expect(unlisted).toEqual([]);
+// SF12 (J525): public/ holds engine front-end art only. A zone's file fails here as an unlisted one does; the build's runtime
+// (physics, Basis, spawn packs) is no art. The delete list's files stay until SF13 removes them.
+test('every file under public/ is on the engine list, the delete list or the build\'s runtime', () => {
+  const strays = publicVerdicts('.').filter(row => row.verdict !== 'engine' && row.verdict !== 'delete' && !isRuntime(row.path)).map(row => `${row.path} (${row.verdict})`);
+  expect(strays).toEqual([]);
+  expect(publicCut('.')).toEqual([]);
+});
+
+test('the runtime the build writes under public/ is no art and needs no list', () => {
+  expect(['assets/physics/rapier.wasm', 'basis/r186/basis_transcoder.wasm', 'assets/spawn/parts/a.pack.br', 'assets/packs/x.bin'].every(isRuntime)).toBe(true);
+  expect(['assets/tex/leafy_grass/diffuse.jpg', 'assets/physics.glb', 'programs/a.json'].some(isRuntime)).toBe(false);
 });
 
 test('the committed lists are sorted, unique and disjoint', () => {
@@ -53,4 +60,11 @@ test('the committed lists are sorted, unique and disjoint', () => {
 test('nothing on the delete list is still in engine git', () => {
   const remove = readList('src/scripts/public-delete.json'), tracked = new Set(publicVerdicts('.').filter(row => row.source === 'engine git').map(row => row.path));
   expect([...remove].filter(path => tracked.has(path))).toEqual([]);
+});
+
+test('the engine KTX2 map names engine files only: a zone\'s KTX2 is its cook\'s (SF12, J525)', () => {
+  const engine = readList('src/scripts/public-engine.json');
+  const map = JSON.parse(readFileSync('src/scripts/ktx2-engine-map.json', 'utf8')) as Record<'phone' | 'desktop', Record<string, string>>;
+  const stray = Object.values(map).flatMap(rows => Object.entries(rows)).flat().filter(url => !engine.has(url.replace(/^\//u, '')));
+  expect(stray).toEqual([]);
 });

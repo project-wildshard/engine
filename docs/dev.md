@@ -134,7 +134,11 @@ are gone, and `test/no-pinned-art.test.ts` keeps them gone. It writes
 from the cook, and an install removes what an earlier one published. A
 zoneless build refuses any file under `public/` or in `dist/` holding a
 pinned blob's or mount's bytes (`src/scripts/pin-public-leaks.mjs`,
-`test/pin-public-leaks.test.ts`). The app build
+`test/pin-public-leaks.test.ts`). `public/` holds engine front-end art
+only (SF12): the page build copies `src/scripts/public-engine.json` and the
+build's runtime (physics, Basis, spawn packs), not the folder, and
+`node src/scripts/public-verdicts.mjs --check` fails on any other file
+(`--cut` lists tracked ones to `git rm`). The app build
 checks every declared baked texture mode before bundling and again in
 final output, including the native image fallback. Native model-map source
 keys are checked as well as the boot file lists; CPU model fallbacks must

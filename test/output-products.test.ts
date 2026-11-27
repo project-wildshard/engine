@@ -94,6 +94,15 @@ describe('app public copy before final product publication',()=>{
       expect(()=>copyDeferredPublic(root,join(root,'dist'))).toThrow('Public file collides');
     } finally {rmSync(root,{recursive:true,force:true});}
   });
+  it('SF12: with the engine list, the page copies listed engine art and the build\'s runtime, never a zone\'s file',()=>{
+    const root=mkdtempSync(resolve('tmp/app-public-'));
+    try {
+      write(root,'src/scripts/public-engine.json',JSON.stringify({version:1,files:['assets/practice/dummy.glb','manifest.webmanifest']}));
+      for(const path of ['manifest.webmanifest','assets/practice/dummy.glb','assets/physics/rapier.wasm','basis/r186/basis_transcoder.wasm','assets/tex/leafy_grass/diffuse.jpg','assets/nalati-grasslands/cards.png'])write(root,`public/${path}`,path);
+      copyDeferredPublic(root,join(root,'dist'));
+      expect(Object.keys(files(join(root,'dist')))).toEqual(['assets/physics/rapier.wasm','assets/practice/dummy.glb','basis/r186/basis_transcoder.wasm','manifest.webmanifest']);
+    } finally {rmSync(root,{recursive:true,force:true});}
+  });
   it('accepts an absent public tree',()=>{
     const root=mkdtempSync(resolve('tmp/app-public-'));
     try {expect(()=>copyDeferredPublic(root,join(root,'dist'))).not.toThrow();}
