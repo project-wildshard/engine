@@ -340,12 +340,17 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, folder: st
         : set === 'whole' ? [...new Set([...fence.mounts, ...mounts.map(row => row.url).filter(url => ownFarView(url, shard.slug) && onTier(url, tier))])] : fence.mounts;
       // A phone file whose target no phone list names (a fence shard's file read past its fence) rides in the phone's whole
       // set: no other tier's part holds it, and it costs less than the target a phone read from a desktop part before.
-      const listed = new Set([...urls, ...urls.flatMap(url => images?.phoneTargets.get(url) ?? [])]), unlisted = tier === 'phone' && set === 'whole' ? [...tierRows.keys()].filter(url => !listed.has(url)).map(url => `tier:${url}`) : [];
-      return [...[...urls.flatMap(url => tiered(tier, url)), ...unlisted].flatMap(url => {
+      const textures = blobRows(tier, wholeSet(tier, set) ? undefined : fence.hashes);
+      const listed = new Set([...urls, ...urls.flatMap(url => images?.phoneTargets.get(url) ?? [])]);
+      // A texture blob already selected for the phone may also appear in those tier fallbacks.
+      const listedTextures = new Set(textures.map(row => row.url));
+      const unlisted = tier === 'phone' && set === 'whole' ? [...tierRows].flatMap(([url, files]) =>
+        listed.has(url) ? [] : files.filter(row => !listedTextures.has(row.url))) : [];
+      return [...urls.flatMap(url => tiered(tier, url)).flatMap(url => {
         if (url.startsWith('tier:')) return tierRows.get(url.slice(5)) ?? [];
         if (url.startsWith('cooked:')) { const row = cookedRows.get(url.slice(7)); return row === undefined ? [] : [row]; }
         const row = mountRow.get(url); return row === undefined ? [] : [row()];
-      }), ...tier === 'phone' ? layerRows.values() : [], ...blobRows(tier, wholeSet(tier, set) ? undefined : fence.hashes)];
+      }), ...unlisted, ...tier === 'phone' ? layerRows.values() : [], ...textures];
     }};
 }
 

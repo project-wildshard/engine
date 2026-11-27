@@ -17,7 +17,7 @@ import {loadBasisuImageKtx2, type ImageKtx2Encode} from '../src/cook/game/imageK
 import {loadBasisuAstc6} from '../src/cook/game/astc6Wasm';
 import {isKtx2, ktx2Info, phoneTier, phoneTierSize, type Astc6Encode} from '../src/cook/game/tierTextures';
 import {cookedKtx2TableOf} from '../src/shared/game/shardfile/cookedKtx2Table';
-import {openShardfile, shardHalf} from '../src/cook/game/shardCook';
+import {openShardfile, shardHalf, type OpenShardfile} from '../src/cook/game/shardCook';
 import {folderTarball} from '../src/cook/game/folderTarball';
 import {mkdirSync} from 'node:fs';
 
@@ -36,6 +36,36 @@ beforeAll(async () => {
   png = new Uint8Array(await sharp(noise(64, 2), {raw: {width: 64, height: 64, channels: 3}}).png().toBuffer());
   odd = new Uint8Array(await sharp(noise(30, 3), {raw: {width: 30, height: 30, channels: 3}}).png().toBuffer());
 }, 60_000);
+
+it('lists a fetched phone texture blob once and still carries a texture outside the fence', () => {
+  const held = openShardfile(folderTarball('test/fixtures/corpus/brasscap-mesa'), {preparationOnly: true});
+  const discovery = pageTable(), discoveryPath = 'mounts/discovery.json';
+  const digest = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
+  const blob = (bytes: Uint8Array, suffix: string) => {
+    const hash = digest(bytes), path = `blobs/image/${hash}.${suffix}`;
+    return {kind: 'image' as const, path, hash, compressed: bytes.length, decoded: 0, gpu: 0,
+      triangles: 0, draws: 0, dependencies: [], critical: false};
+  };
+  const inside = blob(png, 'png'), outside = blob(jpg, 'jpg');
+  const reads = new Map([[discoveryPath, discovery], [inside.path, png], [outside.path, jpg]]);
+  const fixture: OpenShardfile = {
+    ...held, preparationOnly: false, index: {...held.index, files: [inside, outside]},
+    cook: {version: 3, renderer: inside.hash, inputHash: inside.hash, packs: 'fence',
+      fence: [inside.hash], programs: {version: 2, lines: ['void main() {}'], shaders: [[0]], programs: [[0, 0]]},
+      mounts: [{url: `/shardfiles/${held.slug}/discovery.json`, path: discoveryPath, hash: digest(discovery), bytes: discovery.length}]},
+    read: path => reads.get(path) ?? held.read(path),
+  };
+  const half = shardHalf(fixture, (_url, bytes) => bytes.length, undefined, {phone: true, encode: astc6, images: encode});
+  const insideUrl = half.ktx2Table.phone[`/shardfiles/${held.slug}/${inside.path}`];
+  const outsideUrl = half.ktx2Table.phone[`/shardfiles/${held.slug}/${outside.path}`];
+  expect(insideUrl).toMatch(/\.t512-[a-f0-9]{8}\.ktx2$/u);
+  expect(outsideUrl).toMatch(/\.t512-[a-f0-9]{8}\.ktx2$/u);
+  const urls = (set: 'entry' | 'whole'): readonly string[] => half.mountRows('phone', set).map(row => row.url);
+  expect(urls('entry')).toContain(insideUrl);
+  expect(urls('entry')).not.toContain(outsideUrl);
+  expect(urls('whole').filter(url => url === insideUrl)).toHaveLength(1);
+  expect(urls('whole')).toContain(outsideUrl);
+});
 
 describe('SF15: the encode per map kind', () => {
   it('reads colour as sRGB, normal maps and numeric planes as linear, by the hand-made sets\' names', () => {
