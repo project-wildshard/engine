@@ -182,6 +182,9 @@ export function staticChecks(lintThreads=PUSH_BUDGET.lintThreads){
     // Meta QA 11-25 row 42: every installed org package's engines.node admits each Node engine's range lets CI pick
     // (format 0.79.2's <25 under engine's <27 broke server-release 45703635653 at pnpm install on Node 26).
     {name:'check:node-ranges',commands:[[process.execPath,'src/scripts/node-ranges.mjs']]},
+    // SF15 (opus-pine): cook-version.json names the cook inputs being pushed, about 5 s with no golden cook when the
+    // hash matches (8f5a53c1d and 4589161e3 moved cookedKtx2Table.ts and imageKtx2Wasm.ts unrecorded: red 45922304788).
+    {name:'check:cook-record',commands:[[process.execPath,'src/scripts/cookVersion.ts']]},
   ];
 }
 
