@@ -15,7 +15,7 @@ import type { BootStep, ByteKey } from '../../../shared/engine/boot/steps';
 import { assetVersions, publicBytes } from '../../../shared/engine/boot/tables';
 import { DefaultLoadingManager } from 'three';
 import { TIER, TIER_CONFIG } from '../core/tier';
-import { standIn, texMode, type TexMode } from './gpuFiles';
+import { isGpuTableSource, standIn, texMode, type TexMode } from './gpuFiles';
 import { decodeImageBitmap } from './imageDecode';
 import { waitFor } from '../../../shared/engine/boot/waits';
 
@@ -74,8 +74,10 @@ function ktx2StandIn(url: string, tex: TexMode): string | undefined {
   } catch { return undefined; }
   return standIn(path, tex);
 }
-/** the tier's copy of a file (`.phone.webp` / `.phone.glb`), whatever the textures ride as */
-export function phoneUrl(url: string): string { return phoneCopy(url, known); }
+/** the tier's copy of a file (`.phone.webp` / `.phone.glb`), whatever the textures ride as. SF7c: a copy the tier's
+ *  registered KTX2 table keys counts too: a cooked shard's page holds no copy of the zone, so Nine's phone asked
+ *  `paint/concrete.jpg`, which its prepared phone set (recorded on a page that did hold `concrete.phone.webp`) leaves out. */
+export function phoneUrl(url: string): string { return phoneCopy(url, file => known(file) || isGpuTableSource(file)); }
 /** `phoneUrl` against another table of files: an aliased model's own (SF5d: a cooked shardfile names its hand-made
  *  `.phone.glb` only in its alias table, never in the page's byte table). */
 export function phoneCopy(url: string, has: (file: string) => boolean): string {
