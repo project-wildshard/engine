@@ -112,10 +112,18 @@ export function pruneDevserverClient(client, kind = 'devserver') {
   for (const name of DROP_TOP) drop(join(client, name));
   for (const name of DROP_ASSETS) drop(join(client, 'assets', name));
   for (const name of DROP_GPU) drop(join(client, 'assets', 'gpu', name));
-  // baked: only the engine's common bake; spawn: only the in-page server's book (`server-<build>.json`)
-  for (const [folder, keep] of /** @type {const} */ ([['assets/baked', name => name === 'common'], ['assets/spawn', name => /^server-.+\.json$/u.test(name)]])) {
-    const path = join(client, folder);
-    if (existsSync(path)) for (const name of readdirSync(path)) if (!keep(name)) drop(join(path, name));
+  const baked = join(client, 'assets/baked');
+  if (existsSync(baked)) for (const name of readdirSync(baked)) if (name !== 'common') drop(join(baked, name));
+  const spawn = join(client, 'assets/spawn');
+  if (existsSync(spawn)) for (const name of readdirSync(spawn)) {
+    const file = join(spawn, name);
+    if (!/^server-.+\.json$/u.test(name)) {
+      drop(file);
+      continue;
+    }
+    // The author page supplies its own one-cell catalogue. The full grid's collision part is gone with the pinned spawn sets.
+    const { grid, ...book } = /** @type {{grid?: unknown, [key: string]: unknown}} */ (JSON.parse(readFileSync(file, 'utf8')));
+    if (grid !== undefined) writeFileSync(file, JSON.stringify(book));
   }
   const shardfiles = join(client, 'shardfiles');
   if (existsSync(shardfiles)) for (const slug of readdirSync(shardfiles)) {

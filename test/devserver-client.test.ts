@@ -21,9 +21,21 @@ test('the client keeps the engine page and drops first-party shard content', () 
     'assets/nalati/a.glb', 'assets/baked/driftwood-isle/x.bin', 'assets/spawn/driftwood-isle-client-phone-1.json', 'assets/spawn/parts/1.pack.br',
     'shardfiles/driftwood-isle/shard.json', 'shardfiles/driftwood-isle/blobs/image/a.jpg'];
   const root = client({ devserver: true }, [...kept, ...dropped]);
+  writeFileSync(join(root, 'assets/spawn/server-abc.json'), '{"book":"server","build":"abc","shards":{}}');
   pruneDevserverClient(root);
   for (const file of kept) expect(existsSync(join(root, file)), file).toBe(true);
   for (const file of dropped) expect(existsSync(join(root, file)), file).toBe(false);
+});
+
+for (const kind of ['devserver', 'preparation'] as const) test(`the ${kind} client drops the full grid collision reference with its part`, () => {
+  const bookPath = 'assets/spawn/server-abc.json', partPath = 'assets/spawn/server/0000000000000001.pack.br';
+  const root = client({ devserver: kind === 'devserver' }, [bookPath, partPath]);
+  if (kind === 'preparation') writeFileSync(join(root, 'version.json'), JSON.stringify({ preparationOnly: true }));
+  const book = { book: 'server', build: 'abc', shards: {} };
+  writeFileSync(join(root, bookPath), JSON.stringify({ ...book, grid: { url: `/${partPath}` } }));
+  pruneDevserverClient(root, kind);
+  expect(JSON.parse(readFileSync(join(root, bookPath), 'utf8'))).toEqual(book);
+  expect(existsSync(join(root, partPath))).toBe(false);
 });
 
 // TC13 (mini QA, 2026-11-16): v0.1.29's archive kept each discovery.json and deleted the card art it names, so a fresh SDK
