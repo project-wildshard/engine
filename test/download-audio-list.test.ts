@@ -73,7 +73,8 @@ for (const [shard, engineFiles] of SHARDS) {
       expect(audioDiff(listed, want), address.url).toEqual(clean);
       // The engine's music rows are AU18's list alone, all in the one style; no other style's folder appears.
       const music = listed.map(path).filter(url => url.startsWith('/assets/music/'));
-      expect(music.filter(url => url.startsWith(musicDir(ENGINE_MUSIC_STYLE))).sort()).toEqual(engineMusic);
+      const dir = withAssetTables(tables, () => musicDir(ENGINE_MUSIC_STYLE));
+      expect(music.filter(url => url.startsWith(dir)).sort()).toEqual(engineMusic);
       expect(music.filter(url => /^\/assets\/music\/(?:[a-z0-9-]+-)?(?:folk|orchestral)\//u.test(url))).toEqual([]);
       // The comparison bites each way: one more shipped recording, one fewer, or one twice fails it (the cook-side proof:
       // project/journal/2026-11-13-download-audio-list.md).

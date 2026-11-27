@@ -51,7 +51,8 @@ export function shardBootAudio(sections: ReadonlyMap<string, unknown>, tables: A
 }
 /** AU18: the build log's line for a shard's derived engine music (its boot set's files under the engine style). */
 export function engineMusicLine(shard: string, bootAudio: readonly string[], tables: AssetTables): string {
-  const dir = musicDir(ENGINE_MUSIC_STYLE), music = bootAudio.filter(url => url.startsWith(dir));
+  // SF4: the music folder comes from the tables (a zone style keeps its own), so the lookup reads this build's
+  const dir = withAssetTables(tables, () => musicDir(ENGINE_MUSIC_STYLE)), music = bootAudio.filter(url => url.startsWith(dir));
   const bytes = music.reduce((sum, url) => sum + (tables.bytes[url] ?? 0), 0);
   return `${shard}: engine music: ${music.length} files, ${(bytes / 1e6).toFixed(2)} MB${music.length === 0 ? '' : ` (${music.map(url => url.slice(dir.length)).join(', ')})`}`;
 }
