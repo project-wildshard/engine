@@ -2,6 +2,7 @@ import { DefaultLoadingManager, LoaderUtils } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { afterEach, beforeAll, expect, it, vi } from 'vitest';
 import { loadRigFile } from '@wildshard/engine/anim/rig';
+import { withAssetTables } from '../../../shared/engine/boot/tables';
 
 // loadRigFile imports rigParser on first use, and its chain (core/ktx2 -> boot/bytes, since OF17 e4cb7b1f) installs the
 // page's own URL modifier as it loads. Load it first, so it can't replace the modifier a test sets.
@@ -27,6 +28,24 @@ it('keeps default tier routing for aliases and isolates each file from the share
   expect(reads.map(row => row.image)).toEqual(['https://game.example/assets/scan/wood.png?tier=phone',
     'https://game.example/assets/packed/wood.webp?tier=phone', 'https://game.example/assets/scan/wood.png?tier=phone']);
   expect(reads.every(row => row.ordinary === 'https://game.example/assets/scan/metal.png?tier=phone')).toBe(true);
+});
+
+it('loads the authored image form while ordinary rigs keep the GPU stand-in', async () => {
+  vi.stubGlobal('location', { href: 'https://game.example/play/' });
+  const original = '/assets/figures/elder.glb';
+  const gpu = '/assets/gpu/figures/elder.glb';
+  const tables = { bytes: {}, versions: { [original]: 'cabb1e' }, sfx: {}, music: {}, packs: {} };
+  DefaultLoadingManager.setURLModifier(path => path === original ? gpu : path);
+  const file = await new GLTFLoader().parseAsync(JSON.stringify({ asset: { version: '2.0' }, scene: 0, scenes: [{ nodes: [] }], nodes: [] }), '');
+  const reads: string[] = [];
+  vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(function readFixture(this: GLTFLoader, url) {
+    reads.push(withAssetTables(tables, () => this.manager.resolveURL(url)));
+    return Promise.resolve(file);
+  });
+  await loadRigFile(original);
+  await loadRigFile(original, undefined, 'img');
+  await loadRigFile(original);
+  expect(reads).toEqual([gpu, `${original}?v=cabb1e`, gpu]);
 });
 
 it('resolves root and relative images from the original aliased model before tier routing', async () => {

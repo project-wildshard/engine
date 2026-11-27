@@ -106,7 +106,10 @@ export async function atlasFigureSkin(input: unknown, sky: SkyRig, owner: Scope,
   read: typeof loadRigFile = loadRigFile): Promise<THREE.SkinnedMesh> {
   const row = v.parse(FigureAtlasSchema, input);
   if (row.sources.length > row.columns * row.rows || new Set(row.joints).size !== row.joints.length) throw new Error('Invalid figure atlas layout');
-  const [mesh, sources] = await Promise.all([FigureSkins.prepared(skinUrl(row.url), read), Promise.all(row.sources.map(url => read(url)))]);
+  const [mesh, sources] = await Promise.all([
+    FigureSkins.prepared(skinUrl(row.url), read),
+    Promise.all(row.sources.map(url => read(url, undefined, 'img'))),
+  ]);
   owner.own(mesh.geometry); owner.own(mesh.skeleton);
   for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) material.dispose();
   if (owner.disposed) throw new Error('Figure left during skin admission');
@@ -121,13 +124,16 @@ export async function atlasFigureSkin(input: unknown, sky: SkyRig, owner: Scope,
     if (!(object instanceof THREE.Mesh)) throw new Error('Missing figure atlas source');
     const material: unknown = Array.isArray(object.material) ? object.material[0] : object.material;
     if (!(material instanceof THREE.MeshStandardMaterial) || material.map === null) throw new Error('Missing figure atlas image');
-    const image = material.map.image as CanvasImageSource;
+    const image: unknown = material.map.image;
+    const bitmap = typeof ImageBitmap !== 'undefined' && image instanceof ImageBitmap;
+    if (!bitmap && !(typeof HTMLImageElement !== 'undefined' && image instanceof HTMLImageElement))
+      throw new Error(`Figure atlas source ${row.sources[i]} has no drawable image`);
     try {
       context.drawImage(image, i % row.columns * row.cell, Math.floor(i / row.columns) * row.cell, row.cell, row.cell);
     } finally {
       // The uncached GLTF owns this bitmap. The canvas has its own copy
       // after drawImage, so it no longer needs the source pixels.
-      if (!THREE.Cache.enabled && typeof ImageBitmap !== 'undefined' && image instanceof ImageBitmap) image.close();
+      if (!THREE.Cache.enabled && bitmap) image.close();
     }
   });
   const map = owner.own(new THREE.CanvasTexture(canvas)); map.flipY = false; map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;

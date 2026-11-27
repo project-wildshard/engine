@@ -39,7 +39,12 @@ afterEach(() => { vi.unstubAllGlobals(); });
 
 test('the merged figure copies each bitmap into its assigned cell before retiring it', async () => {
   const first = new SourceBitmap(), second = new SourceBitmap();
-  const read = (url: string): Promise<GLTF> => Promise.resolve(url === row.url ? readyMesh() : source(url === 'first.glb' ? first : second));
+  const gpu = new THREE.CompressedTexture([], 1024, 1024);
+  const read = vi.fn((url: string, _aliases?: Readonly<Record<string, string>>, form?: 'img'): Promise<GLTF> => {
+    if (url === row.url) return Promise.resolve(readyMesh());
+    return Promise.resolve(form === 'img' ? source(url === 'first.glb' ? first : second)
+      : file(new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial({ map: gpu }))));
+  });
   const drawImage = vi.fn((image: SourceBitmap) => { expect(image.closed).toBe(false); });
   const canvas = { width: 0, height: 0, getContext: () => ({ drawImage }) };
   vi.stubGlobal('ImageBitmap', SourceBitmap);
@@ -47,6 +52,7 @@ test('the merged figure copies each bitmap into its assigned cell before retirin
   const owner = new Scope('figure atlas fixture');
   try {
     const mesh = await atlasFigureSkin(row, sky, owner, undefined, read);
+    expect(read.mock.calls).toEqual([[row.url], ['first.glb', undefined, 'img'], ['second.glb', undefined, 'img']]);
     expect(drawImage.mock.calls).toEqual([[first, 0, 0, 16, 16], [second, 16, 0, 16, 16]]);
     expect([first.closed, second.closed]).toEqual([true, true]);
     expect(mesh.material).toMatchObject({ map: { image: canvas } });

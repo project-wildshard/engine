@@ -1,7 +1,7 @@
 
 import { retried } from '../boot/retry';
 import {readModuleGroups} from '../boot/download';
-import { phoneCopy } from '../boot/bytes';
+import { phoneCopy, tierUrl, versionedUrl } from '../boot/bytes';
 import { type AnimationClip, type Object3D, type Texture, BufferGeometry, DefaultLoadingManager, InstancedBufferAttribute, InstancedMesh, LoadingManager, SkinnedMesh } from 'three';
 import type * as RigParser from './rigParser';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -47,13 +47,16 @@ export function prepareRigLoader(): Promise<typeof RigParser> {
 
 let loader: RigParser.RigLoader | undefined;
 /** Cache/clone policy stays with the owning asset scope. All rig GLBs use this parser.
- * Optional resource aliases match the resolved URL pathname; both aliases and
- * ordinary dependencies retain the default manager's tier/pack resolution. */
-export async function loadRigFile(url: string, aliases: Readonly<Record<string, string>> = {}): Promise<GLTF> {
+ * Resource aliases match the resolved URL pathname. Callers that copy pixels
+ * to a canvas request the image form, with normal tier and content routing. */
+export async function loadRigFile(url: string, aliases: Readonly<Record<string, string>> = {}, form?: 'img'): Promise<GLTF> {
   const { createRigLoader } = await prepareRigLoader();
   loader ??= createRigLoader();
-  const read = Object.keys(aliases).length === 0 ? loader : createRigLoader(new LoadingManager());
+  const read = form === undefined && Object.keys(aliases).length === 0 ? loader : createRigLoader(new LoadingManager());
   if (read !== loader) {
+    const resolve = form === 'img'
+      ? (path: string) => versionedUrl(tierUrl(path, form))
+      : (path: string) => DefaultLoadingManager.resolveURL(path);
     const page = new URL(location.href), original = new URL(url, page);
     // Aliased glTFs can declare root-relative images. Three needs an absolute
     // original base to resolve those, rather than appending /assets twice.
@@ -64,9 +67,10 @@ export async function loadRigFile(url: string, aliases: Readonly<Record<string, 
       // has resolved dependencies. External, data and blob URLs stay untouched.
       const request = (resolved.protocol === 'http:' || resolved.protocol === 'https:') && resolved.origin === page.origin
         ? `${resolved.pathname}${resolved.search}${resolved.hash}` : path;
-      const served = DefaultLoadingManager.resolveURL(request), key = new URL(served, page).pathname;
+      const served = resolve(request), key = new URL(served, page).pathname;
       // SF5d: a phone reads the model's hand-made phone copy when the alias table names one, as the page's own table does
-      return DefaultLoadingManager.resolveURL(aliases[phoneCopy(key, file => file in aliases)] ?? request);
+      const alias = aliases[phoneCopy(key, file => file in aliases)];
+      return alias === undefined ? served : resolve(alias);
     });
   }
   const gltf = await read.loadAsync(url);
