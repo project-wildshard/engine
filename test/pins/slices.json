@@ -2,16 +2,16 @@
   "slices": [
     {
       "slug": "far-reach",
-      "from": "396a637f04e28b195ac1c4b36f95f7234b7700d7955d21cb663084f377c2043d",
-      "hash": "eb4c2cde24e9a1d8bb2d96da75fa8b48504dd358a65a38063cb2ddaa9d368691",
-      "bytes": 3907584,
+      "from": "845f773a4c8f4ed7dc5c3f89e5be3f8d92b5364ff7243857fb8c275d2a6c7cba",
+      "hash": "f324a36ab1c6e1d829d075ed38d4b269e4e0d55617fb646f434ce442deb7a540",
+      "bytes": 3905536,
       "files": 118
     },
     {
       "slug": "driftwood-isle",
-      "from": "2d4515d42e0598a72926d93e2a5751d6d70eab18ae055644c2fb10f732d0a41e",
-      "hash": "747e8cba59a79b948a237abbfac59957fe331532e3082b1dcaadd706ffe1e802",
-      "bytes": 16961024,
+      "from": "50bb372fe0817758e06ce57225028581ef2f9c1c55485a13a97c021264689a33",
+      "hash": "ce1f4aba152fc5eadd4217bf82f23f798b4f1495b8db4079cef34d0e754d0353",
+      "bytes": 16959488,
       "files": 199
     },
     {

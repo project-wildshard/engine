@@ -243,9 +243,11 @@ test('J234: both channels sign a build only after its server book and parts are 
 });
 
 test('GO7: a release of every pin opens every grid cell, under the slug the grid reads', () => {
-  const pins = JSON.parse(readFileSync('test/pins/shardfiles.json', 'utf8')) as { shards: { slug: string; uploadNumber: number }[] };
+  const pins = JSON.parse(readFileSync('test/pins/shardfiles.json', 'utf8')) as { shards: { slug: string; uploadNumber: number; shardVersion?: string }[] };
+  // PV2: a pin that names its shard version carries it into the release (SF24 pins Driftwood's images-only upload with one).
+  const head = (slug: string) => { const row = pins.shards.find(shard => shard.slug === slug); return { slug, revision: row?.uploadNumber, ...(row?.shardVersion === undefined ? {} : { shardVersion: row.shardVersion }) }; };
   // J434 retired the Template pin, the one whose folder differed from its slug: every pin serves under its own slug.
-  expect(releaseShards(pins, 'driftwood-isle,brasscap-mesa')).toEqual([{ slug: 'driftwood-isle', revision: pins.shards.find(row => row.slug === 'driftwood-isle')?.uploadNumber }, { slug: 'brasscap-mesa', revision: pins.shards.find(row => row.slug === 'brasscap-mesa')?.uploadNumber }]);
+  expect(releaseShards(pins, 'driftwood-isle,brasscap-mesa')).toEqual([head('driftwood-isle'), head('brasscap-mesa')]);
   expect(() => releaseShards(pins, 'brasscap-mesa,brasscap-mesa')).toThrow(/unique/u);
   // A release of every pin opens every grid cell, through the server's own WORLD_CELLS=grid reading.
   const served = releaseShards(pins, pins.shards.map(row => row.slug).join(',')).map(row => row.slug);

@@ -9,15 +9,17 @@
     },
     {
       "slug": "driftwood-isle",
-      "uploadNumber": 13,
-      "hash": "2d4515d42e0598a72926d93e2a5751d6d70eab18ae055644c2fb10f732d0a41e",
-      "bytes": 97968640
+      "uploadNumber": 14,
+      "shardVersion": "0.0.13",
+      "hash": "50bb372fe0817758e06ce57225028581ef2f9c1c55485a13a97c021264689a33",
+      "bytes": 103626752
     },
     {
       "slug": "far-reach",
-      "uploadNumber": 9,
-      "hash": "396a637f04e28b195ac1c4b36f95f7234b7700d7955d21cb663084f377c2043d",
-      "bytes": 52609024
+      "uploadNumber": 10,
+      "shardVersion": "0.0.10",
+      "hash": "845f773a4c8f4ed7dc5c3f89e5be3f8d92b5364ff7243857fb8c275d2a6c7cba",
+      "bytes": 61477888
     },
     {
       "slug": "nalati-grasslands",
@@ -35,21 +37,24 @@
     },
     {
       "slug": "open-plot-alien-plain",
-      "uploadNumber": 3,
-      "hash": "dc9530e30ae211dc1319ea380b97c13ecd6b15d47697dde1ef7b8976542f0234",
-      "bytes": 8552960
+      "uploadNumber": 4,
+      "shardVersion": "0.0.4",
+      "hash": "746c8311b66ccc8a29dab8154e2e99df882dac07357e5f787439d3352079b13c",
+      "bytes": 8718336
     },
     {
       "slug": "open-plot-clockwork-canyon",
-      "uploadNumber": 3,
-      "hash": "769fb3cf00fefe3990b2e04e51d067276454de4f7d24ba01f09a0f05180370fb",
-      "bytes": 12079616
+      "uploadNumber": 4,
+      "shardVersion": "0.0.4",
+      "hash": "33d6adb75b713e5217eec822716395b26582cb9eb6d70a6df37830d3fb33b9b9",
+      "bytes": 12301824
     },
     {
       "slug": "open-plot-coral-drift",
-      "uploadNumber": 4,
-      "hash": "1eadc3d8eb30f92fc85bba8a32a23ec1bf1399102fb459d5feab017c1d51fc3b",
-      "bytes": 14666752
+      "uploadNumber": 5,
+      "shardVersion": "0.0.4",
+      "hash": "4396da4d8c503317b6763c03b918a80c1c92740df3f7e564302d646cb25cb5cf",
+      "bytes": 15013376
     },
     {
       "slug": "open-plot-desert-ruin",
@@ -59,75 +64,87 @@
     },
     {
       "slug": "open-plot-ember-forge",
-      "uploadNumber": 3,
-      "hash": "cc8578855df849f9fec4708e1cb374935d6314a328a1cc0bae44154f657d5ebd",
-      "bytes": 11204608
+      "uploadNumber": 4,
+      "shardVersion": "0.0.4",
+      "hash": "57cb8edf691df462f1e16b2868fa467828165ded6ec444f435c683f3546293d4",
+      "bytes": 11677696
     },
     {
       "slug": "open-plot-fossil-badlands",
-      "uploadNumber": 3,
-      "hash": "6bb64209a6c0961926b6fa23ccd76671453b26280d42617e8eaddfaac9d28c0c",
-      "bytes": 10504704
+      "uploadNumber": 4,
+      "shardVersion": "0.0.4",
+      "hash": "f6095c606d0875f40853f3e8bc422ac427969338a38eacdf2ec448efe0456f86",
+      "bytes": 10710016
     },
     {
       "slug": "open-plot-frostline-peaks",
-      "uploadNumber": 3,
-      "hash": "d7f8d41f00ca6e79f726823745926d64a3ee9841a3040775212a7a1a1b68137d",
-      "bytes": 13219328
+      "uploadNumber": 4,
+      "shardVersion": "0.0.4",
+      "hash": "0479860111198905d78fb907c6358b40e93fa0ee1e616cfb3de2cceea57fcad9",
+      "bytes": 14484480
     },
     {
       "slug": "open-plot-jungle-ziggurat",
-      "uploadNumber": 3,
-      "hash": "aba4da75774ad3a6ac8e81c5dbc0eeb8fb0ea1def1869258659b761cc3f2d256",
-      "bytes": 13045760
+      "uploadNumber": 4,
+      "shardVersion": "0.0.4",
+      "hash": "8dd8d7af2b7a2dfa7c43df24956c4745350e55961a9d64be78370eabcd33fa17",
+      "bytes": 13570048
     },
     {
       "slug": "open-plot-lantern-bayou",
-      "uploadNumber": 3,
-      "hash": "a760942ca1260572c8b468f27a4dd00b9b503dd798a480e1c68f5265d5eb5582",
-      "bytes": 14472192
+      "uploadNumber": 4,
+      "shardVersion": "0.0.4",
+      "hash": "95a2764a5d369210cee5878d183d7b5a3d51c19a4e75193ed187809c2aae091b",
+      "bytes": 14716416
     },
     {
       "slug": "open-plot-mosslight-ruins",
-      "uploadNumber": 3,
-      "hash": "7ae59eddb0e95917f786c02339e83fd4471ef4a19760667228612a731bcd9480",
-      "bytes": 16528896
+      "uploadNumber": 4,
+      "shardVersion": "0.0.4",
+      "hash": "9642fa737ab67f73f1daa44d61a2aa4f177398b0c31d7ecda3e6dde0cae83c72",
+      "bytes": 17085440
     },
     {
       "slug": "open-plot-night-market",
-      "uploadNumber": 3,
-      "hash": "51162fa40b817beeeadac2b891732159ed4badce0daa875ab04e5312f48c8e6a",
-      "bytes": 17905152
+      "uploadNumber": 4,
+      "shardVersion": "0.0.4",
+      "hash": "f935a95af7dba902e21d3e93e2ac14ebe5eb5391c15e3481dc1f36a70fb884a0",
+      "bytes": 19340288
     },
     {
       "slug": "open-plot-patchwork-fairground",
-      "uploadNumber": 3,
-      "hash": "293e70f037ee399eba22f8fba8aaf3f2a896e63b87e1d435faddb995dae69f6c",
-      "bytes": 9641472
+      "uploadNumber": 4,
+      "shardVersion": "0.0.4",
+      "hash": "cf176460faf5a8e544efa4dd8f492b0922ee5bf0f0f522ac51778113e65f3e98",
+      "bytes": 9812480
     },
     {
       "slug": "open-plot-saltwind-lighthouse",
-      "uploadNumber": 3,
-      "hash": "f038088e7ccd7f9347c9b24a3e2f9e7c0965bce5bd3290fa37d92eb67721345c",
-      "bytes": 5296128
+      "uploadNumber": 4,
+      "shardVersion": "0.0.4",
+      "hash": "8af29ae3eb2d903d5b7f0be551417fe631f6444dd11f3b5447c383adb00dd5ac",
+      "bytes": 5438464
     },
     {
       "slug": "open-plot-sky-harbor",
-      "uploadNumber": 3,
-      "hash": "58faeb5e2fa3d371f9db871af3b99b2b27e3eb83dcca99a54e4cebe6b61561af",
-      "bytes": 10497024
+      "uploadNumber": 4,
+      "shardVersion": "0.0.4",
+      "hash": "ef12f42dc699ace30a8c2d359be80993df6c0793b4c207cace500f64e03ddeba",
+      "bytes": 10717184
     },
     {
       "slug": "open-plot-sky-race",
-      "uploadNumber": 3,
-      "hash": "ddaf0adcd003dbb871c28b34ed9b620fcc7a4384f43ed011d6d44dee5b9a4cce",
-      "bytes": 10863104
+      "uploadNumber": 4,
+      "shardVersion": "0.0.4",
+      "hash": "fbbb472ba2b41cfb86292a6122e66706f5d4c7e582f06a5e5d9cc65d683084e4",
+      "bytes": 11091456
     },
     {
       "slug": "open-plot-starfall-observatory",
-      "uploadNumber": 3,
-      "hash": "99b19a1eeaa6234a2f588428f925ccb13053780c2c993d884825ae862246cff8",
-      "bytes": 11393024
+      "uploadNumber": 4,
+      "shardVersion": "0.0.4",
+      "hash": "83b80b9cc04bed59b2b5d69a4fce7d7d83d8ae8cd1a86fd153762cbe383eccbc",
+      "bytes": 11591168
     },
     {
       "slug": "open-plot-thin-ice",
@@ -143,9 +160,10 @@
     },
     {
       "slug": "sunscar-dunes",
-      "uploadNumber": 8,
-      "hash": "08d0da0e061fb02e0b3ec6a1d68314dde66ab80e7fd8f9292d619d2f92a4f239",
-      "bytes": 11457536
+      "uploadNumber": 10,
+      "shardVersion": "0.0.9",
+      "hash": "724d296da9faa1cb4099e8cfcdd518b7efd9e2561bf85ed8a9a7ce0b452f6529",
+      "bytes": 14446592
     },
     {
       "slug": "mossgate",

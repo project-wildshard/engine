@@ -125,13 +125,14 @@ test('a re-pin renames the piano stems the product mounts, everywhere the manife
 
 const driftwood = (JSON.parse(readFileSync('test/pins/shardfiles.json', 'utf8')) as {shards: {slug: string; hash: string}[]}).shards.find(row => row.slug === 'driftwood-isle')?.hash ?? '';
 const pinned = join(process.env['WILDSHARD_PIN_CACHE'] ?? join(homedir(), '.cache/wildshard/pins'), `${driftwood}.tar`);
-test.skipIf(!existsSync(pinned))('the pinned Driftwood product mounts exactly the island stems the piano manifest names', () => {
+// SF23/SF24: Driftwood's images-only upload plays its own island set from its shardfile, so its pin mounts no engine piano stem.
+test.skipIf(!existsSync(pinned))('the pinned Driftwood product plays its own island set and mounts no engine piano stem', () => {
   const mounts = productMounts(new Uint8Array(readFileSync(pinned)));
-  expect(mounts.filter(url => url.startsWith('/assets/music/piano/island-')).length).toBe(2);
+  expect(mounts.filter(url => url.startsWith('/assets/music/piano/'))).toEqual([]);
+  const own = mounts.filter(url => /^\/assets\/driftwood-isle\/music\/driftwood-isle\/island-(calm|tension)-[a-f0-9]{8}\.m4a$/u.test(url));
+  expect(own.length).toBe(2);
   const manifest = readFileSync('public/assets/music/piano/music.json', 'utf8');
-  expect(movePianoStems(manifest, mounts).moved).toEqual([]);
-  const stale = manifest.replaceAll(/island-calm-[a-f0-9]{8}/gu, 'island-calm-00000000');
-  expect(movePianoStems(stale, mounts).manifest).toBe(manifest);
+  expect(movePianoStems(manifest, mounts)).toEqual({manifest, moved: []});
 }, 60_000);
 
 test('committed pin heads name their catalogue upload number', () => {
