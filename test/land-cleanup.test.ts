@@ -6,6 +6,8 @@
 // deleted hosted land).
 // oxlint-disable-next-line import/no-nodejs-modules -- Real git repositories, hooks and the land CLI.
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
+// oxlint-disable-next-line import/no-nodejs-modules -- Each racing cook commit records a digest of its own inputs.
+import { createHash } from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture repositories stay in the repository scratch root.
 import { closeSync, existsSync, ftruncateSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
@@ -249,6 +251,55 @@ describe('land (J422): rebasing onto a moved main', () => {
     f.git(f.repo, ['pull', '--quiet', '--ff-only', 'origin', 'main']);
     expect(revision(f.repo)).not.toBe(before);
   }, 90_000);
+
+  test('two racing cook commits land with a cook record for the combined inputs', () => {
+    const f = fixture();
+    const record = 'src/cook/game/cook-version.json', first = 'src/cook/game/first.ts', second = 'src/cook/game/second.ts';
+    const hash = (a: string, b: string) => createHash('sha256').update(a).update(b).digest('hex');
+    const base = {cookVersion: '1.0.0', cookHash: hash('first', 'second'), formatVersion: '0.1.0.6', goldenDigest: 'd'.repeat(64)};
+    const write = (root: string, path: string, body: string) => {writeFileSync(join(root, path), body);};
+    mkdirSync(join(f.repo, 'src/cook/game'), {recursive: true});
+    write(f.repo, first, 'first');
+    write(f.repo, second, 'second');
+    write(f.repo, record, JSON.stringify(base));
+    mkdirSync(join(f.repo, 'src/scripts'), {recursive: true});
+    const resolver = resolve('src/scripts/cookVersion.ts');
+    write(f.repo, 'src/scripts/cookVersion.ts', `
+      import assert from 'node:assert/strict';
+      import {execFileSync} from 'node:child_process';
+      import {createHash} from 'node:crypto';
+      import {readFileSync,writeFileSync} from 'node:fs';
+      import {rebasedCookVersion} from ${JSON.stringify(resolver)};
+      assert.deepEqual(process.argv.slice(2), ['--rebase']);
+      const read = ref => JSON.parse(execFileSync('git',['show',ref+'${record}'],{encoding:'utf8'}));
+      const parent = read('HEAD:');
+      const cookHash = createHash('sha256').update(readFileSync('${first}')).update(readFileSync('${second}')).digest('hex');
+      const current = await rebasedCookVersion(read(':1:'), read(':3:'), parent, {cookHash, formatVersion:parent.formatVersion}, () => Promise.resolve(parent.goldenDigest));
+      writeFileSync('${record}', JSON.stringify(current));
+      console.log('Recorded cook '+current.cookVersion+' '+current.cookHash);
+    `);
+    f.git(f.repo, ['add', first, second, record, 'src/scripts/cookVersion.ts']);
+    f.git(f.repo, ['commit', '--quiet', '-m', 'cook fixture']);
+    f.git(f.repo, ['push', '--quiet', 'origin', 'main']);
+    f.git(f.peer, ['pull', '--quiet', '--ff-only', 'origin', 'main']);
+    const wt = f.worktree('cook-race');
+    const change = (root: string, path: string, body: string, cookHash: string) => {
+      write(root, path, body);
+      write(root, record, JSON.stringify({...base, cookHash, sameOutputFrom: base.cookHash}));
+      f.git(root, ['commit', '--quiet', '-m', 'cook the independent input', '--', path, record]);
+    };
+    change(wt, second, 'branch second', hash('first', 'branch second'));
+    const upstreamHash = hash('main first', 'second');
+    change(f.peer, first, 'main first', upstreamHash);
+    f.git(f.peer, ['push', '--quiet', 'origin', 'HEAD:main']);
+
+    const result = f.land(wt);
+    expect(result.status, result.stdout).toBe(0);
+    const cookHash = hash('main first', 'branch second');
+    expect(result.stdout).toContain(`Recorded cook 1.0.0 ${cookHash}`);
+    expect(JSON.parse(f.git(f.remote, ['show', `main:${record}`]))).toEqual({...base, cookHash, sameOutputFrom: upstreamHash});
+    expect(f.git(wt, ['status', '--porcelain'])).toBe('');
+  }, 60_000);
 
   test('a rebase conflict stops with the conflicting paths and leaves the worktree as it was', () => {
     const f = fixture();

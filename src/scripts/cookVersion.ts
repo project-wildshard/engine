@@ -58,6 +58,32 @@ export async function checkCookVersion(current: CookVersion, actual: Readonly<{c
   if (current.goldenDigest !== await golden()) throw new Error('Golden cook differs from the recorded digest. Bump cookVersion.');
 }
 
+type CookInputs = Readonly<Pick<CookVersion, 'cookHash' | 'formatVersion'>>;
+
+async function generateCookVersion(version: string, actual: CookInputs, previous: CookVersion | undefined,
+  golden: () => Promise<string>): Promise<CookVersion> {
+  const goldenDigest = await golden();
+  const same = previous?.cookVersion === version;
+  const current: CookVersion = {cookVersion: version, ...actual, goldenDigest,
+    ...(same ? {sameOutputFrom: previous.cookHash} : {})};
+  await checkCookVersion(current, actual, previous, () => Promise.resolve(goldenDigest));
+  return current;
+}
+
+/** Reapply the author's declaration to the new parent and prove the merged bytes. */
+export async function rebasedCookVersion(base: CookVersion, replayed: CookVersion, parent: CookVersion,
+  actual: CookInputs, golden: () => Promise<string>): Promise<CookVersion> {
+  await checkCookVersion(replayed, replayed, base, () => Promise.resolve(replayed.goldenDigest));
+  if (base.cookVersion !== replayed.cookVersion) {
+    if (!newer(replayed.cookVersion, parent.cookVersion)) {
+      throw new Error(`The replayed cookVersion ${replayed.cookVersion} would reuse an issued version. Choose a bump above ${parent.cookVersion}.`);
+    }
+    return generateCookVersion(replayed.cookVersion, actual, parent, golden);
+  }
+  if (actual.cookHash === parent.cookHash && actual.formatVersion === parent.formatVersion) return parent;
+  return generateCookVersion(parent.cookVersion, actual, parent, golden);
+}
+
 export function recordedCookVersion(root = ROOT): CookVersion {
   return readVersion(readFileSync(join(root, LOCK), 'utf8'));
 }
@@ -78,20 +104,36 @@ async function goldenCook(): Promise<string> {
   } finally { rmSync(work, {recursive: true, force: true}); }
 }
 
+const git = (args: string[]): string => execFileSync('git', args, {cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']});
+
 function fromBase(base: string): CookVersion | undefined {
-  const git = (args: string[]): string => execFileSync('git', args, {cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']});
   const commit = git(['rev-parse', '--verify', '--end-of-options', `${base}^{commit}`]).trim();
   const file = git(['ls-tree', commit, '--', LOCK]);
   return file === '' ? undefined : readVersion(git(['show', `${commit}:${LOCK}`]));
 }
 
+function writeVersion(current: CookVersion): void {
+  writeFileSync(join(ROOT, LOCK), `${JSON.stringify(current, null, 2)}\n`);
+  console.log(`Recorded cook ${current.cookVersion} ${current.cookHash}`);
+}
+
 async function main(): Promise<void> {
-  const {values} = parseArgs({options: {base: {type: 'string'}, bump: {type: 'string'}, same: {type: 'boolean'}}});
+  const {values} = parseArgs({options: {base: {type: 'string'}, bump: {type: 'string'}, same: {type: 'boolean'}, rebase: {type: 'boolean'}}});
   if (values.bump !== undefined && values.same === true) throw new Error('Choose either --bump VERSION or --same');
+  if (values.rebase === true && (values.bump !== undefined || values.same === true || values.base !== undefined)) {
+    throw new Error('--rebase reads its version declaration from the conflicted index');
+  }
   await import(new URL('./format-hook.mjs', import.meta.url).href);
   const {SHARDFILE_VERSION: formatVersion} = await import('@wildshard/format/version');
   const actual = {cookHash: cookHash(ROOT).cookHash, formatVersion};
   const previous = fromBase(values.base === undefined ? 'HEAD' : /^0+$/u.test(values.base) ? 'HEAD~1' : values.base);
+  if (values.rebase === true) {
+    if (previous === undefined) throw new Error('Cook rebase requires a cook record on its new parent');
+    const base = readVersion(git(['show', `:1:${LOCK}`]));
+    const replayed = readVersion(git(['show', `:3:${LOCK}`]));
+    writeVersion(await rebasedCookVersion(base, replayed, previous, actual, goldenCook));
+    return;
+  }
   if (values.bump === undefined && values.same !== true) {
     const current = recordedCookVersion();
     await checkCookVersion(current, actual, previous, goldenCook);
@@ -103,12 +145,7 @@ async function main(): Promise<void> {
   if (!VERSION.test(version)) throw new Error('cookVersion must be X.Y.Z');
   if (values.bump !== undefined && previous !== undefined && !newer(version, previous.cookVersion)) throw new Error('Choose a higher cook version');
   if (values.same === true && previous?.cookHash === actual.cookHash) throw new Error('The cook hash is unchanged');
-  const goldenDigest = await goldenCook();
-  const current: CookVersion = {cookVersion: version, ...actual, goldenDigest,
-    ...(values.same === true && previous !== undefined ? {sameOutputFrom: previous.cookHash} : {})};
-  await checkCookVersion(current, actual, previous, () => Promise.resolve(goldenDigest));
-  writeFileSync(join(ROOT, LOCK), `${JSON.stringify(current, null, 2)}\n`);
-  console.log(`Recorded cook ${version} ${actual.cookHash}`);
+  writeVersion(await generateCookVersion(version, actual, previous, goldenCook));
 }
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === import.meta.filename) await main();

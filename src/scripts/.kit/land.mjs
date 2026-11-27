@@ -30,6 +30,7 @@ import {commitLanes,foreignCommits,nameCommits} from '../lane-commits.mjs';
 export const LAND_WORKFLOWS=Object.freeze(['ci']);
 const PLAN_BRANCH=/^plan\/[a-z0-9][a-z0-9._-]*$/u;
 const SHA=/^[a-f0-9]{40}$/u;
+const COOK_RECORD='src/cook/game/cook-version.json';
 
 class StopError extends Error{name='StopError';}
 
@@ -396,6 +397,19 @@ class Landing{
   this.preflight(`after ${GEN.join(' ')}`);
  }
 
+ /** The cook record is generated for these merged inputs. The CLI reads
+  * the author's declaration from the replayed commit and checks the golden. */
+ regenerateCookRecord(){
+  const lag=installLag(this.root);
+  if(lag!=='')this.install(['node_modules'],`is behind: ${lag}`);
+  const regenerated=spawnSync(process.execPath,['src/scripts/cookVersion.ts','--rebase'],{
+   cwd:this.root,env:this.env,encoding:'utf8',stdio:['ignore','pipe','pipe'],
+  });
+  if(regenerated.status!==0)throw new StopError(failureLine(`${regenerated.stderr}${regenerated.stdout}`,regenerated.error));
+  git(this.root,['add','--',COOK_RECORD]);
+  this.say('cook',regenerated.stdout.trim());
+ }
+
  /** Rebase onto origin/main; a conflict aborts and stops with the paths.
   * @param {string} main */
  rebase(main){
@@ -403,22 +417,31 @@ class Landing{
   // refused it, and the stop said only "(none reported)"; the same clean check as before the gate names each path first
   this.preflight(`before rebasing onto main ${short(main)}`);
   const before=this.head();
-  const result=tryGit(this.root,['-c','rebase.autoStash=false','-c','rebase.updateRefs=false','rebase','--quiet',main]);
+  let result=tryGit(this.root,['-c','rebase.autoStash=false','-c','rebase.updateRefs=false','rebase','--quiet',main]);
+  let conflicts=[], cookFailure;
+  while(result.status!==0){
+   conflicts=git(this.root,['diff','--name-only','--diff-filter=U']).split('\n').filter(Boolean);
+   if(conflicts.length!==1||conflicts[0]!==COOK_RECORD)break;
+   try{this.regenerateCookRecord();}
+   catch(error){cookFailure=error instanceof Error?error.message:String(error);break;}
+   const empty=tryGit(this.root,['diff','--cached','--quiet']).status===0;
+   result=tryGit(this.root,['rebase',empty?'--skip':'--continue'],{...this.env,GIT_EDITOR:'true'});
+  }
   if(result.status===0){
    this.expected=this.head();
    this.say('rebased',`${short(before)} -> ${short(this.expected)} onto main ${short(main)}`);
    this.installIfDependenciesMoved(before);
    return;
   }
-  const conflicts=git(this.root,['diff','--name-only','--diff-filter=U']).split('\n').filter(Boolean);
   const aborted=tryGit(this.root,['rebase','--abort']);
   const paths=conflicts.length>0?conflicts.join(', '):'(none reported)';
   if(aborted.status!==0||this.head()!==before||existsSync(resolve(this.root,git(this.root,['rev-parse','--git-path','rebase-merge'])))){
    this.receipt(`STOP rebase onto ${short(main)} failed and its abort did not restore ${short(before)}`);
    throw new StopError(`rebase onto main ${short(main)} failed (${paths}) and git rebase --abort did not restore ${short(before)}: ${aborted.stderr.trim()}\nInspect the worktree by hand: git status, git rebase --abort.`);
   }
-  this.receipt(`STOP rebase conflict onto main ${short(main)}: ${paths}`);
-  throw new StopError(`rebase onto main ${short(main)} conflicts in: ${paths}\nResolve: git rebase origin/main, fix those paths, git rebase --continue, then run land again. HEAD is back at ${short(before)}.`);
+  const reason=cookFailure===undefined?'':`\nCook record: ${cookFailure}`;
+  this.receipt(`STOP rebase conflict onto main ${short(main)}: ${paths}${cookFailure===undefined?'':`; ${cookFailure}`}`);
+  throw new StopError(`rebase onto main ${short(main)} conflicts in: ${paths}${reason}\nResolve: git rebase origin/main, fix those paths, git rebase --continue, then run land again. HEAD is back at ${short(before)}.`);
  }
 
  /** A rebase that brought in a lockfile or package.json change: install before any pre-push, or every check fails on a
