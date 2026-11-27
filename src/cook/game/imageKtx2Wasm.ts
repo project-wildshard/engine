@@ -27,7 +27,7 @@ import {availableParallelism} from 'node:os';
 import {join} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {Worker} from 'node:worker_threads';
-import {BASISU_WASM_BUILD} from './astc6Wasm';
+import {BASISU_WASM_BUILD} from './astc6Wasm.ts';
 import type {TextureRole} from './tierTextures';
 
 /** How one image is encoded: its texels' read and whether its loader flipped it. */
