@@ -54,6 +54,7 @@ function start({ file, args, cwd, out, name, observe }) {
       try { observe(JSON.parse(line)); } catch { /* Unstructured output remains in the log. */ }
     }
   });
+  /** @type {Promise<number|null>} */
   const done = new Promise(resolve => {
     child.once('close', code => { lines.close(); closeSync(log); resolve(failure === undefined ? code : null); });
   });
@@ -83,17 +84,31 @@ function observeMove({ root, out, shared }) {
   } };
 }
 
-/** @param {{ root:string, out:string, build:string, release:string, name:string, candidate?:string, deploy:boolean }} options */
-async function runQa({ root, out, build, release, name, candidate, deploy }) {
+/** Keep the child's output before the run scratch is closed.
+ * @param {{work:string, proof:string, name:string, code:number|null, log:(line:string)=>void}} options */
+export function finishQaLeg({work, proof, name, code, log}) {
+  const logFile = `${name}.log`;
+  keepReleaseProof(work, proof, [logFile]);
+  const path = join(work, name, 'verdict.json'), result = read(path);
+  if (result === undefined || (code !== 0 && result.hold !== true)) {
+    const saved = join(proof, logFile);
+    log(`${name} exited ${code ?? 'without a status'} (${saved})`);
+    const tail = readFileSync(saved, 'utf8').trimEnd().split('\n').slice(-12).join('\n').slice(-3000);
+    if (tail !== '') log(tail);
+    throw new RefusedError(`${name} did not produce its QA verdict`);
+  }
+  renameSync(path, join(work, name, 'leg.json'));
+  return result;
+}
+
+/** @param {{ root:string, out:string, proof:string, build:string, release:string, name:string, candidate?:string, deploy:boolean, log:(line:string)=>void }} options */
+async function runQa({ root, out, proof, build, release, name, candidate, deploy, log }) {
   const dir = join(out, name);
   const job = start({ file: 'bash', args: [join(scripts, 'browser-lane.sh'), '--max', '20', process.execPath,
     join(scripts, 'staging-qa.mjs'), '--root', root, '--build', build, '--release', release, '--out', dir,
     ...(candidate === undefined ? ['--url', stage.origin] : ['--candidate', candidate]), ...(deploy ? ['--deploy-checks'] : [])],
   cwd: toolsRoot, out, name });
-  const code = await job.done, path = join(dir, 'verdict.json'), result = read(path);
-  if (result === undefined || (code !== 0 && result.hold !== true)) throw new RefusedError(`${name} did not produce its QA verdict`);
-  renameSync(path, join(dir, 'leg.json'));
-  return result;
+  return finishQaLeg({work: out, proof, name, code: await job.done, log});
 }
 
 /** @param {string} out @param {string} build @param {string} [resume] @returns {Promise<import('./flow.mjs').ZoneEntryProof | undefined>} */
@@ -187,7 +202,7 @@ export async function deployStaging({ root, build, release, source, out, observe
     }
     step = 'deploy smoke';
     const candidate = alreadyLive ? undefined : readState().check.deployment.url;
-    qa = await runQa({ root, build, release, out: work, name: 'qualification', ...(candidate === undefined ? {} : { candidate }), deploy: true });
+    qa = await runQa({ root, build, release, out: work, proof: out, log, name: 'qualification', ...(candidate === undefined ? {} : { candidate }), deploy: true });
     keepReleaseProof(work, out, ['qualification/leg.json']);
     const bad = qaGap(qa, build);
     if (bad !== undefined) throw new RefusedError(bad);
@@ -199,7 +214,7 @@ export async function deployStaging({ root, build, release, source, out, observe
       aliasMoved = true;
       step = 'live smoke';
       try {
-        live = await runQa({ root, build, release, out: work, name: 'live', deploy: false });
+        live = await runQa({ root, build, release, out: work, proof: out, log, name: 'live', deploy: false });
         liveProblem = qaGap(live, build);
       } catch (error) {
         liveProblem = error instanceof RefusedError ? error.message : 'Live M3 did not complete';

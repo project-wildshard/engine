@@ -48,23 +48,40 @@ export function browserStatus(){
  const rows=active.filter(row=>row.browser===true);
  // Snapshots are atomically renamed. Include physical roots outside this
  // ledger without exposing command lines or counting admitted roots twice.
- const processes=execFileSync('ps',['-axo','pid=,ppid=,command='],{encoding:'utf8',timeout:5000}).trim().split('\n').map(line=>{
+ const snapshot=execFileSync('ps',['-axo','pid=,ppid=,comm='],{encoding:'utf8',timeout:5000});
+ const processes=snapshot.trim().split('\n').flatMap(line=>{
   const match=/^\s*(\d+)\s+(\d+)\s+(.+)$/u.exec(line);
-  return{pid:Number(match?.[1]),parent:Number(match?.[2]),command:match?.[3]??''};
+  return match===null?[]:[{pid:Number(match[1]),parent:Number(match[2]),executable:match[3]??''}];
  });
  const parents=new Map(processes.map(row=>[row.pid,row.parent]));
  const admitted=new Set(rows.map(row=>row.holder));
+ // Darwin supplies paths; Linux can truncate chrome-headless-shell to chrome-headless.
+ const browserExecutable=/(?:^|\/)(?:Google Chrome for Testing|chrome-headless(?:-shell)?|chromium|chrome)$/iu;
+ const candidates=processes.filter(row=>browserExecutable.test(row.executable)).map(row=>row.pid);
+ let commands='';
+ if(candidates.length>0){
+  try{
+   commands=execFileSync('ps',['-p',candidates.join(','),'-o','pid=,command='],{encoding:'utf8',timeout:5000});
+  }catch(error){
+   // ps exits 1 with no rows if every selected process has already exited.
+   if(!(error instanceof Error&&'status'in error&&error.status===1&&'stdout'in error&&error.stdout==='')){
+    throw new Error('Could not read arguments for browser processes');
+   }
+  }
+ }
  // Chrome's Mac executable uses Contents/MacOS. Crashpad runs inside Contents/Frameworks.
  const browserRoot=/^\/[^ ]*\/(?:ms-playwright|\.agent-browser\/browsers)\/(?:[^/\s]+\/)*(?:Google Chrome for Testing\.app\/Contents\/MacOS\/Google Chrome for Testing|chrome-headless-shell|Chromium|chrome)(?:\s|$)/u;
  /** @type {number[]} */const outside=[];
- for(const row of processes){
-  if(!browserRoot.test(row.command)||row.command.includes('--type='))continue;
-  let pid=row.pid,owned=false;
+ for(const line of commands.trim().split('\n')){
+  const match=/^\s*(\d+)\s+(.+)$/u.exec(line),command=match?.[2]??'';
+  if(match===null||!browserRoot.test(command)||command.includes('--type='))continue;
+  const root=Number(match[1]);
+  let pid=root,owned=false;
   for(let depth=0;pid>1&&depth<64;depth++){
    if(admitted.has(pid)){owned=true;break;}
    pid=parents.get(pid)??0;
   }
-  if(!owned)outside.push(row.pid);
+  if(!owned)outside.push(root);
  }
  return{total:rows.length+outside.length,slots:browserSlots({capacity,active,outside:outside.length}),holders:rows.flatMap(row=>typeof row.holder==='number'?[row.holder]:[]),outside};
 }

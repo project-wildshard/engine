@@ -10,6 +10,7 @@ import {spawnSync} from 'node:child_process';
 import {afterEach, expect, test} from 'vitest';
 import {CHANNELS, CHECKED_DOCUMENTS, PHASES, PUBLIC_ROOMS, QA_LEGS, RELEASE_PUBLIC_KEY, qaGap, pinnedReleaseKey, RefusedError, runPhase, ownTablePath, type Channel, type Deps, type PageHost, type Phase} from '../src/scripts/page-release/flow.mjs';
 import {runRedacted} from '../src/scripts/page-release/redact.mjs';
+import {finishQaLeg} from '../src/scripts/page-release/staging-deploy.mjs';
 import {CONFIG, WORKERS, isVersionUrl, workersHost} from '../src/scripts/page-release/hosts/workers.mjs';
 import {measureAssets} from '../src/scripts/app-build/assetLimits.mjs';
 
@@ -560,6 +561,23 @@ test('check compares every checked document, sw.js and deploy-chunks.json includ
 // OFF-VERCEL OV4: the Workers host, driven through the real flow by a fake wrangler and a fake version URL.
 const scratch: string[] = [];
 afterEach(() => { for (const dir of scratch.splice(0)) rmSync(dir, {recursive: true, force: true}); });
+
+test('a child exit without a QA verdict keeps its log and reports the last lines', () => {
+  const root = mkdtempSync(resolve('tmp/page-release-logs-'));
+  scratch.push(root);
+  const proof = join(root, 'proof');
+  const logFile = 'qualification.log';
+  const log = ['startup', ...Array.from({length: 12}, (_, i) => `step ${i}`), 'browser admission failed'].join('\n');
+  writeFileSync(join(root, logFile), log);
+  const messages: string[] = [];
+  expect(() => finishQaLeg({work:root, proof, name:'qualification', code:1, log:line => messages.push(line)}))
+    .toThrow('qualification did not produce its QA verdict');
+  expect(readFileSync(join(proof, logFile), 'utf8')).toBe(log);
+  expect(messages).toEqual([
+    `qualification exited 1 (${join(proof, logFile)})`,
+    log.split('\n').slice(-12).join('\n'),
+  ]);
+});
 
 const versionId = '0123abcd-1111-4222-8333-444455556666';
 

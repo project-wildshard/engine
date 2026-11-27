@@ -29,11 +29,22 @@ test('reserved cores follow the ledger: a borrowed grant is covered by its root,
 
 test('counts Chrome for Testing without charging its Crashpad helper as another browser', () => {
   const chrome = '/Users/example/.agent-browser/browsers/chrome-157/Google Chrome for Testing.app/Contents';
-  vi.mocked(execFileSync).mockReturnValueOnce([
-    `5100001 1 ${chrome}/MacOS/Google Chrome for Testing --headless --mute-audio`,
-    `5100002 1 ${chrome}/Frameworks/Google Chrome for Testing Framework.framework/Versions/157/Helpers/chrome_crashpad_handler --monitor-self`,
-    '5100003 1 /Users/example/Library/Caches/ms-playwright/chromium-157/chrome-headless-shell --mute-audio',
-    '5100004 5100003 /Users/example/Library/Caches/ms-playwright/chromium-157/chrome-headless-shell --type=renderer',
+  const ps = vi.mocked(execFileSync);
+  ps.mockClear();
+  ps.mockReturnValueOnce([
+    `5100001 1 ${chrome}/MacOS/Google Chrome for Testing`,
+    `5100002 1 ${chrome}/Frameworks/chrome_crashpad_handler`,
+    '5100003 1 chrome-headless',
+    '5100004 5100003 chrome-headless',
+    '5100005 1 /usr/bin/node',
+  ].join('\n')).mockReturnValueOnce([
+    `5100001 ${chrome}/MacOS/Google Chrome for Testing --headless --mute-audio`,
+    '5100003 /Users/example/Library/Caches/ms-playwright/chromium-157/chrome-headless-shell --mute-audio',
+    '5100004 /Users/example/Library/Caches/ms-playwright/chromium-157/chrome-headless-shell --type=renderer',
   ].join('\n'));
   expect(browserStatus().outside).toEqual([5100001, 5100003]);
+  expect(ps.mock.calls.map(([, args]) => args)).toEqual([
+    ['-axo', 'pid=,ppid=,comm='],
+    ['-p', '5100001,5100003,5100004', '-o', 'pid=,command='],
+  ]);
 });

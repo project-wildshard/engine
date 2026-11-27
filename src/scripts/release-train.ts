@@ -361,7 +361,9 @@ async function main(args: string[]) {
         throw dirt === undefined ? error : new Error(`${error instanceof Error ? error.message : String(error)}\n${dirt}`);
       } finally {
         pageDone = true;
-        keepReleaseProof(deployRoot, deployEvidence, ['verdict.json', 'qualification/leg.json', 'zone-entry/zone-entry.json', 'mmo-observer.json']);
+        keepReleaseProof(deployRoot, deployEvidence, [
+          'verdict.json', 'qualification/leg.json', 'qualification.log', 'live.log', 'zone-entry/zone-entry.json', 'mmo-observer.json',
+        ]);
         const live = state()?.['go-live'];
         if (live?.build === build) record(savedAlias, live);
       }

@@ -224,7 +224,9 @@ Pass the held staging verdict (or its `zone-entry/zone-entry.json`) as
 
 Release and QA runs use `tmp/$WS_LANE_NAME/<run>` and remove their work
 on exit, including a held run. `--out` and `--qa-out` receive the verdicts
-used by the next step. The train keeps those proof and dispatch records in
+used by the next step. The deploy evidence also keeps `qualification.log`
+and `live.log`. Go-live prints the last lines when a QA leg exits without a
+verdict. The train keeps those proof and dispatch records in
 `~/.cache/wildshard/plan-artifacts/release-qa/`. Each page build still
 keeps its phase record for the following upload and alias commands.
 `node src/scripts/.kit/worktree.mjs reap --dry-run` lists scratch idle for 24 hours

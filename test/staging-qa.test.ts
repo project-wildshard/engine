@@ -6,6 +6,7 @@ import { QA_RIG_SHARDS, tourFixture } from '../src/scripts/staging-qa-local.mjs'
 import { TOUR_FEATURED } from '../src/scripts/zone-entry-featured.mjs';
 import { CHANNELS, qaGap, QA_LEGS } from '../src/scripts/page-release/flow.mjs';
 import { chromiumCandidateArgs } from '../src/scripts/staging-qa-browser.mjs';
+import { candidateTunnelTarget } from '../src/scripts/staging-qa-candidate.mjs';
 import { pickPhone, qaDevice } from '../src/scripts/staging-qa-sim.mjs';
 import { budgetFinding, LEG_CAP_S, LEG_TARGET_S, LEGS, nominalSeconds, STEPS } from '../src/scripts/staging-qa-budget.mjs';
 
@@ -15,6 +16,15 @@ const expected = ['journey-webkit'];
 const proof = { id: 'journey-webkit', browser: 'webkit', pass: true, seconds: 3, playedMs: 2000, log: 'run.log' };
 const smoke = { build, scenarios: [{ id: 'K3', status: 'ran', legs: [{ playedMs: 4000 }] }], findings: [] };
 const clean = { build, smoke, proofs: [proof], expected, selected, after: build, full: false };
+
+it('tunnels the signed release origin from a checked staging candidate', () => {
+  const releases = new URL(CHANNELS.staging.release).hostname;
+  expect(candidateTunnelTarget(`${releases}:443`, 9000)).toEqual({host:releases, port:443});
+  expect(candidateTunnelTarget('staging.wildshard.io:443', 9000)).toEqual({host:'127.0.0.1', port:9000});
+  expect(candidateTunnelTarget('rooms-staging.wildshard.io:443', 9000)).toEqual({host:'rooms-staging.wildshard.io', port:443});
+  expect(candidateTunnelTarget(`${releases}:8443`, 9000)).toBeUndefined();
+  expect(candidateTunnelTarget('example.com:443', 9000)).toBeUndefined();
+});
 
 it('pins only the staging preview key in Chromium while preserving its launch flags', () => {
   const pin = Buffer.alloc(32, 6).toString('base64');

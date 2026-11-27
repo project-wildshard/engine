@@ -16,9 +16,17 @@ import { certificateSpki } from './staging-qa-browser.mjs';
 const { origin, release, socket } = CHANNELS.staging;
 const staging = new URL(origin).hostname;
 const rooms = new URL(socket).hostname;
-const passThrough = new Set([rooms, new URL(API_ORIGIN).hostname, new URL(PACKS_ORIGIN).hostname]);
+const passThrough = new Set([rooms, new URL(release).hostname, new URL(API_ORIGIN).hostname, new URL(PACKS_ORIGIN).hostname]);
 const loopback = '127.0.0.1';
 const fetchUnrouted = globalThis.fetch.bind(globalThis);
+
+/** Route the checked staging origin to the preview and allow its public dependencies over TLS.
+ * @param {string} authority @param {number} tlsPort */
+export function candidateTunnelTarget(authority, tlsPort) {
+  const host = authority.replace(/:443$/u, '');
+  if (authority !== `${host}:443` || (host !== staging && !passThrough.has(host))) return undefined;
+  return host === staging ? { host: loopback, port: tlsPort } : { host, port: 443 };
+}
 
 /** @param {string} url */
 async function readPublic(url) {
@@ -135,16 +143,15 @@ async function candidateTransport(root, out, dist) {
     proxy = createProxy((_incoming, response) => { response.writeHead(403).end(); });
     proxy.on('connection', stream => { track(stream); });
     proxy.on('connect', (incoming, client, head) => {
-      const authority = incoming.url ?? '';
-      const host = authority.replace(/:443$/u, '');
-      if (authority !== `${host}:443` || (host !== staging && !passThrough.has(host))) {
+      const target = candidateTunnelTarget(incoming.url ?? '', tlsPort);
+      if (target === undefined) {
         client.end('HTTP/1.1 403 Forbidden\r\n\r\n');
         return;
       }
-      const upstream = track(connect(host === staging ? { host: loopback, port: tlsPort } : { host, port: 443 }));
+      const upstream = track(connect(target));
       upstream.once('connect', () => {
         if (client.destroyed) { upstream.destroy(); return; }
-        if (host === rooms) stats.roomTunnels++;
+        if (target.host === rooms) stats.roomTunnels++;
         client.write('HTTP/1.1 200 Connection Established\r\n\r\n');
         if (head.length > 0) upstream.write(head);
         client.pipe(upstream).pipe(client);
