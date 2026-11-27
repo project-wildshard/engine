@@ -1,6 +1,6 @@
-import type {CookedPartMember} from '@wildshard/engine/boot/tables';
 // oxlint-disable-next-line import/no-unassigned-import -- The sim's Math goes in before any module body runs.
 import '@wildshard/engine/core/portableMathFirst';
+import type {CookedPartMember} from '@wildshard/engine/boot/tables';
 import { loadRapier, type Rapier } from '@wildshard/engine/physics/rapier';
 import { installCatalogue } from '@wildshard/engine/game/grid/catalogueSlot';
 import { RAPIER_WASM_URL } from '@wildshard/engine/physics/wasmUrl';
