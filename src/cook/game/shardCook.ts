@@ -37,6 +37,8 @@ import {cookedKtx2TableOf, EMPTY_COOKED_KTX2_TABLE, type CookedKtx2Table} from '
 import {createPartEncoder, packable, writeSpawnParts, type CookedMember, type PartEncoder} from './spawnParts';
 import {cookedMapPngs, type CookedMapOptions, type CookedMapStats, type MapDrawn} from './cookedMap';
 import {cookedMapPath} from '../../shared/game/shardfile/cookedMapPath';
+import {ENGINE_MUSIC_STYLE} from '@wildshard/engine/audio/bootAudio';
+import {zoneScoreSet} from '@wildshard/engine/boot/zoneAssets';
 
 export type CookTier = 'phone' | 'desktop';
 export type CookSet = 'entry' | 'whole';
@@ -347,9 +349,13 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, folder: st
       // SF4: a fence shard's phone whole set also carries its own far view, which the grid reads outside any fence (the
       // preparation records the client flow): without it a cooked Driftwood's phone read the page's engine-wide copy.
       const music = source.audio.music;
-      const scoreDir = music?.catalogue?.mode === 'bank' ? music.source?.dir : undefined;
+      // SF23: and a slots score's own sets (`sets: { pine: '<slug>' }`): the night or race slot plays outside the fence.
+      // a set's folder is named for its zone, so the slug filter below drops another zone's set
+      const ownSets = Object.values(music?.sets ?? {}).flatMap(name => zoneScoreSet(name, ENGINE_MUSIC_STYLE)?.dir ?? []);
+      const scoreDirs = [...(music?.catalogue?.mode === 'bank' && music.source ? [music.source.dir] : []), ...ownSets]
+        .filter(dir => dir.startsWith(`/assets/${shard.slug}/music/`));
       // Muted author preparation can read the score manifest without playing its recordings.
-      const ownScore = (url: string): boolean => scoreDir !== undefined && scoreDir.startsWith(`/assets/${shard.slug}/music/`) && url.startsWith(scoreDir);
+      const ownScore = (url: string): boolean => scoreDirs.some(dir => url.startsWith(dir));
       const urls = wholeSet(tier, set) ? mounts.map(row => row.url).filter(url => onTier(url, tier))
         : set === 'whole' ? [...new Set([...fence.mounts, ...mounts.map(row => row.url).filter(url => (ownFarView(url, shard.slug) || ownScore(url)) && onTier(url, tier))])] : fence.mounts;
       // A phone file whose target no phone list names (a fence shard's file read past its fence) rides in the phone's whole

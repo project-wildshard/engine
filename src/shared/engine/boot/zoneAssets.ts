@@ -85,3 +85,20 @@ export function isAudioUrl(url: string): 'music' | 'sfx' | null {
   const match = new RegExp(`^/assets/(?:${SLUG}/)?(music|sfx)/`, 'u').exec(url);
   return match?.[1] === 'music' || match?.[1] === 'sfx' ? match[1] : null;
 }
+
+/** SF23: a zone's own slot set. A score slot whose set is the zone's slug (`sets: { pine: '<slug>' }`) plays the zone's copy
+ *  of that slot from `/assets/<slug>/music/<slug>-<style>/` (Pine Hollow's night and boss, Mossgate's and Mirror Salt's
+ *  pine and island): shard-format counts only a slot set `base` as engine music. Null for a set that is no slug. */
+export function zoneScoreSet(set: string, style: string): { readonly dir: string; readonly manifestKey: string } | null {
+  if (set === 'base' || !ZONE_SLUG.test(set)) return null;
+  const manifestKey = `${set}-${style}`;
+  return { dir: `/assets/${set}/music/${manifestKey}/`, manifestKey };
+}
+/** SF23: how a page whose tables lack a zone's slot set reads its manifest from the zone's cook (lent by the client: the
+ *  spawn download; none here, so a Node bake or a page built with the zone adopts nothing). */
+let scoreSetAdoption: (set: { readonly dir: string; readonly manifestKey: string }) => Promise<void> = () => Promise.resolve();
+export function useZoneScoreSetAdoption(adopt: (set: { readonly dir: string; readonly manifestKey: string }) => Promise<void>): void {
+  scoreSetAdoption = adopt;
+}
+/** Adopt `set` into the music tables when a cooked zone carries it. */
+export const adoptZoneScoreSet = (set: { readonly dir: string; readonly manifestKey: string }): Promise<void> => scoreSetAdoption(set);

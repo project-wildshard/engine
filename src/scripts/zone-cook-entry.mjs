@@ -152,7 +152,8 @@ try{
     page.on('pageerror',(/** @type {Error} */ error)=>{errors.push(String(error.message).slice(0,300));});
     const started=Date.now();let gameplayMs=null,why=null,memoryCard=false;
     try{
-      await enterZone(page,{zone:slug,base:preview.url,flags:'mute=1&nolock=1&skipintro=1&sw=0',alone:true,waitUntil:'commit',timeout:Number(o.timeout)});
+      // a zone the grid does not place yet (Mirror Salt, staging only) sits at the origin; a placed zone keeps its cell
+      await enterZone(page,{zone:slug,base:preview.url,flags:'mute=1&nolock=1&skipintro=1&sw=0',alone:true,unplaced:true,waitUntil:'commit',timeout:Number(o.timeout)});
       // Gameplay as the boot cases judge it (parity/boot-smoke.mjs bootObservation): play state, HUD in, a valid player.
       for(const deadline=Date.now()+Number(o.timeout);;){
         const seen=await page.evaluate(bootObservation).catch(()=>null);

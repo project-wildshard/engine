@@ -1,4 +1,5 @@
-import { SCORE_GENRE, scoreManifest, shipped, type ScoreSet, type StemSting, type BossPhase, type MusicStyle } from '../../../shared/engine/audio/bootAudio';
+import { SCORE_GENRE, musicManifest, scoreManifest, shipped, type ScoreSet, type StemSting, type BossPhase, type MusicStyle } from '../../../shared/engine/audio/bootAudio';
+import { adoptZoneScoreSet, zoneScoreSet } from '../../../shared/engine/boot/zoneAssets';
 import type { SlotAudio, StyleBank } from './Stems';
 import type { Audio } from './Audio';
 import type { Music, MusicState } from './Music';
@@ -274,7 +275,10 @@ export class CatalogueScore implements ScoreSource {
       let bank:StyleBank|undefined;
       try {
         const [{decodeStyle},{cachedBytes,decodeBytes}]=await Promise.all([import('./Stems'),import('./preload')]);
-        const decode = () => decodeStyle(genre,[slot],cachedBytes,decodeBytes,undefined,profile.sets[slot]??'base',slot===this.base?undefined:profile.catalogue?.extraStings);
+        const set=profile.sets[slot]??'base',own=musicManifest(genre,set)===undefined?zoneScoreSet(set,genre):null;
+        // SF23: a zone's own slot set this page's tables lack comes from the zone's cook before its decode
+        if(own!==null)await adoptZoneScoreSet(own);
+        const decode = () => decodeStyle(genre,[slot],cachedBytes,decodeBytes,undefined,set,slot===this.base?undefined:profile.catalogue?.extraStings);
         if (owner?.disposed) return;
         bank=await (owner === undefined ? decode() : owner.run(decode));
       } catch(error){console.info(`[music] ${profile.id} ${key}: ${error instanceof Error?error.message:String(error)} — the theme plays`);}

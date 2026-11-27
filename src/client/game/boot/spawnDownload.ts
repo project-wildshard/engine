@@ -18,7 +18,7 @@ import { memoryAttribution } from '@wildshard/engine/core/memoryAttribution';
 import {bareSlug} from '../../../shared/game/grid/catalogueSlot';
 import {behindRooms, looseSlug, placedLoose, placedSpawn} from './placedSpawn';
 import {leaveForRoomsRevision} from './roomsAhead';
-import {useZoneDownloadListing} from '@wildshard/engine/boot/zoneAssets';
+import {useZoneDownloadListing, useZoneScoreSetAdoption} from '@wildshard/engine/boot/zoneAssets';
 
 /** This leaf statically imports no engine, renderer or worker. The title can start it on
  * the tap; Loading later adopts the same progress rather than recounting IO. */
@@ -374,6 +374,11 @@ export async function spawnMountSize(url: string): Promise<number | undefined> {
 }
 // SF4: a cooked zone's own mounts are read where its download lists them, not from the page's engine-wide copies
 useZoneDownloadListing(spawnListed);
+// SF23: a cooked zone's own slot set (`/assets/<slug>/music/<slug>-piano/`) joins the music tables from its verified parts
+useZoneScoreSetAdoption(async set => {
+  const {adoptCookedMusic} = await import('../shardfile/audioCatalogue');
+  await adoptCookedMusic(set.dir.split('/')[2] ?? '', set);
+});
 /** Control: the level is complete and its reads are done, so the member bytes go. */
 export function releaseSpawnMembers(): void { members.clear(); keptSpawnMembers.clear(); storedUrls.clear(); jobPaths = null; jobWaits = null; jobDemand = null; storeRead = null; }
 /** Debug 'Loading: runtime packs / shardfile' (DL16, default shardfile): set by the composition root before a spawn
