@@ -72,9 +72,9 @@ const RETIRED_PACKS = `https://${['wildshard-packs', 'wildshard', 'workers', 'de
  * @param {string} path @param {string} channel @param {string} key @param {boolean} check @param {number} uid @param {number} gid */
 function prefill(path, channel, key, check, uid, gid) {
   if (!['production', 'staging'].includes(channel)) throw new Error('Unknown release channel');
-  const values = { PACK_ORIGIN: 'https://packs.wildshard.io', RELEASE_URL: `https://packs.wildshard.io/releases/${channel}.json`, RELEASE_PUBLIC_KEY: key };
+  const values = { PACK_ORIGIN: 'https://packs.wildshard.io', RELEASE_URL: `https://releases.wildshard.io/${channel}.json`, RELEASE_PUBLIC_KEY: key };
   /** @type {Record<string, readonly string[]>} */
-  const retired = { PACK_ORIGIN: [RETIRED_PACKS, `${RETIRED_PACKS}/`], RELEASE_URL: [`${RETIRED_PACKS}/releases/${channel}.json`] };
+  const retired = { PACK_ORIGIN: [RETIRED_PACKS, `${RETIRED_PACKS}/`], RELEASE_URL: [`${RETIRED_PACKS}/releases/${channel}.json`, `https://packs.wildshard.io/releases/${channel}.json`] };
   let before, stat;
   try {
     const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);

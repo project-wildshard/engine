@@ -15,7 +15,7 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export const PLACEMENTS = 'https://packs.wildshard.io/releases/staging-placements.json';
+export const PLACEMENTS = 'https://releases.wildshard.io/staging-placements.json';
 export const STAGING = 'https://staging.wildshard.io';
 
 /** @typedef {{ serial: number, cells: Record<string, string> }} SweepState */

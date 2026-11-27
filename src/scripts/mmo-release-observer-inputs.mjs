@@ -4,7 +4,7 @@ import {createHash} from 'node:crypto';
 import {readReleaseFile} from '../server/host/dedicated/releaseFile.ts';
 import {botTarget,STAGING_SOCKET} from '../../test/fixtures/dedicated/mmoBotsGuard.ts';
 
-const RELEASE='https://packs.wildshard.io/releases/staging.json';
+const RELEASE='https://releases.wildshard.io/staging.json';
 const HEALTH='https://wildshard.tailb41b20.ts.net:8443/health';
 const BUNDLES='https://github.com/project-wildshard/engine/releases/download';
 const BUILD=/^[0-9a-f]{40}$/u,SEGMENT=/^[A-Za-z0-9][A-Za-z0-9._-]{0,200}$/u;

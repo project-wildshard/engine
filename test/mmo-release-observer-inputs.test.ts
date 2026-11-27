@@ -109,7 +109,7 @@ test('an ordinary endpoint outage remains distinguishable from authenticated ref
  await assert.rejects(observationInputs(options).read(),(error:unknown)=>error instanceof Error&&!(error instanceof ObservationRefusedError)&&/503/u.test(error.message));
 });
 test('remote overrides cannot select production or unrelated observation hosts',()=>{
- assert.throws(()=>observationInputs({publicKey:'00',releaseUrl:'https://packs.wildshard.io/releases/production.json'}),/staging only/u);
+ assert.throws(()=>observationInputs({publicKey:'00',releaseUrl:'https://releases.wildshard.io/production.json'}),/staging only/u);
  assert.throws(()=>observationInputs({publicKey:'00',healthUrl:'https://example.test/health'}),/staging only/u);
 });
 

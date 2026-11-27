@@ -20,7 +20,7 @@ if(entry!==undefined||candidateId!==undefined){
 }
 // The loopback candidate runs the page assets. Only the uploaded Worker implements its document redirect.
 const staticBase=entry??base;
-const channel=human?'production':'staging',releaseURL=`https://packs.wildshard.io/releases/${channel}.json`;
+const channel=human?'production':'staging',releaseURL=`https://releases.wildshard.io/${channel}.json`;
 /** @param {string|URL} url */
 async function read(url){const response=await fetch(url,{cache:'no-store',redirect:'error',signal:AbortSignal.timeout(15000)});assert.equal(response.status,200,String(url));return response;}
 const version=await(await read(new URL('/version.json',staticBase))).json();assert.equal(version.build,build);

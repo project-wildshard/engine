@@ -16,7 +16,7 @@ import { parseArgs } from 'node:util';
 import { agentFetch } from '../agent-requests.mjs';
 
 export const API = 'https://api.wildshard.io';
-export const PACKS = 'https://packs.wildshard.io';
+export const RELEASES = 'https://releases.wildshard.io';
 const HASH = /^[0-9a-f]{64}$/u;
 
 /** @typedef {{slug: string, revision?: number, hash?: string}} ReleaseEntry */
@@ -64,9 +64,9 @@ export function pointerMoves(entries, listed, catalogue) {
 
 /** Read the release file, the API's list and its catalogue, and answer the moves still owed. @param {PointerDeps} deps */
 export async function readMoves(deps = {}) {
-  const get = deps.fetch ?? agentFetch, api = deps.api ?? API, packs = deps.packs ?? PACKS;
+  const get = deps.fetch ?? agentFetch, api = deps.api ?? API, packs = deps.packs ?? RELEASES;
   const [signed, listed, catalogue] = await Promise.all([
-    json(get, `${packs}/releases/production.json`, { cache: 'no-store' }),
+    json(get, `${packs}/production.json`, { cache: 'no-store' }),
     json(get, new URL('/api/shardfiles', api)),
     json(get, new URL('/api/catalogue', api)),
   ]);

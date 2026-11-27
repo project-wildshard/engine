@@ -49,7 +49,7 @@ function wire(url,headers={}) {
 
 /** Read-only, post-deploy CF2: use a part named by the current channel. */
 async function liveRead() {
-  const origin='https://packs.wildshard.io',envelope=await(await fetch(`${origin}/releases/staging.json`,{signal:AbortSignal.timeout(15_000)})).json();
+  const origin='https://packs.wildshard.io',envelope=await(await fetch('https://releases.wildshard.io/staging.json',{signal:AbortSignal.timeout(15_000)})).json();
   const release=JSON.parse(envelope.body),book=await(await fetch(`${origin}/assets/spawn/server-${release.engineBuild}.json`,{signal:AbortSignal.timeout(15_000)})).json();
   const part=/** @type {import('../shared/game/shardfile/serverPack').ServerPackPart|undefined} */(Object.values(book.shards)[0]);assert.ok(part?.url&&part.hash);
   const headers={origin:'https://staging.wildshard.io'};

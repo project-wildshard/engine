@@ -29,7 +29,7 @@ import { ownSimulatorHid } from './staging-qa-idb.mjs';
 import { chatLinePattern, playerNameSource, roomsHealthURL, splitRoomsHealthLines } from './staging-proof-lines.mjs';
 import { SAVE_PREFIX, tapDocument } from './zone-entry.mjs';
 
-const STAGING = 'https://staging.wildshard.io', RELEASE = 'https://packs.wildshard.io/releases/staging.json', SHARD = 'driftwood-isle';
+const STAGING = 'https://staging.wildshard.io', RELEASE = 'https://releases.wildshard.io/staging.json', SHARD = 'driftwood-isle';
 const SOCKETS = new Set(['wss://rooms-staging.wildshard.io', 'wss://wildshard.tailb41b20.ts.net:8443']);
 /** @param {string} name @param {string} fallback */
 const flag = (name, fallback) => process.argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;

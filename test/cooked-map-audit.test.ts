@@ -6,6 +6,8 @@ import {auditCookedMaps, auditLines, mapKeys, MISSING} from '../src/scripts/cook
 const hash = (n: number): string => n.toString(16).padStart(64, '0');
 const PACKS = 'https://packs.test/', API = 'https://api.test', origins = {production: 'https://play.test', staging: 'https://staging.test'} as const;
 
+const RELEASES = 'https://releases.test/';
+
 /** A store with one build a channel, three shards and their indexes; `drop` removes keys from one index, `unserved` paths 404. */
 function world(options: {drop?: {hash: string; size: 'full' | 'cell'}; unserved?: string; noIndex?: string} = {}): typeof fetch {
   const shards = [
@@ -22,7 +24,7 @@ function world(options: {drop?: {hash: string; size: 'full' | 'cell'}; unserved?
     if (url === `${API}/api/catalogue`) return json({shards});
     for (const [channel, origin] of Object.entries(origins)) {
       if (url === `${origin}/version.json`) return json({build: channel === 'production' ? 'build-p' : 'build-s'});
-      if (url === `${PACKS}releases/${channel}-placements.json`) return json({body: JSON.stringify({cells: placements[channel as keyof typeof placements]}), signature: 'x'});
+      if (url === `${RELEASES}${channel}-placements.json`) return json({body: JSON.stringify({cells: placements[channel as keyof typeof placements]}), signature: 'x'});
     }
     const index = /^https:\/\/packs\.test\/index\/([\w-]+)\/([a-f0-9]{64})\.json\?t=\d+$/u.exec(url);
     if (index !== null) {
@@ -36,7 +38,7 @@ function world(options: {drop?: {hash: string; size: 'full' | 'cell'}; unserved?
     throw new Error(`unexpected ${url}`);
   }) as typeof fetch;
 }
-const audit = (read: typeof fetch): ReturnType<typeof auditCookedMaps> => auditCookedMaps({fetch: read, origins, packs: PACKS, api: API, now: () => 0});
+const audit = (read: typeof fetch): ReturnType<typeof auditCookedMaps> => auditCookedMaps({fetch: read, origins, packs: PACKS, releases: RELEASES, api: API, now: () => 0});
 
 test('every cooked head with both keys served is mapped; a catalogue head no page of the build reads is only noted', async () => {
   const rows = await audit(world());

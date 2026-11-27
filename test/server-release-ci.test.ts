@@ -67,7 +67,7 @@ test('real S3 HTTP conditional writes advance once, retry a race, and reject an 
   let held: { body: string; etag: string } | null = null, writes = 0, conflicts = 0;
   const waiting: (() => void)[] = [];
   const server = createServer((request, response) => {
-    expect(request.url?.split('?')[0]).toBe('/packs/releases/staging.json');
+    expect(request.url?.split('?')[0]).toBe('/wildshard-releases/staging.json');
     if (request.method === 'GET') {
       if (held === null) { response.writeHead(404, { 'Content-Type': 'application/xml' }).end('<Error><Code>NoSuchKey</Code></Error>'); return; }
       const current = held;
@@ -96,7 +96,7 @@ test('real S3 HTTP conditional writes advance once, retry a race, and reject an 
     try { history.git(['merge-base', '--is-ancestor', a, b]); return true; }
     catch { return false; }
   };
-  const publish = (build: string): ReturnType<typeof publishChannel> => publishChannel({ client, bucket: 'packs', candidate: release(build), privateKey: pem, publicKey, isAncestor,
+  const publish = (build: string): ReturnType<typeof publishChannel> => publishChannel({ client, bucket: 'wildshard-releases', candidate: release(build), privateKey: pem, publicKey, isAncestor,
     packsReady: () => Promise.resolve(null) });
   try {
     expect((await publish(older)).release.serial).toBe(1);
@@ -115,8 +115,12 @@ test('real S3 HTTP conditional writes advance once, retry a race, and reject an 
 test('J234: both channels sign a build only after its server book and parts are in the bucket, and alignment is forward-only', async () => {
   const objects = new Map<string, string>();
   let writes = 0;
+  const releaseBucket = 'wildshard-releases';
+  const releaseKey = (key: string): string => `signed:${key}`;
   const server = createServer((request, response) => {
-    const key = decodeURIComponent(request.url?.split('?')[0] ?? '').replace(/^\/packs\//u, '');
+    const path = decodeURIComponent(request.url?.split('?')[0] ?? '');
+    const releasePath = `/${releaseBucket}/`;
+    const key = path.startsWith(releasePath) ? releaseKey(path.slice(releasePath.length)) : path.replace(/^\/packs\//u, '');
     const held = objects.get(key), etag = held === undefined ? '' : `"${createHash('sha256').update(held).digest('hex')}"`;
     if (request.method === 'GET' || request.method === 'HEAD') {
       if (held === undefined) { response.writeHead(404, { 'Content-Type': 'application/xml' }).end(request.method === 'HEAD' ? undefined : '<Error><Code>NoSuchKey</Code></Error>'); return; }
@@ -144,9 +148,10 @@ test('J234: both channels sign a build only after its server book and parts are 
   const shelve = (build: string, n: number): void => {
     objects.set(`assets/spawn/server-${build}.json`, JSON.stringify({ book: 'server', build, shards: { 'driftwood-isle': { ...part(n), more: [part(n + 1)] } }, grid: part(n + 2) }));
   };
-  const publish = (build: string, align = false, channel: 'staging' | 'production' = 'staging'): ReturnType<typeof publishChannel> => publishChannel({ client, bucket: 'packs', candidate: { ...release(build), channel },
-    privateKey: pem, publicKey, isAncestor, align, packsReady: next => serverPacksReady(client, 'packs', next) });
-  const channel = (name = 'staging'): ReleaseFile => readReleaseFile(objects.get(`releases/${name}.json`) ?? '', publicKey);
+  const ready = (row: ReleaseFile): ReturnType<typeof serverPacksReady> => serverPacksReady(client, 'packs', row, { client, bucket: releaseBucket });
+  const publish = (build: string, align = false, channel: 'staging' | 'production' = 'staging'): ReturnType<typeof publishChannel> => publishChannel({ client, bucket: releaseBucket, candidate: { ...release(build), channel },
+    privateKey: pem, publicKey, isAncestor, align, packsReady: ready });
+  const channel = (name = 'staging'): ReleaseFile => readReleaseFile(objects.get(releaseKey(`${name}.json`)) ?? '', publicKey);
   try {
     // No book: nothing is signed, and the first file is never written.
     expect(await publish(older)).toMatchObject({ status: 'held', reason: `no server book at assets/spawn/server-${older}.json` });
@@ -174,14 +179,14 @@ test('J234: both channels sign a build only after its server book and parts are 
     expect(writes).toBe(2);
     // Production holds the same way: a tag whose packs are missing writes no production file at all,
     expect(await publish(newest, false, 'production')).toMatchObject({ status: 'held', reason: `no server book at assets/spawn/server-${newest}.json` });
-    expect(objects.has('releases/production.json')).toBe(false);
+    expect(objects.has(releaseKey('production.json'))).toBe(false);
     expect((await publish(sha, false, 'production')).status).toBe('published');
     // and a live production file keeps its exact signed bytes while the next tag's packs are incomplete.
-    const live = objects.get('releases/production.json');
+    const live = objects.get(releaseKey('production.json'));
     shelve(newest, 7);
     for (const n of [7, 8]) objects.set(part(n).url.slice(1), 'part');
     expect(await publish(newest, false, 'production')).toMatchObject({ status: 'held', release: { engineBuild: sha, serial: 1 }, reason: 'no server part at assets/spawn/server/9999999999999999.pack.br' });
-    expect(objects.get('releases/production.json')).toBe(live);
+    expect(objects.get(releaseKey('production.json'))).toBe(live);
     objects.set(part(9).url.slice(1), 'part');
     expect((await publish(newest, false, 'production')).status).toBe('published');
     expect(channel('production')).toMatchObject({ engineBuild: newest, serial: 2 });
@@ -191,23 +196,24 @@ test('J234: both channels sign a build only after its server book and parts are 
     const source = { version: 1, items: [{ id: 'sword', maxTier: 3 }, { id: 'amulet', maxTier: 1 }] };
     objects.set('/api/items.json', JSON.stringify(source));
     const apiRead: typeof fetch = async (_url, init) => fetch(`http://127.0.0.1:${String(address.port)}/api/items.json`, init);
-    const items = await copyItemCatalogue(client, 'packs', apiRead), body = objects.get(items.path);
+    const items = await copyItemCatalogue(client, releaseBucket, apiRead), body = objects.get(releaseKey(items.path));
+    expect(objects.has(items.path)).toBe(false);
     expect(JSON.parse(body ?? '')).toEqual({ version: 1, items: [...source.items].reverse() });
-    expect(await copyItemCatalogue(client, 'packs', apiRead)).toEqual(items);
+    expect(await copyItemCatalogue(client, releaseBucket, apiRead)).toEqual(items);
     expect(writes, 'the same hash-named object is not overwritten').toBe(5);
     const candidate = { ...release(newest), items };
-    expect(await serverPacksReady(client, 'packs', candidate)).toBeNull();
-    const signedItems = await publishChannel({ client, bucket: 'packs', candidate, privateKey: pem, publicKey, isAncestor,
-      packsReady: next => serverPacksReady(client, 'packs', next) });
+    expect(await ready(candidate)).toBeNull();
+    const signedItems = await publishChannel({ client, bucket: releaseBucket, candidate, privateKey: pem, publicKey, isAncestor,
+      packsReady: ready });
     expect(signedItems.status).toBe('published'); expect(channel().items).toEqual(items);
     expect(await readSignedRelease(signedItems.signed, publicKey)).toEqual(signedItems.release);
-    objects.delete(items.path);
-    expect(await serverPacksReady(client, 'packs', candidate)).toBe(`no item catalogue at ${items.path}`);
-    objects.set(items.path, 'corrupt');
-    expect(await serverPacksReady(client, 'packs', candidate)).toBe(`item catalogue hash mismatch at ${items.path}`);
-    await expect(copyItemCatalogue(client, 'packs', apiRead)).rejects.toThrow('Existing item catalogue hash mismatch');
+    objects.delete(releaseKey(items.path));
+    expect(await ready(candidate)).toBe(`no item catalogue at ${items.path}`);
+    objects.set(releaseKey(items.path), 'corrupt');
+    expect(await ready(candidate)).toBe(`item catalogue hash mismatch at ${items.path}`);
+    await expect(copyItemCatalogue(client, releaseBucket, apiRead)).rejects.toThrow('Existing item catalogue hash mismatch');
     objects.set('/api/items.json', JSON.stringify({ version: 1, items: [source.items[0], source.items[0]] }));
-    await expect(copyItemCatalogue(client, 'packs', apiRead)).rejects.toThrow('Duplicate platform item');
+    await expect(copyItemCatalogue(client, releaseBucket, apiRead)).rejects.toThrow('Duplicate platform item');
     // Abandoning an unmerged staging release must not strand its next prepared release; the packs gate still runs.
     const prepared = createTempRepo();
     try {
@@ -220,15 +226,15 @@ test('J234: both channels sign a build only after its server book and parts are 
       prepared.git(['update-ref', 'refs/remotes/origin/main', fixed]);
       const next = prepared.commit({ 'package.json': manifest('0.1.31') }, 'chore(release): v0.1.31');
       prepared.git(['update-ref', 'refs/remotes/origin/release/v0.1.31', next]);
-      objects.set('releases/staging.json', signRelease(release(abandoned), pem));
+      objects.set(releaseKey('staging.json'), signRelease(release(abandoned), pem));
       const rotate = (build: string, nextChannel: 'staging' | 'production' = 'staging'): ReturnType<typeof publishChannel> => publishChannel({
-        client, bucket: 'packs', candidate: { ...release(build), channel: nextChannel }, privateKey: pem, publicKey, isAncestor, align: nextChannel === 'staging',
-        preparedFollows: (a, b) => preparedReleaseFollows(a, b, prepared.dir), packsReady: row => serverPacksReady(client, 'packs', row) });
+        client, bucket: releaseBucket, candidate: { ...release(build), channel: nextChannel }, privateKey: pem, publicKey, isAncestor, align: nextChannel === 'staging',
+        preparedFollows: (a, b) => preparedReleaseFollows(a, b, prepared.dir), packsReady: ready });
       expect(await rotate(next)).toMatchObject({ status: 'held', release: { engineBuild: abandoned, serial: 1 } });
       shelve(next, 1);
       expect(await rotate(next)).toMatchObject({ status: 'published', release: { engineBuild: next, serial: 2 } });
       await expect(rotate(abandoned)).rejects.toThrow(/unrelated history/u);
-      objects.set('releases/production.json', signRelease({ ...release(abandoned), channel: 'production' }, pem));
+      objects.set(releaseKey('production.json'), signRelease({ ...release(abandoned), channel: 'production' }, pem));
       await expect(rotate(next, 'production')).rejects.toThrow(/unrelated history/u);
       expect(channel()).toMatchObject({ engineBuild: next, serial: 2 });
       expect(channel('production')).toMatchObject({ engineBuild: abandoned, serial: 1 });
@@ -487,7 +493,7 @@ test('the main publisher admits an unmerged release head and refuses unreachable
     const invoke = (channel: string): { status: number | null; stdout: string; stderr: string } => spawnSync(process.execPath, [resolve('src/scripts/server-release/publish.mjs'), '--check', '--channel', channel, '--build', build,
       '--tag', channel === 'staging' ? `server-staging-${build}` : 'v1.2.3', '--bundle', archive, '--out', join(repo.dir, 'release.json')],
     { cwd: repo.dir, encoding: 'utf8', timeout: 5000, env: { PATH: process.env['PATH'], E7_RELEASE_SIGNING_KEY: pem, E7_RELEASE_PUBLIC_KEY: publicKey,
-      E7_RELEASE_SOCKET: 'wss://stage.example.test/', E7_SERVER_SHARDS: 'driftwood-isle', R2_ACCOUNT_ID: 'a'.repeat(32), R2_BUCKET_PACKS: 'wildshard-packs', R2_PACKS_ACCESS_KEY_ID: 'fixture', R2_PACKS_SECRET_ACCESS_KEY: 'fixture' } });
+      E7_RELEASE_SOCKET: 'wss://stage.example.test/', E7_SERVER_SHARDS: 'driftwood-isle', R2_ACCOUNT_ID: 'a'.repeat(32), R2_BUCKET_PACKS: 'wildshard-packs', R2_PACKS_ACCESS_KEY_ID: 'fixture', R2_PACKS_SECRET_ACCESS_KEY: 'fixture', R2_RELEASES_ACCESS_KEY_ID: 'fixture', R2_RELEASES_SECRET_ACCESS_KEY: 'fixture' } });
     for (const channel of ['staging', 'production']) {
       const admitted = invoke(channel);
       expect(admitted.status, String(admitted.stderr)).toBe(0);

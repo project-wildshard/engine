@@ -18,7 +18,7 @@ import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 /** Where the API writes staging's placement file (SA33a) and the box reads it (SA33's PLACEMENT_URL). */
-export const STAGING_PLACEMENTS = 'https://packs.wildshard.io/releases/staging-placements.json';
+export const STAGING_PLACEMENTS = 'https://releases.wildshard.io/staging-placements.json';
 /** The live preview's baked catalogue: the last grid, kept when staging can't be read. */
 export const LIVE_PREVIEW_CATALOGUE = 'https://preview.wildshard.io/catalogue.json';
 /** The API's placement key (SA33a, `~/.config/wildshard/placement-signing-key.pub.pem`), SPKI DER in hex: the box's PLACEMENT_PUBLIC_KEY. */

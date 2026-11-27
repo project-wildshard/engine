@@ -29,7 +29,7 @@ import {resolve as resolvePath} from 'node:path';
 import {pathToFileURL} from 'node:url';
 
 const HOST = 'wildshard-agent';
-const RELEASES = 'https://packs.wildshard.io/releases';
+const RELEASES = 'https://releases.wildshard.io';
 const TAG = /^v\d{1,4}\.\d{1,4}\.\d{1,4}$/u;
 const SIGNED_TAG = /^(?:v\d{1,4}\.\d{1,4}\.\d{1,4}|server-(?:staging|production)-[0-9a-f]{40})$/u, COMMIT = /^[0-9a-f]{40}$/u;
 const MARK = 'cook <tag>';

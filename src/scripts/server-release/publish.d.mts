@@ -14,7 +14,7 @@ export interface PublishOptions {
   /** Staging only: a person-named green build; forward-only (J234). */
   align?: boolean;
 }
-export function serverPacksReady(client: S3Client, bucket: string, release: ReleaseFile): Promise<string | null>;
+export function serverPacksReady(client: S3Client, bucket: string, release: ReleaseFile, items?: {client: S3Client; bucket: string}): Promise<string | null>;
 export function publishChannel(options: PublishOptions): Promise<{
   status: string; release: ReleaseFile; signed: string; reason?: string;
 }>;

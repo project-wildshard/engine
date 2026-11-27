@@ -14,9 +14,9 @@ import {pathToFileURL} from 'node:url';
 import {readerToken} from './gh-limit.mjs';
 
 export const SOURCES={
- staging:{release:'https://packs.wildshard.io/releases/staging.json',page:'https://staging.wildshard.io/version.json',
+ staging:{release:'https://releases.wildshard.io/staging.json',page:'https://staging.wildshard.io/version.json',
   box:'https://wildshard.tailb41b20.ts.net:8443/health'},
- production:{release:'https://packs.wildshard.io/releases/production.json',page:'https://play.wildshard.io/version.json'},
+ production:{release:'https://releases.wildshard.io/production.json',page:'https://play.wildshard.io/version.json'},
  preview:{page:'https://preview.wildshard.io/version.json'},
  api:'https://api.wildshard.io/api/health',
  npm:['@wildshard/engine','@wildshard/sdk','@wildshard/shard-format'],

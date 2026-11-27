@@ -42,7 +42,7 @@ PLACEMENT_PAIR = ('PLACEMENT_URL', 'PLACEMENT_PUBLIC_KEY')
 
 def placements(channel):
     """The one signed placement file a channel reads: the API writes only releases/<channel>-placements.json (SA33a)."""
-    return f'https://packs.wildshard.io/releases/{channel}-placements.json'
+    return f'https://releases.wildshard.io/{channel}-placements.json'
 
 # Each allowed key and its rule. Anything else is refused: secrets (SEAT_SECRET, SENTRY_DSN, DATABASE_URL), the trust roots
 # (RELEASE_URL, RELEASE_PUBLIC_KEY, BUNDLE_ORIGIN, PACK_ORIGIN, TELEMETRY_URL, ERRORS_URL) and exposure (HOST, PORT,
@@ -71,7 +71,7 @@ RULES = {'WORLD_CELLS': "'grid' or comma-separated cell names (a-z, 0-9, -), non
          'WORLD_SEATS': 'a whole number from 1 to 2000', 'RECORD_TAG': 'up to 64 of A-Z a-z 0-9 . _ -',
          'ALLOWED_ORIGINS': "comma-separated, none twice, from https://play.wildshard.io, https://staging.wildshard.io and "
                             "https://preview.wildshard.io, keeping the channel's own (production play, staging staging)",
-         'PLACEMENT_URL': "https://packs.wildshard.io/releases/<channel>-placements.json for this channel, or blank",
+         'PLACEMENT_URL': "https://releases.wildshard.io/<channel>-placements.json for this channel, or blank",
          'PLACEMENT_PUBLIC_KEY': f'the API placement key {PLACEMENT_PUBLIC_KEY}, or blank',
          'METRICS_PORT': "the channel's own metrics port (production 9790, staging 9791), or blank (off)",
          'PLAYTEST': '0 or 1, on staging only (production never records a playtest file)',

@@ -243,7 +243,7 @@ afterEach(() => { vi.restoreAllMocks(); network = () => new Response('missing', 
 /** The packs file and API row a new author's slug would have, the file signed by `key`. */
 function placedNetwork(channel: string, key = keys.privateKey): (url: string) => Response {
   return url => {
-    if (url === `https://packs.wildshard.io/releases/${channel}-placements.json`) return new Response(signedFile(placementBody(channel, ['new-author-isle']), key))
+    if (url === `https://releases.wildshard.io/${channel}-placements.json`) return new Response(signedFile(placementBody(channel, ['new-author-isle']), key))
     if (url === 'https://api.wildshard.io/api/catalogue/shards/new-author-isle') return Response.json({ slug: 'new-author-isle', name: 'New <Author> Isle' })
     if (url === 'https://api.wildshard.io/api/catalogue/shards/not-placed') return Response.json({ slug: 'not-placed', name: 'Not Placed' })
     return new Response('missing', { status: 404 })
@@ -287,7 +287,7 @@ test('a slug serves its page, and a retired slug\'s old link goes to the new one
   const pub = keys.publicKey.export({ type: 'spki', format: 'der' }).toString('hex')
   const importKey = crypto.subtle.importKey.bind(crypto.subtle)
   vi.spyOn(crypto.subtle, 'importKey').mockImplementation(((format: 'spki', _data: BufferSource, algorithm: AlgorithmIdentifier, extractable: boolean, usages: KeyUsage[]) => importKey(format, Buffer.from(pub, 'hex'), algorithm, extractable, usages)) as never)
-  network = url => url === 'https://packs.wildshard.io/releases/staging-placements.json'
+  network = url => url === 'https://releases.wildshard.io/staging-placements.json'
     ? new Response(signedFile({ ...(placementBody('staging', ['brasscap-mesa']) as object), aliases: { 'blender-template': 'brasscap-mesa' } }))
     : new Response('missing', { status: 404 })
   const response = await worker.fetch(new Request('https://staging.wildshard.io/slug/brasscap-mesa'), { ASSETS: site([]) })

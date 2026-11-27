@@ -351,8 +351,8 @@ Both existing engine readers authenticate that string before parsing it.
 `bundle.name` includes `<tag>/<archive>`, relative to C25's default
 `https://github.com/project-wildshard/engine/releases/download`.
 
-Channel objects are `releases/staging.json` and
-`releases/production.json`, with `Cache-Control: no-store`. The producer
+Channel objects are `staging.json` and `production.json` at the root of
+`wildshard-releases`, with `Cache-Control: no-store`. The producer
 authenticates the previous object, chooses `serial + 1`, and uses its
 ETag in `If-Match` (`If-None-Match: *` on first publication). A concurrent
 change retries against the newly signed object. Identical publication is
@@ -375,6 +375,8 @@ No repository settings or secrets are created by this change.
 | Secret | `R2_ACCOUNT_ID` | Existing R2 account identifier |
 | Secret | `R2_PACKS_ACCESS_KEY_ID` | Existing scoped packs writer access key ID |
 | Secret | `R2_PACKS_SECRET_ACCESS_KEY` | Existing scoped packs writer secret |
+| Secret | `R2_RELEASES_ACCESS_KEY_ID` | Object Read & Write access key for `wildshard-releases` |
+| Secret | `R2_RELEASES_SECRET_ACCESS_KEY` | Matching scoped secret |
 | Variable | `R2_BUCKET_PACKS` | `wildshard-packs` |
 
 Unset or empty shard variables select `driftwood-isle,nalati-grasslands`;
@@ -388,8 +390,9 @@ when the stored object has the previous signature.
 
 The public packs origin is `https://packs.wildshard.io`: the
 `wildshard-packs` R2 bucket on its custom domain, behind Cloudflare's
-CDN, with CORS for the page's origin set on the bucket. It serves these
-paths; the channel objects are `no-store` and never cached. ST27's
+CDN, with CORS for the page's origin set on the bucket. It serves the
+pack books and parts. `https://releases.wildshard.io` serves signed channel
+objects, placements and the item catalogue. ST27's
 page/pack producer must use the same full SHA as its `engineBuild` and
 supply the corresponding server pack book before a sitting can move.
 This CI job does not cook or publish packs, configure tunnels, change

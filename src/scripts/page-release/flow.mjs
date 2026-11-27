@@ -18,6 +18,7 @@ import {createHash, createPublicKey, verify} from 'node:crypto';
 import {LEGS} from '../staging-qa-budget.mjs';
 import {smokeGap} from '../zone-entry-tour.mjs';
 
+export const RELEASES_ORIGIN = 'https://releases.wildshard.io';
 export const PACKS_ORIGIN = 'https://packs.wildshard.io';
 /** Where every channel's page sends `/api/{errors,telemetry,inbox}` (API-CLOUDFLARE AC11). */
 export const API_ORIGIN = 'https://api.wildshard.io';
@@ -38,17 +39,17 @@ export const CHECKED_DOCUMENTS = /** @type {const} */ (['version.json', 'index.h
 /** @type {{staging: WorldChannelConfig, production: WorldChannelConfig, preview: SoloChannelConfig, explore: SoloChannelConfig}} */
 export const CHANNELS = {
   // SHELL-CUTOVER SC1: the solo build of the newest green main, no world stamp, so the in-page server runs.
-  explore: {channel: 'explore', solo: true, origin: 'https://explore.wildshard.io', release: `${PACKS_ORIGIN}/releases/staging.json`},
-  preview: {channel: 'preview', solo: true, origin: 'https://preview.wildshard.io', release: `${PACKS_ORIGIN}/releases/preview.json`},
+  explore: {channel: 'explore', solo: true, origin: 'https://explore.wildshard.io', release: `${RELEASES_ORIGIN}/staging.json`},
+  preview: {channel: 'preview', solo: true, origin: 'https://preview.wildshard.io', release: `${RELEASES_ORIGIN}/preview.json`},
   staging: {
     channel: 'staging', solo: false, other: 'production', origin: 'https://staging.wildshard.io',
-    release: `${PACKS_ORIGIN}/releases/staging.json`, socket: 'wss://rooms-staging.wildshard.io',
+    release: `${RELEASES_ORIGIN}/staging.json`, socket: 'wss://rooms-staging.wildshard.io',
     // D7: rooms' public /health is private; the tailnet one is the build's proof.
     health: 'https://wildshard.tailb41b20.ts.net:8443/health',
   },
   production: {
     channel: 'production', solo: false, other: 'staging', origin: 'https://play.wildshard.io',
-    release: `${PACKS_ORIGIN}/releases/production.json`, socket: 'wss://rooms.wildshard.io',
+    release: `${RELEASES_ORIGIN}/production.json`, socket: 'wss://rooms.wildshard.io',
     health: 'https://wildshard.tailb41b20.ts.net/health',
   },
 };
@@ -407,14 +408,14 @@ function checkOutput(channel, deps, context, refuse) {
   if (!html.includes(`globalThis.__WS_BUILD_ID__=${JSON.stringify(deps.build)};`)) refuse('index.html is not stamped with this build');
   const stamp = /globalThis\.__WS_WORLD__=(\{[^;]+\});/u.exec(html)?.[1];
   if (channel.solo) {
-    if (stamp !== undefined || html.includes('/releases/')) refuse(`index.html names a world, but ${channel.channel} is the solo game`);
+    if (stamp !== undefined || html.includes(RELEASES_ORIGIN)) refuse(`index.html names a world, but ${channel.channel} is the solo game`);
     if (channel.channel === 'explore' && !html.includes('globalThis.__WS_EXPLORE__=true;')) refuse('index.html has no Explore stamp');
     return files;
   }
   const world = stamp === undefined ? undefined : JSON.parse(stamp);
   if (world?.release !== channel.release) refuse(`index.html release file is ${world?.release}, not ${channel.release}`);
   if (world?.key !== (deps.releaseKey ?? RELEASE_PUBLIC_KEY)) refuse('index.html release key is not E7_RELEASE_PUBLIC_KEY');
-  if (html.includes(`/releases/${channel.other}.json`)) refuse(`index.html names the ${channel.other} release file`);
+  if (html.includes(`${RELEASES_ORIGIN}/${channel.other}.json`)) refuse(`index.html names the ${channel.other} release file`);
   return files;
 }
 
@@ -644,6 +645,6 @@ async function waitForDomain(channel, deps, refuse) {
     await deps.sleep(10_000);
   }
   const html = await deps.fetchText(`${channel.origin}/`);
-  if (channel.solo) { if (html.includes('/releases/')) refuse(`${channel.origin} page names a release file, but preview is solo`); return; }
-  if (!html.includes(channel.release) || html.includes(`/releases/${channel.other}.json`)) refuse(`${channel.origin} page does not name only ${channel.release}`);
+  if (channel.solo) { if (html.includes(RELEASES_ORIGIN)) refuse(`${channel.origin} page names a release file, but preview is solo`); return; }
+  if (!html.includes(channel.release) || html.includes(`${RELEASES_ORIGIN}/${channel.other}.json`)) refuse(`${channel.origin} page does not name only ${channel.release}`);
 }

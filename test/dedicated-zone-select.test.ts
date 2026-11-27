@@ -173,7 +173,7 @@ test('marker audit holds mismatches with their confirmed seat and forgets old bu
 });
 
 test('the box reads upload metadata from the API, never from the signed placement host', () => {
-  expect(zoneCatalogueUrl('https://packs.wildshard.io/releases/staging-placements.json').href).toBe('https://api.wildshard.io/api/catalogue');
+  expect(zoneCatalogueUrl('https://releases.wildshard.io/staging-placements.json').href).toBe('https://api.wildshard.io/api/catalogue');
   expect(zoneCatalogueUrl(undefined).href).toBe('https://api.wildshard.io/api/catalogue');
   expect(zoneCatalogueUrl('http://127.0.0.1:8787/releases/staging-placements.json').href).toBe('http://127.0.0.1:8787/api/catalogue');
 });

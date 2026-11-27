@@ -205,7 +205,7 @@ jobs:
           };
           const [pageJson, signedJson] = await Promise.all([
             read('https://staging.wildshard.io/version.json'),
-            read('https://packs.wildshard.io/releases/staging.json'),
+            read('https://releases.wildshard.io/staging.json'),
           ]);
           const page = JSON.parse(pageJson);
           const release = readPublication(signedJson, process.env.E7_RELEASE_PUBLIC_KEY);
@@ -239,7 +239,7 @@ jobs:
           };
           const [pageJson, signedJson] = await Promise.all([
             read('https://play.wildshard.io/version.json'),
-            read('https://packs.wildshard.io/releases/production.json'),
+            read('https://releases.wildshard.io/production.json'),
           ]);
           const page = JSON.parse(pageJson);
           const release = readPublication(signedJson, process.env.E7_RELEASE_PUBLIC_KEY);

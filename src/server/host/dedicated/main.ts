@@ -58,7 +58,7 @@ const engineVersion = typeof __ENGINE_VERSION__ === 'string' ? __ENGINE_VERSION_
 if (process.argv.includes('--sentry-test')) process.exit(await sendSentryTest({ env: process.env, build: process.env['WILDSHARD_BUILD'] ?? __BUILD_ID__, version: engineVersion, log }));
 const build = process.env['WILDSHARD_BUILD'] ?? __BUILD_ID__, origin = need('PACK_ORIGIN'), cache = process.env['PACK_CACHE'] ?? '/var/lib/wildshard/packs';
 const port = Number(process.env['PORT'] ?? 8790), host = process.env['HOST'] ?? '127.0.0.1', started = Date.now();
-const releaseAt = need('RELEASE_URL'), releaseKey = need('RELEASE_PUBLIC_KEY'), channel = process.env['RELEASE_CHANNEL'] ?? 'production';
+const releaseAt = need('RELEASE_URL'), releaseOrigin = new URL(releaseAt).origin, releaseKey = need('RELEASE_PUBLIC_KEY'), channel = process.env['RELEASE_CHANNEL'] ?? 'production';
 const readRelease = async (): Promise<ReleaseFile> => {
   const file = await fetchReleaseFile(releaseAt, releaseKey);
   if (file.channel !== channel) throw new Error(`Release channel ${file.channel} does not match ${channel}`);
@@ -82,7 +82,7 @@ function roomPacks(file: ReleaseFile, slug: string, placed?: {readonly hash?: st
   return {origin, cache, cooked};
 }
 const itemReads: PackReads = { fetched: 0, fetchedBytes: 0, cached: 0, refused: 0 };
-const catalogue = await readReleaseItems(release.items, { origin, cache }, itemReads);
+const catalogue = await readReleaseItems(release.items, { origin: releaseOrigin, cache }, itemReads);
 // C5, C11, GO3: the cells, by grid instance, fixed at startup; a player with no save lands in the first. `grid` opens every grid cell
 // the release names, home first. A cell runs its shard's pack, and the release must name that shard.
 const listed = process.env['WORLD_CELLS'] ?? homeCell(), cells = worldCells(listed, release.shards.map(shard => shard.slug));
@@ -263,7 +263,7 @@ const watch = new ReleaseWatch({ read: readRelease, serving: release, ...(poll =
     return releasedWorldShards(listed, released, bundleCells);
   },
   changed: async (next, shards) => {
-    const nextCatalogue = await readReleaseItems(next.items, { origin, cache }, reads);
+    const nextCatalogue = await readReleaseItems(next.items, { origin: releaseOrigin, cache }, reads);
     for (const slug of shards) await readPackFolder(slug, next.engineBuild, await rapier(), roomPacks(next, slug), reads, undefined, nextCatalogue);
     world.beginGrace(next.engineBuild);
   } });

@@ -15,7 +15,7 @@ assert.equal(new URL(base).origin,'https://staging.wildshard.io','J205 requires 
 assert.match(build,/^[a-f0-9]{40}$/u);assert.match(key,/^[a-f0-9]+$/u);
 assert.ok(engine==='chromium'||engine==='webkit');
 // MS7.3: only rooms-staging is a live socket; D7 health stays private on the tailnet.
-const releaseURL='https://packs.wildshard.io/releases/staging.json',sockets=['wss://rooms-staging.wildshard.io'];
+const releaseURL='https://releases.wildshard.io/staging.json',sockets=['wss://rooms-staging.wildshard.io'];
 const response=await fetch(releaseURL,{cache:'no-store',redirect:'error',signal:AbortSignal.timeout(30000)});assert.equal(response.status,200);
 const signed=await response.json();assert.ok(verify(null,Buffer.from(signed.body),createPublicKey({key:Buffer.from(key,'hex'),format:'der',type:'spki'}),Buffer.from(signed.signature,'hex')));
 const release=JSON.parse(signed.body);assert.equal(release.channel,'staging');assert.equal(release.engineBuild,build);assert.ok(Number.isSafeInteger(release.saveEpoch));if(expectedEpoch!==undefined)assert.equal(release.saveEpoch,expectedEpoch);

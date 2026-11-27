@@ -23,6 +23,7 @@ import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
 const ROOT = absolute(import.meta.dirname, '..', '..');
+const RELEASES = 'https://releases.wildshard.io';
 const ORIGIN = 'https://packs.wildshard.io', BUNDLES = 'https://github.com/project-wildshard/engine/releases/download';
 const POSTGRES_IMAGE = 'pgvector/pgvector:pg17', PORT = 18797, CELL = 'driftwood-isle', TOLERANCE_M = 2;
 const { values } = parseArgs({ options: { old: { type: 'string', default: 'v0.1.42' }, new: { type: 'string', default: 'v0.1.46' },
@@ -48,7 +49,7 @@ async function until(/** @type {() => boolean} */ done, /** @type {number} */ ms
 // --- The release's shards and item catalogue, as staging signs them (the packs every recent build cooked).
 const key = /^EXPECTED_RELEASE_PUBLIC_KEY=([0-9a-f]+)$/mu.exec(readFileSync(join(ROOT, 'src/scripts/vps/setup.sh'), 'utf8'))?.[1];
 if (key === undefined) throw new Error('No pinned release key in src/scripts/vps/setup.sh');
-const signed = await (await fetch(`${ORIGIN}/releases/staging.json`, { cache: 'no-store', signal: AbortSignal.timeout(30_000) })).json();
+const signed = await (await fetch(`${RELEASES}/staging.json`, { cache: 'no-store', signal: AbortSignal.timeout(30_000) })).json();
 if (!verify(null, Buffer.from(signed.body), createPublicKey({ key: Buffer.from(key, 'hex'), format: 'der', type: 'spki' }), Buffer.from(signed.signature, 'hex'))) throw new Error('The staging release file has a bad signature');
 /** @type {{ saveEpoch: number, shards: { slug: string, revision: number }[], items?: unknown }} */
 const staging = JSON.parse(signed.body);

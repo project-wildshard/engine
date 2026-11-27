@@ -34,13 +34,12 @@ export const PlacementSchema: v.GenericSchema<PlacementFile> = v.object({ kind: 
 export const SignedPlacementSchema: v.GenericSchema<{ readonly body: string; readonly signature: string }> = v.object({ body: v.string(), signature: v.string() });
 /** The API's placement key (SA33a, `~/.config/wildshard/placement-signing-key.pub.pem`), SPKI DER in hex: the box's PLACEMENT_PUBLIC_KEY. */
 export const PLACEMENT_PUBLIC_KEY = '302a300506032b65700321004afd39342aac6a4de6066cb72e9df54cbd3d4eb522e5e6e175a17954ab98f25e';
-/** A channel's placement file beside its release file: `…/releases/staging.json` → `…/releases/staging-placements.json`. Null for
+/** A channel's placement file sits beside its release file. Null for
  *  any other address, and for preview, whose page bakes staging's cells at deploy instead (SA35). */
 export function placementsURL(release: string): string | null {
   let url: URL;
   try { url = new URL(release); } catch { return null; }
-  const channel = /^\/releases\/(staging|production)\.json$/u.exec(url.pathname)?.[1];
-  if (channel === undefined || url.search !== '' || url.hash !== '') return null;
-  url.pathname = `/releases/${channel}-placements.json`;
+  if (!/^\/(?:releases\/)?(?:staging|production)\.json$/u.test(url.pathname) || url.search !== '' || url.hash !== '') return null;
+  url.pathname = url.pathname.replace(/\.json$/u, '-placements.json');
   return url.href;
 }

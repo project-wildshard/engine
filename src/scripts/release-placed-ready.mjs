@@ -45,7 +45,7 @@ async function main() {
   };
   const result = await ensurePlacedHeads({base: base.grid.cells,
     read: async () => {
-      const file = await placement.fetchPlacementFile('https://packs.wildshard.io/releases/staging-placements.json', PLACEMENT_PUBLIC_KEY);
+      const file = await placement.fetchPlacementFile('https://releases.wildshard.io/staging-placements.json', PLACEMENT_PUBLIC_KEY);
       if (file.channel !== 'staging') throw new Error('A non-staging placement file cannot qualify staging');
       return file;
     },

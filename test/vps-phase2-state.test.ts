@@ -98,7 +98,7 @@ test('prefill moves exact rows off the retired packs Worker and keeps every othe
     expect(readFileSync(path, 'utf8')).toBe(original);
     args[4] = '--apply'; const applied = run(args); expect(applied.status, String(applied.stderr)).toBe(0);
     expect(String(applied.stdout)).not.toContain('owned-test-value');
-    expect(readFileSync(path, 'utf8')).toBe(`PACK_ORIGIN=https://packs.wildshard.io\nRELEASE_URL=https://packs.wildshard.io/releases/staging.json\nRELEASE_PUBLIC_KEY=${key}\nSEAT_SECRET=owned-test-value\n`);
+    expect(readFileSync(path, 'utf8')).toBe(`PACK_ORIGIN=https://packs.wildshard.io\nRELEASE_URL=https://releases.wildshard.io/staging.json\nRELEASE_PUBLIC_KEY=${key}\nSEAT_SECRET=owned-test-value\n`);
     expect(String(run(args).stdout)).toContain('ok keep filled PACK_ORIGIN');
     // The origin with a trailing slash moves too.
     const slashed = readFileSync(path, 'utf8').replace('PACK_ORIGIN=https://packs.wildshard.io', `PACK_ORIGIN=${worker}/`);

@@ -26,7 +26,7 @@ const flag = (name, fallback) => process.argv.find(arg => arg.startsWith(`--${na
 // GRID-CROSSING GC27 (J311): `--base=<a preview build>` runs the same walk on preview (preview.wildshard.io, or a local
 // `src/scripts/serve-build.sh` build), whose in-page server hosts the grid: no world door, so no staging health or release read.
 const BASE = flag('base', 'https://staging.wildshard.io').replace(/\/$/u, ''), STAGING = BASE === 'https://staging.wildshard.io';
-const HEALTH = 'https://wildshard.tailb41b20.ts.net:8443/health', RELEASE = 'https://packs.wildshard.io/releases/staging.json';
+const HEALTH = 'https://wildshard.tailb41b20.ts.net:8443/health', RELEASE = 'https://releases.wildshard.io/staging.json';
 const out = absolute(process.argv.slice(2).find(arg => !arg.startsWith('--')) ?? '');
 if (out === absolute('')) throw new Error('usage: grid-spawn-proof.mjs <out dir> [--base=<preview url>] [--layouts=desktop,phone] [--cells=…] [--parallel=3] [--no-dev]');
 const layouts = flag('layouts', 'desktop,phone').split(','), parallel = Math.min(3, Number(flag('parallel', '3')));

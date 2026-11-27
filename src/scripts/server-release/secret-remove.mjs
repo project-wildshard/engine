@@ -18,7 +18,7 @@ import { parseArgs } from 'node:util';
 import { agentFetch } from '../agent-requests.mjs';
 
 export const REPOSITORY = 'project-wildshard/engine';
-const PACKS = 'https://packs.wildshard.io';
+const RELEASES = 'https://releases.wildshard.io';
 const VERSION = /^v(\d+)\.(\d+)\.(\d+)$/u;
 const NAME = /^[A-Z][A-Z0-9_]*$/u;
 
@@ -76,7 +76,7 @@ const runGit = args => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 
 
 /** releases/production.json's engineBuild. */
 async function liveBuild() {
-  const answer = await agentFetch(`${PACKS}/releases/production.json`, { cache: 'no-store', signal: AbortSignal.timeout(60_000) });
+  const answer = await agentFetch(`${RELEASES}/production.json`, { cache: 'no-store', signal: AbortSignal.timeout(60_000) });
   if (!answer.ok) throw new Error(`releases/production.json: HTTP ${answer.status}`);
   const signed = /** @type {{body?: unknown}} */ (await answer.json());
   const body = typeof signed.body === 'string' ? JSON.parse(signed.body) : undefined;

@@ -1,4 +1,4 @@
-// One CAS-protected signed object per channel in wildshard-packs. No VPS access.
+// One CAS-protected signed object per channel. No VPS access.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -23,11 +23,12 @@ const missing = error => error instanceof S3ServiceException && (error.name === 
  *  file last. The server preloads the
  *  named build's book and parts before its grace and stays on its old build while they are missing, so a file naming a build with
  *  no book strands every check behind it. Null when the book and every part the release's shards and grid need are in the bucket.
- * @param {S3Client} client @param {string} bucket @param {ReleaseFile} release @returns {Promise<string | null>} */
-export async function serverPacksReady(client, bucket, release) {
+ * @param {S3Client} client @param {string} bucket @param {ReleaseFile} release
+ * @param {{client: S3Client, bucket: string}} [items] @returns {Promise<string | null>} */
+export async function serverPacksReady(client, bucket, release, items = { client, bucket }) {
   if (release.items !== undefined) {
     let body;
-    try { body = await (await client.send(new GetObjectCommand({ Bucket: bucket, Key: release.items.path }))).Body?.transformToByteArray(); }
+    try { body = await (await items.client.send(new GetObjectCommand({ Bucket: items.bucket, Key: release.items.path }))).Body?.transformToByteArray(); }
     catch (error) { if (missing(error)) return `no item catalogue at ${release.items.path}`; throw error; }
     if (body === undefined || !itemBytesMatch(body, release.items)) return `item catalogue hash mismatch at ${release.items.path}`;
   }
@@ -58,7 +59,7 @@ export async function serverPacksReady(client, bucket, release) {
  *  as it is (`held`), on every channel.
  * @param {PublishOptions} options @returns {Promise<{status: string, release: ReleaseFile, signed: string, reason?: string}>} */
 export async function publishChannel(options) {
-  const { client, bucket, privateKey, publicKey, isAncestor: ancestor } = options, candidate = publication(options.candidate), key = `releases/${candidate.channel}.json`;
+  const { client, bucket, privateKey, publicKey, isAncestor: ancestor } = options, candidate = publication(options.candidate), key = `${candidate.channel}.json`;
   if (releasePublicKey(privateKey) !== publicKey.toLowerCase()) throw new Error('Signing key does not match E7_RELEASE_PUBLIC_KEY');
   if (options.align === true && candidate.channel !== 'staging') throw new Error('Only staging can be aligned');
   if (typeof options.packsReady !== 'function') throw new Error('Every channel needs the packs gate (J234)');
@@ -138,6 +139,8 @@ async function main() {
   if (values.bundle === undefined || values.tag === undefined || values.out === undefined) throw new Error('Expected --bundle, --tag and --out');
   const privateKey = need('E7_RELEASE_SIGNING_KEY'), publicKey = need('E7_RELEASE_PUBLIC_KEY'), account = need('R2_ACCOUNT_ID'), bucket = need('R2_BUCKET_PACKS');
   const credentials = { accessKeyId: need('R2_PACKS_ACCESS_KEY_ID'), secretAccessKey: need('R2_PACKS_SECRET_ACCESS_KEY') };
+  const releaseBucket = 'wildshard-releases';
+  const releaseCredentials = { accessKeyId: need('R2_RELEASES_ACCESS_KEY_ID'), secretAccessKey: need('R2_RELEASES_SECRET_ACCESS_KEY') };
   if (!/^[0-9a-f]{32}$/u.test(account)) throw new Error('Invalid R2_ACCOUNT_ID');
   if (bucket !== 'wildshard-packs') throw new Error('R2_BUCKET_PACKS must be wildshard-packs (C26)');
   const epoch = v.parse(v.object({ saveEpoch: v.pipe(v.number(), v.integer(), v.minValue(1)) }), JSON.parse(sourceFile('save-epoch.json'))).saveEpoch;
@@ -147,20 +150,22 @@ async function main() {
     bundle: bundleDescriptor(values.bundle, values.tag), socket: need('E7_RELEASE_SOCKET') });
   if (releasePublicKey(privateKey) !== publicKey.toLowerCase()) throw new Error('Signing key does not match E7_RELEASE_PUBLIC_KEY');
   if (values.check) { console.log('Server release configuration admitted'); return; }
-  const client = new S3Client({ region: 'auto', endpoint: `https://${account}.r2.cloudflarestorage.com`, credentials });
+  const endpoint = `https://${account}.r2.cloudflarestorage.com`;
+  const client = new S3Client({ region: 'auto', endpoint, credentials });
+  const releaseClient = new S3Client({ region: 'auto', endpoint, credentials: releaseCredentials });
   try {
-    const packsReady = (/** @type {ReleaseFile} */ release) => serverPacksReady(client, bucket, release);
-    const items = await copyItemCatalogue(client, bucket);
-    const result = await publishChannel({ client, bucket, candidate: { ...candidate, items }, privateKey, publicKey, isAncestor,
+    const packsReady = (/** @type {ReleaseFile} */ release) => serverPacksReady(client, bucket, release, { client: releaseClient, bucket: releaseBucket });
+    const items = await copyItemCatalogue(releaseClient, releaseBucket);
+    const result = await publishChannel({ client: releaseClient, bucket: releaseBucket, candidate: { ...candidate, items }, privateKey, publicKey, isAncestor,
       preparedFollows: preparedReleaseFollows, align, packsReady });
     writeFileSync(values.out, `${result.signed}\n`);
-    console.log(JSON.stringify({ status: result.status, channel: result.release.channel, serial: result.release.serial, engineBuild: result.release.engineBuild, object: `releases/${result.release.channel}.json`,
+    console.log(JSON.stringify({ status: result.status, channel: result.release.channel, serial: result.release.serial, engineBuild: result.release.engineBuild, object: `${result.release.channel}.json`,
       ...result.reason === undefined ? {} : { held: candidate.engineBuild, reason: result.reason } }));
     if (result.status === 'held') {
       const next = candidate.channel === 'production' ? "re-run this tag's server-release run" : `run server-release with build=${candidate.engineBuild}`;
       console.log(`::notice title=${candidate.channel} held::${candidate.engineBuild.slice(0, 7)} is not signed: ${result.reason ?? ''}. Publish its packs, then ${next}.`);
     }
-  } finally { client.destroy(); }
+  } finally { releaseClient.destroy(); client.destroy(); }
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

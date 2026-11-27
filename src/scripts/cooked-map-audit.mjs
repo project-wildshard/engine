@@ -2,7 +2,7 @@
 // MAP-NEXT MN4 (meta docs/plans/MULTI-REPO-SAGA/MMO-SAGA/MAP-NEXT-PLAN.md; J450, Jake 2026-11-19: "The map and the minimap should
 // never be broken ... done at cook time"): every head a staging or production page can read through the cook has its map.
 //   node src/scripts/cooked-map-audit.mjs [--channel production|staging]... [--json]
-// For each channel it reads the page's build (`<origin>/version.json`), the signed placement file's cells (`releases/<channel>-
+// For each channel it reads the page's build (`<origin>/version.json`), the signed placement file's cells (`<channel>-
 // placements.json`, read, not verified: this is a report) and the API catalogue's live, preview and staging heads, then each head's
 // cook index for that build (`index/<build>/<hash>.json`, as `placedContent.ts` reads it). A head is missing its map when:
 //   no-map    its index lacks either `cooked-map-v1` key (the page draws its olive plot);
@@ -20,6 +20,7 @@ import { resolve } from 'node:path';
 
 export const ORIGINS = Object.freeze({ production: 'https://play.wildshard.io', staging: 'https://staging.wildshard.io' });
 export const PACKS = 'https://packs.wildshard.io/', API = 'https://api.wildshard.io';
+const RELEASES = 'https://releases.wildshard.io/';
 /** The states that make the audit red. */
 export const MISSING = Object.freeze(['no-map', 'map-404', 'no-index']);
 const HEX = /^[a-f0-9]{64}$/u;
@@ -29,11 +30,11 @@ export const mapKeys = (/** @type {string} */ loose, /** @type {string} */ slug)
   ['', '-cell'].map(size => `${loose}shardfiles/${slug.replace(/^_/u, '')}/cooked-map-v1${size}.png`);
 
 /**
- * @param {{fetch?: typeof fetch, channels?: readonly Channel[], origins?: Readonly<Record<Channel, string>>, packs?: string, api?: string, now?: () => number}} [ports]
+ * @param {{fetch?: typeof fetch, channels?: readonly Channel[], origins?: Readonly<Record<Channel, string>>, packs?: string, releases?: string, api?: string, now?: () => number}} [ports]
  * @returns {Promise<HeadRow[]>}
  */
 export async function auditCookedMaps(ports = {}) {
-  const read = ports.fetch ?? agentFetch, origins = ports.origins ?? ORIGINS, packs = ports.packs ?? PACKS, api = ports.api ?? API;
+  const read = ports.fetch ?? agentFetch, origins = ports.origins ?? ORIGINS, packs = ports.packs ?? PACKS, releases = ports.releases ?? RELEASES, api = ports.api ?? API;
   const minute = Math.floor((ports.now ?? Date.now)() / 60_000);
   /** @param {string} url */
   const json = async url => {
@@ -75,7 +76,7 @@ export async function auditCookedMaps(ports = {}) {
       const head = heads.get(hash) ?? { slug, from: new Set() };
       head.from.add(from); heads.set(hash, head);
     };
-    const signed = /** @type {{body?: unknown} | undefined} */ (await json(`${packs}releases/${channel}-placements.json`));
+    const signed = /** @type {{body?: unknown} | undefined} */ (await json(`${releases}${channel}-placements.json`));
     const placed = typeof signed?.body === 'string' ? /** @type {{cells?: {slug: string, hash?: string}[]}} */ (JSON.parse(signed.body)).cells ?? [] : [];
     for (const cell of placed) add(cell.slug.replace(/^_/u, ''), cell.hash, 'placed');
     for (const row of catalogue.shards) {

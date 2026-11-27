@@ -146,6 +146,8 @@ jobs:
           R2_BUCKET_PACKS: ${{ vars.R2_BUCKET_PACKS }}
           R2_PACKS_ACCESS_KEY_ID: ${{ secrets.R2_PACKS_ACCESS_KEY_ID }}
           R2_PACKS_SECRET_ACCESS_KEY: ${{ secrets.R2_PACKS_SECRET_ACCESS_KEY }}
+          R2_RELEASES_ACCESS_KEY_ID: ${{ secrets.R2_RELEASES_ACCESS_KEY_ID }}
+          R2_RELEASES_SECRET_ACCESS_KEY: ${{ secrets.R2_RELEASES_SECRET_ACCESS_KEY }}
         run: >-
           node src/scripts/server-release/publish.mjs --check
           --channel "$RELEASE_CHANNEL" --build "$SOURCE_SHA" --tag "$RELEASE_TAG"
@@ -168,6 +170,8 @@ jobs:
           R2_BUCKET_PACKS: ${{ vars.R2_BUCKET_PACKS }}
           R2_PACKS_ACCESS_KEY_ID: ${{ secrets.R2_PACKS_ACCESS_KEY_ID }}
           R2_PACKS_SECRET_ACCESS_KEY: ${{ secrets.R2_PACKS_SECRET_ACCESS_KEY }}
+          R2_RELEASES_ACCESS_KEY_ID: ${{ secrets.R2_RELEASES_ACCESS_KEY_ID }}
+          R2_RELEASES_SECRET_ACCESS_KEY: ${{ secrets.R2_RELEASES_SECRET_ACCESS_KEY }}
         run: >-
           node src/scripts/server-release/publish.mjs
           --channel "$RELEASE_CHANNEL" --build "$SOURCE_SHA" --tag "$RELEASE_TAG"

@@ -81,11 +81,12 @@ test('one key: the page, the box and the preview bake believe the same placement
 });
 
 test('the address: a released page reads its own channel\'s file; preview and a solo build read none', () => {
-  expect(placementsURL('https://packs.wildshard.io/releases/staging.json')).toBe('https://packs.wildshard.io/releases/staging-placements.json');
+  expect(placementsURL('https://releases.wildshard.io/staging.json')).toBe('https://releases.wildshard.io/staging-placements.json');
+  expect(placementsURL('https://releases.wildshard.io/production.json')).toBe('https://releases.wildshard.io/production-placements.json');
   expect(placementsURL('https://packs.wildshard.io/releases/production.json')).toBe('https://packs.wildshard.io/releases/production-placements.json');
-  expect(placementsURL('https://packs.wildshard.io/releases/preview.json')).toBeNull();
+  expect(placementsURL('https://releases.wildshard.io/preview.json')).toBeNull();
   expect(placementsURL('not a url')).toBeNull();
-  expect(placementsOf({ __WS_WORLD__: { release: 'https://packs.wildshard.io/releases/staging.json', key: 'ab' } })).toBe('https://packs.wildshard.io/releases/staging-placements.json');
+  expect(placementsOf({ __WS_WORLD__: { release: 'https://releases.wildshard.io/staging.json', key: 'ab' } })).toBe('https://releases.wildshard.io/staging-placements.json');
   expect(placementsOf({})).toBeNull();
   expect(placementsOf({ __WS_PLACEMENTS__: URL_AT })).toBe(URL_AT);
 });

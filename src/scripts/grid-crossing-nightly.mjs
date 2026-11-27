@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GRID-CROSSING GC17: GC3's crossing run every night and after every staging release, from this Mac until MAC-MINI-RUNNER MR7 takes it.
 // One call decides what is due and runs it (a launchd agent calls it every hour):
-//   release  staging's signed release file (packs.wildshard.io/releases/staging.json) names a serial no run has read: the online walks
+//   release  staging's signed release file (releases.wildshard.io/staging.json) names a serial no run has read: the online walks
 //            (`grid-crossing-qa.mjs`, Driftwood's exits, Chromium and WebKit, desktop and phone) on staging
 //   nightly  after 03:00 (this Mac's clock) and none yet today: the every-pair tour (`grid-crossing-tour.mjs`, Chromium desktop) on preview
 // Each run writes `grid-crossing-report.mjs`'s report under <root>/<kind>-<stamp>/report and checks the ratchet: a pair worse than
@@ -27,7 +27,7 @@ const state = existsSync(STATE) ? JSON.parse(readFileSync(STATE, 'utf8')) : { se
 
 const now = new Date(), pad = (/** @type {number} */ n) => String(n).padStart(2, '0');
 const today = `${String(now.getFullYear())}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`, stamp = `${today}T${pad(now.getHours())}${pad(now.getMinutes())}`;
-const signed = /** @type {{ body: string }} */ (await (await fetch('https://packs.wildshard.io/releases/staging.json', { cache: 'no-store' })).json());
+const signed = /** @type {{ body: string }} */ (await (await fetch('https://releases.wildshard.io/staging.json', { cache: 'no-store' })).json());
 const serial = /** @type {{ serial: number }} */ (JSON.parse(signed.body)).serial;
 
 /** @type {('release' | 'nightly')[]} */

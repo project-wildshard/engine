@@ -196,7 +196,7 @@ test('the build bakes the channel release file from packs.wildshard.io', async (
     const seen: Record<string, string>[] = [];
     deps.run = (_file, _args, env) => { seen.push(env); };
     await runPhase('build', deps);
-    expect(seen[0]?.['WILDSHARD_RELEASE_URL']).toBe(`https://packs.wildshard.io/releases/${channel}.json`);
+    expect(seen[0]?.['WILDSHARD_RELEASE_URL']).toBe(`https://releases.wildshard.io/${channel}.json`);
     expect(seen[0]?.['WS_BUILD_ID']).toBe(build);
     // OFF-VERCEL OV3: a release build says so, and carries old builds from its own channel's domain.
     expect(seen[0]?.['WS_RELEASE']).toBe('1');
@@ -751,7 +751,7 @@ test('Explore deploys the live staging SHA without publishing a new world releas
   const explore = {...deps, catalogue, fetchText: () => Promise.resolve(body)};
   for (const step of PHASES) await runPhase(step, explore);
   expect(calls).toContain('goLive');
-  expect(calls).toContain('fetch https://packs.wildshard.io/releases/staging.json');
+  expect(calls).toContain('fetch https://releases.wildshard.io/staging.json');
   expect(calls).toContain('fetch https://staging.wildshard.io/version.json');
   expect(calls.some(line => line.startsWith('packs.') || line.includes('page-release/preview.mjs'))).toBe(false);
   live.stagingVersion = {...live.stagingVersion, build: source};

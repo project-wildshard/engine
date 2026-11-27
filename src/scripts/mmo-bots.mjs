@@ -54,6 +54,7 @@ import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
 const ROOT = absolute(import.meta.dirname, '..', '..');
+const RELEASES = 'https://releases.wildshard.io';
 const ORIGIN = 'https://packs.wildshard.io', BUNDLES = 'https://github.com/project-wildshard/engine/releases/download';
 // MS7.3: only rooms-staging is a live socket. D7 keeps the health read private on the tailnet.
 const STAGING_SOCKETS = ['wss://rooms-staging.wildshard.io'], STAGING_HEALTH = 'https://wildshard.tailb41b20.ts.net:8443/health';
@@ -143,7 +144,7 @@ if (releaseProof) {
 // --- The release, as the VPS reads it: signed, pinned.
 const key = /^EXPECTED_RELEASE_PUBLIC_KEY=([0-9a-f]+)$/mu.exec(readFileSync(join(ROOT, 'src/scripts/vps/setup.sh'), 'utf8'))?.[1];
 if (key === undefined) throw new Error('No pinned release key in src/scripts/vps/setup.sh');
-const signed = await (await fetch(`${ORIGIN}/releases/staging.json`, { cache: 'no-store', signal: AbortSignal.timeout(30_000) })).json();
+const signed = await (await fetch(`${RELEASES}/staging.json`, { cache: 'no-store', signal: AbortSignal.timeout(30_000) })).json();
 if (!verify(null, Buffer.from(signed.body), createPublicKey({ key: Buffer.from(key, 'hex'), format: 'der', type: 'spki' }), Buffer.from(signed.signature, 'hex'))) throw new Error('The staging release file has a bad signature');
 /** @type {{ channel: string, serial: number, engineBuild: string, saveEpoch: number, shards: { slug: string, revision: number }[], bundle: { name: string, sha256: string }, socket: string }} */
 const release = JSON.parse(signed.body);
@@ -330,7 +331,7 @@ const stagingRestart = { asked: /** @type {{ askedAt: string, error?: string } |
 /** MW5 release proof: the signed release file as the bots' page would preload it, read when the countdown is heard. */
 const preload = { read: /** @type {{ readAt: string, error?: string, serial?: number, engineBuild?: string, shards?: number } | null} */ (null) };
 const readSigned = async () => {
-  const file = await (await fetch(`${ORIGIN}/releases/staging.json`, { cache: 'no-store', signal: AbortSignal.timeout(30_000) })).json();
+  const file = await (await fetch(`${RELEASES}/staging.json`, { cache: 'no-store', signal: AbortSignal.timeout(30_000) })).json();
   if (!verify(null, Buffer.from(file.body), createPublicKey({ key: Buffer.from(key, 'hex'), format: 'der', type: 'spki' }), Buffer.from(file.signature, 'hex'))) throw new Error('The staging release file has a bad signature');
   const body = JSON.parse(file.body);
   return { serial: body.serial, engineBuild: body.engineBuild, shards: body.shards.length };

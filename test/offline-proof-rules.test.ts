@@ -15,7 +15,7 @@ const greenLog = [
   row('/assets/spawn/nalati-grasslands-grid-phone-0123456789abcdef.json', { phase: 'start', step: 'start.app:selected-discovery' }),
   row('/assets/grid-seam-plans-0123456789abcdef.json', { phase: 'load', step: 'home' }),
   row('/api/telemetry', { phase: 'load', servedBy: 'failed', fail: 'net::ERR_INTERNET_DISCONNECTED' }),
-  row('https://packs.wildshard.io/releases/staging.json', { phase: 'start', servedBy: 'failed', fail: 'net::ERR_INTERNET_DISCONNECTED' }),
+  row('https://releases.wildshard.io/staging.json', { phase: 'start', servedBy: 'failed', fail: 'net::ERR_INTERNET_DISCONNECTED' }),
   row('/version.json?t=1', { phase: 'start', servedBy: 'failed', fail: 'net::ERR_INTERNET_DISCONNECTED' }),
   // the service worker's own network-first read failing offline is not the page's read
   row('/programs/nalati-grasslands.json', { origin: 'sw', servedBy: 'failed', fail: 'net::ERR_INTERNET_DISCONNECTED' }),

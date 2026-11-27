@@ -115,7 +115,7 @@ test('wildshard-config narrows ALLOWED_ORIGINS to the game hosts, keeping the ch
 
 // SA33: the placement pair. Each placement key takes one exact value or blank, and the
 // two go together, as main.ts throws at boot on one without the other.
-const STAGING_FILE = 'https://packs.wildshard.io/releases/staging-placements.json';
+const STAGING_FILE = 'https://releases.wildshard.io/staging-placements.json';
 const PLACEMENT_KEY = /^export const PLACEMENT_PUBLIC_KEY = '([0-9a-f]+)';$/mu.exec(readFileSync('src/scripts/preview-grid.ts', 'utf8'))?.[1] ?? '';
 
 test('wildshard-config pins the placement key preview-grid.ts holds, an Ed25519 SPKI', () => {
@@ -127,7 +127,7 @@ test('wildshard-config refuses a placement file or key that is not the API\'s ow
   const root = etc(), other = PLACEMENT_KEY.slice(0, -2) + (PLACEMENT_KEY.endsWith('00') ? '01' : '00');
   for (const [args, why] of [
     [['set', 'staging', 'PLACEMENT_URL', 'https://evil.example/releases/staging-placements.json', 'PLACEMENT_PUBLIC_KEY', PLACEMENT_KEY], 'PLACEMENT_URL must be'],
-    [['set', 'staging', 'PLACEMENT_URL', 'https://packs.wildshard.io/releases/production-placements.json', 'PLACEMENT_PUBLIC_KEY', PLACEMENT_KEY], 'PLACEMENT_URL must be'],
+    [['set', 'staging', 'PLACEMENT_URL', 'https://releases.wildshard.io/production-placements.json', 'PLACEMENT_PUBLIC_KEY', PLACEMENT_KEY], 'PLACEMENT_URL must be'],
     [['set', 'staging', 'PLACEMENT_URL', `${STAGING_FILE}?x=1`, 'PLACEMENT_PUBLIC_KEY', PLACEMENT_KEY], 'PLACEMENT_URL must be'],
     [['set', 'staging', 'PLACEMENT_URL', STAGING_FILE, 'PLACEMENT_PUBLIC_KEY', other], 'PLACEMENT_PUBLIC_KEY must be'],
     [['set', 'staging', 'PLACEMENT_URL', STAGING_FILE, 'PLACEMENT_PUBLIC_KEY', PLACEMENT_KEY.toUpperCase()], 'PLACEMENT_PUBLIC_KEY must be'],
@@ -136,7 +136,7 @@ test('wildshard-config refuses a placement file or key that is not the API\'s ow
     [['set', 'staging', 'PLACEMENT_URL', STAGING_FILE, 'PLACEMENT_PUBLIC_KEY', ''], 'go together'],
     [['set', 'staging', 'PLACEMENT_URL', STAGING_FILE, 'PLACEMENT_URL', STAGING_FILE], 'each key once'],
     [['set', 'staging', 'PLACEMENT_URL', STAGING_FILE, 'PLACEMENT_PUBLIC_KEY'], 'usage'],
-    [['set', 'production', 'PLACEMENT_URL', 'https://packs.wildshard.io/releases/production-placements.json', 'PLACEMENT_PUBLIC_KEY', PLACEMENT_KEY], 'a production change needs --production'],
+    [['set', 'production', 'PLACEMENT_URL', 'https://releases.wildshard.io/production-placements.json', 'PLACEMENT_PUBLIC_KEY', PLACEMENT_KEY], 'a production change needs --production'],
   ] as const) {
     const run = config(root, ...args);
     expect(run.status, args.join(' ')).toBe(1);
@@ -157,7 +157,7 @@ test('wildshard-config sets the placement pair in one write and one restart, cle
   expect(config(root, 'set', 'staging', 'PLACEMENT_URL', '', 'PLACEMENT_PUBLIC_KEY', '').status).toBe(0);
   expect(config(root, 'show', 'staging').out).toBe('PLACEMENT_URL=\nPLACEMENT_PUBLIC_KEY=\n');
   // Production takes its own file, flagged.
-  const production = config(root, 'set', 'production', 'PLACEMENT_URL', 'https://packs.wildshard.io/releases/production-placements.json', 'PLACEMENT_PUBLIC_KEY', PLACEMENT_KEY, '--production');
+  const production = config(root, 'set', 'production', 'PLACEMENT_URL', 'https://releases.wildshard.io/production-placements.json', 'PLACEMENT_PUBLIC_KEY', PLACEMENT_KEY, '--production');
   expect(production.status, production.out).toBe(0);
   // A pair root wrote in the .env counts: the settings file may not blank one half of it, or add the other half alone.
   const fresh = etc();
