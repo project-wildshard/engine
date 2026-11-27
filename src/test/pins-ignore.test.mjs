@@ -35,7 +35,6 @@ const PUBLISHED = [
   // land STOPs (opus-sam1b, opus-shardsize, 2026-11-13): gen --inputs-only wrote these untracked in plan worktrees
   'public/assets/gpu/nalati/models/balbal-cb303eb6.glb',
   'public/assets/gpu/nalati/cards-7ecab075.ktx2',
-  'public/assets/baked/common/cloud-field.bin',
   'public/assets/music/folk/island-tension-bb05ab64.m4a',
   'public/assets/hdri/qwantani_sunset_puresky_2k.key.jpg',
   // AU21 (opus-parity2, 2026-11-13): sdk 0.2.10 renames a re-encoded recording to its bytes, so a re-pin moves these names
