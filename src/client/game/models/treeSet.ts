@@ -6,7 +6,7 @@ import { TIER_CONFIG } from '@wildshard/engine/core/tier';
 import { defineModel, type ModelContext, type ModelDef, type ModelPart } from '@wildshard/engine/models/model';
 import type { LookReplaceContext } from '@wildshard/engine/render/look';
 import { FOREST_BANDS, trunkCapsule } from '@wildshard/engine/world/forest/Forest';
-import { BARK_LAYERS, treeSetUrls } from '@wildshard/engine/world/forest/treeSet';
+import { barkLayers, treeSetUrls } from '@wildshard/engine/world/forest/treeSet';
 import { painterlyMaterial } from '@wildshard/engine/world/painterly';
 import type { SkyRig } from '@wildshard/engine/world/skyRig';
 import { TreeFactory, isTreeMaterial, type TreeMaterial } from '@wildshard/engine/world/TreeFactory';
@@ -81,7 +81,7 @@ export class TreeSetFactory extends TreeFactory {
       pool,
       loadTexture(U.cardsAlbedo, true, 1, undefined, cards), loadTexture(U.cardsNormal, false, 1, undefined, cards), loadTexture(U.cardsArm, false, 1, undefined, cards),
       loadTexture(U.farAlbedo, true, 1, undefined, far), loadTexture(U.farNormal, false, 1, undefined, far),
-      loadPBRArray([...BARK_LAYERS], TIER_CONFIG.layerSize),
+      loadPBRArray(barkLayers(rows.set), TIER_CONFIG.layerSize),
       catalogueDescriptor(rows.product).then(source => lookGraphMaterials(resourceScope(), { renderer: this.renderer }, source, [graphs.bark, graphs.needles, graphs.twigs, graphs.far])),
     ]);
     lendLooks(resourceScope(), looks); this.looks = looks;

@@ -134,7 +134,7 @@ try{
   const gpu=process.platform==='darwin'?['--use-angle=metal','--enable-gpu','--ignore-gpu-blocklist']:['--use-angle=swiftshader','--enable-unsafe-swiftshader'];
   const launched=await chromium.launch({headless:true,args:['--mute-audio','--no-first-run','--disable-extensions',...gpu,...KEYCHAIN_ARGS]});browser=launched;
   const page0=new URL(preview.url).origin;
-  /** @type {Record<string, {gameplayMs:number|null,textures:unknown,requests:number,fromCook:number,fromPage:number,zoneFromPage:string[],missing:string[],errors:string[]}>} */
+  /** @type {Record<string, {gameplayMs:number|null,memoryCard:boolean,textures:unknown,requests:number,fromCook:number,fromPage:number,zoneFromPage:string[],missing:string[],errors:string[]}>} */
   const results={};
   const shapes={desktop:{viewport:{width:1280,height:800},deviceScaleFactor:1},
     phone:{viewport:{width:402,height:874},deviceScaleFactor:3,isMobile:true,hasTouch:true,
@@ -150,7 +150,7 @@ try{
     context.on('requestfailed',(/** @type {import('playwright').Request} */ request)=>{requests.push({url:request.url(),status:-1,failure:request.failure()?.errorText});});
     page.on('console',(/** @type {import('playwright').ConsoleMessage} */ message)=>{if(message.type()==='error')errors.push(`console: ${message.text().slice(0,300)}`);});
     page.on('pageerror',(/** @type {Error} */ error)=>{errors.push(String(error.message).slice(0,300));});
-    const started=Date.now();let gameplayMs=null,why=null;
+    const started=Date.now();let gameplayMs=null,why=null,memoryCard=false;
     try{
       await enterZone(page,{zone:slug,base:preview.url,flags:'mute=1&nolock=1&skipintro=1&sw=0',alone:true,waitUntil:'commit',timeout:Number(o.timeout)});
       // Gameplay as the boot cases judge it (parity/boot-smoke.mjs bootObservation): play state, HUD in, a valid player.
@@ -159,6 +159,9 @@ try{
         if(seen!==null&&seen.fatal.length>0)throw new Error(`fatal: ${seen.fatal.join(' | ').slice(0,300)}`);
         if(seen?.ready===true)break;
         if(seen?.revealing===true)await page.locator('.ws-grid-reveal').dispatchEvent('pointerdown').catch(()=>undefined);
+        // J445: a phone estimate past the line shows the may-crash card, never a refusal; a player enters with Play anyway.
+        const card=page.locator('dialog.ws-load-memory-warning[open] .ws-load-play');
+        if(await card.isVisible().catch(()=>false)){memoryCard=true;await card.click().catch(()=>undefined);}
         if(Date.now()>deadline)throw new Error(`no gameplay in ${o.timeout} ms (app ${seen?.appState ?? 'unavailable'})`);
         await page.waitForTimeout(500);
       }
@@ -171,11 +174,11 @@ try{
     const onPage=requests.filter(row=>row.url.startsWith(page0)).map(row=>({...row,path:new URL(row.url).pathname}));
     const zoneFromPage=onPage.filter(row=>row.status>=200&&row.status<400&&zoneArt(row.path)).map(row=>row.path);
     const missing=requests.filter(row=>row.status===404||row.status===-1).map(row=>row.url.replace(page0,'').replace(origin,'cook:')+(row.failure===undefined?'':` (${row.failure})`));
-    const result={gameplayMs,textures:why,requests:requests.length,fromCook:requests.filter(row=>row.url.startsWith(origin)).length,
+    const result={gameplayMs,memoryCard,textures:why,requests:requests.length,fromCook:requests.filter(row=>row.url.startsWith(origin)).length,
       fromPage:onPage.length,zoneFromPage:[...new Set(zoneFromPage)].sort(),missing:[...new Set(missing)].sort(),errors};
     results[tier]=result;
     if(gameplayMs===null||zoneFromPage.length>0)failed=true;
-    console.log(`${slug} ${tier}: gameplay ${gameplayMs===null?'MISSED':`${gameplayMs} ms`}, ${requests.length} requests (${result.fromCook} cook, ${onPage.length} page), zone art from the page ${result.zoneFromPage.length}, missing ${result.missing.length}`);
+    console.log(`${slug} ${tier}: gameplay ${gameplayMs===null?'MISSED':`${gameplayMs} ms`}${memoryCard?' (after the may-crash card)':''}, ${requests.length} requests (${result.fromCook} cook, ${onPage.length} page), zone art from the page ${result.zoneFromPage.length}, missing ${result.missing.length}`);
   }
   writeFileSync(join(out,`${slug}.json`),JSON.stringify({slug,hash,bytes:tarball.length,sha:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),results,cookReads:cookReads.length},null,1));
   if(failed)process.exitCode=1;

@@ -17,11 +17,19 @@ import { prepareRigLoader } from '../../anim/rig';
 /** the bark array's layers, in the order treegen.py's BARK_* constants index them */
 export const BARK_LAYERS = ['pine_bark', 'fir_bark', 'metasequoia_bark', 'birch_bark', 'bark_willow_02'] as const;
 
+/** SF5: the bark sets a tree set tiles. A zone's own set (`/assets/<slug>/models/<set>`) reads them from the zone's
+ *  `/assets/<slug>/tex/<id>`, beside its other textures; an engine-wide set from `/assets/tex/<id>`. */
+export function barkLayers(set: string): string[] {
+  const zone = /^\/assets\/([a-z0-9-]+)\/models\//u.exec(set)?.[1];
+  return BARK_LAYERS.map(id => zone === undefined ? id : `/assets/${zone}/tex/${id}`);
+}
+
 export const TREE_SET_PARTS = ['trunk', 'trunkLo', 'hi', 'lo', 'twigs', 'far'] as const;
 export type TreeSetPart = (typeof TREE_SET_PARTS)[number];
 
+/** SF5: a set named by its folder URL, `/assets/<slug>/models/<set>` (a zone's own trees), or by an engine-wide id. */
 export function treeSetUrls(set: string): { glb: string; cardsAlbedo: string; cardsNormal: string; cardsArm: string; farAlbedo: string; farNormal: string } {
-  const b = `/assets/models/${set}`;
+  const b = set.startsWith('/assets/') ? set.replace(/\/+$/u, '') : `/assets/models/${set}`;
   return {
     glb: `${b}/trees.glb`,
     cardsAlbedo: `${b}/cards-albedo.png`, cardsNormal: `${b}/cards-normal.jpg`, cardsArm: `${b}/cards-arm.jpg`,

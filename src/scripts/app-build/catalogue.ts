@@ -257,6 +257,15 @@ export function nightlyHeadCatalogue(built: StandaloneCatalogue, reviewed: Stand
   }]};
 }
 
+/** STANDALONE-SHARDFILES SF5d: a page trusts a stored shard by the hash of the header it reads, and that header is the
+ *  cook's. A shard with a shardVersion has it stamped into its cook section by the cook (cookJob `openShardfile`), so its
+ *  header is not the upload's: the upload's validated `indexHash` names bytes no page reads, and the page took stale-client
+ *  recovery ("app older than its product") on Pine Hollow 0.0.18. The verdict names the served header instead. */
+export function storedVerdict<T extends {readonly verdict: unknown}>(proved: T, header: Uint8Array): T {
+  const indexHash = createHash('sha256').update(header).digest('hex');
+  return {...proved, verdict: {...(proved.verdict as Record<string, unknown>), indexHash}};
+}
+
 /** A deploy's catalogue over a build's: the build keeps what it shipped, grid included, and gains each added shard's rows. */
 export function catalogueWithAdded(built: StandaloneCatalogue, live: StandaloneCatalogue, slugs: readonly string[]): StandaloneCatalogue {
   const added = new Set(slugs), named = (row: {readonly slug: string}): boolean => added.has(bareSlug(row.slug));
@@ -297,9 +306,11 @@ export async function addStoredShards(out: string, heads: readonly {readonly slu
         loose[bareSlug(index.slug)] = index.loose;
       }
       for (const row of index.manifests) await copy(row.url.slice(1), scratch);
-      await copy(index.header, out, `${index.loose ?? ''}${index.header}`);
+      const headerBytes = await need(`${index.loose ?? ''}${index.header}`);
+      mkdirSync(dirname(join(out, index.header)), {recursive: true});
+      writeFileSync(join(out, index.header), headerBytes);
       for (const key of index.keys) if (key.startsWith('assets/spawn/server/')) await copy(key, out);
-      const proved = await folderVerdict(await read(head.hash), out);
+      const proved = storedVerdict(await folderVerdict(await read(head.hash), out), headerBytes);
       const server = index.serverPack?.index.slice(1);
       added.push({slug: index.slug, hash: head.hash, header: index.header, manifests: index.manifests,
         entryPrograms: index.keys.includes(`${index.loose ?? ''}programs/${index.slug}.json`), ...proved,
