@@ -11,3 +11,7 @@ before signing the preview release.
 
 Production pointer reconciliation reads the root production object.
 The staging smoke drivers reject a page with the new production URL.
+
+The signed VPS setup moves both room URLs from their exact legacy
+values. It preserves secrets, the placement key and other settings.
+Local file-backed room proofs still resolve item bytes from their packs.

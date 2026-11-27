@@ -238,10 +238,14 @@ for channel in production staging; do
   filled=$("$NODE" "$HERE/setup-state.mjs" prefill "$ETC/$channel.env" "$channel" "$EXPECTED_RELEASE_PUBLIC_KEY" --apply 0 "${CHANNEL_GID[$channel]}")
   [ -z "$filled" ] || printf '%s\n' "$filled"
   # PACKS-CDN PC3 (PC4-REMOVE): a server reads PACK_ORIGIN and RELEASE_URL once, so a moved row needs a restart below.
-  case $filled in *'off the retired packs Worker'*) MOVED_PACKS="$MOVED_PACKS$channel " ;; esac
+  case $filled in *'off the retired packs Worker'*|*'off the legacy release path'*) MOVED_PACKS="$MOVED_PACKS$channel " ;; esac
 done
 # J266 (MS3.5): the settings an agent may change move out of the secrets file into <channel>.settings, once.
-for channel in production staging; do python3 -I "$HERE/wildshard-config" split "$channel"; done
+for channel in production staging; do
+  split=$(python3 -I "$HERE/wildshard-config" split "$channel")
+  printf '%s\n' "$split"
+  case $split in *'off the legacy release path'*) MOVED_PACKS="$MOVED_PACKS$channel " ;; esac
+done
 # The Phase 1 private backup credentials are left byte-for-byte alone.
 if [ ! -f "$ETC/ops.env" ]; then say stop 'Phase 1 ops.env missing'; exit 1; fi
 repair_metadata "$ETC/ops.env" 600 root:root

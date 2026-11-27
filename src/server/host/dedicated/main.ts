@@ -58,7 +58,8 @@ const engineVersion = typeof __ENGINE_VERSION__ === 'string' ? __ENGINE_VERSION_
 if (process.argv.includes('--sentry-test')) process.exit(await sendSentryTest({ env: process.env, build: process.env['WILDSHARD_BUILD'] ?? __BUILD_ID__, version: engineVersion, log }));
 const build = process.env['WILDSHARD_BUILD'] ?? __BUILD_ID__, origin = need('PACK_ORIGIN'), cache = process.env['PACK_CACHE'] ?? '/var/lib/wildshard/packs';
 const port = Number(process.env['PORT'] ?? 8790), host = process.env['HOST'] ?? '127.0.0.1', started = Date.now();
-const releaseAt = need('RELEASE_URL'), releaseOrigin = new URL(releaseAt).origin, releaseKey = need('RELEASE_PUBLIC_KEY'), channel = process.env['RELEASE_CHANNEL'] ?? 'production';
+const releaseAt = need('RELEASE_URL'), releaseKey = need('RELEASE_PUBLIC_KEY'), channel = process.env['RELEASE_CHANNEL'] ?? 'production';
+const releaseAddress = new URL(releaseAt), releaseOrigin = releaseAddress.protocol === 'file:' ? origin : releaseAddress.origin;
 const readRelease = async (): Promise<ReleaseFile> => {
   const file = await fetchReleaseFile(releaseAt, releaseKey);
   if (file.channel !== channel) throw new Error(`Release channel ${file.channel} does not match ${channel}`);

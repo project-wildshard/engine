@@ -41,7 +41,7 @@ PLACEMENT_PAIR = ('PLACEMENT_URL', 'PLACEMENT_PUBLIC_KEY')
 
 
 def placements(channel):
-    """The one signed placement file a channel reads: the API writes only releases/<channel>-placements.json (SA33a)."""
+    """The one signed placement file a channel reads (SA33a)."""
     return f'https://releases.wildshard.io/{channel}-placements.json'
 
 # Each allowed key and its rule. Anything else is refused: secrets (SEAT_SECRET, SENTRY_DSN, DATABASE_URL), the trust roots
@@ -665,22 +665,37 @@ def main(argv):
         if len(args) != 2:
             stop('usage: wildshard-config split <channel>')
         env_rows = read_rows(env_path)
+        settings_before = read_rows(settings_path)
+        legacy_placement = f'https://packs.wildshard.io/releases/{channel}-placements.json'
+
+        def move_placement(row):
+            if key_of(row) == 'PLACEMENT_URL' and plain(row) == legacy_placement:
+                return f'PLACEMENT_URL={placements(channel)}'
+            return row
+
+        settings_rows = [move_placement(row) for row in settings_before]
+        moved_placement = settings_rows != settings_before
         # systemd strips one pair of matching quotes; a value that still fails its rule stays in the .env, never dropped.
         # The last assignment of a key is the one systemd uses; a key moves only if that one passes its rule, and then all of
         # its rows move, so the precedence never changes (Codex J206).
-        last = {key_of(row): row for row in env_rows if key_of(row) in SETTINGS}
+        last = {key_of(row): move_placement(row) for row in env_rows if key_of(row) in SETTINGS}
         keys = {key for key, row in last.items() if SETTINGS[key](plain(row), channel)}
         moving = [row for row in env_rows if key_of(row) in keys]
-        if not moving:
+        moved_placement = moved_placement or any(move_placement(row) != row for row in moving)
+        if not moving and not moved_placement:
             print(f'ok      {env_path} holds no settings')
             return 0
-        settings_rows = read_rows(settings_path) or list(HEADER)
+        settings_rows = settings_rows or list(HEADER)
         have = {key_of(row) for row in settings_rows}
         # A value already in the settings file wins: it is read last, so it is the one the server runs with today.
         settings_rows += [f'{key}={plain(last[key])}' for key in sorted(keys, key=lambda name: list(SETTINGS).index(name)) if key not in have]
-        write_rows(settings_path, settings_rows, channel)
-        write_rows(env_path, [row for row in env_rows if row not in moving], channel)
-        print(f'doing   move {", ".join(sorted(keys))} from {channel}.env to {channel}.settings')
+        if settings_rows != settings_before:
+            write_rows(settings_path, settings_rows, channel)
+        if moving:
+            write_rows(env_path, [row for row in env_rows if row not in moving], channel)
+            print(f'doing   move {", ".join(sorted(keys))} from {channel}.env to {channel}.settings')
+        if moved_placement:
+            print(f'doing   move PLACEMENT_URL in {channel} settings off the legacy release path')
         return 0
 
     if len(args) < 4 or len(args) % 2 != 0:

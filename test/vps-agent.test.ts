@@ -229,6 +229,21 @@ test("setup.sh's split moves the settings out of the .env once, and leaves every
   expect(read(root, 'production.settings')).toBe(settings);
 });
 
+test('setup migrates exact legacy placement URLs in both room configuration files', () => {
+  const root = etc();
+  const legacy = (channel: string): string => `https://packs.wildshard.io/releases/${channel}-placements.json`;
+  writeFileSync(join(root, 'etc/wildshard/production.settings'), `PLACEMENT_URL=${legacy('production')}\nPLACEMENT_PUBLIC_KEY=${PLACEMENT_KEY}\n`);
+  writeFileSync(join(root, 'etc/wildshard/staging.env'), `SEAT_SECRET=s\nPLACEMENT_URL="${legacy('staging')}"\nPLACEMENT_PUBLIC_KEY=${PLACEMENT_KEY}\n`);
+  for (const channel of ['production', 'staging']) {
+    const split = config(root, 'split', channel);
+    expect(split.status, split.out).toBe(0);
+    expect(split.out).toContain('off the legacy release path');
+    expect(read(root, `${channel}.settings`)).toContain(`PLACEMENT_URL=https://releases.wildshard.io/${channel}-placements.json\nPLACEMENT_PUBLIC_KEY=${PLACEMENT_KEY}\n`);
+    expect(config(root, 'split', channel).out).toContain('holds no settings');
+  }
+  expect(read(root, 'staging.env')).toBe('SEAT_SECRET=s\n');
+});
+
 /** Signed channel files, as server-release signs them, with a test key. */
 function releases(rows: readonly { readonly tag: string; readonly commit: string; readonly tamper?: boolean }[]) {
   const dir = scratch(), { privateKey, publicKey } = generateKeyPairSync('ed25519');

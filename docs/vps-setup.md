@@ -36,12 +36,13 @@ settings survive. A different filled trust root refuses activation.
 Only exactly blank rows are filled, atomically as `640 root:wildshard`:
 
 - `PACK_ORIGIN=https://packs.wildshard.io`.
-- `RELEASE_URL` is that origin's `releases/production.json` or
-  `releases/staging.json`.
+- `RELEASE_URL` is `https://releases.wildshard.io/production.json` or
+  `https://releases.wildshard.io/staging.json`.
 - `RELEASE_PUBLIC_KEY` is the verified public pin.
 
-No seat secret or credential is printed or regenerated in an existing
-file. No manual env editing is needed for these three settings.
+Setup moves the exact legacy release and placement URLs to the release
+domain. It restarts the affected room to read the updated settings and
+preserves the existing secrets.
 
 The Funnel is retired (MMO-SERVER-PLAN MS8, 2026-11-12): the public
 sockets are `wss://rooms.wildshard.io` and `wss://rooms-staging.wildshard.io`

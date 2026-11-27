@@ -67,7 +67,7 @@ function pin(path, expected, uid) {
 // path) is kept, with a warning that names the Worker. PC4-REMOVE: drop this once the Worker is deleted.
 const RETIRED_PACKS = `https://${['wildshard-packs', 'wildshard', 'workers', 'dev'].join('.')}`;
 
-/** Fill only exact blank rows, and move exact rows off the retired packs Worker. All other bytes, including the seat
+/** Fill only exact blank rows, and move exact rows from retired storage addresses. All other bytes, including the seat
  * secret, survive.
  * @param {string} path @param {string} channel @param {string} key @param {boolean} check @param {number} uid @param {number} gid */
 function prefill(path, channel, key, check, uid, gid) {
@@ -92,7 +92,8 @@ function prefill(path, channel, key, check, uid, gid) {
     if (rows.length !== 1) throw new Error(`Expected exactly one ${name} row in ${channel} env`);
     if (rows[0] === `${name}=`) { console.info(`${check ? 'would' : 'doing'} fill ${name} in ${channel} env`); text = text.replaceAll(new RegExp(`^${name}=(?=\\n|$)`, 'gm'), `${name}=${value}`); }
     else if ((retired[name] ?? []).some(old => rows[0] === `${name}=${old}`)) {
-      console.info(`${check ? 'would' : 'doing'} move ${name} in ${channel} env off the retired packs Worker`);
+      const retiredOrigin = rows[0].includes(RETIRED_PACKS) ? 'retired packs Worker' : 'legacy release path';
+      console.info(`${check ? 'would' : 'doing'} move ${name} in ${channel} env off the ${retiredOrigin}`);
       text = text.replace(new RegExp(`^${name}=[^\\n]*`, 'm'), `${name}=${value}`);
     }
     else {
