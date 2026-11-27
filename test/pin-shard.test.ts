@@ -141,3 +141,24 @@ test('committed pin heads name their catalogue upload number', () => {
     expect(pinned.shards.every(row => Number.isSafeInteger(row['uploadNumber']) && !('revision' in row)), file).toBe(true);
   }
 });
+
+// STANDALONE-SHARDFILES SF24: the zone table needs every pin versioned, and the two hidden open plots have their versioned
+// uploads on preview only (staging hides them). A preview pin takes preview's row only for a slug staging names nowhere.
+test('a zone staging hides pins its preview upload; a zone staging plays never pins from preview', async () => {
+  const {pinnedRow} = await import('../src/scripts/pin-shard.ts');
+  const h = (n: number): string => n.toString(16).padStart(64, '0');
+  const staging = {shards: [{slug: 'mossgate', uploadNumber: 27, shardVersion: '0.1.23', hash: h(1)}]};
+  const preview = {shards: [{slug: 'mossgate', uploadNumber: 27, shardVersion: '0.1.23', hash: h(1)}, {slug: 'open-plot-thin-ice', uploadNumber: 5, shardVersion: '0.0.4', hash: h(2)}]};
+  expect(pinnedRow({staging, preview}, 'preview', {slug: 'open-plot-thin-ice', uploadNumber: 5, hash: h(2)})).toMatchObject({shardVersion: '0.0.4'});
+  expect(() => pinnedRow({staging, preview}, 'staging', {slug: 'open-plot-thin-ice', uploadNumber: 5, hash: h(2)})).toThrow('staging names open-plot-thin-ice nowhere');
+  expect(() => pinnedRow({staging, preview}, 'preview', {slug: 'mossgate', uploadNumber: 27, hash: h(1)})).toThrow("pin staging's upload");
+  expect(() => pinnedRow({staging, preview}, 'preview', {slug: 'open-plot-thin-ice', uploadNumber: 4, hash: h(2)})).toThrow('preview names open-plot-thin-ice rev 5');
+  expect(pinnedRow({staging}, 'staging', {slug: 'mossgate', uploadNumber: 27, hash: h(1)})).toMatchObject({shardVersion: '0.1.23'});
+});
+
+// SF24: the staging zone table (page-release/zone-table.mjs `ownZoneTable`) refuses while a pinned zone has no shard version.
+test('every committed pin a zone table reads names its shard version', () => {
+  const pins = JSON.parse(readFileSync('test/pins/shardfiles.json', 'utf8')) as {shards: {slug: string; shardVersion?: string}[]};
+  // Pine waits on its images-only upload (SF24); remove it from this list when its pin lands
+  expect(pins.shards.filter(row => row.shardVersion === undefined).map(row => row.slug)).toEqual(['pine-hollow']);
+});

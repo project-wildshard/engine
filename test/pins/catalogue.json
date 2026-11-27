@@ -587,7 +587,8 @@
       "slug": "brasscap-mesa",
       "name": "Brasscap Mesa",
       "uploadNumber": 19,
-      "hash": "4c7f53c597ed3a9dfdffbddf48785da52c25e2f9fd9487b7748769aabbc9f851"
+      "hash": "4c7f53c597ed3a9dfdffbddf48785da52c25e2f9fd9487b7748769aabbc9f851",
+      "shardVersion": "0.5.21"
     },
     {
       "slug": "driftwood-isle",
@@ -641,8 +642,9 @@
     {
       "slug": "open-plot-desert-ruin",
       "name": "Open Plot · Desert Ruin",
-      "uploadNumber": 3,
-      "hash": "1f5b42894c06f829edd374f698f33f809d151876e8ea9dddb3d4cfbb10ce1694"
+      "uploadNumber": 4,
+      "hash": "c38ca9a87a4aa90886acaef3cb28a640ff41dfaf01d6d7557c8e592a8fbb714b",
+      "shardVersion": "0.0.4"
     },
     {
       "slug": "open-plot-ember-forge",
@@ -731,8 +733,9 @@
     {
       "slug": "open-plot-thin-ice",
       "name": "Open Plot · Thin Ice",
-      "uploadNumber": 4,
-      "hash": "dcf56eddafd42b777d0fbdecca1439cfc0263dadbe1c74fc4bd56f84705d6744"
+      "uploadNumber": 5,
+      "hash": "41a3b1094475fdab97c7938a92ad11f811baa6cec4c3a0c0f89b8a6d06e980de",
+      "shardVersion": "0.0.4"
     },
     {
       "slug": "pine-hollow",
@@ -750,20 +753,23 @@
     {
       "slug": "mossgate",
       "name": "Mossgate Hollow",
-      "uploadNumber": 25,
-      "hash": "f0e3a7601391e6f0709db806f37b7c6ea052f0508a74b22741e5679c1a6dc02d"
+      "uploadNumber": 27,
+      "hash": "0236e0f219cffcf35a7c7906bd03fbbefe3d9708625e68c8f755e92ad8d9c7c0",
+      "shardVersion": "0.1.23"
     },
     {
       "slug": "mirror-salt",
       "name": "Mirror Salt",
-      "uploadNumber": 7,
-      "hash": "8729462ab98c723a355c11d0ce1520bf75b1c65ea889188f597b4dab751df3c3"
+      "uploadNumber": 8,
+      "hash": "bb9e8863589556ed2de17432dfc0b0040429fc48b91e86d6e58d8fd4768248fc",
+      "shardVersion": "0.0.8"
     },
     {
       "slug": "glowfen",
       "name": "Glowfen",
       "uploadNumber": 8,
-      "hash": "d0343bc7c50446381464c84a0c5803fb2ce228e5867038bb70eeaf0f6cc2da3e"
+      "hash": "d0343bc7c50446381464c84a0c5803fb2ce228e5867038bb70eeaf0f6cc2da3e",
+      "shardVersion": "0.0.8"
     }
   ],
   "missing": []

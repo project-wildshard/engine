@@ -5,6 +5,7 @@
 // and drop the staging revisions pinned by hand. Node built-ins only; .github/workflows/shard-pin.yml runs it.
 //
 //   node src/scripts/pin-shard.ts <slug> <uploadNumber> <hash> [staging|prod] [--first]
+//   node src/scripts/pin-shard.ts <slug> <uploadNumber> <hash> preview   a zone the staging channel hides, from preview (SF24)
 //   node src/scripts/pin-shard.ts --drop <slug...>  remove pins after the reviewed catalogue removes them and no test
 //                                               names them (NB10, pin-test-names.ts)
 //
@@ -113,6 +114,23 @@ export function productMounts(tarball: Uint8Array): string[] {
   return rows.flatMap(row => typeof row.url === 'string' ? [row.url] : []);
 }
 
+type ChannelDocument = {shards: (Omit<DocumentRow, 'uploadNumber'> & WireUploadIdentity)[]};
+const channelRow = (document: unknown, slug: string): DocumentRow | undefined => (document as ChannelDocument | undefined)?.shards.map(catalogueUpload).find(shard => shard.slug === slug);
+
+/** The channel row a pin takes: staging's, as every pin did. STANDALONE-SHARDFILES SF24: a zone the staging channel hides (a
+ *  `hidden` placement: open-plot-desert-ruin, open-plot-thin-ice) has its versioned upload on preview only, so `preview` reads
+ *  preview's row, and only for a slug staging names nowhere: a zone staging plays always pins staging's upload. */
+export function pinnedRow(documents: {staging: unknown; preview?: unknown}, from: 'staging' | 'preview', want: {slug: string; uploadNumber: number; hash: string}): DocumentRow {
+  const {slug, uploadNumber, hash} = want;
+  const staged = channelRow(documents.staging, slug);
+  if (from === 'preview' && staged !== undefined) throw new Error(`staging names ${slug} (rev ${String(staged.uploadNumber)}): pin staging's upload, not preview's`);
+  const row = from === 'preview' ? channelRow(documents.preview, slug) : staged;
+  if (row?.uploadNumber !== uploadNumber || row.hash !== hash) {
+    throw new Error(`${from} names ${slug} ${row === undefined ? 'nowhere' : `rev ${String(row.uploadNumber)} ${row.hash.slice(0, 8)}`}, not rev ${String(uploadNumber)} ${hash.slice(0, 8)}`);
+  }
+  return row;
+}
+
 async function getJson(path: string): Promise<unknown> {
   const response = await fetch(`${API}${path}`);
   if (!response.ok) throw new Error(`${path}: HTTP ${response.status}`);
@@ -138,15 +156,13 @@ async function main(argv: readonly string[]): Promise<void> {
   const first = argv.includes('--first');
   const [slug = '', uploadText = '', hash = '', channel = 'staging'] = argv.filter(arg => arg !== '--first');
   const uploadNumber = Number(uploadText);
-  if (!SLUG.test(slug) || !UPLOAD_NUMBER.test(uploadText) || !Number.isSafeInteger(uploadNumber) || uploadNumber < 1 || !HASH.test(hash) || !['staging', 'prod'].includes(channel)) {
-    throw new Error('usage: pin-shard.ts <slug> <uploadNumber> <sha256> [staging|prod] [--first]');
+  if (!SLUG.test(slug) || !UPLOAD_NUMBER.test(uploadText) || !Number.isSafeInteger(uploadNumber) || uploadNumber < 1 || !HASH.test(hash) || !['staging', 'prod', 'preview'].includes(channel)) {
+    throw new Error('usage: pin-shard.ts <slug> <uploadNumber> <sha256> [staging|prod|preview] [--first]');
   }
   // A prod upload moves staging too (J301), so staging names the uploadNumber either way.
-  const [document, listing] = await Promise.all([getJson('/api/catalogue.json?channel=staging&wire=upload'), getJson('/api/shardfiles')]);
-  const row = (document as {shards: (Omit<DocumentRow, 'uploadNumber'> & WireUploadIdentity)[]}).shards.map(catalogueUpload).find(shard => shard.slug === slug);
-  if (row?.uploadNumber !== uploadNumber || row.hash !== hash) {
-    throw new Error(`staging names ${slug} ${row === undefined ? 'nowhere' : `rev ${row.uploadNumber} ${row.hash.slice(0, 8)}`}, not rev ${uploadNumber} ${hash.slice(0, 8)}`);
-  }
+  const [document, previewDocument, listing] = await Promise.all([getJson('/api/catalogue.json?channel=staging&wire=upload'),
+    channel === 'preview' ? getJson('/api/catalogue.json?channel=preview&wire=upload') : Promise.resolve(undefined), getJson('/api/shardfiles')]);
+  const row = pinnedRow({staging: document, preview: previewDocument}, channel === 'preview' ? 'preview' : 'staging', {slug, uploadNumber, hash});
   const bytes = (listing as {shardfiles: {hash: string; bytes: number}[]}).shardfiles.find(file => file.hash === hash)?.bytes;
   if (bytes === undefined || bytes <= 0) throw new Error(`GET /api/shardfiles does not list ${hash.slice(0, 8)}`);
   const moved = movePin(JSON.parse(readFileSync(PINS, 'utf8')) as PinFile, JSON.parse(readFileSync(CATALOGUE, 'utf8')) as PinnedDocument, {slug, uploadNumber, shardVersion: row.shardVersion, hash, bytes}, first ? {name: row.name ?? slug} : undefined);
