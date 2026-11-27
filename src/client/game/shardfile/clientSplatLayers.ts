@@ -8,8 +8,10 @@
  *
  * The source layer textures are never uploaded: their mips are copied into the arrays, then released.
  */
-import { CompressedArrayTexture, CompressedTexture, LinearFilter, LinearMipmapLinearFilter, NoColorSpace, RepeatWrapping, SRGBColorSpace, type Material, type Texture } from 'three';
+import { CompressedArrayTexture, CompressedTexture, DataArrayTexture, DataTexture, LinearFilter, LinearMipmapLinearFilter, NoColorSpace, RepeatWrapping, RGBAFormat, SRGBColorSpace, UnsignedByteType, type Material, type Texture } from 'three';
 import { layerArrayMips, releaseAfterUpload } from '@wildshard/engine/core/ktx2';
+import { markGpuOnly } from '@wildshard/engine/core/gpuOnly';
+import { ownedArray, releaseOwned } from '@wildshard/engine/core/ownedBuffer';
 import { splatDrawTier } from '@wildshard/engine/boot/gpuFiles';
 import { splatTerrainMaterial, type SplatLayers } from '@wildshard/engine/world/Terrain';
 import type { PropSurfaceBinding } from '@wildshard/engine/world/declaredProps';
@@ -22,11 +24,30 @@ export const SPLAT_LAYER_SIZE = 1024;
 
 const NO_MAPS: PropSurfaceBinding['maps'] = { colour: null, normal: null, normalScale: 1, metallicRoughness: null, occlusion: null, occlusionStrength: 1, emissive: null };
 
-/** One role's array from its four transcoded layers: one format, a shared mip level at the array edge, unflipped. */
-export function splatArray(role: SplatRole, layers: readonly Texture[], anisotropy = 8): CompressedArrayTexture {
+/** A decoded layer image's RGBA8 texels at `n`×`n` (a canvas draw, scaled to the array edge). */
+export type LayerPixels = (image: CanvasImageSource & { readonly width: number; readonly height: number }, n: number) => Uint8ClampedArray;
+
+/** The page's canvas: an OffscreenCanvas where there is one (a worker-free WebKit has it too), else a document canvas. */
+export const canvasPixels: LayerPixels = (image, n) => {
+  const canvas = typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(n, n) : Object.assign(document.createElement('canvas'), { width: n, height: n });
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (ctx === null) throw new Error('props.splat: no 2d canvas context for an image layer');
+  ctx.drawImage(image, 0, 0, n, n);
+  return ctx.getImageData(0, 0, n, n).data;
+};
+
+/**
+ * One role's array from its four transcoded layers: one format, a shared mip level at the array edge, unflipped.
+ * SF24 (J525): an images-only shard carries its layers as JPEG or PNG, and the cook makes their KTX2. A page with no cooked
+ * row for them (`wildshard prepare` records before any cook; a dev page) has four decoded images: those make one RGBA8
+ * array at the largest layer's edge (at most `SPLAT_LAYER_SIZE`), mipmapped by three, as the live terrain's image path
+ * (`loadPBRArray`) does. A set mixing compressed and image layers is refused.
+ */
+export function splatArray(role: SplatRole, layers: readonly Texture[], anisotropy = 8, pixels: LayerPixels = canvasPixels): CompressedArrayTexture | DataArrayTexture {
   const compressed = layers.map((t) => (t instanceof CompressedTexture ? t : null));
+  if (compressed.every((t) => t === null)) return splatImageArray(role, layers, anisotropy, pixels);
   const mips = layerArrayMips(compressed, SPLAT_LAYER_SIZE);
-  if (mips === null) throw new Error(`props.splat ${role}: its four layers must be compressed KTX2 of one format and a shared mip edge`);
+  if (mips === null) throw new Error(`props.splat ${role}: its four layers must be compressed KTX2 of one format and a shared mip edge, or four images`);
   const t = new CompressedArrayTexture(mips.mipmaps, mips.n, mips.n, layers.length, mips.format);
   t.wrapS = t.wrapT = RepeatWrapping;
   t.minFilter = LinearMipmapLinearFilter; t.magFilter = LinearFilter;
@@ -38,20 +59,55 @@ export function splatArray(role: SplatRole, layers: readonly Texture[], anisotro
   return releaseAfterUpload(t);
 }
 
+const SPLAT_IMAGE_OWNER = { owner: 'game/splat-ground', asset: 'image layers', kind: 'decode' } as const;
+
+/** SF24: four decoded image layers (`imageTexture`'s unflipped bitmaps) as one RGBA8 array; its texels go once uploaded. */
+function splatImageArray(role: SplatRole, layers: readonly Texture[], anisotropy: number, pixels: LayerPixels): DataArrayTexture {
+  const images = layers.map((t) => {
+    const image: unknown = t.image;
+    if (t instanceof DataTexture || typeof image !== 'object' || image === null || !('width' in image) || typeof image.width !== 'number' || !('height' in image) || typeof image.height !== 'number')
+      throw new Error(`props.splat ${role}: its four layers must be compressed KTX2 of one format and a shared mip edge, or four images`);
+    return image as CanvasImageSource & { readonly width: number; readonly height: number };
+  });
+  const n = Math.min(SPLAT_LAYER_SIZE, Math.max(1, ...images.map((image) => Math.max(image.width, image.height))));
+  const data = ownedArray(Uint8Array, n * n * 4 * images.length, SPLAT_IMAGE_OWNER);
+  for (const [i, image] of images.entries()) {
+    const texels = pixels(image, n);
+    if (texels.length !== n * n * 4) throw new Error(`props.splat ${role}: layer ${String(i)} read ${String(texels.length)} bytes, not ${String(n * n * 4)}`);
+    data.set(texels, i * n * n * 4);
+  }
+  const t = new DataArrayTexture(data, n, n, images.length);
+  t.format = RGBAFormat; t.type = UnsignedByteType;
+  t.wrapS = t.wrapT = RepeatWrapping;
+  t.minFilter = LinearMipmapLinearFilter; t.magFilter = LinearFilter;
+  t.generateMipmaps = true; t.anisotropy = anisotropy; t.flipY = false;
+  t.colorSpace = SPLAT_ROLES[role] === 'colour' ? SRGBColorSpace : NoColorSpace;
+  t.name = `shardfile:splat/${role}`;
+  t.needsUpdate = true;
+  // as a raw-texel KTX2's DataTexture: the texels are on the GPU after the first draw, and a lost context reloads (gpuOnly.ts)
+  t.onUpdate = (): void => { t.onUpdate = null; t.image.data = null; releaseOwned(data); };
+  markGpuOnly('shardfile splat image arrays');
+  return t;
+}
+
 /**
  * The splat surface: the arrays and the material, owned by `scope`, and the binding the declared-props installer draws the
  * splat material name with. `texture` resolves an admitted transcoded layer file (`clientMaterials`' transcode set).
  */
-export function splatSurface(splat: SplatTerrain, ports: { scope: Scope; texture: (ref: string) => Texture; anisotropy?: number }): { material: Material; binding: PropSurfaceBinding } {
+export function splatSurface(splat: SplatTerrain, ports: { scope: Scope; texture: (ref: string) => Texture; anisotropy?: number; pixels?: LayerPixels }): { material: Material; binding: PropSurfaceBinding } {
   const sources = new Set<Texture>();
-  const array = (role: SplatRole): CompressedArrayTexture => {
+  const array = (role: SplatRole): CompressedArrayTexture | DataArrayTexture => {
     const textures = splatLayers(splat, splatDrawTier())[role].map((ref) => ports.texture(ref));
     for (const t of textures) sources.add(t);
-    return ports.scope.own(splatArray(role, textures, ports.anisotropy));
+    return ports.scope.own(splatArray(role, textures, ports.anisotropy, ports.pixels));
   };
   const layers: SplatLayers = { map: array('colour'), normalMap: array('normal'), armMap: array('arm') };
   // the layers live on in the arrays (a file may serve two data roles): the sources never reach the GPU
-  for (const source of sources) { source.mipmaps = []; source.dispose(); }
+  for (const source of sources) {
+    source.mipmaps = []; source.dispose();
+    // SF24: an image layer's decoded bitmap is copied into its array too
+    if (typeof ImageBitmap === 'function' && source.image instanceof ImageBitmap) source.image.close();
+  }
   const material = ports.scope.own(splatTerrainMaterial(layers, { tints: splat.tints, boreal: splat.boreal }));
   const channels = Object.fromEntries(Object.entries(SPLAT_CHANNELS).map(([semantic, row]) => [semantic.toLowerCase(), row]));
   return { material, binding: { material, maps: NO_MAPS, compiled: true, channels } };
@@ -72,7 +128,7 @@ export const readSplatLayer: typeof readCookedTexture = readCookedTexture;
 
 /** S12f2b2: the cooked file of each splat layer this device draws that has one (`layer`), read by URL (`read`), by the
  *  layer's hash. A KTX2 layer's is read only by a phone drawing the phone set (its blob was never admitted there); an image
- *  layer's (`image`, SF16) on either tier, since the arrays take compressed layers only. */
+ *  layer's (`image`, SF16) on either tier where the table names one; with no row (no cook yet) it is drawn from the image (SF24). */
 export async function cookedSplatBytes(splat: SplatTerrain | undefined, drawn: ReadonlySet<string>, tier: 'phone' | 'desktop', layer: (hash: string) => string | undefined,
   read: (url: string) => Promise<Uint8Array> = readSplatLayer, image: (hash: string) => boolean = () => false): Promise<ReadonlyMap<string, Uint8Array>> {
   const cooked = new Map<string, Uint8Array>();
