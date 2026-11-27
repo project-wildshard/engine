@@ -1,4 +1,4 @@
-import { ClampToEdgeWrapping, Data3DTexture, DataArrayTexture, DataTexture, LinearFilter, Vector3, LinearMipmapLinearFilter, LinearSRGBColorSpace, NearestFilter, NoColorSpace, RedFormat, RepeatWrapping, RGBAFormat, SRGBColorSpace, UnsignedByteType, type Texture } from 'three';
+import { ClampToEdgeWrapping, Data3DTexture, DataArrayTexture, DataTexture, LinearFilter, Vector3, LinearMipmapLinearFilter, LinearSRGBColorSpace, NearestFilter, NoColorSpace, RedFormat, RepeatWrapping, RGBAFormat, SRGBColorSpace, Texture, UnsignedByteType } from 'three';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import { BASIS_PATH, detectKtx2Support } from '@wildshard/engine/core/ktx2';
 import type { Renderer } from '@wildshard/engine/render/renderer';
@@ -24,12 +24,16 @@ import { bootTask } from '@wildshard/engine/boot/timing';
  * publish a product texture that names a handle, and a volume with its numbers for the world's variant (`cube`). */
 export async function lendWorldSceneTextures(rows: readonly WorldSceneLentTexture[], owner: Scope, product: Pick<ShardFolder, 'file' | 'url'>, handles: SceneHandles, renderer: Renderer | undefined,
   cube: 'standalone' | 'cell'): Promise<void> {
-  const products = rows.filter(row => row.kind === 'product');
-  if (products.length > 0 && renderer === undefined) throw new Error('Product textures need the world renderer');
   // the looks these textures lend to compile one a step first: the rows' loads settle back to back
   await prepareLentLooks(rows.flatMap(row => row.looks));
   if (owner.disposed) throw new Error('World scene textures unloaded while preparing their looks');
-  const loader = renderer === undefined || products.length === 0 ? null : detectKtx2Support(new KTX2Loader().setTranscoderPath(BASIS_PATH), renderer);
+  // SF7i: the KTX2 reader is made for the first KTX2 product only; a product image (J525) needs no renderer
+  let loader: KTX2Loader | undefined;
+  const ktx2 = (): KTX2Loader => {
+    if (renderer === undefined) throw new Error('Product textures need the world renderer');
+    loader ??= detectKtx2Support(new KTX2Loader().setTranscoderPath(BASIS_PATH), renderer);
+    return loader;
+  };
   try {
     await Promise.all(rows.map(async row => {
       if (row.kind === 'volume') { await lendVolume(row, row.files[cube][TIER], owner, product, handles); return; }
@@ -39,7 +43,7 @@ export async function lendWorldSceneTextures(rows: readonly WorldSceneLentTextur
         if (row.publish !== undefined) handles.publish(row.publish, texture);
         return;
       }
-      const texture = owner.own(row.kind === 'image' ? await loadTextureRow(row) : row.kind === 'layers' ? await loadLayers(row) : await loadFolder(row, product, loader));
+      const texture = owner.own(row.kind === 'image' ? await loadTextureRow(row) : row.kind === 'layers' ? await loadLayers(row) : await loadFolder(row, product, ktx2));
       if (owner.disposed) throw new Error('World scene textures unloaded while loading');
       if (row.kind === 'product') {
         if (row.publish !== undefined) handles.publish(row.publish, texture);
@@ -84,12 +88,19 @@ async function loadRaster(row: Extract<WorldSceneLentTexture, { kind: 'raster' }
   return texture;
 }
 
-/** A product's own KTX2 blob for the tier (its encoded orientation, flipY false), sampled by its row; GPU-only once uploaded. */
-async function loadFolder(row: Extract<WorldSceneLentTexture, { kind: 'product' }>, product: Pick<ShardFolder, 'file' | 'url'>, loader: KTX2Loader | null): Promise<Texture> {
-  if (loader === null) throw new Error('Product textures need a KTX2 reader');
+const KTX2_IDENTIFIER = [0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb];
+/** SF7i: whether a product file is a KTX2 blob (its identifier), rather than an image the shardfile carries (J525). */
+export function isKtx2Bytes(bytes: Uint8Array): boolean { return KTX2_IDENTIFIER.every((byte, i) => bytes[i] === byte); }
+
+/** A product's own texture for the tier, sampled by its row; GPU-only once uploaded. A KTX2 blob keeps its encoded orientation;
+ *  an image (Nine's sign atlas since SF7a, J525) decodes with its rows as stored, so its first row lands where the KTX2's did. */
+async function loadFolder(row: Extract<WorldSceneLentTexture, { kind: 'product' }>, product: Pick<ShardFolder, 'file' | 'url'>, ktx2: () => KTX2Loader): Promise<Texture> {
   const file = row.file[TIER], url = product.url(file);
   const bytes = Uint8Array.from(await bootTask(`texture:read ${file}`, () => waitFor('Reading texture', product.file(file), 'file', url)));
-  const texture = await bootTask(`texture:decode ${file}`, () => waitFor('Preparing texture', new Promise<Texture>((resolve, reject) => { loader.parse(bytes.buffer, resolve, reject); }), 'worker', url));
+  const texture = isKtx2Bytes(bytes)
+    ? await bootTask(`texture:decode ${file}`, () => waitFor('Preparing texture', new Promise<Texture>((resolve, reject) => { ktx2().parse(bytes.buffer, resolve, reject); }), 'worker', url))
+    : new Texture(await bootTask(`texture:decode ${file}`, () => waitFor('Preparing texture',
+      createImageBitmap(new Blob([bytes]), { premultiplyAlpha: 'none', colorSpaceConversion: 'none' }), 'worker', url)));
   texture.flipY = false; texture.name = row.label;
   if (row.colour !== undefined) texture.colorSpace = row.colour === 'srgb' ? SRGBColorSpace : LinearSRGBColorSpace;
   applyTextureSampler(texture, row.sampler);
