@@ -13,6 +13,7 @@ import {describe, expect, it} from 'vitest';
 import {FORMAT_MIGRATIONS, type FormatMigration, type MigratingShard} from '@wildshard/format/formatMigrations';
 import {migrateShardfile} from '@wildshard/format/migrate';
 import {readTar, writeTar} from '@wildshard/format/tar';
+import {validationSourceBytes} from '@wildshard/format/validationReceipt';
 import {runCookJob, ShardfileRefusedError, type CookJobPorts} from '../src/cook/game/cookJob';
 import {checkShardfile} from '../src/server/host/checkShardfile';
 import {hashOf, legacyMigrationFixture, useCookHarness} from './fixtures/cookWorkerHarness';
@@ -72,8 +73,28 @@ const ports = (migrations?: readonly FormatMigration[]): CookJobPorts => ({
   ...(migrations === undefined ? {} : {migrations}),
 });
 
+function withShardVersion(tarball: Uint8Array, shardVersion: string): Uint8Array {
+  const files = new Map(readTar(tarball)), bytes = files.get('shard.json');
+  if (bytes === undefined) throw new Error('Missing fixture index');
+  const raw: unknown = JSON.parse(new TextDecoder().decode(bytes));
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) throw new Error('Invalid fixture index');
+  files.set('shard.json', validationSourceBytes({...raw, shardVersion}));
+  return writeTar(files);
+}
+
 describe('a renameKind step through the cook (FE9d)', () => {
   const h = useCookHarness(legacyMigrationFixture.folder);
+
+  it('copies the authored version into the published cook metadata and binds its bytes', async () => {
+    const shardVersion = '2.3.4-rc.1';
+    const tar = withShardVersion(writeTar(migrateShardfile(readTar(withRegion(h.real)), {hash: hashOf}).files), shardVersion);
+    const output = join(h.scratch, 'versioned');
+    const report = await runCookJob(tar, output, {...ports(chain), shardVersion: '1.0.0'});
+    const header = join(output, 'client', report.header);
+    const metadata = readFileSync(join(header, '..', 'cook.json'));
+    expect(JSON.parse(metadata.toString('utf8'))).toMatchObject({shardVersion});
+    expect(JSON.parse(readFileSync(header, 'utf8'))).toMatchObject({cook: {path: 'cook.json', bytes: metadata.length, hash: hashOf(metadata)}});
+  }, 120_000);
 
   it('refuses the old spelling when no step renames it', async () => {
     await expect(runCookJob(seeded(h.real), join(h.scratch, 'unrenamed'), ports())).rejects.toThrow(ShardfileRefusedError);
@@ -82,9 +103,11 @@ describe('a renameKind step through the cook (FE9d)', () => {
   it('cooks the renamed copy byte for byte as the original with today\'s name', async () => {
     // The original as today's format writes it: the registry's own chain, so the cook takes it as it is.
     const today = writeTar(migrateShardfile(readTar(withRegion(h.real)), {hash: hashOf}).files);
-    const plain = await runCookJob(today, join(h.scratch, 'plain'), ports(chain));
+    const version = {shardVersion: '1.2.3-rc.1'};
+    const plain = await runCookJob(today, join(h.scratch, 'plain'), {...ports(chain), ...version});
+    expect(JSON.parse(readFileSync(join(h.scratch, 'plain/client', plain.header, '..', 'cook.json'), 'utf8'))).toMatchObject(version);
     expect(plain.provenance?.applied ?? []).toEqual([]);
-    const copy = await runCookJob(seeded(h.real), join(h.scratch, 'renamed'), ports(chain));
+    const copy = await runCookJob(seeded(h.real), join(h.scratch, 'renamed'), {...ports(chain), ...version});
     expect(copy.hash).not.toBe(plain.hash);
     expect(copy.provenance?.applied).toContain(renameStep.id);
     expect(tree(join(h.scratch, 'renamed'))).toEqual(tree(join(h.scratch, 'plain')));

@@ -18,6 +18,7 @@ import type {ShardfileCheckReport, ShardfileEntryProof} from '@wildshard/engine/
 import {migrateShardfile, validateMigrated} from '@wildshard/format/migrate';
 import type {FormatMigration} from '@wildshard/format/formatMigrations';
 import {readTar, writeTar} from '@wildshard/format/tar';
+import {validationSourceBytes} from '@wildshard/format/validationReceipt';
 // D31 (J137), EG-8: the largest shardfile, stored or decoded; shard-format owns it so the API and the cook share it.
 import {MAX_SHARDFILE_BYTES} from '@wildshard/format/uploadCaps';
 import {cookShard, openShardfile, serverRows, type CookReport, type CookShardPhase, type OpenShardfile, type WireBytes} from './shardCook';
@@ -178,8 +179,9 @@ export async function runCookJob(tarball: Uint8Array, out: string, ports: CookJo
   if (ports.expectedSlug !== undefined && !new Set([ports.expectedSlug]).has(product.index.identity.slug)) {
     throw new ShardfileRefusedError(`A shardfile for ${product.index.identity.slug} under ${ports.expectedSlug}`);
   }
+  const rawShardVersion = product.index.shardVersion, shardVersion = rawShardVersion ?? ports.shardVersion;
   const provenance = cookProvenance(tarball, sha256, ports.migrations);
-  const refused = provenanceRefusal(product.index.identity.slug, provenance, ports.expected, ports.shardVersion);
+  const refused = provenanceRefusal(product.index.identity.slug, provenance, ports.expected, shardVersion);
   if (refused !== undefined) throw new ShardfileRefusedError(refused);
   phase('proof');
   const check = await checked(product, ports);
@@ -190,11 +192,18 @@ export async function runCookJob(tarball: Uint8Array, out: string, ports: CookJo
   phase('server-files');
   // Each manifest names the header at its product URL, and no part holds it (DL18); its `?v=` is what caches it.
   const shard = openShardfile(cooked, renderer), header = `shardfiles/${shard.slug}/shard.json`, file = join(client, header);
-  mkdirSync(dirname(file), {recursive: true}); writeFileSync(file, shard.header);
+  mkdirSync(dirname(file), {recursive: true});
+  if (shardVersion === undefined) {
+    writeFileSync(file, shard.header);
+  } else {
+    const data = {...(shard.cook ?? {version: 1, mounts: []}), shardVersion};
+    const cookBytes = validationSourceBytes(data);
+    writeFileSync(join(dirname(file), 'cook.json'), cookBytes);
+    const cookedHeader: unknown = JSON.parse(new TextDecoder().decode(shard.header));
+    if (!object(cookedHeader)) throw new Error('Invalid cooked header');
+    writeFileSync(file, validationSourceBytes({...cookedHeader, cook: {path: 'cook.json', hash: sha256(cookBytes), bytes: cookBytes.length}}));
+  }
   const raw = ports.versionedOutput === true ? readTar(tarball) : undefined;
-  const rawHeader = raw?.get('shard.json');
-  const original: unknown = rawHeader === undefined ? undefined : JSON.parse(new TextDecoder().decode(rawHeader));
-  const rawShardVersion = object(original) && typeof original['shardVersion'] === 'string' ? original['shardVersion'] : undefined;
   const objects = raw === undefined ? undefined
     : classifyCookObjects(raw, out, shard.slug, cook.manifests.map(row => row.url), cook.server.index, shard.cook?.mounts ?? []);
   return {slug: product.index.identity.slug, hash: sha256(tarball), proof, check, cook, header, server: writeServerPack(shard, join(out, 'server')), seconds: (ports.now() - started) / 1000,
