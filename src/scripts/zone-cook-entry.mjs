@@ -148,7 +148,7 @@ try{
     /** @type {{url:string,status:number,failure?:string}[]} */ const requests=[];/** @type {string[]} */ const errors=[];
     context.on('requestfinished',(/** @type {import('playwright').Request} */ request)=>{void request.response().then((/** @type {import('playwright').Response|null} */ answer)=>{requests.push({url:request.url(),status:answer?.status()??0});});});
     context.on('requestfailed',(/** @type {import('playwright').Request} */ request)=>{requests.push({url:request.url(),status:-1,failure:request.failure()?.errorText});});
-    page.on('console',(/** @type {import('playwright').ConsoleMessage} */ message)=>{if(message.type()==='error')errors.push(`console: ${message.text().slice(0,300)}`);});
+    page.on('console',(/** @type {import('playwright').ConsoleMessage} */ message)=>{if(message.type()==='error')errors.push(`console: ${message.text().slice(0,300)}${message.location().url===''?'':` at ${message.location().url}`}`);});
     page.on('pageerror',(/** @type {Error} */ error)=>{errors.push(String(error.message).slice(0,300));});
     const started=Date.now();let gameplayMs=null,why=null,memoryCard=false;
     try{
@@ -173,7 +173,7 @@ try{
     await context.close();
     const onPage=requests.filter(row=>row.url.startsWith(page0)).map(row=>({...row,path:new URL(row.url).pathname}));
     const zoneFromPage=onPage.filter(row=>row.status>=200&&row.status<400&&zoneArt(row.path)).map(row=>row.path);
-    const missing=requests.filter(row=>row.status===404||row.status===-1).map(row=>row.url.replace(page0,'').replace(origin,'cook:')+(row.failure===undefined?'':` (${row.failure})`));
+    const missing=requests.filter(row=>row.status>=400||row.status===-1).map(row=>row.url.replace(page0,'').replace(origin,'cook:')+(row.failure===undefined?(row.status>=400?` (${row.status})`:''):` (${row.failure})`));
     const result={gameplayMs,memoryCard,textures:why,requests:requests.length,fromCook:requests.filter(row=>row.url.startsWith(origin)).length,
       fromPage:onPage.length,zoneFromPage:[...new Set(zoneFromPage)].sort(),missing:[...new Set(missing)].sort(),errors};
     results[tier]=result;
