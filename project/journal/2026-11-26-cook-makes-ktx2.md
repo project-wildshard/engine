@@ -76,3 +76,15 @@ of made-up bytes standing in for KTX2 reached `createImageBitmap`, which
 Node lacks, and main went red (run 45924093166). The page now decodes by
 magic (`textureKind`: KTX2, PNG or JPEG) and refuses anything else by
 name, and `test/helpers/ktx2Fixture.ts` is the shared KTX2 stand-in.
+
+## Skin maps, posed atlases and lossless data maps (SF17)
+
+Pine's creature skin maps and bird atlases and Dunes' sand maps were KTX2
+blobs no rule encoded. Now every PNG or JPEG blob cooks: a skin look's
+textures (format `skinLookTextureRefs`) and any blob no rule names (a
+posed atlas) as sRGB UASTC. The ground's grain, trail and key-shadow maps
+are data by rule: `dataKtx2.ts` decodes the PNG and writes the single-level
+zstd R8 or RGBA8 KTX2 Dunes' `rawKtx2` made by hand, texels identical,
+keyed `<blob URL>#data` so a page reads it in either texture mode. A PNG
+posed atlas reads the table's KTX2 by its URL or decodes the image. No new
+format field was needed. Cook 1.6.0.

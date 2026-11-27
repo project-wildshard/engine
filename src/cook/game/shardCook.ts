@@ -29,6 +29,7 @@ import { entryReadSet } from '@wildshard/format/entryReadSet';
 import {phoneTier, splatPhoneTier, type Astc6Encode, type SplatPhoneLayer} from './tierTextures';
 import {splatTerrainOf} from '@wildshard/format/splatTerrain';
 import {blobKtx2, blobTextureUses, type TextureBlob} from './blobKtx2';
+import {skinLookTextureRefs} from '@wildshard/format/skinAssets';
 import {wasmAstc6} from './astc6Wasm';
 import {desktopKtx2} from './cookedKtx2';
 import {wasmImageKtx2, type ImageKtx2Encode} from './imageKtx2Wasm';
@@ -342,12 +343,13 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, folder: st
     }};
 }
 
-/** SF16: each PNG or JPEG product blob a texture rule names, with how the page samples it (`blobTextureUses`). */
+/** SF16: each PNG or JPEG product blob, with how the page samples it (`blobTextureUses`); SF17: a blob no rule names (a posed
+ *  atlas, say) is a colour texture, the hand-made bake's own default. */
 function textureBlobs(shard: OpenShardfile, prefix: string): readonly TextureBlob[] {
-  const uses = blobTextureUses(shard.source.look, shard.source.props);
+  const uses = blobTextureUses(shard.source.look, shard.source.props, skinLookTextureRefs(shard.source));
   return shard.index.files.flatMap(row => {
-    const use = uses.get(row.hash);
-    return use === undefined || row.kind !== 'image' || row.commons === true ? [] : [{hash: row.hash, url: `${prefix}${row.path}`, bytes: shard.read(row.path), use}];
+    const use = uses.get(row.hash) ?? {role: 'srgb', layer: false};
+    return row.kind !== 'image' || row.commons === true ? [] : [{hash: row.hash, url: `${prefix}${row.path}`, bytes: shard.read(row.path), use}];
   });
 }
 

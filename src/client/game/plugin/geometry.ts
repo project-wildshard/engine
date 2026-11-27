@@ -25,7 +25,9 @@ import { retainCachedResources } from "@wildshard/engine/app/cachedAssets";
 import { cacheUntilDisposed } from "@wildshard/engine/app/disposalCache";
 import { releaseOnUpload } from "@wildshard/engine/render/memorySaver";
 import { ktx2File, prepareCompressedTexture } from "@wildshard/engine/core/ktx2";
-import { RepeatWrapping, Matrix4, Bone, FileLoader, SkinnedMesh, Texture, type AnimationClip, type Wrapping, type MinificationTextureFilter, type MagnificationTextureFilter, Box3, Sphere, BufferGeometry, Float32BufferAttribute, Group, Mesh, MeshStandardMaterial, Uint16BufferAttribute, Vector3, BufferAttribute, InterleavedBufferAttribute, type Object3D, CanvasTexture, LinearMipmapLinearFilter, SRGBColorSpace, BoxGeometry, CylinderGeometry, ConeGeometry, SphereGeometry, TorusGeometry, IcosahedronGeometry, CapsuleGeometry, Shape, ExtrudeGeometry, Color, type MeshStandardMaterialParameters, type Material, InstancedMesh } from "three";
+import { gpuFile } from "@wildshard/engine/boot/gpuFiles";
+import { imageTexture } from "../shardfile/blobTextures";
+import { DefaultLoadingManager, RepeatWrapping, Matrix4, Bone, FileLoader, SkinnedMesh, Texture, type AnimationClip, type Wrapping, type MinificationTextureFilter, type MagnificationTextureFilter, Box3, Sphere, BufferGeometry, Float32BufferAttribute, Group, Mesh, MeshStandardMaterial, Uint16BufferAttribute, Vector3, BufferAttribute, InterleavedBufferAttribute, type Object3D, CanvasTexture, LinearMipmapLinearFilter, SRGBColorSpace, BoxGeometry, CylinderGeometry, ConeGeometry, SphereGeometry, TorusGeometry, IcosahedronGeometry, CapsuleGeometry, Shape, ExtrudeGeometry, Color, type MeshStandardMaterialParameters, type Material, InstancedMesh } from "three";
 import { applySurfaceLooks, type SurfaceInputs } from "../systems/looks/surfaceLooks";
 import type { SurfaceLook } from "@wildshard/format/surfaceLooks";
 import { Rng } from "@wildshard/format/seededRng";
@@ -1969,10 +1971,29 @@ export interface PosedAssetSet { readonly geometry: BufferGeometry; readonly ran
  * flipY false, repeat wrap, mipmapped linear, anisotropy 4, sRGB; fenced before the set publishes it.
  */
 async function posedAtlas(url: string): Promise<Texture> {
-  const atlas = await ktx2File(url);
+  const source = posedAtlasSource(url, gpuFile);
+  if (source.kind === 'image') return posedImageAtlas(source.url);
+  const atlas = await ktx2File(source.url);
   atlas.wrapS = RepeatWrapping; atlas.wrapT = RepeatWrapping; atlas.anisotropy = 4; atlas.colorSpace = SRGBColorSpace;
   atlas.name = 'posed-atlas'; atlas.needsUpdate = true;
   return prepareCompressedTexture(atlas);
+}
+/** SF17: where a posed atlas reads from. A PNG or JPEG atlas (a shardfile carries images only, J525) reads the cook's KTX2
+ *  the table names under its URL when this page loads KTX2 (`file`: `gpuFile`), else the image itself; a KTX2 atlas reads
+ *  as it is. */
+export function posedAtlasSource(url: string, file: (served: string) => string | undefined): { readonly kind: 'ktx2' | 'image'; readonly url: string } {
+  if (!/\.(?:png|jpe?g)$/iu.test(url)) return { kind: 'ktx2', url };
+  const cooked = file(url);
+  return cooked === undefined ? { kind: 'image', url } : { kind: 'ktx2', url: cooked };
+}
+/** A posed atlas decoded from its image (KTX2 vetoed, or no cooked row), sampled as its KTX2 would be. */
+async function posedImageAtlas(url: string): Promise<Texture> {
+  const resolved = DefaultLoadingManager.resolveURL(url), response = await fetch(resolved);
+  if (!response.ok) throw new Error(`Posed atlas ${url} answered ${String(response.status)}`);
+  const atlas = await imageTexture(new Uint8Array(await response.arrayBuffer()));
+  atlas.wrapS = RepeatWrapping; atlas.wrapT = RepeatWrapping; atlas.anisotropy = 4; atlas.colorSpace = SRGBColorSpace;
+  atlas.name = 'posed-atlas';
+  return atlas;
 }
 /**
  * Read packed channels and original image bytes without vertex packing or attribute copies. The atlas is either

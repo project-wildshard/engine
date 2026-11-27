@@ -77,6 +77,8 @@ export function blobGpuFile(hash: string, tex?: TexMode): string | undefined {
   imageBlobs ??= imageBlobKeys(GPU_FILES[TIER]);
   const key = imageBlobs.get(hash);
   if (key === undefined) return undefined;
+  // SF17: a data map's file is lossless (uncompressed texels): every page reads it, in either texture mode
+  if (key.endsWith('#data')) return standIn(key, 'ktx2');
   return tex === undefined ? gpuFile(key) : standIn(key, tex);
 }
 
