@@ -7,7 +7,7 @@ import { RAPIER_WASM_URL } from '@wildshard/engine/physics/wasmUrl';
 import { isWasmModule } from '@wildshard/engine/physics/rapierModule';
 import { askHeldReads, type HeldRead } from '../../../shared/host/standalone/heldReads';
 import { runStandaloneServer } from './serverHost';
-import { fetchGridCollision, fetchServerFolder, installWorkerCookedMembers, installWorkerCookedObjects } from './serverFolder';
+import { cookedServerSource, fetchGridCollision, fetchServerFolder, installWorkerCookedMembers, installWorkerCookedObjects } from './serverFolder';
 import { bootMark, bootTask } from '@wildshard/engine/boot/timing';
 import { warmRapier } from '@wildshard/engine/physics/rapierWarm';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
@@ -30,7 +30,11 @@ export interface ServerWorkerStart {
    *  stored them, as the page does; empty on a page with no zone table. */
   readonly cooked?: readonly (readonly [string, string])[] | null;
   readonly cookedMembers?: readonly (readonly [string, CookedPartMember])[];
+  /** Fix preview PV8: the page's zone table (`#ws-zone-table`'s text), so a zone's server pack is read from the cook at the table's key
+   *  (staging's build), never from this page build's server book, which holds the road's part only; null on a page with none. */
+  readonly zoneTable?: string | null;
 }
+
 
 /** Launch only on the first save. Rapier's detached snapshot bytes cross the port by transfer. */
 function backgroundSaveEncoder(): (snapshot: SimSnapshotBytes) => Promise<string> {
@@ -108,12 +112,13 @@ export function runServerWorker(event: MessageEvent<unknown>): void {
   if (start.catalogue !== null) installCatalogue(start.catalogue);
   if (Array.isArray(start.cooked)) installWorkerCookedObjects(start.cooked);
   if (start.cookedMembers !== undefined) installWorkerCookedMembers(start.cookedMembers);
+  const versioned = cookedServerSource(start.zoneTable);
   // The bare names `@wildshard/format/validationReceipt` reads: this worker's bundle leaves them to its realm.
   if (typeof start.validator === 'string' && Array.isArray(start.verdicts)) Object.assign(globalThis, { __SHARDFILE_VALIDATOR__: start.validator, __SHARDFILE_VERDICTS__: start.verdicts });
   const [control, game, harness, reads] = event.ports;
   if (control === undefined || game === undefined) return;
   const held = reads === undefined ? undefined : askHeldReads(reads);
-  runStandaloneServer({ control, game, ...harness === undefined ? {} : { harness }, ...typeof start.goto === 'string' ? { goto: start.goto } : {}, ...typeof start.goto === 'string' && start.enter !== undefined && start.enter !== null ? { enter: start.enter } : {}, load: async (boot, slug, patch) => fetchServerFolder(new URL(`../${slug}/`, new URL(boot.base, globalThis.location.href)).href, await rapierOf(held, compiledOf(start)), held, patch, ownsServer(start, slug)),
+  runStandaloneServer({ control, game, ...harness === undefined ? {} : { harness }, ...typeof start.goto === 'string' ? { goto: start.goto } : {}, ...typeof start.goto === 'string' && start.enter !== undefined && start.enter !== null ? { enter: start.enter } : {}, load: async (boot, slug, patch) => fetchServerFolder(new URL(`../${slug}/`, new URL(boot.base, globalThis.location.href)).href, await rapierOf(held, compiledOf(start)), held, patch, ownsServer(start, slug), versioned(slug)),
     ...start.backgroundSaves === true ? { encodeSave: backgroundSaveEncoder() } : {},
     strips: boot => fetchGridCollision(boot.base),
     onSaveRefused: error => { console.warn('Standalone save refused, falling back', error); } });

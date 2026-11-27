@@ -12,6 +12,7 @@ import { serverReadsFile } from '@wildshard/format/serverReads';
 import { shardFolderData } from '@wildshard/engine/game/shardfile/folderData';
 import { GRID_COLLISION_BODY, GRID_COLLISION_HEADER, readGridCollision, type GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
 import { checkedCookedMember, COOKED_ORIGIN, cookedIndexKey, cookedObjectKey, readCookedIndexAddress, type CookedShardRef } from '@wildshard/engine/game/shardfile/cookedPackPaths';
+import { readZoneTable, zoneRef } from '@wildshard/engine/game/grid/zoneTable';
 import { cookIndexPath, readCookedServerIndex, readServerPack, readServerPackBook, serverPackBookPath, serverPackFile, serverPackPart, type ServerPack, type ServerPackBook, type ServerPackPart } from '@wildshard/engine/game/shardfile/serverPack';
 import type { HeadlessRuntimeInput } from '../headlessRuntime';
 import type { HeldRead } from '../../../shared/host/standalone/heldReads';
@@ -110,6 +111,17 @@ export interface CookedServerSource {
   readonly origin?: string;
 }
 
+/** Fix preview PV8: where a zone's server pack is, by the page's zone table (`#ws-zone-table`'s text, handed to the worker): its signed
+ *  identity and the bucket. Undefined for a zone the table doesn't name, and for a page with no table (its build's book has the pack). */
+export function cookedServerSource(text: string | null | undefined): (slug: string) => CookedServerSource | undefined {
+  if (typeof text !== 'string' || text === '') return () => undefined;
+  const table = readZoneTable(JSON.parse(text)), rows = new Map(table.zones.map(row => [row.slug, row]));
+  return slug => {
+    const row = rows.get(shardOf(slug));
+    return row === undefined ? undefined : { ref: zoneRef(table, row), origin: table.origin ?? COOKED_ORIGIN };
+  };
+}
+
 /** A versioned room pack uses the same signed shard identity and object paths as the page. */
 async function versionedServerPack(cooked: CookedServerSource, read: ServerRead): Promise<{readonly pack: ServerPack; readonly objectKey: (path: string) => string}> {
   const {ref, hash} = cooked, root = cooked.origin ?? COOKED_ORIGIN, path = cookedIndexKey(ref);
@@ -199,8 +211,9 @@ export async function readServerHeader(root: string, build: string, source: Serv
  * P1-E5.2: the worker's product reader, loadHeadlessFolder over `fetch`. It verifies the same index, sizes and SHA-256
  * addresses with the same checks; only where the bytes come from differs.
  */
-export function fetchServerFolder(base: string, rapier: Rapier, held?: HeldRead, patch?: (shard: Shardfile) => Shardfile, ownServer = false): Promise<HeadlessRuntimeInput> {
-  return readServerFolder(new URL(base, globalThis.location.href).href, workerBuild, serverBytes, rapier, held, undefined, patch, ownServer);
+export function fetchServerFolder(base: string, rapier: Rapier, held?: HeldRead, patch?: (shard: Shardfile) => Shardfile, ownServer = false, versioned?: CookedServerSource): Promise<HeadlessRuntimeInput> {
+  // PV8: a zone the page's zone table names reads its server pack from the cook (`versionedServerPack`), not this build's book
+  return readServerFolder(new URL(base, globalThis.location.href).href, workerBuild, serverBytes, rapier, held, undefined, patch, ownServer, undefined, versioned);
 }
 /** A shard's server inputs under `root`, whichever server is reading: `source` is what differs. `hash`, a placed slug's shardfile (SA47),
  *  lets a slug the build's book lacks open from the cook's index. `patch` (DEVSERVER, SHARD-SOURCE AP19: `withDevGameplay`) changes
