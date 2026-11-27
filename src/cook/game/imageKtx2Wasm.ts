@@ -72,10 +72,12 @@ type BasisFactory = (options: {wasmBinary: Uint8Array; print: () => void; printE
 
 const PRESET = {srgb: 'setSRGBPreset', linear: 'setLinearPreset', normal: 'setNormalMapPreset'} as const satisfies Record<TextureRole, keyof BasisEncoder>;
 
-/** The image's kind and size from its header: a PNG's IHDR or a JPEG's first frame marker. Undefined for anything else. */
-export function imageHead(bytes: Uint8Array): {readonly kind: 'png' | 'jpg'; readonly width: number; readonly height: number} | undefined {
+/** The image's kind and size from its header: a PNG's IHDR, a WebP's VP8, VP8L or VP8X chunk (SF19), or a JPEG's first
+ *  frame marker. Undefined for anything else. */
+export function imageHead(bytes: Uint8Array): {readonly kind: 'png' | 'jpg' | 'webp'; readonly width: number; readonly height: number} | undefined {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   if (bytes.length >= 24 && view.getUint32(0) === 0x89504e47 && view.getUint32(4) === 0x0d0a1a0a) return {kind: 'png', width: view.getUint32(16), height: view.getUint32(20)};
+  if (bytes.length >= 30 && view.getUint32(0) === 0x52494646 && view.getUint32(8) === 0x57454250) return webpHead(bytes, view);
   if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return undefined;
   for (let at = 2; at + 9 < bytes.length;) {
     if (bytes[at] !== 0xff) return undefined;
@@ -87,6 +89,38 @@ export function imageHead(bytes: Uint8Array): {readonly kind: 'png' | 'jpg'; rea
   return undefined;
 }
 
+/** SF19: a WebP's size from its first chunk: lossy (`VP8 `: 14 bits each after the frame's start code), lossless (`VP8L`:
+ *  14 bits each, less one, after its signature) or extended (`VP8X`: the canvas, 24 bits each, less one). */
+function webpHead(bytes: Uint8Array, view: DataView): {readonly kind: 'webp'; readonly width: number; readonly height: number} | undefined {
+  const chunk = view.getUint32(12);
+  if (chunk === 0x56503820 && bytes[23] === 0x9d && bytes[24] === 0x01 && bytes[25] === 0x2a) return {kind: 'webp', width: view.getUint16(26, true) & 0x3fff, height: view.getUint16(28, true) & 0x3fff};
+  if (chunk === 0x5650384c && bytes[20] === 0x2f) { const bits = view.getUint32(21, true); return {kind: 'webp', width: (bits & 0x3fff) + 1, height: ((bits >>> 14) & 0x3fff) + 1}; }
+  if (chunk === 0x56503858) return {kind: 'webp', width: (view.getUint32(24, true) & 0xffffff) + 1, height: (view.getUint32(27, true) & 0xffffff) + 1};
+  return undefined;
+}
+
+/** SF19: basisu reads PNG and JPEG only, so a WebP is encoded from a PNG of its pixels. The PNGs are made ahead
+ *  (`decodeWebp`, async: sharp has no synchronous decode) and kept per thread by the WebP's hash; `encode` stays
+ *  synchronous, and a WebP no pass decoded stays an image, as every WebP did before SF19. */
+const webpPngs = new Map<string, Uint8Array>();
+const webpKey = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
+/** The PNG `decodeWebp` made for this WebP, if any. */
+export const decodedWebp = (bytes: Uint8Array): Uint8Array | undefined => webpPngs.get(webpKey(bytes));
+/** Decode each WebP among `images` to a PNG of its pixels (lossless, alpha kept) for `encode` to read. False when sharp
+ *  can't load here (the encodes then leave WebP as images); a WebP sharp refuses is left out. */
+export async function decodeWebp(images: Iterable<Uint8Array>): Promise<boolean> {
+  const todo = [...images].filter(bytes => imageHead(bytes)?.kind === 'webp' && !webpPngs.has(webpKey(bytes)));
+  if (todo.length === 0) return true;
+  let sharp: ((input: Uint8Array) => {png: (options: {compressionLevel: number}) => {toBuffer: () => Promise<Buffer>}}) | undefined;
+  try { sharp = ((await import('sharp')) as unknown as {default: typeof sharp}).default; } catch { return false; }
+  if (sharp === undefined) return false;
+  const decode = sharp;
+  await Promise.all(todo.map(async bytes => {
+    try { webpPngs.set(webpKey(bytes), new Uint8Array(await decode(bytes).png({compressionLevel: 1}).toBuffer())); } catch { /* left an image */ }
+  }));
+  return true;
+}
+
 /** One encoder on this thread. */
 export async function loadBasisuImageKtx2(): Promise<ImageKtx2Encode> {
   const require = createRequire(import.meta.url);
@@ -95,9 +129,10 @@ export async function loadBasisuImageKtx2(): Promise<ImageKtx2Encode> {
   const basis = await factory({wasmBinary: wasm, print: () => undefined, printErr: () => undefined});
   basis.initializeBasis();
   const uastc = basis.basis_tex_format.cUASTC_LDR_4x4.value;
-  return (image, {role, flip}) => {
-    const head = imageHead(image);
-    if (head === undefined) return undefined;
+  return (input, {role, flip}) => {
+    const first = imageHead(input), image = first?.kind === 'webp' ? decodedWebp(input) : input;
+    const head = image === undefined ? undefined : imageHead(image);
+    if (head === undefined || image === undefined || head.kind === 'webp') return undefined;
     const encoder = new basis.BasisEncoder();
     try {
       encoder.setDebug(false); encoder.setStatusOutput(false);
@@ -170,6 +205,8 @@ export async function wasmImageKtx2(options: {readonly cacheDir?: string; readon
   const flush = async (): Promise<void> => {
     const jobs = [...pending]; pending.clear();
     if (jobs.length === 0) return;
+    // SF19: a worker thread has no PNG of a WebP, so it is sent the PNG (the key stays the WebP's)
+    await decodeWebp(jobs.map(([, input]) => input.bytes));
     const module = new URL('imageKtx2Wasm.ts', import.meta.url).href;
     const hook = new URL('../../scripts/format-hook.mjs', import.meta.url).href;
     // SF15: lanes bounded by their heaps as well as their count (`encodeLanes.ts`). A lane's refusal isn't kept: the real
@@ -177,7 +214,7 @@ export async function wasmImageKtx2(options: {readonly cacheDir?: string; readon
     await runLanes(jobs.map(([key, input]) => ({key, input, heap: imageKtx2Heap(input.bytes)})), {
       lanes, budget: encodeBudget(),
       spawn: () => new Worker(WORKER, {eval: true, workerData: {module, hook}}),
-      message: (job, id) => ({id, bytes: job.input.bytes, as: job.input.as}),
+      message: (job, id) => ({id, bytes: decodedWebp(job.input.bytes) ?? job.input.bytes, as: job.input.as}),
       done: (job, out) => { if (out !== undefined) keep(job.key, out); },
     });
   };

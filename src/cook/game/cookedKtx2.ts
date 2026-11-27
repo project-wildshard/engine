@@ -3,8 +3,8 @@
  * the phone tier's ASTC 6x6 files are then cooked from those (`phoneTier`, S12c), so the KTX2 table the client reads
  * (`gpuFiles.ts` `standIn`) names the cook's files and no shard carries a hand-made set.
  *
- * What is encoded: every `/assets/` mount whose bytes are a PNG or JPEG on the 4x4 block grid, every `.glb` mount holding
- * PNG or JPEG images (`ktx2Glb`), and nothing a cook mount row marks `keepImage` (UI art, pixel art: J525's opt-out). A source the table already names (a shard from before SF15,
+ * What is encoded: every `/assets/` mount whose bytes are a PNG, JPEG or WebP (SF19: read from a PNG of its pixels) on the
+ * 4x4 block grid, every `.glb` mount holding such images (`ktx2Glb`), and nothing a cook mount row marks `keepImage` (UI art, pixel art: J525's opt-out). A source the table already names (a shard from before SF15,
  * with its hand-made set) keeps its row, so an old shard cooks as it did.
  *
  * How (the hand-made sets' rules, sharddev `bake-ktx2.mjs`): the role from the file's name (`roleOfImage`); a standalone
@@ -66,7 +66,8 @@ export function glbImageRoles(json: Gltf): ReadonlyMap<number, TextureRole> {
   return out;
 }
 
-const mimeOf = (bytes: Uint8Array): 'image/png' | 'image/jpeg' | undefined => { const kind = imageHead(bytes)?.kind; return kind === 'png' ? 'image/png' : kind === 'jpg' ? 'image/jpeg' : undefined; };
+// SF19: a WebP is encoded too (the encoder reads it from a PNG of its pixels: `decodeWebp`)
+const mimeOf = (bytes: Uint8Array): 'image/png' | 'image/jpeg' | 'image/webp' | undefined => { const kind = imageHead(bytes)?.kind; return kind === 'png' ? 'image/png' : kind === 'jpg' ? 'image/jpeg' : kind === 'webp' ? 'image/webp' : undefined; };
 
 /** The GLB with each embedded PNG or JPEG image swapped for its KTX2 (`KHR_texture_basisu`), or undefined when none is
  *  encoded. Buffer 0 is rebuilt in its own order with every range (each buffer view, each meshopt stream) on a 16-byte step,
@@ -217,7 +218,7 @@ export function desktopKtx2(discovery: Uint8Array, mounts: readonly CookImageMou
       if (phoneServed(url) === url) phoneRow(url, url, target);
       continue;
     }
-    if (!/^(?:jpe?g|png)$/u.test(ext)) continue;
+    if (!/^(?:jpe?g|png|webp)$/u.test(ext)) continue;
     const bytes = mount.read(), head = imageHead(bytes);
     // A block format's top level is whole 4x4 blocks; an image off that grid stays an image.
     if (head === undefined || head.width % 4 !== 0 || head.height % 4 !== 0) continue;
