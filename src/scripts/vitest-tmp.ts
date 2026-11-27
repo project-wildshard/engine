@@ -3,7 +3,7 @@ import { constants } from 'node:os';
 import { resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Plugin } from 'vitest/config';
-import {PUSH_BUDGET,PUSH_PROFILE} from './push-budget.mjs';
+import {pushWorkers,PUSH_PROFILE} from './push-budget.mjs';
 import type {startCpuBroker} from './cpu-broker.mjs';
 import { temporaryRun as sharedRun, viteTmpRoot } from './.kit/vite-tmp.mjs';
 
@@ -39,7 +39,7 @@ export async function runVitest(args: readonly string[]): Promise<number> {
       const {assertHeavyLease}=await import('./heavy-lane-lease.mjs');
       assertHeavyLease('full-test');
       const {startCpuBroker}=await import('./cpu-broker.mjs');
-      broker=await startCpuBroker(full?{cohortSlots:PUSH_BUDGET.workers}:{});
+      broker=await startCpuBroker(full?{cohortSlots:pushWorkers()}:{});
     }
     // Each real file now owns CPU admission before collection. Performance and
     // uncapped encoder files reserve the whole budget, so their original clocks

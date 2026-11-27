@@ -1,5 +1,7 @@
 import { expect, test } from 'vitest';
 import { vitestMaxWorkers, vitestNodeExecArgv } from '../src/scripts/vitest-lane';
+import { pushEnvironment } from '../.githooks/push-checks.mjs';
+import { pushWorkers } from '../src/scripts/push-budget.mjs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Verify the real fork/thread WASM flag boundary, not only its config text.
 import { Worker } from 'node:worker_threads';
 // oxlint-disable-next-line import/no-nodejs-modules -- The worker message or error settles the actual inheritance probe.
@@ -42,4 +44,12 @@ test('invalid explicit limits still refuse rather than falling back', () => {
     expect(() => vitestMaxWorkers({ WS_COMMIT_RELATED_TOKEN: 'invocation', WS_VITEST_MAX_WORKERS: value }))
       .toThrow('WS_VITEST_MAX_WORKERS must be a positive integer');
   }
+});
+
+test('the engine push profile uses the gate worker override', () => {
+  const env = pushEnvironment({ PATH: process.env['PATH'], WS_GATE_WORKERS: '3' });
+  expect(env['WS_GATE_WORKERS']).toBe('3');
+  expect(pushWorkers(env)).toBe(3);
+  expect(env['PATH']).not.toContain('.githooks/gate-bin');
+  expect(pushEnvironment(env)['PATH']).toBe(env['PATH']);
 });

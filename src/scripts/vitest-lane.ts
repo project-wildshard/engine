@@ -1,6 +1,6 @@
 import { parseCLI } from 'vitest/node';
 import { assertHeavyLease } from './heavy-lane-lease.mjs';
-import { PUSH_BUDGET, PUSH_PROFILE } from './push-budget.mjs';
+import { pushWorkers, PUSH_PROFILE } from './push-budget.mjs';
 import { ancestorCpuBudget, PARENT_CONTEXT } from './cpu-admission.mjs';
 
 /** Node 24 shares WASM import wrappers across isolates but can reclaim a dying
@@ -20,7 +20,7 @@ export function vitestMaxWorkers(env: VitestEnvironment = process.env): number |
   // concurrent borrowed workers must not each spend that entire parent budget.
   if (env[PARENT_CONTEXT] !== undefined && ancestorCpuBudget(env) !== null) return 1;
   if (env.WS_PUSH_GATE_PROFILE === PUSH_PROFILE) {
-    return PUSH_BUDGET.workers;
+    return pushWorkers(env);
   }
   const { WS_VITEST_MAX_WORKERS: requested, CI: ci, GITHUB_ACTIONS: actions, WS_COMMIT_RELATED_TOKEN: commit } = env;
   if (requested === undefined) {

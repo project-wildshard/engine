@@ -3,6 +3,7 @@ import {availableParallelism,constants,getPriority,homedir,loadavg} from 'node:o
 import {appendFileSync,mkdirSync,readFileSync,rmSync} from 'node:fs';
 import {dirname,join,resolve,delimiter} from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {gateTestEnvironment,gateWorkers} from './gate-workers.mjs';
 import {assertHeavyLease} from '../src/scripts/heavy-lane-lease.mjs';
 import {gateSlot} from '../src/scripts/push-gate-slot.mjs';
 import {PUSH_BUDGET, PUSH_PROFILE, SPLIT_PROFILE} from '../src/scripts/push-budget.mjs';
@@ -19,7 +20,7 @@ import {freshenPush} from '../src/scripts/typecheck-fresh.mjs';
 /** Identical proof identity before/inside a real lease; no heavy work is done on reuse.
  * @param {NodeJS.ProcessEnv} [environment] */
 export function pushEnvironment(environment=process.env){
-  const env={...gateEnvironment(environment),PWD:process.cwd(),WS_PUSH_GATE_PROFILE:PUSH_PROFILE,WS_VITEST_MAX_WORKERS:String(PUSH_BUDGET.workers),
+  const env={...gateEnvironment(environment),PWD:process.cwd(),WS_PUSH_GATE_PROFILE:PUSH_PROFILE,
     WS_PUSH_LINT_THREADS:String(PUSH_BUDGET.lintThreads),GOMAXPROCS:String(PUSH_BUDGET.lintGo),UV_THREADPOOL_SIZE:'1',WS_CPU_ADMISSION:'1',
     WS_HEAVY_SCHEDULER_ROOT:resolve(environment.WS_HEAVY_SCHEDULER_ROOT??environment.WS_HEAVY_ROOT??resolve(homedir(),'.wildshard-heavy-lanes'))};
   if(environment.WS_LOCAL_LAND_SOURCE_REF!==undefined){
@@ -48,7 +49,9 @@ export function pushEnvironment(environment=process.env){
     // Repeating a directory changes no lookup but would change the runtime hash.
     if(env.MANPATH!==undefined)env.MANPATH=[...new Set(env.MANPATH.split(delimiter))].join(delimiter);
   }
-  Reflect.deleteProperty(env,'WILDSHARD_RING');Reflect.deleteProperty(env,'WS_TEST_QUARANTINE');return env;
+  Reflect.deleteProperty(env,'WILDSHARD_RING');Reflect.deleteProperty(env,'WS_TEST_QUARANTINE');
+  const workers=String(gateWorkers(env));
+  return {...env,WS_GATE_WORKERS:workers,WS_VITEST_MAX_WORKERS:workers};
 }
 
 /** J505 (Jake, 2026-11-23: "make it a permanent fix"): a push gate step that runs past ~3x its normal time is stuck, not
@@ -190,7 +193,7 @@ export function staticChecks(lintThreads=PUSH_BUDGET.lintThreads){
 
 async function main(){
   assertHeavyLease('full-test');
-  const env=pushEnvironment();
+  const env=pushEnvironment(),testEnv=gateTestEnvironment(env);
   const began=Date.now();
   // DS9: a plan branch push or a watching driver runs the split gate; hosted CI runs the rest.
   const split=splitRequested(env),profile=split?SPLIT_PROFILE:PUSH_PROFILE;
@@ -236,7 +239,7 @@ async function main(){
       console.error(`  - saved exact-tree proof run ${recorded.run} (${covered.mode})${composed?`; inherited full ${delta.proof?.run} plus incoming delta`:''}`);
     }
   };
-  console.error(`  - full push budget ${JSON.stringify(PUSH_BUDGET)}; nice ${getPriority()}; load ${loadavg().map(v=>v.toFixed(1)).join('/')}`);
+  console.error(`  - full push budget ${JSON.stringify({...PUSH_BUDGET,workers:Number(env.WS_GATE_WORKERS)})}; nice ${getPriority()}; load ${loadavg().map(v=>v.toFixed(1)).join('/')}`);
   if(selection.mode==='docs'&&!delta.eligible){
     const result=await parallelChecks([
       {name:'lint (docs-only)',commands:[['pnpm','run','--silent','lint:kit','--threads',String(PUSH_BUDGET.lintThreads)],['pnpm','run','--silent','lint:game']]},
@@ -245,12 +248,12 @@ async function main(){
       // EV9: agent-parity reads AGENTS.md and CLAUDE.md; a test that reads a changed doc runs too.
       {name:'check:parity (docs-only)',commands:[['pnpm','run','--silent','check:parity']]},
       ...(selection.tests?.length?[{name:`vitest (docs readers: ${selection.tests.length})`,commands:[[process.execPath,'src/scripts/vitest-tmp.ts','run','--passWithNoTests',...selection.tests]]}]:[]),
-    ],{env});
+    ],{env:testEnv});
     console.error(`  - docs-only push lane ${result.ok?'green':'RED'} in ${result.seconds.toFixed(1)} s`);if(result.ok)record(result.seconds);process.exitCode=result.ok?0:1;return;
   }
   // Meta QA 11-25 row 53: tsc -b trusts mtimes, and the cloned cache can predate a pushed file (5068a7365's red).
   console.error(`  - ${freshenPush(split?planBaseRefs(env.WS_PUSH_REFS):env.WS_PUSH_REFS,process.cwd())}`);
-  const generated=await parallelChecks([{name:'gen:inputs',commands:[['pnpm','run','--silent','gen:inputs']]}],{env});
+  const generated=await parallelChecks([{name:'gen:inputs',commands:[['pnpm','run','--silent','gen:inputs']]}],{env:testEnv});
   if(!generated.ok){process.exitCode=1;return;}
   if(selection.mode==='related'){
     const {completePushSelection}=await import('../src/scripts/push-related.mjs');
@@ -296,8 +299,8 @@ async function main(){
   // With known reds on, Vitest runs beside the static lane, not inside it: a Vitest red must not stop the static checks,
   // since a known red still lets the push go when everything else is green.
   const [rest,tests]=await Promise.all([
-    parallelChecks([...staticChecks(),...fs27.tasks,...readers,...(delta.eligible&&selection.mode==='docs'?[{name:'check:parity (incoming docs)',commands:[['pnpm','run','--silent','check:parity']]}]:[]),{name:'test:kit',commands:[['pnpm','run','--silent','test:kit']]},...(knownRed?[]:vitest)],{env}),
-    knownRed?parallelChecks(vitest,{env}):Promise.resolve({ok:true,seconds:0,results:[],timedOut:false}),
+    parallelChecks([...staticChecks(),...fs27.tasks,...readers,...(delta.eligible&&selection.mode==='docs'?[{name:'check:parity (incoming docs)',commands:[['pnpm','run','--silent','check:parity']]}]:[]),{name:'test:kit',commands:[['pnpm','run','--silent','test:kit']]},...(knownRed?[]:vitest)],{env:testEnv}),
+    knownRed?parallelChecks(vitest,{env:testEnv}):Promise.resolve({ok:true,seconds:0,results:[],timedOut:false}),
   ]);
   let result={...rest,ok:rest.ok&&tests.ok,results:[...rest.results,...tests.results]},tolerated=false;
   if(knownRed&&rest.ok&&!tests.ok&&report!==undefined){
@@ -306,7 +309,7 @@ async function main(){
     if(pushed===null||pushed.size===0)console.error('  !! known-red: the Vitest report names no failing test; the red stands');
     else{
       try{
-        const {sha,main:known}=await mainReds(process.cwd(),[...pushed.keys()],{env});
+        const {sha,main:known}=await mainReds(process.cwd(),[...pushed.keys()],{env:testEnv});
         const fresh=newReds(pushed,known),old=[...pushed.values()].reduce((sum,ids)=>sum+ids.size,0)-fresh.length;
         if(fresh.length===0){
           console.error(`  - known-red: all ${old} failing test(s) fail on origin/main ${sha.slice(0,10)} too; not this push's red (main's CI and the forward fixer own them):`);

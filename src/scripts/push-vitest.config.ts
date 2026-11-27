@@ -2,7 +2,7 @@ import {defineConfig} from 'vitest/config';
 import base from '../../vitest.config.ts';
 import {CI_SERIAL_TESTS} from './vitest-ci-files.ts';
 import {assertHeavyLease} from './heavy-lane-lease.mjs';
-import {PUSH_PROFILE,PUSH_BUDGET} from './push-budget.mjs';
+import {PUSH_PROFILE,pushWorkers} from './push-budget.mjs';
 import {withTestEnvironments} from './vitest-environments.ts';
 import {PushDurationSequencer} from './push-duration-sequencer.ts';
 
@@ -16,5 +16,5 @@ assertHeavyLease('full-test');
 export default defineConfig(withTestEnvironments({...base,test:{...base.test,isolate:true,pool:'forks',
   ...(phase==='admitted'?{sequence:{...base.test?.sequence,sequencer:PushDurationSequencer}}:{}),
   ...(phase==='native'?{include:[...CI_SERIAL_TESTS],maxWorkers:1}
-    :phase==='ordinary'?{exclude:[...(base.test?.exclude??[]),...CI_SERIAL_TESTS],maxWorkers:PUSH_BUDGET.workers}
-      :{maxWorkers:PUSH_BUDGET.workers})}}));
+    :phase==='ordinary'?{exclude:[...(base.test?.exclude??[]),...CI_SERIAL_TESTS],maxWorkers:pushWorkers()}
+      :{maxWorkers:pushWorkers()})}}));

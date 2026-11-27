@@ -8,6 +8,7 @@
 // The hooks only check; `pnpm fix` (or `pnpm lint:fix` / `pnpm format`) fix.
 // Bypass a lane: SKIP_CHECK=1 (last resort; CI still runs it).
 import { spawn } from 'node:child_process';
+import { gateTestEnvironment } from './gate-workers.mjs';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -200,7 +201,8 @@ if (existsSync(lagModule)) {
 
 // Hooks export GIT_INDEX_FILE and friends; tools that shell out to git
 // (knip, tests that build repos) must see a normal environment.
-const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
+const cleanEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
+const env = lane === 'push' ? gateTestEnvironment(cleanEnv) : cleanEnv;
 const run = ({ name, args = [], command = ['pnpm', 'run', '--silent', ...args] }) => new Promise((done) => {
   const child = spawn(command[0], command.slice(1), { cwd: pkgDir, env });
   let output = '';
