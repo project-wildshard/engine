@@ -15,13 +15,15 @@ import {afterAll, beforeAll, describe, expect, it} from 'vitest';
 import {desktopKtx2, flipsImage, roleOfImage, type CookImageMount} from '../src/cook/game/cookedKtx2';
 import {loadBasisuImageKtx2, type ImageKtx2Encode} from '../src/cook/game/imageKtx2Wasm';
 import {loadBasisuAstc6} from '../src/cook/game/astc6Wasm';
-import {isKtx2, ktx2Info, phoneTier, type Astc6Encode} from '../src/cook/game/tierTextures';
+import {isKtx2, ktx2Info, phoneTier, phoneTierSize, type Astc6Encode} from '../src/cook/game/tierTextures';
 import {cookedKtx2TableOf} from '../src/shared/game/shardfile/cookedKtx2Table';
 import {openShardfile, shardHalf} from '../src/cook/game/shardCook';
 import {folderTarball} from '../src/cook/game/folderTarball';
 import {mkdirSync} from 'node:fs';
 
 const ASTC_6X6 = new Set([165, 166]);
+/** The phone trim at a test's size: small images keep CI's file under its 60 s budget (J295). */
+const small = (source: string): number | undefined => (phoneTierSize(source) === undefined ? undefined : 64);
 /** The KTX2's DFD transfer function: 2 is sRGB, 1 linear. */
 const transfer = (bytes: Uint8Array): number => { const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength); return bytes[view.getUint32(48, true) + 14] ?? 0; };
 const pageTable = (): Uint8Array => new TextEncoder().encode(JSON.stringify({version: 1, slug: 'z', native: {ktx2: {$call: 'pageModeKtx2', args: [{shard: {phone: {}, desktop: {}}, grid: {phone: {}, desktop: {}}}]}}}));
@@ -30,7 +32,7 @@ const noise = (size: number, seed: number): Buffer => Buffer.from(Array.from({le
 let encode: ImageKtx2Encode, astc6: Astc6Encode, jpg: Uint8Array, png: Uint8Array, odd: Uint8Array;
 beforeAll(async () => {
   [encode, astc6] = await Promise.all([loadBasisuImageKtx2(), loadBasisuAstc6()]);
-  jpg = new Uint8Array(await sharp(noise(1024, 1), {raw: {width: 1024, height: 1024, channels: 3}}).jpeg({quality: 90}).toBuffer());
+  jpg = new Uint8Array(await sharp(noise(128, 1), {raw: {width: 128, height: 128, channels: 3}}).jpeg({quality: 90}).toBuffer());
   png = new Uint8Array(await sharp(noise(64, 2), {raw: {width: 64, height: 64, channels: 3}}).png().toBuffer());
   odd = new Uint8Array(await sharp(noise(30, 3), {raw: {width: 30, height: 30, channels: 3}}).png().toBuffer());
 }, 60_000);
@@ -54,7 +56,7 @@ describe('SF15: the encode per map kind', () => {
   it('encodes a JPG and a PNG as UASTC with a full mip chain, sRGB for colour and linear for a normal map', () => {
     const colour = encode(jpg, {role: 'srgb', flip: true}), normal = encode(png, {role: 'normal', flip: false});
     expect(colour !== undefined && isKtx2(colour)).toBe(true);
-    expect(ktx2Info(colour ?? new Uint8Array())).toMatchObject({vkFormat: 0, width: 1024, height: 1024, levels: 11});
+    expect(ktx2Info(colour ?? new Uint8Array())).toMatchObject({vkFormat: 0, width: 128, height: 128, levels: 8});
     expect(transfer(colour ?? new Uint8Array())).toBe(2);
     expect(ktx2Info(normal ?? new Uint8Array())).toMatchObject({vkFormat: 0, width: 64, height: 64, levels: 7});
     expect(transfer(normal ?? new Uint8Array())).toBe(1);
@@ -73,18 +75,18 @@ describe('SF15: the desktop KTX2 and its table rows', () => {
     let table = cookedKtx2TableOf(JSON.parse(new TextDecoder().decode(cooked?.discovery)));
     expect(Object.keys(table.desktop).sort()).toEqual(['/assets/z/sky/day.png', '/assets/z/tex/leafy_grass/diffuse.jpg', '/assets/z/tex/leafy_grass/diffuse.jpg#layer']);
     const layer = made.get(table.desktop['/assets/z/tex/leafy_grass/diffuse.jpg#layer'] ?? '');
-    expect(ktx2Info(layer ?? new Uint8Array())).toMatchObject({vkFormat: 0, width: 1024, levels: 11});
+    expect(ktx2Info(layer ?? new Uint8Array())).toMatchObject({vkFormat: 0, width: 128, levels: 8});
     expect(table.desktop['/assets/z/tex/leafy_grass/diffuse.jpg']).toMatch(/^\/assets\/z\/tex\/leafy_grass\/diffuse-[a-f0-9]{8}\.ktx2$/u);
-    // The phone tier: each row's 6x6 file, cooked from the desktop file (S12c), trimmed to 512 but a #layer twin and a sky kept whole.
-    const phone = phoneTier(cooked?.discovery ?? new Uint8Array(), url => made.get(url) ?? files.get(url), undefined, astc6);
+    // The phone tier: each row's 6x6 file, cooked from the desktop file (S12c), trimmed (to 64 here, 512 in a cook) but a #layer twin and a sky kept whole.
+    const phone = phoneTier(cooked?.discovery ?? new Uint8Array(), url => made.get(url) ?? files.get(url), small, astc6);
     expect(phone).toBeDefined();
     const phoneMade = new Map([...phone?.files.values() ?? []].flat().map(file => [file.url, file.bytes]));
     table = cookedKtx2TableOf(JSON.parse(new TextDecoder().decode(phone?.discovery)));
     const ground = phoneMade.get(table.phone['/assets/z/tex/leafy_grass/diffuse.jpg'] ?? '') ?? new Uint8Array();
     expect(ASTC_6X6.has(ktx2Info(ground).vkFormat)).toBe(true);
-    expect(ktx2Info(ground).width).toBe(512);
+    expect(ktx2Info(ground).width).toBe(64);
     const twin = phoneMade.get(table.phone['/assets/z/tex/leafy_grass/diffuse.jpg#layer'] ?? '') ?? new Uint8Array();
-    expect(ktx2Info(twin)).toMatchObject({width: 1024});
+    expect(ktx2Info(twin)).toMatchObject({width: 128});
     expect(ASTC_6X6.has(ktx2Info(twin).vkFormat)).toBe(true);
     // The UI badge stays an image, and an image off the 4x4 grid too.
     expect(table.desktop['/assets/z/ui/badge.png']).toBeUndefined();
