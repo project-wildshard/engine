@@ -167,12 +167,15 @@ function fenceHints(shard: OpenShardfile): {readonly hashes: ReadonlySet<string>
 export const ownFarView = (url: string, slug: string): boolean => url.startsWith(`/assets/${slug.replace(/^_/u, '')}/baked/far`) && /\/baked\/far(?:-impostor)?\.(?:json|glb|png)$/u.test(url);
 
 /** A mount's tier by its name: `.desktop`, `.phone` and a shard's `astc6/` overlay say so, and a file with a `.phone` sibling is the desktop's. */
-function mountTiers(urls: ReadonlySet<string>): (url: string, tier: CookTier) => boolean {
+/** Which tiers carry a mount. SF7j (J525): a phone keeps a shard's original even beside a hand-made `.phone` copy. The client
+ *  never names a shard's copy (`phoneUrl` knows the engine's own files only), so a phone set holding Nine's `scroll.phone.png`
+ *  in place of `scroll.png` answered the page's `scroll.png` with two 404s and an abort. The copy still rides on the phone,
+ *  where its KTX2 row is keyed by both names (SF5d); the cook makes the tier forms, so a hand-made copy is legacy. */
+function mountTiers(): (url: string, tier: CookTier) => boolean {
   return (url, tier) => {
     if (/\.phone[.-]|\/astc6\//u.test(url)) return tier === 'phone';
     if (/\.desktop[.-]/u.test(url)) return tier === 'desktop';
-    const dot = url.lastIndexOf('.');
-    return tier === 'desktop' || !urls.has(`${url.slice(0, dot)}.phone${url.slice(dot)}`);
+    return true;
   };
 }
 
@@ -262,7 +265,7 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, folder: st
   // C3: a page reads this before it knows the product, and a cold offline entry reads it too.
   const document = shard.cook?.mounts.find(row => row.url === `${prefix}discovery.json`), mounts = downloaded(shard);
   // S12b: the phone tier's files, made from the KTX2 table's own targets; the discovery document names them.
-  const onTier = mountTiers(new Set(mounts.map(row => row.url))), mountByURL = new Map(mounts.map(row => [row.url, row])), mountOf = (url: string): Uint8Array | undefined => { const row = mountByURL.get(url); return row === undefined ? undefined : shard.read(row.path); };
+  const onTier = mountTiers(), mountByURL = new Map(mounts.map(row => [row.url, row])), mountOf = (url: string): Uint8Array | undefined => { const row = mountByURL.get(url); return row === undefined ? undefined : shard.read(row.path); };
   // SF15: the cook's desktop KTX2 of each image mount, named in the table; a mount row may keep its image (`keepImage`).
   // SF7h: a held rig map is encoded as its held document says (data or normal, unflipped), not by its URL.
   const held = tiers.images !== undefined && document !== undefined ? heldMapRoles(shard.index, path => shard.read(path)) : new Map<string, never>();
