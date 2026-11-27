@@ -23,6 +23,13 @@ describe('the cooked index KTX2 table (SF15)', () => {
     expect(() => readCookedKtx2Table({version: 1, phone: {'a.jpg': '/a.ktx2'}, desktop: {}})).toThrow();
   });
 
+  it('reads a build output the SDK names procedural: as a source, never as a target', () => {
+    const desktop = {'procedural:/assets/pine-hollow/viewmodel/bolt.col.png': '/assets/gpu/pine-hollow/viewmodel/bolt.col-0a1b2c3d.ktx2'};
+    expect(readCookedKtx2Table({version: 1, phone: {}, desktop}).desktop).toEqual(desktop);
+    expect(() => readCookedKtx2Table({version: 1, phone: {}, desktop: {'/a.png': 'procedural:/a.ktx2'}})).toThrow();
+    expect(() => readCookedKtx2Table({version: 1, phone: {}, desktop: {'other:/a.png': '/a.ktx2'}})).toThrow();
+  });
+
   it('takes the table from a cooked discovery document, the one-shard map first', () => {
     const grid = {phone: {'/assets/x.jpg': '/assets/x-grid.ktx2'}, desktop: {}};
     const document = {native: {ktx2: {$call: 'pageModeKtx2', args: [{shard: shardRows, grid}]}}};

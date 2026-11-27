@@ -16,7 +16,9 @@ type Rows = Readonly<Record<string, string>>;
 export interface CookedKtx2Table {readonly version: 1; readonly phone: Rows; readonly desktop: Rows}
 
 const url = v.pipe(v.string(), v.minLength(2), v.maxLength(512), v.regex(/^\/[^\s?]*$/u, 'a path with no query'));
-const tier = v.pipe(v.record(url, url), v.check(rows => Object.keys(rows).length <= 16_384, 'at most 16384 rows a tier'));
+/** A source is a path, or a build output the SDK names `procedural:<path>` (Pine's viewmodel maps and coats). */
+const source = v.pipe(v.string(), v.minLength(2), v.maxLength(512), v.regex(/^(?:procedural:)?\/[^\s?]*$/u, 'a path with no query'));
+const tier = v.pipe(v.record(source, url), v.check(rows => Object.keys(rows).length <= 16_384, 'at most 16384 rows a tier'));
 export const CookedKtx2TableSchema: v.GenericSchema<unknown, CookedKtx2Table> = v.strictObject({version: v.literal(1), phone: tier, desktop: tier});
 
 /** The table as a cooked index holds it, checked; throws on any other shape. */
