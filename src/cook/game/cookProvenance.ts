@@ -22,7 +22,12 @@ export function cookProvenance(tarball: Uint8Array, hash: (bytes: Uint8Array) =>
 /** Why the copy disagrees with the API's, or undefined if there is no conflict. */
 export function provenanceRefusal(slug: string, provenance: CookProvenance | undefined, expected: ExpectedCopy | undefined, shardVersion?: string): string | undefined {
   if (expected === undefined) return undefined;
-  if (provenance?.chainId !== expected.chainId) {
+  // The API names the unchanged original "identity". The cook still
+  // records its canonical chain ID even when that chain ran no steps.
+  const matches = expected.chainId === 'identity'
+    ? provenance?.applied.length === 0
+    : provenance?.chainId === expected.chainId;
+  if (provenance === undefined || !matches) {
     return `${slug} shardVersion ${shardVersion ?? '(unavailable)'}: migration chain mismatch (cook ${provenance?.chainId ?? '(unreadable)'}, API ${expected.chainId})`;
   }
   if (expected.digest === provenance.digest) return undefined;

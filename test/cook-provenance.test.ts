@@ -33,6 +33,15 @@ describe('the cook provenance', () => {
     expect(provenanceRefusal(slug, provenance, {chainId: provenance.chainId, digest: '0'.repeat(64)})).toMatch(new RegExp(`^${slug}: the migrated copy's digest`, 'u'));
   });
 
+  it('accepts API identity only when no migration ran and the raw digest matches', () => {
+    const provenance = {formatIn: '0.1.0.6', chainId: 'a'.repeat(64), digest: 'b'.repeat(64), applied: []};
+    const identity = {chainId: 'identity', digest: provenance.digest};
+    expect(provenanceRefusal(slug, provenance, identity)).toBeUndefined();
+    expect(provenanceRefusal(slug, provenance, {...identity, digest: '0'.repeat(64)})).toContain('digest');
+    expect(provenanceRefusal(slug, {...provenance, applied: ['made-a-copy']}, identity)).toContain('chain mismatch');
+    expect(provenanceRefusal(slug, undefined, identity)).toContain('unreadable');
+  });
+
   it('refuses a doctored digest by slug before any pack is cooked', async () => {
     const provenance = cookProvenance(h.real, hashOf);
     if (provenance === undefined) throw new Error('the chain read nothing');
