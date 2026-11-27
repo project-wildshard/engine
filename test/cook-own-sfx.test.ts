@@ -5,6 +5,7 @@ import { expect, test } from 'vitest';
 import { folderTarball } from '../src/cook/game/folderTarball';
 import { openShardfile, ownSfxDirs, shardHalf, type OpenShardfile } from '../src/cook/game/shardCook';
 import { GOLDEN_FIXTURES } from '../src/scripts/cookVersion';
+import { ownMountRows } from '../src/cook/game/entryTotals';
 
 test("a zone's own sfx set folders, and nothing else, are its own", () => {
   const urls = ['/assets/isle/sfx/isle/sfx.json', '/assets/isle/sfx/isle/gull-1-00000000.m4a', '/assets/isle/sfx/night/sfx.json',
@@ -43,4 +44,15 @@ test('the golden cook takes a fence shard whose phone whole set carries its own 
   expect(listed('entry')).toEqual(['/assets/cli-fixture/props/fenced.bin']);
   expect(listed('whole')).toEqual(['/assets/cli-fixture/props/fenced.bin', '/assets/cli-fixture/sfx/cli-fixture/sfx.json',
     '/assets/cli-fixture/sfx/cli-fixture/gull-1-1a358b4e.m4a']);
+});
+
+// SF11: the app build lists a zone's own boot recordings and inventory rows from its shardfile, not from public/.
+test("the build finds a zone's own mount by its page URL, and no engine file", () => {
+  const half = shardHalf(openShardfile(folderTarball('test/fixtures/made-up-fence')), (_url, bytes) => bytes.length);
+  const own = ownMountRows(half);
+  const gull = own('/assets/cli-fixture/sfx/cli-fixture/gull-1-1a358b4e.m4a');
+  expect(gull?.url.split('?')[0]).toBe('/assets/cli-fixture/sfx/cli-fixture/gull-1-1a358b4e.m4a');
+  expect(gull === undefined ? undefined : new TextDecoder().decode(half.read(gull.url))).toBe('a made-up own sfx variant');
+  expect(own('/assets/cli-fixture/sfx/cli-fixture/sfx.json?v=00000000')?.url.split('?')[0]).toBe('/assets/cli-fixture/sfx/cli-fixture/sfx.json');
+  expect(own('/assets/sfx/best/hit-1-aefbc41d.m4a')).toBeUndefined();
 });

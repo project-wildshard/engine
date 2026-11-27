@@ -33,6 +33,9 @@ const EXTRA: Bytes = {};
 /** Sizes of files outside public/assets that a boot declares (the bundle's hashed title / explore art, src/client/engine/boot/extras.ts). */
 export function addBytes(extra: Readonly<Record<string, number>>): void { Object.assign(EXTRA, extra); }
 const known = (f: string): boolean => f in EXTRA || f in publicBytes();
+/** Standalone shardfiles SF11: the declared files this page's tables don't size (a zone's own files, which no pin copies under
+ *  public/ any more); the boot sizes them from the zone's cook (`addBytes`) before it totals them. */
+export const unsizedFiles = (files: ChunkFiles): string[] => [...new Set(Object.values(files).flat().filter(f => !known(f)))];
 const sizeOf = (f: string): number | undefined => EXTRA[f] ?? publicBytes()[f];
 
 export function declareTotals(files: ChunkFiles): Record<ByteKey, { bytes: number; files: number }> {

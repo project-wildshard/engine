@@ -3,7 +3,7 @@ import {afterEach,beforeEach,expect,test,vi} from 'vitest';
 import {bootFiles,extraFetches,pathOf,startDeferredAudioPreload,startMenuPreload,startLateAudio} from './extras';
 import {setBootCatalog,type BootLevel} from './catalog';
 import {prepareBootAudio} from './audioInventory';
-import {declareTotals,installByteCounter,releaseByteCounter,type ChunkFiles} from './bytes';
+import {addBytes,declareTotals,installByteCounter,releaseByteCounter,unsizedFiles,type ChunkFiles} from './bytes';
 import {installAssetTables,type AssetTables} from '../../../shared/engine/boot/tables';
 import {NO_AUDIO,type LevelAudioProfile,type LevelAudioBank} from '../audio/levelAudio';
 import {createBootPlan,type StepProgress} from './plan';
@@ -240,4 +240,15 @@ test('art on this page is read by its path; art on another origin keeps its whol
   expect(pathOf(loose)).toBe(loose);
   expect(pathOf(`${location.origin}/shardfiles/plot/blobs/image/x.jpg?v=1`)).toBe('/shardfiles/plot/blobs/image/x.jpg');
   expect(pathOf('/assets/art/card.jpg')).toBe('/assets/art/card.jpg');
+});
+
+// SF11: no pin copies a zone's mounts under public/, so the tables size engine files only; a zone's own sky is unsized
+// until the boot sizes it from the zone's cook, and only then does the total take it.
+test("a zone's own boot file is unsized until its cook sizes it",()=>{
+  const sky='/assets/fixture-zone/hdri/dusk.sky.jpg',files:ChunkFiles={...blank,sky:[sky],music:[music,music]};
+  expect(unsizedFiles(files)).toEqual([sky]);
+  expect(()=>declareTotals(files)).toThrow(sky);
+  addBytes({[sky]:42});
+  expect(unsizedFiles(files)).toEqual([]);
+  expect(declareTotals(files).sky).toEqual({bytes:42,files:1});
 });

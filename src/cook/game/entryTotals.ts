@@ -52,6 +52,13 @@ export function withShardMounts(tables: AssetTables, rows: readonly {readonly ur
   }
   return {...tables, bytes, music, sfx};
 }
+/** SF11: a zone's own mount row for a page URL, or undefined for an engine file. No pin copies a zone's mounts under public/,
+ *  so the build lists a zone's boot recordings and inventory rows from its shardfile; every tier's sets, desktop first. */
+export function ownMountRows(half: Pick<ShardHalf, 'mountRows'>): (url: string) => SpawnFile | undefined {
+  const rows = new Map([...half.mountRows('desktop', 'whole'), ...half.mountRows('phone', 'entry'), ...half.mountRows('phone', 'whole')]
+    .map(row => [row.url.split('?')[0] ?? row.url, row] as const));
+  return url => rows.get(url.split('?')[0] ?? url);
+}
 export function shardBootAudio(sections: ReadonlyMap<string, unknown>, tables: AssetTables, fenceMounts: readonly string[], shard = 'shard'): readonly string[] {
   const row = sections.get('audio/audio'), data = typeof row === 'object' && row !== null && 'audio' in row ? row.audio as AudioData : undefined;
   // A level with no music or sample rows boots with no recordings (NO_AUDIO); anything else must select, as on the page.
@@ -315,6 +322,15 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
     const shardTables = assetTables === undefined ? undefined : withShardMounts(assetTables, [...entryMounts, ...half.mountRows('phone', 'whole')], url => half.read(url));
     const bootAudio = shardTables === undefined ? [] : shardBootAudio(sections, shardTables, entryMounts.map(row => row.url), directory);
     if (shardTables !== undefined && sections.has('audio/audio')) console.info(engineMusicLine(directory, bootAudio, shardTables));
+    // SF11: a file the zone carries (a boot recording, an inventory row) is its own mount, since no pin copies it under
+    // public/; the engine's files still come from public/ or this build's output.
+    const ownMount = ownMountRows(half);
+    const ownRow = (url: string, declared?: number): SpawnFile => {
+      const own = ownMount(url); if (own === undefined) return asset(url, declared);
+      if (declared !== undefined && declared !== own.bytes) throw new Error(`Spawn asset size differs: ${url}`);
+      if (!sources.has(own.url)) sources.set(own.url, () => half.read(own.url));
+      return own;
+    };
     const write = (tier: 'phone' | 'desktop', flow: 'client' | 'grid', addresses: readonly Address[] = [], mode = '000', whole = false): number => {
       const selected = new Map<string, SpawnFile>(), add = (row: SpawnFile): void => {selected.set(row.url, row);};
       for (const row of shardRows[tier][whole ? 'whole' : 'entry']) add(row);
@@ -325,7 +341,7 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
       }
       for (const row of common) add(row);
       for (const [url, bytes] of [...bank.common, ...bank[flow]]) add(asset(url, bytes));
-      for (const url of bootAudio) add(asset(url));
+      for (const url of bootAudio) add(ownRow(url));
       if (flow === 'grid') for (const row of discoveries) add(row);
       for (const member of bank.optional.groups[`home:${prefix}`] ?? []) {
         const row = bank.optional.files[member]; if (row === undefined) throw new Error('Invalid spawn module index'); add(asset(row[0], row[1]));
@@ -349,7 +365,7 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
         // S4 on Sky: this inventory names a page's image sources on every tier. A phone with an overlay reads the 6×6 file in
         // their place, and one with no ASTC reads them loose, so they stay off the phone's list.
         const standIns = tier === 'phone' ? overlay : {};
-        for (const [url, bytes] of v.parse(files, JSON.parse(new TextDecoder().decode(inventory)))) if (!Object.hasOwn(standIns, url.split('?')[0] ?? url)) add(asset(url, bytes));
+        for (const [url, bytes] of v.parse(files, JSON.parse(new TextDecoder().decode(inventory)))) if (!Object.hasOwn(standIns, url.split('?')[0] ?? url)) add(ownRow(url, bytes));
       }
       // Required code can resolve while bulk content downloads. Keep each
       // partition's original order, every row and the full download barrier.

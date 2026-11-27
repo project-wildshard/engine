@@ -48,6 +48,26 @@ it('publishes every declared baked mode for both tiers and refuses a missing fal
     rmSync(join(root,`public${npc}`));expect(()=>checkBakedTextures(root,join(root,'public'))).toThrow(npc);
   }finally{rmSync(root,{recursive:true,force:true});}
 });
+// SF11: no pin publishes a zone's mounts, so a zone's own declared file is present as a row of its cook.json mounts (under
+// mounts/ or over one of its blobs, as an images-only upload carries it); another zone's row is not, nor a row whose file is gone.
+it("counts a zone's own mount row as present, never another zone's",()=>{
+  const root=mkdtempSync(resolve('tmp/app-baked-own-'));
+  const portrait='/assets/dawn-isle/ui/portrait.webp',model='/assets/dawn-isle/models/stone.glb',blob=`blobs/image/${'a'.repeat(64)}.webp`;
+  const cook=(rows: {url: string, path: string}[]): string=>JSON.stringify({version:1,mounts:rows.map(row=>({...row,bytes:16,hash:'b'.repeat(64)}))});
+  try{
+    write(root,'out/dawn/shard.json','{}');write(root,'out/dusk/shard.json','{}');
+    write(root,'out/dawn/mounts/shardfiles/dawn/discovery.json',JSON.stringify({rows:{bootBindings:{card:[portrait],models:[model]}}}));
+    write(root,`out/dawn/mounts${model}`,'authored payload');write(root,`out/dawn/${blob}`,'authored payload');
+    write(root,'out/dawn/cook.json',cook([{url:portrait,path:blob},{url:model,path:`mounts${model}`}]));
+    expect(checkBakedTextures(root,join(root,'public'))).toBe(2);
+    expect(checkBakedTextures(root,join(root,'dist'))).toBe(2);
+    write(root,'out/dawn/cook.json',cook([{url:portrait,path:blob}]));write(root,'out/dusk/cook.json',cook([{url:model,path:`mounts${model}`}]));
+    write(root,`out/dusk/mounts${model}`,'authored payload');
+    expect(()=>checkBakedTextures(root,join(root,'public'))).toThrow(model);
+    rmSync(join(root,`out/dawn/${blob}`));write(root,'out/dawn/cook.json',cook([{url:portrait,path:blob},{url:model,path:`mounts${model}`}]));
+    expect(()=>checkBakedTextures(root,join(root,'public'))).toThrow(portrait);
+  }finally{rmSync(root,{recursive:true,force:true});}
+});
 describe('app public copy before final product publication',()=>{
   it('keeps emitted collisions, nested public bytes and the actual final product tree exact',()=>{
     const root=mkdtempSync(resolve('tmp/app-public-'));
