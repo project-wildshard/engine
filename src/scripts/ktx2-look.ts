@@ -22,7 +22,8 @@ import {join, resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- a Node script.
 import {parseArgs} from 'node:util';
 import sharp from 'sharp';
-import {flipsImage, roleOfImage} from '../cook/game/cookedKtx2';
+import {DESKTOP_LAYER_MAX, flipsImage, roleOfImage} from '../cook/game/cookedKtx2';
+import {trimKtx2} from '../cook/game/tierTextures';
 import {imageHead, loadBasisuImageKtx2} from '../cook/game/imageKtx2Wasm';
 import {cookedKtx2TableOf} from '../shared/game/shardfile/cookedKtx2Table';
 import {GPU_FILES} from '../client/engine/boot/ktx2.generated';
@@ -84,7 +85,8 @@ for (const [at, [source, target]] of wanted.entries()) {
   const image = read(source), hand = read(target), layer = source.endsWith('#layer');
   if (image === undefined || hand === undefined || imageHead(image) === undefined) { skipped.push(`${source}: ${image === undefined ? 'no source' : hand === undefined ? 'no hand-made file' : 'not a PNG or JPEG'}`); continue; }
   const url = source.replace(/#layer$/u, ''), role = roleOfImage(url), flip = !layer && flipsImage(url, gltfFolders);
-  const cooked = encode(image, {role, flip}), handImage = decodeKtx2(hand), cookedImage = cooked === undefined ? undefined : decodeKtx2(cooked);
+  // A `#layer` twin is trimmed to the desktop's array size, as `desktopKtx2` writes it.
+  const encoded = encode(image, {role, flip}), cooked = layer && encoded !== undefined ? trimKtx2(encoded, DESKTOP_LAYER_MAX) : encoded, handImage = decodeKtx2(hand), cookedImage = cooked === undefined ? undefined : decodeKtx2(cooked);
   if (handImage === undefined || cookedImage === undefined) { skipped.push(`${source}: ${handImage === undefined ? 'hand-made file did not decode' : 'cook encode failed'}`); continue; }
   const scale = Math.min(1, draw / Math.max(handImage.width, handImage.height)), width = Math.max(4, Math.round(handImage.width * scale)), height = Math.max(4, Math.round(handImage.height * scale));
   // The source as the cook's loader would see it: flipped when the cook flips it, so a right flip compares near.

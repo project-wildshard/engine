@@ -28,3 +28,13 @@ their bytes, so old shards cook as they did.
 `src/scripts/ktx2-look.ts` is the look check the re-pack lanes run before
 deleting a hand-made set: per texture it decodes the hand-made and the
 cooked KTX2 beside the source and sorts by PSNR, worst first.
+
+## Slice: GLB images
+
+A GLB mount holding PNG or JPEG images now cooks to a GLB whose images are
+KTX2 under `KHR_texture_basisu`, each with the role of the material slot
+that samples it (`glbImageRoles`: colour over normal over data). Buffer 0
+is rebuilt in its own order on 16-byte steps, every other byte kept; a GLB
+whose ranges partly overlap, or whose image view an accessor also reads, is
+left alone. The phone pass then trims it to 512 and writes 6x6, as for any
+KTX2 GLB. Cook 1.2.0.

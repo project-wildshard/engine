@@ -3,8 +3,8 @@
  * the phone tier's ASTC 6x6 files are then cooked from those (`phoneTier`, S12c), so the KTX2 table the client reads
  * (`gpuFiles.ts` `standIn`) names the cook's files and no shard carries a hand-made set.
  *
- * What is encoded: every `/assets/` mount whose bytes are a PNG or JPEG on the 4x4 block grid, and nothing a cook mount
- * row marks `keepImage` (UI art, pixel art: J525's opt-out). A source the table already names (a shard from before SF15,
+ * What is encoded: every `/assets/` mount whose bytes are a PNG or JPEG on the 4x4 block grid, every `.glb` mount holding
+ * PNG or JPEG images (`ktx2Glb`), and nothing a cook mount row marks `keepImage` (UI art, pixel art: J525's opt-out). A source the table already names (a shard from before SF15,
  * with its hand-made set) keeps its row, so an old shard cooks as it did.
  *
  * How (the hand-made sets' rules, sharddev `bake-ktx2.mjs`): the role from the file's name (`roleOfImage`); a standalone
@@ -15,7 +15,7 @@
  * Pure bytes in, bytes out: no file system, no shardfile. */
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {createHash} from 'node:crypto';
-import {trimKtx2, type TextureRole, type TierFile} from './tierTextures';
+import {readGlb, trimKtx2, writeGlb, type Gltf, type TextureRole, type TierFile} from './tierTextures';
 import {imageHead, type ImageKtx2Encode} from './imageKtx2Wasm';
 
 type Json = null | boolean | number | string | readonly Json[] | {readonly [key: string]: Json};
@@ -43,6 +43,92 @@ export function flipsImage(url: string, gltfFolders: ReadonlySet<string>): boole
   const folder = url.slice(0, url.lastIndexOf('/')), parent = folder.slice(0, folder.lastIndexOf('/'));
   if (folder.endsWith('/textures') && gltfFolders.has(parent)) return false;
   return !/(?:^|[_\-.])lm[_\-.]/u.test(url.split('/').pop()?.toLowerCase() ?? '');
+}
+
+/** Per image of a GLB, the strictest role of the slots that sample it (colour over normal over linear). */
+export function glbImageRoles(json: Gltf): ReadonlyMap<number, TextureRole> {
+  const rank: Record<TextureRole, number> = {linear: 0, normal: 1, srgb: 2};
+  const out = new Map<number, TextureRole>();
+  const sourceOf = (texture: number): number | undefined => { const row = json.textures?.[texture]; return row?.source ?? row?.extensions?.KHR_texture_basisu?.source ?? row?.extensions?.EXT_texture_webp?.source; };
+  const note = (info: unknown, role: TextureRole): void => {
+    if (!isMap(info) || typeof info['index'] !== 'number') return;
+    const source = sourceOf(info['index']); if (source === undefined) return;
+    const held = out.get(source); if (held === undefined || rank[role] > rank[held]) out.set(source, role);
+  };
+  for (const material of json.materials ?? []) {
+    const pbr = isMap(material.pbrMetallicRoughness) ? material.pbrMetallicRoughness : {};
+    note(pbr['baseColorTexture'], 'srgb'); note(material.emissiveTexture, 'srgb'); note(material.normalTexture, 'normal');
+    note(pbr['metallicRoughnessTexture'], 'linear'); note(material.occlusionTexture, 'linear');
+    for (const extension of Object.values(material.extensions ?? {})) if (isMap(extension)) for (const [key, value] of Object.entries(extension)) {
+      note(value, /normal/iu.test(key) ? 'normal' : /color|sheen|specularColor/iu.test(key) ? 'srgb' : 'linear');
+    }
+  }
+  return out;
+}
+
+const mimeOf = (bytes: Uint8Array): 'image/png' | 'image/jpeg' | undefined => { const kind = imageHead(bytes)?.kind; return kind === 'png' ? 'image/png' : kind === 'jpg' ? 'image/jpeg' : undefined; };
+
+/** The GLB with each embedded PNG or JPEG image swapped for its KTX2 (`KHR_texture_basisu`), or undefined when none is
+ *  encoded. Buffer 0 is rebuilt in its own order with every range (each buffer view, each meshopt stream) on a 16-byte step,
+ *  so no alignment changes and every other byte is the GLB's own; a GLB whose ranges partly overlap is left as it is. */
+export function ktx2Glb(bytes: Uint8Array, encode: ImageKtx2Encode): Uint8Array | undefined {
+  const glb = readGlb(bytes);
+  if (glb === undefined) return undefined;
+  const {json, bin} = glb, views = json.bufferViews ?? [], roles = glbImageRoles(json);
+  const swaps = new Map<number, Uint8Array>(), encoded = new Set<number>();
+  for (const [index, image] of (json.images ?? []).entries()) {
+    const view = image.bufferView === undefined ? undefined : views[image.bufferView];
+    if (view === undefined || view.buffer !== 0 || image.bufferView === undefined || swaps.has(image.bufferView)) continue;
+    const at = view.byteOffset ?? 0, source = bin.subarray(at, at + view.byteLength);
+    if (mimeOf(source) === undefined) continue;
+    const out = encode(source, {role: roles.get(index) ?? 'srgb', flip: false});
+    if (out === undefined) continue;
+    swaps.set(image.bufferView, out); encoded.add(index);
+  }
+  if (swaps.size === 0) return undefined;
+  // An image view shared with an accessor would tear: leave such a GLB alone.
+  if ((json.accessors ?? []).some(accessor => accessor.bufferView !== undefined && swaps.has(accessor.bufferView))) return undefined;
+  interface Range {readonly at: number; readonly end: number; readonly set: (offset: number, length: number) => void; readonly swap?: Uint8Array}
+  const ranges: Range[] = [];
+  for (const [index, view] of views.entries()) {
+    if (view.buffer === 0) {
+      const swap = swaps.get(index);
+      ranges.push({at: view.byteOffset ?? 0, end: (view.byteOffset ?? 0) + view.byteLength, set: (offset, length) => { view.byteOffset = offset; view.byteLength = length; }, ...(swap === undefined ? {} : {swap})});
+    }
+    const meshopt = view.extensions?.EXT_meshopt_compression;
+    if (meshopt?.buffer === 0) ranges.push({at: meshopt.byteOffset ?? 0, end: (meshopt.byteOffset ?? 0) + meshopt.byteLength, set: offset => { meshopt.byteOffset = offset; }});
+  }
+  ranges.sort((left, right) => left.at - right.at || left.end - right.end);
+  for (const [at, range] of ranges.entries()) {
+    const before = ranges[at - 1];
+    if (before !== undefined && range.at < before.end && (range.at !== before.at || range.end !== before.end || range.swap !== undefined || before.swap !== undefined)) return undefined;
+  }
+  const parts: Uint8Array[] = [];
+  let length = 0, last: {at: number; end: number; offset: number} | undefined;
+  for (const range of ranges) {
+    // The same range named twice (two views over one stream) stays one copy.
+    if (last !== undefined && last.at === range.at && last.end === range.end && range.swap === undefined) { range.set(last.offset, range.end - range.at); continue; }
+    const body = range.swap ?? bin.subarray(range.at, range.end), offset = Math.ceil(length / 16) * 16;
+    if (offset > length) parts.push(new Uint8Array(offset - length));
+    parts.push(body); length = offset + body.length;
+    range.set(offset, body.length);
+    last = {at: range.at, end: range.end, offset};
+  }
+  const out = new Uint8Array(Math.ceil(length / 4) * 4);
+  let write = 0;
+  for (const part of parts) { out.set(part, write); write += part.length; }
+  const buffer = json.buffers?.[0];
+  if (buffer !== undefined) buffer.byteLength = out.length;
+  for (const index of encoded) { const image = json.images?.[index]; if (image !== undefined) image.mimeType = 'image/ktx2'; }
+  for (const texture of json.textures ?? []) {
+    const source = texture.source ?? texture.extensions?.EXT_texture_webp?.source;
+    if (source === undefined || !encoded.has(source)) continue;
+    const {EXT_texture_webp: _webp, ...rest} = texture.extensions ?? {};
+    texture.extensions = {...rest, KHR_texture_basisu: {source}};
+    delete texture.source;
+  }
+  for (const key of ['extensionsUsed', 'extensionsRequired'] as const) json[key] = [...new Set([...json[key] ?? [], 'KHR_texture_basisu'])];
+  return writeGlb(json, out);
 }
 
 /** One mount the cook may encode: its URL, its bytes, and whether its row keeps it an image (`keepImage`). */
@@ -122,6 +208,15 @@ export function desktopKtx2(discovery: Uint8Array, mounts: readonly CookImageMou
     const {url} = mount;
     if (mount.keepImage === true || !url.startsWith('/assets/') || named.has(url) || PHONE_COPY.test(url)) continue;
     const dot = url.lastIndexOf('.'), stem = url.slice(0, dot), ext = url.slice(dot + 1).toLowerCase();
+    if (ext === 'glb') {
+      const cooked = ktx2Glb(mount.read(), encode);
+      if (cooked === undefined) continue;
+      const target = file(url, stem, cooked, 'glb');
+      desktopRow(url, url, target);
+      // A `.phone` GLB holds a lighter mesh, so it is its own source; a GLB with none is the phone's too.
+      if (phoneServed(url) === url) phoneRow(url, url, target);
+      continue;
+    }
     if (!/^(?:jpe?g|png)$/u.test(ext)) continue;
     const bytes = mount.read(), head = imageHead(bytes);
     // A block format's top level is whole 4x4 blocks; an image off that grid stays an image.

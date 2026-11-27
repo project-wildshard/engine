@@ -96,11 +96,14 @@ export function trimKtx2(bytes: Uint8Array, maxSize: number): Uint8Array {
 }
 
 interface GltfView {buffer: number; byteOffset?: number; byteLength: number; extensions?: {EXT_meshopt_compression?: {buffer: number; byteOffset?: number; byteLength: number}}}
-interface GltfTexture {source?: number; extensions?: {KHR_texture_basisu?: {source?: number}}}
-interface Gltf {materials?: {normalTexture?: {index: number}}[]; textures?: GltfTexture[]; accessors?: {bufferView?: number; sparse?: {indices: {bufferView: number}; values: {bufferView: number}}}[]; bufferViews?: GltfView[]; buffers?: {byteLength: number; uri?: string}[]; images?: {bufferView?: number; mimeType?: string; uri?: string}[]}
+interface GltfTexture {source?: number; extensions?: {KHR_texture_basisu?: {source?: number}; EXT_texture_webp?: {source?: number}; [name: string]: unknown}}
+interface GltfMaterial {normalTexture?: {index: number}; emissiveTexture?: {index: number}; occlusionTexture?: {index: number}; pbrMetallicRoughness?: Record<string, unknown>; extensions?: Record<string, unknown>}
+/** The parts of a glTF document the tier and SF15 cooks read and write. */
+export interface Gltf {materials?: GltfMaterial[]; textures?: GltfTexture[]; accessors?: {bufferView?: number; sparse?: {indices: {bufferView: number}; values: {bufferView: number}}}[]; bufferViews?: GltfView[]; buffers?: {byteLength: number; uri?: string}[]; images?: {bufferView?: number; mimeType?: string; uri?: string}[]; extensionsUsed?: string[]; extensionsRequired?: string[]}
 interface Glb {readonly json: Gltf; readonly bin: Uint8Array}
 
-function readGlb(bytes: Uint8Array): Glb | undefined {
+/** A GLB's JSON and its BIN chunk, or undefined for anything else. */
+export function readGlb(bytes: Uint8Array): Glb | undefined {
   if (bytes.length < 20) return undefined;
   const view = viewOf(bytes);
   if (view.getUint32(0, true) !== GLB_MAGIC || view.getUint32(16, true) !== JSON_CHUNK) return undefined;
@@ -110,7 +113,8 @@ function readGlb(bytes: Uint8Array): Glb | undefined {
   return {json, bin: bytes.subarray(binAt + 8, binAt + 8 + view.getUint32(binAt, true))};
 }
 
-function writeGlb(json: Gltf, bin: Uint8Array): Uint8Array {
+/** A GLB from its JSON and BIN chunk, each padded to 4 bytes. */
+export function writeGlb(json: Gltf, bin: Uint8Array): Uint8Array {
   const text = new TextEncoder().encode(JSON.stringify(json)), jsonLength = Math.ceil(text.length / 4) * 4, binLength = Math.ceil(bin.length / 4) * 4;
   const out = new Uint8Array(12 + 8 + jsonLength + (binLength > 0 ? 8 + binLength : 0)), view = viewOf(out);
   view.setUint32(0, GLB_MAGIC, true); view.setUint32(4, 2, true); view.setUint32(8, out.length, true);
