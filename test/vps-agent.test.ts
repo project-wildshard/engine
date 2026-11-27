@@ -297,7 +297,8 @@ function cookBox(rebuildText = '#!/bin/bash\n[ "$1" = --cook ] || exit 9\nset -e
   writeFileSync(join(root, 'etc/wildshard/cook.env'), 'COOK_ENGINE_REF=v0.1.18\nWILDSHARD_BUILD=0000000000000000000000000000000000000000\nCOOK_NOTIFY_TOKEN=planted-cook-secret\n');
   const { dir, key } = releases([{ tag: 'v0.1.20', commit: one }, { tag: 'v0.1.21', commit: two }, {tag: `server-staging-${two}`, commit: two}]);
   const wrapper = join(root, 'apply'), rebuild = join(root, 'rebuild.sh');
-  writeFileSync(wrapper, `#!/bin/bash\nexec node ${JSON.stringify(APPLY)} "$@"\n`, { mode: 0o755 });
+  // The test's own Node, never PATH's: the push gate's gate-bin/node shim needs WS_GATE_NODE, which configWith drops.
+  writeFileSync(wrapper, `#!/bin/bash\nexec ${JSON.stringify(process.execPath)} ${JSON.stringify(APPLY)} "$@"\n`, { mode: 0o755 });
   writeFileSync(rebuild, rebuildText, { mode: 0o755 });
   const env = { WILDSHARD_CONFIG_TEST_APPLY: wrapper, WILDSHARD_CONFIG_TEST_REBUILD: rebuild, WILDSHARD_APPLY_TEST: dir, WILDSHARD_APPLY_TEST_KEY: key };
   return { root, one, two, run: (extra: Readonly<Record<string, string>>, ...args: string[]) => configWith(root, { ...env, ...extra }, ...args) };

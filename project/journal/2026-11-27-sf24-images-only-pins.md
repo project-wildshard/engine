@@ -11,3 +11,10 @@
 - Proof: Driftwood booted all five phases in Chromium (Explorer 66 thumbnails) and Starfall in
   muted headless WebKit (Explorer 2 thumbnails, 2.6 s), with no ambiguous built index address;
   192 pin-reading test files pass.
+- The push gate then named three more audio tests that read the old layout: Driftwood's engine
+  music is now the title and three stings (4 files, no island), and an images-only zone mounts
+  its own audio under /assets/<slug>/sfx/, which the download tests' audio patterns now accept.
+  vps-agent failed once under the gate's load and passes alone.
+- vps-agent's cook wrapper ran PATH's node; inside the push gate that is gate-bin/node, which
+  needs WS_GATE_NODE, and the test's spawn env drops it, so three cases failed only in the
+  gate. The wrapper now execs the test's own Node (process.execPath).

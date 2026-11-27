@@ -69,7 +69,7 @@ for (const [shard, pageAudio] of [['driftwood-isle', 91], ['pine-hollow', 1], ['
     const half = shardHalf(openShardfile(folderTarball(product)), (_url, bytes) => bytes.length);
     const mounts = half.mountRows('phone', 'entry').map(row => row.url);
     // A recording, not a set's `music.json` / `sfx.json` manifest that mounts beside them (QA-FEEDBACK-2026-11-23-b).
-    const audioPath = /^\/assets\/(?:music|sfx)\/.+\.(?!json$)[a-z0-9]+$/u;
+    const audioPath = /^\/assets\/(?:[a-z0-9-]+\/)?(?:music|sfx)\/.+\.(?!json$)[a-z0-9]+$/u;
     const fence = mounts.map(url => url.split('?')[0] ?? url).filter(url => audioPath.test(url));
     const listed = shardBootAudio(half.shard.sections, common, mounts, shard);
     const cook = half.shard.cook;
@@ -85,7 +85,7 @@ for (const [shard, pageAudio] of [['driftwood-isle', 91], ['pine-hollow', 1], ['
     installAssetTables(tables);
     // The page's default-style boot reads are exactly the cooked boot set; the fence adds its own on top.
     expect(page.length).toBeGreaterThanOrEqual(pageAudio);
-    if (shard === 'driftwood-isle') expect(page.filter(url => url.startsWith('/assets/sfx/driftwood-isle/')).length).toBeGreaterThanOrEqual(16);
+    if (shard === 'driftwood-isle') expect(page.filter(url => url.startsWith('/assets/driftwood-isle/sfx/driftwood-isle/')).length).toBeGreaterThanOrEqual(16);
     expect(listed).toEqual([...new Set([...page, ...fence])].filter(url => Object.hasOwn(common.bytes, url)));
   });
 }

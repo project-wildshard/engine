@@ -70,7 +70,8 @@ test('the cook refuses a shard naming an engine slot or sting the style lacks', 
 
 // The pinned products (`node src/scripts/pins.ts install`) and this build's boot table, when the checkout has them.
 const bootTables = 'out/.app/boot-tables.json';
-for (const [shard, slots] of [['driftwood-isle', ['title', 'island']], ['pine-hollow', ['title', 'pine']], ['nalati-grasslands', ['title']], ['nine-dragon-stack', ['title']]] as const) {
+// SF23/SF24: Driftwood's images-only pin plays its own island set, so it names only the engine title.
+for (const [shard, slots] of [['driftwood-isle', ['title']], ['pine-hollow', ['title', 'pine']], ['nalati-grasslands', ['title']], ['nine-dragon-stack', ['title']]] as const) {
   test.skipIf(!existsSync(`out/${shard}/shard.json`) || !existsSync(bootTables))(`${shard}: its rows name engine music the build has`, () => {
     const common = JSON.parse((JSON.parse(readFileSync(bootTables, 'utf8')) as { common: string }).common) as AssetTables;
     const half = shardHalf(openShardfile(folderTarball(`out/${shard}`)), (_url, bytes) => bytes.length);

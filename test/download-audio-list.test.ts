@@ -16,10 +16,11 @@ import { cookFilesOnly } from './filesOnlyCook';
 
 // Driftwood, Pine, Nalati, Nine Dragon, one Open Plot, Dunes and Far Reach, each with its engine music's file count
 // (AU18's derived list: title, its base slot's calm and tension, its stings). Counts, not names: a re-encode renames.
-const SHARDS = [['driftwood-isle', 6], ['pine-hollow', 6], ['nalati-grasslands', 4], ['nine-dragon-stack', 1],
+const SHARDS = [['driftwood-isle', 4], ['pine-hollow', 6], ['nalati-grasslands', 4], ['nine-dragon-stack', 1],
   ['open-plot-alien-plain', 1], ['sunscar-dunes', 0], ['far-reach', 0]] as const;
-const AUDIO = /^\/assets\/(?:music|sfx)\/[^?]+\.(?:m4a|mp3|ogg|opus|wav|webm|flac)$/u;
-const AUDIO_BANK = /^\/assets\/(music|sfx)\/([^/]+)\/\1\.json$/u;
+// SF24: an images-only zone mounts its own audio under its slug (/assets/<slug>/sfx/...), beside the engine's.
+const AUDIO = /^\/assets\/(?:[a-z0-9-]+\/)?(?:music|sfx)\/[^?]+\.(?:m4a|mp3|ogg|opus|wav|webm|flac)$/u;
+const AUDIO_BANK = /^\/assets\/(?:[a-z0-9-]+\/)?(music|sfx)\/([^/]+)\/\1\.json$/u;
 const path = (url: string): string => url.split('?')[0] ?? url;
 // The pinned products (`pnpm pins`, as CI's test jobs install them); the boot tables are baked here, never read stale.
 const have = SHARDS.every(([shard]) => existsSync(`out/${shard}/shard.json`));
