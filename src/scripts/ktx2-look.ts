@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** SF15 (J525): the look check before a zone's hand-made KTX2 sets are deleted. For every texture row of a product's own
- * KTX2 table whose source is a JPG or PNG, it encodes the cook's KTX2 from that source with the cook's settings
+ * KTX2 table whose source is a JPG, PNG or WebP (SF19), it encodes the cook's KTX2 from that source with the cook's settings
  * (`desktopKtx2`'s role and flip rules, `loadBasisuImageKtx2`) and draws the same texture three ways on one board: the
  * source, the hand-made KTX2 and the cooked one, each decoded as a GPU would read it. Each pair gets its PSNR against the
  * source, so the board sorts the worst first and flags a flip the cook got wrong (the cooked copy far from the source while
@@ -24,7 +24,7 @@ import {parseArgs} from 'node:util';
 import sharp from 'sharp';
 import {DESKTOP_LAYER_MAX, flipsImage, roleOfImage} from '../cook/game/cookedKtx2';
 import {trimKtx2} from '../cook/game/tierTextures';
-import {imageHead, loadBasisuImageKtx2} from '../cook/game/imageKtx2Wasm';
+import {decodeWebp, imageHead, loadBasisuImageKtx2} from '../cook/game/imageKtx2Wasm';
 import {cookedKtx2TableOf} from '../shared/game/shardfile/cookedKtx2Table';
 import {GPU_FILES} from '../client/engine/boot/ktx2.generated';
 
@@ -80,10 +80,12 @@ const png = async (rgba: Uint8Array, width: number, height: number, name: string
 const encode = await loadBasisuImageKtx2();
 interface Row {readonly source: string; readonly role: string; readonly flip: boolean; readonly handBytes: number; readonly cookedBytes: number; readonly hand: number; readonly cooked: number; readonly between: number; readonly files: readonly string[]}
 const rows: Row[] = [], skipped: string[] = [];
-const wanted = Object.entries(table).filter(([source, target]) => target.endsWith('.ktx2') && /\.(?:jpe?g|png)(?:#layer)?$/iu.test(source) && source.includes(values.only)).slice(0, Number(values.limit));
+const wanted = Object.entries(table).filter(([source, target]) => target.endsWith('.ktx2') && /\.(?:jpe?g|png|webp)(?:#layer)?$/iu.test(source) && source.includes(values.only)).slice(0, Number(values.limit));
 for (const [at, [source, target]] of wanted.entries()) {
   const image = read(source), hand = read(target), layer = source.endsWith('#layer');
   if (image === undefined || hand === undefined || imageHead(image) === undefined) { skipped.push(`${source}: ${image === undefined ? 'no source' : hand === undefined ? 'no hand-made file' : 'not a PNG or JPEG'}`); continue; }
+  // SF19: a WebP source is encoded from a PNG of its pixels, as the cook's prepare pass makes it
+  await decodeWebp([image]);
   const url = source.replace(/#layer$/u, ''), role = roleOfImage(url), flip = !layer && flipsImage(url, gltfFolders);
   // A `#layer` twin is trimmed to the desktop's array size, as `desktopKtx2` writes it.
   const encoded = encode(image, {role, flip}), cooked = layer && encoded !== undefined ? trimKtx2(encoded, DESKTOP_LAYER_MAX) : encoded, handImage = decodeKtx2(hand), cookedImage = cooked === undefined ? undefined : decodeKtx2(cooked);
