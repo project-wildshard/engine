@@ -11,7 +11,7 @@
 // owned-worktree cleanup. A red main is fixed forward at once (J249).
 import {execFileSync,spawn,spawnSync} from 'node:child_process';
 import {keepCopy,worktreeState} from '../pin-keep-copy.mjs';
-import {appendFileSync,existsSync,linkSync,lstatSync,mkdirSync,readFileSync,realpathSync,renameSync,rmSync,writeFileSync} from 'node:fs';
+import {appendFileSync,existsSync,linkSync,lstatSync,mkdirSync,mkdtempSync,readFileSync,realpathSync,renameSync,rmSync,writeFileSync} from 'node:fs';
 import {homedir,hostname} from 'node:os';
 import {basename,dirname,join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -466,8 +466,9 @@ class Landing{
  /** Fast-forward main to HEAD. Refuses before pushing unless origin/main is
   * an ancestor; the refspec has no `+` and no force flag ever.
   * J422's push gate (lint, types, related tests) runs in the pre-push.
+  * @param {string} proof the current land's completed-gate receipt
   * @returns {Promise<'landed'|'moved'>} */
- async pushMain(){
+ async pushMain(proof){
   const head=this.holds('before the merge'),main=this.fetchMain();
   if(!isAncestor(this.root,main,head))return 'moved';
   if(main===head)return 'landed';
@@ -487,7 +488,7 @@ class Landing{
   this.say('merging',`main ${short(main)} -> ${short(head)} fast-forward only; push gate: lint, types, related tests (J422)`);
   // The pre-push knows this is land's main push and of which kind (.githooks/run-checks.mjs).
   /** @type {NodeJS.ProcessEnv} */
-  const env={...this.env,WS_LAND_MAIN_PUSH:`push:${head}`};
+  const env={...this.env,WS_LAND_MAIN_PUSH:`push:${head}`,WS_LAND_GATE_FILE:proof};
   // The outer queue authenticates this controller, never a hook or proof.
   for(const key of Object.keys(env))if(key.startsWith('WS_FULL_GATE_'))Reflect.deleteProperty(env,key);
   Reflect.deleteProperty(env,'WS_LOCAL_LAND_DELTA');
@@ -559,9 +560,19 @@ class Landing{
   * full suite once per tip and main-watch names the push that turned it red. A lost race rebases and pushes again.
   * @param {string} base */
  async runPush(base){
+  const scratch=join(this.root,'tmp',this.lane);
+  mkdirSync(scratch,{recursive:true});
+  const proofDir=mkdtempSync(join(scratch,'land-gate-'));
+  try{
+   return await this.retryPush(base,join(proofDir,'proved.json'));
+  }finally{rmSync(proofDir,{recursive:true,force:true});}
+ }
+
+ /** @param {string} base @param {string} proof */
+ async retryPush(base,proof){
   let main=base;
   for(let round=1;round<=this.options.rounds;round++){
-   if(await this.pushMain()==='landed'){
+   if(await this.pushMain(proof)==='landed'){
     return this.landed('push','push gate (lint, types, related tests); main ci runs the full suite',round,main);
    }
    main=this.fetchMain();

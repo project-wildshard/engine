@@ -80,6 +80,11 @@ if (lane === 'push' && scripts.check && existsSync(join(root, 'src/scripts/push-
   // hosted land's `exact` and `carried` pushes, FS23 J400's full local gate (`local`).
   // The marker is read from the hook's own environment: the gate's environment keeps only its allowlist.
   const landMain=landMainMode({...env,WS_LAND_MAIN_PUSH:process.env.WS_LAND_MAIN_PUSH},env.WS_PUSH_REFS);
+  const land=landMain==='push'?(await import('./land-gate.mjs')).landGate(root):null;
+  if(land?.reusable()){
+    console.error('  - land reused a completed push gate after a disjoint rebase; main CI checks the combined tree');
+    process.exit(0);
+  }
   // BUILD-MAX EV2 (J288, WL13): a main push from the canonical checkout runs the split gate too
   // (src/scripts/push-local-split.mjs MAIN_PUSH_SPLIT); main's own CI runs the full suite and main-watch reports it.
   const split=splitRequested(env);
@@ -139,6 +144,7 @@ if (lane === 'push' && scripts.check && existsSync(join(root, 'src/scripts/push-
   }finally{copy?.remove();}
   // EV2: a green split main push hands main's verdict to main-watch, as land does (LS5). It waits for this SHA to
   // reach origin/main and quits quietly if the push never lands (a lost race).
+  if(code===0&&pregated===null)land?.record();
   if(code===0&&split&&landMain===null&&sha!==null&&mainPushed(env.WS_PUSH_REFS)&&process.env.WS_MAIN_WATCH!=='0'&&existsSync(join(root,'src/scripts/main-watch.mjs'))){
     const lane=process.env.WS_LANE_NAME??'',pane=process.env.HERDR_PANE_ID??'';
     try{
