@@ -163,6 +163,9 @@ function fenceHints(shard: OpenShardfile): {readonly hashes: ReadonlySet<string>
   return {hashes, mounts: downloaded(shard).filter(row => hashes.has(row.hash)).map(row => row.url)};
 }
 
+/** SF4: a zone's own far view (`/assets/<slug>/baked/far.json`, `far.glb`, `far-impostor.png`), which the grid's far ring reads. */
+export const ownFarView = (url: string, slug: string): boolean => url.startsWith(`/assets/${slug.replace(/^_/u, '')}/baked/far`) && /\/baked\/far(?:-impostor)?\.(?:json|glb|png)$/u.test(url);
+
 /** A mount's tier by its name: `.desktop`, `.phone` and a shard's `astc6/` overlay say so, and a file with a `.phone` sibling is the desktop's. */
 function mountTiers(urls: ReadonlySet<string>): (url: string, tier: CookTier) => boolean {
   return (url, tier) => {
@@ -331,7 +334,10 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, folder: st
       return selected;
     },
     mountRows: (tier, set) => {
-      const urls = wholeSet(tier, set) ? mounts.map(row => row.url).filter(url => onTier(url, tier)) : fence.mounts;
+      // SF4: a fence shard's phone whole set also carries its own far view, which the grid reads outside any fence (the
+      // preparation records the client flow): without it a cooked Driftwood's phone read the page's engine-wide copy.
+      const urls = wholeSet(tier, set) ? mounts.map(row => row.url).filter(url => onTier(url, tier))
+        : set === 'whole' ? [...new Set([...fence.mounts, ...mounts.map(row => row.url).filter(url => ownFarView(url, shard.slug) && onTier(url, tier))])] : fence.mounts;
       // A phone file whose target no phone list names (a fence shard's file read past its fence) rides in the phone's whole
       // set: no other tier's part holds it, and it costs less than the target a phone read from a desktop part before.
       const listed = new Set([...urls, ...urls.flatMap(url => images?.phoneTargets.get(url) ?? [])]), unlisted = tier === 'phone' && set === 'whole' ? [...tierRows.keys()].filter(url => !listed.has(url)).map(url => `tier:${url}`) : [];
