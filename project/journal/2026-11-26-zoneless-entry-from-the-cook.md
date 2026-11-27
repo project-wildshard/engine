@@ -15,3 +15,8 @@ before the zones' indexes were in, and the loading card's art (`--ws-load-portra
 first paint, the shell, the in-page entry and the grid's destination) is a page path by design. The plain title now waits for the
 cooked zones on the same 3 s deadline, and every portrait setter goes through `loadPortrait`, which holds a zone's art until its
 index says where the cook stored it.
+
+Offline, the third visit stalled on main.js: no code chunk was in any cache. The worker's list joins `dist-content/` when it
+exists (serviceWorker.ts `splitBundle`, for a split page), and a split left from an earlier build named 22 files this page doesn't
+hold; one missing name fails the whole precache. The zoneless check now refuses a worker that precaches a file the page doesn't
+hold, and names a leftover split when there is one.

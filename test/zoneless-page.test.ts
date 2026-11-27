@@ -7,7 +7,7 @@ import {existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync}
 // oxlint-disable-next-line import/no-nodejs-modules -- Confine the scratch root to this checkout.
 import {join, resolve} from 'node:path';
 import {afterEach, expect, test} from 'vitest';
-import {checkZoneless, dropZoneFiles, zoneFiles} from '../src/scripts/app-build/zoneless.mjs';
+import {checkZoneless, dropZoneFiles, workerFiles, zoneFiles} from '../src/scripts/app-build/zoneless.mjs';
 
 const ZONE = ['assets/spawn/server/0123456789abcdef.pack.br', 'assets/spawn/server-driftwood-isle-0123456789abcdef.json', 'shardfiles/driftwood-isle/shard.json', 'assets/spawn/parts/0123456789abcdef.pack.br', 'assets/spawn/driftwood-isle-entry-phone-1111111111111111.json',
   'assets/spawn/packs-b1.json', 'assets/spawn/code/bbe313ded99e664c.json', 'programs/driftwood-isle.json', 'assets/baked/driftwood-isle/far.glb', 'assets/driftwood-isle/tex.ktx2', 'assets/boot-driftwood-isle-a4f8374f.json'];
@@ -61,4 +61,17 @@ test('one leftover zone file, a program included (PV5), fails the check by name'
   const dir = dist([...PAGE, 'programs/driftwood-isle.json']);
   writeFileSync(join(dir, 'assets/spawn/server-b1.json'), JSON.stringify({...BOOK, shards: {}}));
   expect(() => { checkZoneless(dir); }).toThrow(/programs\/driftwood-isle\.json/u);
+});
+
+test('a worker that precaches a file the page lost fails the check: its precache never finishes, so the page cannot start offline', () => {
+  const dir = dist(PAGE);
+  writeFileSync(join(dir, 'assets/spawn/server-b1.json'), JSON.stringify({...BOOK, shards: {}}));
+  mkdirSync(join(dir, 'sw-core'));
+  writeFileSync(join(dir, 'sw.js'), 'importScripts("/sw-core/abc.js");');
+  const core = (files: string[]): void => { writeFileSync(join(dir, 'sw-core/abc.js'), `const FILES = JSON.parse(${JSON.stringify(JSON.stringify(files))});`); };
+  core(['/index.html', '/b/b1/main-x.js']);
+  expect(workerFiles(dir)).toEqual(['index.html', 'b/b1/main-x.js']);
+  expect(() => { checkZoneless(dir); }).not.toThrow();
+  core(['/index.html', '/assets/grid-strip-mesh-46c94ae4.bin']);
+  expect(() => { checkZoneless(dir); }).toThrow(/precaches 1 file\(s\) the page doesn't hold.*grid-strip-mesh-46c94ae4/u);
 });

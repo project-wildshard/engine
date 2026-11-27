@@ -5,7 +5,7 @@
 // in-page server reads a zone's pack from the cook at the table's key (serverRuntime.ts), so the build's server book keeps the road's
 // part only (`grid`, the road's collision) and the zones' parts and packs leave with the rest.
 import {existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync} from 'node:fs';
-import {dirname, join, relative} from 'node:path';
+import {dirname, join, relative, resolve} from 'node:path';
 import {classify, shardNames} from '../page-size.mjs';
 
 /** The page's own S6 files: the road (grid seams, seam plans, strip books, pages and meshes), the boot tables and the world map. */
@@ -90,4 +90,17 @@ export function checkZoneless(dir) {
   if (books.length > 0) throw new Error(`A preview page reads its zones' server packs from the cook, but ${books.join(', ')} still names zones`);
   const files = zoneFiles(dir);
   if (files.length > 0) throw new Error(`A preview page reads its zones from the cook, but dist holds ${files.length} zone file(s): ${files.slice(0, 5).join(', ')}${files.length > 5 ? ', …' : ''}`);
+  const gone = workerFiles(dir).filter(path => !existsSync(join(dir, path.split('?')[0] ?? path)));
+  // a split (`<dist>-content`, splitOutput.mjs) left from an earlier build is joined into the worker's list (serviceWorker.ts splitBundle)
+  const stale = existsSync(`${resolve(dir)}-content`) ? ` (${resolve(dir)}-content is joined into the worker's list: an earlier build's split?)` : '';
+  if (gone.length > 0) throw new Error(`The service worker precaches ${gone.length} file(s) the page doesn't hold, so it never finishes and the page can't start offline: ${gone.slice(0, 5).join(', ')}${stale}`);
+}
+
+/** The page paths this build's service worker precaches (sw.js names its core; serviceWorker.ts writes `FILES` into it). Empty with no worker.
+ * @param {string} dir @returns {string[]} */
+export function workerFiles(dir) {
+  const boot = join(dir, 'sw.js'), core = existsSync(boot) ? /\/(sw-core\/[\w-]+\.js)/u.exec(readFileSync(boot, 'utf8'))?.[1] : undefined;
+  if (core === undefined || !existsSync(join(dir, core))) return [];
+  const list = /\bFILES\s*=\s*JSON\.parse\(("(?:[^"\\]|\\.)*")\)/u.exec(readFileSync(join(dir, core), 'utf8'))?.[1];
+  return list === undefined ? [] : JSON.parse(JSON.parse(list)).filter(path => path.startsWith('/')).map(path => path.slice(1));
 }
