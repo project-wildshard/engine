@@ -159,6 +159,5 @@ test('a zone staging hides pins its preview upload; a zone staging plays never p
 // SF24: the staging zone table (page-release/zone-table.mjs `ownZoneTable`) refuses while a pinned zone has no shard version.
 test('every committed pin a zone table reads names its shard version', () => {
   const pins = JSON.parse(readFileSync('test/pins/shardfiles.json', 'utf8')) as {shards: {slug: string; shardVersion?: string}[]};
-  // Pine waits on its images-only upload (SF24); remove it from this list when its pin lands
-  expect(pins.shards.filter(row => row.shardVersion === undefined).map(row => row.slug)).toEqual(['pine-hollow']);
+  expect(pins.shards.filter(row => row.shardVersion === undefined).map(row => row.slug)).toEqual([]);
 });
