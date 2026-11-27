@@ -273,22 +273,35 @@ export function redSuspect(commits,files,changes){
   return undefined;
 }
 
+/** @typedef {{address?:string,name?:string,where?:string,state?:string}} HcTerminal */
+
+/** Herdr's visible tab is the last segment of `where` (`space / tab`). A named terminal can also match directly.
+ * @param {readonly HcTerminal[]} terminals @param {string} lane @param {string} slug */
+function terminalFor(terminals,lane,slug){
+  const aliases=slug===''?new Set([lane]):new Set([lane,slug,`engine plan/${slug}`]);
+  const live=terminals.filter(row=>row.state==='live'&&typeof row.address==='string');
+  const named=live.filter(row=>row.name!==undefined&&aliases.has(row.name));
+  if(named.length>0)return named.length===1?named[0]?.address:undefined;
+  const shown=live.filter(row=>row.where!==undefined&&(aliases.has(row.where)||aliases.has(row.where.split(' / ').at(-1)??'')));
+  return shown.length===1?shown[0]?.address:undefined;
+}
+
 /** @typedef {{lane:string,sendPane?:string,sendTerminal?:string,key:string,lanes:Set<string>,commits:Set<string>,fixer:boolean}} RedRecipient */
 /** @typedef {{lane:string,slug:string,pane?:string}} RedLander */
 /** @param {readonly {sha:string,lander?:RedLander}[]} rows @param {Parameters<typeof paneFor>[0]} panes
- * @param {ReadonlyMap<string,string>} agents @param {readonly string[]} fixers */
-export function redRecipients(rows,panes,agents,fixers){
+ * @param {ReadonlyMap<string,string>} agents @param {readonly string[]} fixers @param {readonly HcTerminal[]} [terminals] */
+export function redRecipients(rows,panes,agents,fixers,terminals=[]){
   const groups=new Map();
-  /** @param {string} lane @param {string|undefined} pane @param {string} [sha] */
-  const add=(lane,pane,sha)=>{
-    const address=pane??agents.get(lane);
-    const key=address===undefined?`agent:${lane}`:`pane:${address}`;
-    const group=/** @type {RedRecipient} */(groups.get(key)??{lane,sendPane:pane,key,lanes:new Set(),commits:new Set(),fixer:false});
+  /** @param {string} lane @param {string|undefined} pane @param {string} [sha] @param {string} [slug] */
+  const add=(lane,pane,sha,slug='')=>{
+    const terminal=terminalFor(terminals,lane,slug), address=pane??agents.get(lane);
+    const key=terminal!==undefined?`hc:${terminal}`:address===undefined?`agent:${lane}`:`pane:${address}`;
+    const group=/** @type {RedRecipient} */(groups.get(key)??{lane,sendPane:pane,sendTerminal:terminal,key,lanes:new Set(),commits:new Set(),fixer:false});
     group.lanes.add(lane);
     if(sha===undefined)group.fixer=true;else group.commits.add(sha);
     groups.set(key,group);
   };
-  for(const {sha,lander} of rows)if(lander!==undefined)add(lander.lane,lander.pane??paneFor(panes,lander.slug),sha);
+  for(const {sha,lander} of rows)if(lander!==undefined)add(lander.lane,lander.pane??paneFor(panes,lander.slug),sha,lander.slug);
   for(const lane of fixers)add(lane,undefined);
   return /** @type {RedRecipient[]} */([...groups.values()]);
 }
@@ -368,11 +381,11 @@ export function shouldPromptRed({machine,run,commits,recipientLanes,localLanes,r
 function notifyRed(io,state,run,recipient,text,commits=[]){
   const seen=state.notified??={};
   const previous=Array.isArray(seen[run])?seen[run]:[];
-  const pane=recipient.key.startsWith('pane:'),aliases=[...recipient.lanes].map(lane=>`agent:${lane}`);
+  const addressed=recipient.key.startsWith('pane:')||recipient.key.startsWith('hc:'),aliases=[...recipient.lanes].map(lane=>`agent:${lane}`);
   if(previous.includes(recipient.key)||aliases.some(alias=>previous.includes(alias)
-    ||(!pane&&previous.some(key=>key.startsWith(`${alias}@pane:`)))))return null;
+    ||previous.some(key=>key.startsWith(`${alias}@hc:`)||(!addressed&&key.startsWith(`${alias}@pane:`)))))return null;
   if(io.redAllowed!==undefined&&!io.redAllowed(run,commits.length>0?commits:state.red?.history?.commits??[],[...recipient.lanes]))return null;
-  const keys=[recipient.key,...pane?aliases.map(alias=>`${alias}@${recipient.key}`):[]];
+  const keys=[recipient.key,...addressed?aliases.map(alias=>`${alias}@${recipient.key}`):[]];
   seen[run]=[...new Set([...previous,...keys])];
   const history=state.red?.history;
   if(history!==undefined&&commits.length>0)history.commits=[...new Set([...history.commits,...commits])];
@@ -446,7 +459,7 @@ export function sharedRuns(cache,fetch,now=Date.now(),freshMs=45_000){
   return runs;
 }
 
-/** The real world: GitHub through gh, git, the receipts log and herdr. Tests pass their own.
+/** The real world: GitHub through gh, git, the receipts log and hc. Tests pass their own.
  * @param {NodeJS.ProcessEnv} env */
 /** Meta QA 11-26 (Jake: "make the agent a mandatory parameter", "dont hardcode opus"): meta's QA writer names its
  * author only from --agent, so main-watch passes the runner's own WS_AGENT (`claude:<model>` or `codex:<model>`) and
@@ -465,6 +478,22 @@ export function liveIo(env=process.env){
   const repo=env.WS_MAIN_WATCH_REPO??REPO;
   const receipts=resolve(env.WS_LANE_RECEIPTS??join(homedir(),'.cache/wildshard/lane-receipts.log'));
   const run=(/** @type {string} */command,/** @type {string[]} */args)=>execFileSync(command,args,{cwd:root,encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:60_000,maxBuffer:32<<20});
+  /** @param {string[]} args @param {number} timeout */
+  const hc=(args,timeout)=>{
+    /** @param {string} command */
+    const call=command=>execFileSync(command,args,{cwd:root,encoding:'utf8',env,stdio:['ignore','pipe','pipe'],timeout,maxBuffer:1<<20});
+    try{return call('hc');}catch(error){
+      if(!(error instanceof Error)||!('code' in error)||error.code!=='ENOENT')throw error;
+      return call(join(homedir(),'.local/bin/hc'));
+    }
+  };
+  /** @param {string[]} flags @returns {HcTerminal[]} */
+  const hcList=(flags)=>{
+    try{
+      const rows=JSON.parse(hc(['ls','--json',...flags],7000)).terminals;
+      return Array.isArray(rows)?rows:[];
+    }catch{return [];}
+  };
   // MF12 (4): reads go through the reader App when this machine has it; the dispatch stays on the user's login.
   const read=(/** @type {string[]} */args,timeout=60_000)=>execFileSync('gh',args,{cwd:root,encoding:'utf8',env:readerEnv(env),stdio:['ignore','pipe','pipe'],timeout,maxBuffer:32<<20});
   const runsCache=resolve(env.WS_MAIN_WATCH_RUNS_CACHE??join(homedir(),'.cache/wildshard/main-watch-runs.json'));
@@ -558,31 +587,13 @@ export function liveIo(env=process.env){
     contains:(/** @type {string} */ancestor,/** @type {string} */descendant)=>{try{run('git',['merge-base','--is-ancestor',ancestor,descendant]);return true;}catch{return false;}},
     receipts:()=>existsSync(receipts)?readFileSync(receipts,'utf8'):'',
     receipt:(/** @type {string} */line)=>{mkdirSync(dirname(receipts),{recursive:true});appendFileSync(receipts,`${new Date().toISOString().slice(11,16)} UTC main-watch ${line}\n`);},
-    panes:()=>{try{return JSON.parse(run('herdr',['pane','list'])).result.panes;}catch{return [];}},
-    agents:()=>{
-      /** @type {Map<string,string>} */const panes=new Map();
-      try{
-        /** @type {{name?:string,pane_id?:string,workspace_id?:string}[]} */
-        const agents=JSON.parse(run('herdr',['agent','list'])).result.agents;
-        for(const {name,pane_id: pane,workspace_id: workspace} of agents)if(name&&pane)
-          panes.set(name,pane.includes(':')||workspace===undefined?pane:`${workspace}:${pane}`);
-      }catch{/* A missing agent list still allows direct pane and lane-name delivery. */}
-      return panes;
-    },
-    send:(/** @type {string} */pane,/** @type {string} */text)=>{try{run('herdr',['pane','run',pane,text]);return true;}catch{return false;}},
-    // QA 11-25 row 21: the builder's hc terminal, which relays a red to lanes with no pane (Agent-tool subagents).
-    builder:()=>{
-      if(env.WS_MAIN_WATCH_BUILDER)return env.WS_MAIN_WATCH_BUILDER;
-      try{
-        /** @type {{address?:string,state?:string}[]} */const terminals=JSON.parse(run('hc',['ls','--json','--label',BUILDER_LABEL])).terminals??[];
-        return terminals.find(row=>row.state===undefined||row.state==='live')?.address;
-      }catch{return undefined;}
-    },
-    // hc refuses (non-zero) a terminal that is gone or sitting on a question; that counts as not delivered.
-    hcSend:(/** @type {string} */terminal,/** @type {string} */text)=>{try{run('hc',['send',terminal,text]);return true;}catch{return false;}},
-    // A lane that is a herdr agent by name (the Codex lanes) has no pane main-watch can find: prompt it by name.
-    prompt:(/** @type {string} */agent,/** @type {string} */text)=>{try{run('herdr',['agent','prompt',agent,text]);return true;}catch{return false;}},
-    // Mini M2 (meta MINI-DECISIONS): every engine main red also goes straight to the forward fixer(s), herdr agents by
+    panes:()=>[], agents:()=>new Map(), send:()=>false, prompt:()=>false,
+    hcTerminals:()=>hcList([]),
+    // QA 11-25 row 21: the builder relays a red to lanes with no terminal.
+    builder:()=>env.WS_MAIN_WATCH_BUILDER??hcList(['--label',BUILDER_LABEL]).find(row=>row.state==='live')?.address,
+    // A vanished or blocked terminal is a failed delivery. Never type past an agent's permission prompt.
+    hcSend:(/** @type {string} */terminal,/** @type {string} */text)=>{try{hc(['send',terminal,text],60_000);return true;}catch{return false;}},
+    // Mini M2 (meta MINI-DECISIONS): every engine main red also goes straight to the forward fixer(s), hc terminals by
     // name, from WS_FORWARD_FIXER (comma-separated), else the machine's ~/.config/wildshard/forward-fixer file (the Mac
     // mini has one; a lane's environment need not carry it).
     fixers:()=>{
@@ -593,7 +604,9 @@ export function liveIo(env=process.env){
     redAllowed:(/** @type {number} */id,/** @type {readonly string[]} */commits,/** @type {readonly string[]} */recipientLanes)=>{
       const machine=env.WS_MACHINE??(/mini/iu.test(hostname())?'mini':'macbook');
       if(machine!=='mini')return true;
-      const text=io.receipts(),localLanes=new Set([...io.agents().keys(),...io.fixers(),...[...landers(text).values()].map(row=>row.lane)]);
+      const text=io.receipts(),localLanes=new Set([...io.fixers(),...[...landers(text).values()].map(row=>row.lane)]);
+      const localTerminals=io.hcTerminals().filter(row=>row.address?.includes('/')===false);
+      for(const lane of recipientLanes)if(terminalFor(localTerminals,lane,'')!==undefined)localLanes.add(lane);
       return shouldPromptRed({machine,run:id,commits,recipientLanes,localLanes,receipts:text,trailers:io.lanes(commits)});
     },
     // Each commit's `Lane:` trailers, by full SHA (row 54 names their authors; MD8 routes by them).
@@ -719,7 +732,7 @@ export function sweep(io,hint={}){
           const newSuspects=newFiles.map(file=>redSuspect(commits,[file],changes)).filter(candidate=>candidate!==undefined);
           // The failing test can point to a change in its source. Only use the run-wide suspect if every failed test is new.
           if(newFiles.length>0&&newFiles.length===tests.length&&suspect!==undefined)newSuspects.push(suspect);
-          if(!repeat)for(const recipient of redRecipients(found,io.panes(),agents,io.fixers())){
+          if(!repeat)for(const recipient of redRecipients(found,io.panes(),agents,io.fixers(),io.hcTerminals?.())){
             const ownsNewFailure=newSuspects.find(candidate=>recipient.commits.has(candidate.sha));
             const ownsNewCommits=new Set([...recipient.commits].filter(sha=>!prompted.has(sha)||sha===ownsNewFailure?.sha));
             if(firstRed)messages.push({recipient,text:redMessage(recipient,details)});
@@ -743,9 +756,12 @@ export function sweep(io,hint={}){
       let fallbackAttempted=false;
       for(const {recipient,text} of messages){
         const how=notifyRed(io,state,run.id,recipient,text,redCommits);
-        if(recipient.commits.size>0&&how==='')needsFallback=true;
+        if(recipient.commits.size>0&&how===''){
+          needsFallback=true;
+          io.receipt(`NOTE RED coord-r2: run ${run.id}; relay to ${[...recipient.lanes].join(', ')}. ${text}`);
+        }
         if(recipient.key===fallback?.key||recipient.lanes.has('builder'))fallbackAttempted=true;
-        if(how!==null)io.receipt(`MAIN RED message to ${[...recipient.lanes].join(', ')} ${how===''?'not delivered (no reachable pane or herdr agent)':how}`);
+        if(how!==null)io.receipt(`MAIN RED message to ${[...recipient.lanes].join(', ')} ${how===''?'not delivered (no reachable terminal)':how}`);
       }
       if(firstRed&&needsFallback&&!fallbackAttempted&&fallbackAlert!==undefined&&fallback!==undefined){
         const how=notifyRed(io,state,run.id,fallback,fallbackAlert,redCommits);

@@ -1,8 +1,8 @@
 // Registered by test/main-watch.test.ts in the engine CI suite.
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { expect, test } from 'vitest';
-import { attribute, failurePaths, KEEPER_MS, landers, memoryQaCall, readState, redMessage, redRecipients, redSuspect, shouldPromptRed, sweep } from '../main-watch.mjs';
+import { attribute, failurePaths, KEEPER_MS, landers, liveIo, memoryQaCall, readState, redMessage, redRecipients, redSuspect, shouldPromptRed, sweep } from '../main-watch.mjs';
 
 const older = 'a'.repeat(40), newer = 'b'.repeat(40), other = 'c'.repeat(40);
 const testFile = 'test/host-ruler-roots.test.ts', sourceFile = 'src/scripts/host-ruler/roots.mjs';
@@ -294,4 +294,52 @@ test('a red range names and prompts every lane that landed a commit in it: the p
 test('a land queue receipt names its lander by its 9-character SHA', () => {
   const who = landers('17:12 UTC opus-fr13 LAND PUSHED engine 2e2d6786d (QA11-25 52)\n');
   expect(attribute(['2e2d6786d3'.padEnd(40, '0')], who).map(row => row.lander?.lane)).toEqual(['opus-fr13']);
+});
+
+
+test('QA 11-26 row 25 sends to named and labelled hc terminals and routes unreachable landers to coord-r2', () => {
+  mkdirSync(resolve('tmp/codex-cookkeys'), { recursive: true });
+  const scratch = mkdtempSync(resolve('tmp/codex-cookkeys/main-watch-hc-'));
+  const state = join(scratch, 'state.json'), sent = join(scratch, 'sends');
+  const named = 'codex-cookkeys', labelled = 'codex-r2fmt', missing = 'opus-pine', blocked = 'codex-blocked';
+  const terminals = [
+    {address: 't3s', state: 'live', name: named, where: 'other / draft'},
+    {address: 't3r', state: 'live', where: `project-wildshard-meta / ${labelled}`},
+    {address: 't9', state: 'live', where: blocked},
+    {address: 't0', state: 'finished', where: missing},
+  ];
+  const green = { id: 70, created_at: '2026-11-19T22:00:00Z', head_sha: other, status: 'completed', conclusion: 'success', event: 'push' };
+  const red = { ...green, id: 71, head_sha: newer, conclusion: 'failure' };
+  const runs = [green], receipts = /** @type {string[]} */ ([]), commits = [newer, older, incoming, 'f'.repeat(40)];
+  try {
+    writeFileSync(join(scratch, 'hc'), `#!/bin/sh
+case "$1" in
+  ls) test "$2" = "--json" && printf '%s\n' '${JSON.stringify({terminals})}' ;;
+  send) test "$#" = 3 && test "$2" != "t9" && printf '%s %s\n' "$2" "$3" >> "$FAKE_HC_SENDS" ;;
+  *) exit 70 ;;
+esac
+`, { mode: 0o755 });
+    const live = liveIo({PATH: scratch, WS_MAIN_WATCH_ROOT: scratch, FAKE_HC_SENDS: sent});
+    /** @type {Parameters<typeof sweep>[0]} */
+    const io = {
+      repo: 'project-wildshard/engine', state, runs: () => runs, tip: () => newer, contains: () => true,
+      failed: () => ({ names: [failed], logs: [`FAIL ${testFile} > section host`] }), annotations: () => '',
+      commits: () => commits, changes: () => new Map([[newer, [testFile]]]),
+      receipts: () => [named, labelled, missing, blocked].map((lane, at) =>
+        `17:01 Cancún ${lane} main-push pushed main ${commits[at]?.slice(0, 10)}: 1 commit(s)`).join('\n'),
+      receipt: line => { receipts.push(line); }, fixers: () => [], panes: () => [], agents: () => new Map(),
+      send: live.send, prompt: live.prompt, hcTerminals: live.hcTerminals, hcSend: live.hcSend, dispatch: () => undefined,
+    };
+    sweep(io);
+    runs.push(red);
+    sweep(io); sweep(io);
+    expect(readFileSync(sent, 'utf8').trim().split('\n')).toEqual([
+      expect.stringContaining('t3s main-watch: MAIN RED.'),
+      expect.stringContaining('t3r main-watch: MAIN RED.'),
+    ]);
+    expect(receipts.filter(line => line.startsWith('NOTE RED coord-r2:'))).toEqual([
+      expect.stringContaining(`run 71; relay to ${missing}. main-watch: MAIN RED.`),
+      expect.stringContaining(`run 71; relay to ${blocked}. main-watch: MAIN RED.`),
+    ]);
+  } finally { rmSync(scratch, { recursive: true, force: true }); }
 });

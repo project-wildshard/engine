@@ -10,6 +10,7 @@ export interface State {judged:number[];dispatched:string[];reruns?:Rerun[];memo
 export interface Verdict {kind:'green'|'red'|'superseded'|'dispatch'|'rerun';run:Run;from?:string|null;by?:string}
 export interface Pane {pane_id:string;label?:string;cwd?:string;foreground_cwd?:string}
 export interface RedRecipient {lane:string;sendPane?:string;sendTerminal?:string;key:string;lanes:Set<string>;commits:Set<string>;fixer:boolean}
+export interface HcTerminal {address?:string;name?:string;where?:string;state?:string}
 export interface RedLander {lane:string;slug:string;pane?:string}
 export interface RedSuspect {sha:string;file:string}
 export interface Io {
@@ -34,6 +35,7 @@ export interface Io {
   rerun?:(id:number)=>void;
   /** QA 11-25 row 21: the builder's hc terminal, and hc send to a terminal (false when refused). */
   builder?:()=>string|undefined;
+  hcTerminals?:()=>HcTerminal[];
   hcSend?:(terminal:string,text:string)=>boolean;
 }
 export const REPO: string;
@@ -58,7 +60,7 @@ export function redSuspect(commits:readonly string[],files:readonly string[],cha
 export const BUILDER_LABEL:string;
 export function fallbackRecipient(terminal:string|undefined):RedRecipient;
 export function redNote(lane:string,run:number,range:string,failed:string):string;
-export function redRecipients(rows:readonly {sha:string;lander?:RedLander}[],panes:readonly Pane[],agents:ReadonlyMap<string,string>,fixers:readonly string[]):RedRecipient[];
+export function redRecipients(rows:readonly {sha:string;lander?:RedLander}[],panes:readonly Pane[],agents:ReadonlyMap<string,string>,fixers:readonly string[],terminals?:readonly HcTerminal[]):RedRecipient[];
 export function redMessage(recipient:RedRecipient,details:{range:string;url:string;failed:string;named:string;suspect?:RedSuspect}):string;
 export function readState(file:string):State|null;
 export function sharedRuns(cache:string,fetch:()=>Run[],now?:number,freshMs?:number):Run[];

@@ -485,13 +485,14 @@ test('row 21: a red whose subagent lander has no pane reaches it by NOTE RED and
   w.runs = [...replay, run(42970000051, 'aaaa1111', 'failure', 50)];w.tip = sha('aaaa1111');
   sweep(io);
   expect(w.receipts).toContain('NOTE RED opus-qa24: run 42970000051 652afa6c00..aaaa111100 tests (3)');
-  expect(w.receipts).toContain('MAIN RED message to opus-qa24 not delivered (no reachable pane or herdr agent)');
+  expect(w.receipts).toContain('MAIN RED message to opus-qa24 not delivered (no reachable terminal)');
   expect(w.sent).toEqual([[`hc:${BUILDER}`, expect.stringContaining('Landers: opus-qa24')]]);
   expect(w.receipts).toContain(`main red fallback to builder sent to hc terminal ${BUILDER}`);
   // The same red again: no second NOTE and no second message.
   w.runs = [...w.runs, { ...run(42970000052, 'aaaa1111', 'failure', 51) }];
   sweep(io);
-  expect(w.receipts.filter(line => line.startsWith('NOTE RED'))).toHaveLength(1);
+  expect(w.receipts.filter(line => line.startsWith('NOTE RED opus-qa24:'))).toHaveLength(1);
+  expect(w.receipts.filter(line => line.startsWith('NOTE RED coord-r2:'))).toHaveLength(1);
   expect(w.sent).toHaveLength(1);
 });
 
