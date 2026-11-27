@@ -38,11 +38,15 @@ export function roleOfImage(url: string): TextureRole {
 }
 
 /** Whether a standalone image's loader drew it flipped (`flipY = true`): all but a glTF's external texture (glTF's own
- *  convention) and a lightmap (loaded `flipY = false`, as Driftwood's are). */
+ *  convention), a lightmap (loaded `flipY = false`, as Driftwood's are) and a creature coat (a rig's skin map). */
 export function flipsImage(url: string, gltfFolders: ReadonlySet<string>): boolean {
   const folder = url.slice(0, url.lastIndexOf('/')), parent = folder.slice(0, folder.lastIndexOf('/'));
   if (folder.endsWith('/textures') && gltfFolders.has(parent)) return false;
-  return !/(?:^|[_\-.])lm[_\-.]/u.test(url.split('/').pop()?.toLowerCase() ?? '');
+  const name = url.split('/').pop()?.toLowerCase() ?? '';
+  // SF17 follow-up: a creature coat (`<hull>.<kind>.<variant>.coat[.phone].<ext>`) is its rig's skin map, drawn with the rig map's
+  // glTF orientation (`riggedHulls.ts`: flipY false), as the hand-made coat bake encoded it
+  if (/\.coat(?:\.phone)?\.[a-z0-9]+$/u.test(name)) return false;
+  return !/(?:^|[_\-.])lm[_\-.]/u.test(name);
 }
 
 /** Per image of a GLB, the strictest role of the slots that sample it (colour over normal over linear). */
