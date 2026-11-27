@@ -2,8 +2,9 @@
 // on by themselves once the scaffold defines them.
 //   commit: like the scaffold's own pre-commit: `lint` and `format:check`
 //           on the staged code files only, plus the whole `typecheck`,
-//           in parallel under a budget (silent < 5 s, warn 5-8 s, BLOCK
-//           > 8 s; SKIP_BUDGET=1). Skipped when no code or JSON is staged.
+//           in parallel in a clean copy of the index. Warn above 5 s.
+//           Lint and format have 8 s, typecheck 45 s (SKIP_BUDGET=1).
+//           Skipped when no code or JSON is staged.
 //   push:   the full `check` script (adds knip and the unit tests).
 // The hooks only check; `pnpm fix` (or `pnpm lint:fix` / `pnpm format`) fix.
 // Bypass a lane: SKIP_CHECK=1 (last resort; CI still runs it).
@@ -13,11 +14,14 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { git } from './lib.mjs';
+import { stagedCheckCommit, stagedCheckTree } from './staged-check-tree.mjs';
 
 const lane = process.argv[2];
 const root = git(['rev-parse', '--show-toplevel']).trim();
 const SOFT = Number(process.env.PRECOMMIT_SOFT_S ?? 5);
 const HARD = Number(process.env.PRECOMMIT_HARD_S ?? 8);
+// A fresh staged copy rebuilds the layered project cache when dependency paths move.
+const TYPECHECK_HARD = Number(process.env.PRECOMMIT_HARD_S ?? 45);
 const LINTABLE = /\.(?:ts|tsx|js|mjs|cjs)$/;
 const FORMATTABLE = /\.(?:ts|tsx|js|mjs|cjs|json|jsonc)$/;
 
@@ -64,9 +68,11 @@ if (lane === 'push') {
 }
 
 // The package is at the repo root; its configs live in src/.
-const pkgDir = root;
+const stagedTree = lane === 'commit' ? stagedCheckTree(root) : null;
+let pkgDir = root;
 const pkgPath = join(pkgDir, 'package.json');
-const scripts = existsSync(pkgPath) ? (JSON.parse(readFileSync(pkgPath, 'utf8')).scripts ?? {}) : {};
+const manifest = stagedTree?.manifest ?? (existsSync(pkgPath) ? JSON.parse(readFileSync(pkgPath, 'utf8')) : {});
+const scripts = manifest.scripts ?? {};
 
 if (lane === 'push' && scripts.check && existsSync(join(root, 'src/scripts/push-budget.mjs'))) {
   const {pushEnvironment}=await import('./push-checks.mjs');
@@ -160,19 +166,17 @@ if (lane === 'push' && scripts.check && existsSync(join(root, 'src/scripts/push-
 
 /** @type {{ name: string, args: string[] }[]} */
 const jobs = [];
-if (lane === 'commit') {
+if (stagedTree !== null) {
   // Staged code under src/, passed relative to the repo root (the
   // package root). Code outside src/ (.githooks, docs) has its own checks.
-  const staged = git(['diff', '--cached', '--name-only', '-z', '--diff-filter=ACMR']).split('\0').filter(Boolean)
-    .filter((path) => path.startsWith('src/'));
+  const staged = stagedTree.files.filter((path) => path.startsWith('src/'));
   const lint = staged.filter((path) => LINTABLE.test(path));
   const format = staged.filter((path) => FORMATTABLE.test(path));
   if (scripts.lint && lint.length) jobs.push({ name: 'lint', args: ['lint', ...lint] });
   if (scripts['format:check'] && format.length) {
     jobs.push({ name: 'format:check', args: ['format:check', '--no-error-on-unmatched-pattern', ...format] });
   }
-  // WL20: tracked and staged files only; another lane's untracked scratch is not in this commit.
-  if (scripts.typecheck && format.length) jobs.push({ name: 'typecheck', command: [process.execPath, join(root, '.githooks', 'commit-typecheck.mjs')] });
+  if (scripts.typecheck && format.length) jobs.push({ name: 'typecheck', command: [process.execPath, '.githooks/commit-typecheck.mjs'] });
   if (!jobs.length) {
     if (Object.keys(scripts).length) console.error('  - no code staged: commit lane skipped');
     process.exit(0);
@@ -182,9 +186,18 @@ if (lane === 'commit') {
 }
 if (!jobs.length) process.exit(0); // no toolchain yet
 
-if (!existsSync(join(pkgDir, 'node_modules'))) {
+if (!existsSync(join(root, 'node_modules'))) {
   console.error(`\n  X ${lane} blocked: node_modules is missing. Run pnpm install (or SKIP_CHECK=1).\n`);
   process.exit(1);
+}
+if (stagedTree !== null) {
+  const sha = stagedCheckCommit(root, stagedTree);
+  for (const key of Object.keys(process.env)) if (key.startsWith('GIT_')) Reflect.deleteProperty(process.env, key);
+  const {makeGateCopy} = await import('../src/scripts/push-gate-copy.mjs');
+  // The commit lane validates the installed lock as before. The push lane can install a fresh one.
+  const copy = makeGateCopy(root, sha, {directory: join(root, 'tmp', 'commit-gate'), say: () => {}, syncLock: false});
+  process.once('exit', copy.remove);
+  pkgDir = copy.path;
 }
 // QA 11-25 row 92: after a pull moved the lockfile, the commit lane ran the old npm-bin-deps runner, which rewrote the
 // tracked .bin-deps files from the repo's pnpm settings. A lane never runs tools older than the lockfile.
@@ -204,11 +217,12 @@ if (existsSync(lagModule)) {
 const cleanEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
 const env = lane === 'push' ? gateTestEnvironment(cleanEnv) : cleanEnv;
 const run = ({ name, args = [], command = ['pnpm', 'run', '--silent', ...args] }) => new Promise((done) => {
+  const start = Date.now();
   const child = spawn(command[0], command.slice(1), { cwd: pkgDir, env });
   let output = '';
   child.stdout.on('data', (chunk) => (output += chunk));
   child.stderr.on('data', (chunk) => (output += chunk));
-  child.on('close', (code) => done({ name, code, output }));
+  child.on('close', (code) => done({ name, code, output, seconds: (Date.now() - start) / 1000 }));
 });
 
 console.error(`  - ${lane} lane: pnpm ${jobs.map((job) => job.name).join(', ')}`);
@@ -225,11 +239,13 @@ if (failed.length) {
 }
 
 if (lane === 'commit') {
-  if (seconds > HARD && process.env.SKIP_BUDGET !== '1') {
-    console.error(`\n  X commit blocked: the commit lane took ${seconds.toFixed(1)} s, over the ${HARD} s budget.`);
+  const budget = (name) => name === 'typecheck' ? TYPECHECK_HARD : HARD;
+  const slow = results.find((result) => result.seconds > budget(result.name));
+  if (slow !== undefined && process.env.SKIP_BUDGET !== '1') {
+    console.error(`\n  X commit blocked: ${slow.name} took ${slow.seconds.toFixed(1)} s, over the ${budget(slow.name)} s budget.`);
     console.error('    Something slow crept in; move it to the push lane. Loaded machine? SKIP_BUDGET=1.\n');
     process.exit(1);
   }
-  if (seconds > SOFT) console.error(`  !! commit lane took ${seconds.toFixed(1)} s (soft ${SOFT} s, hard ${HARD} s)`);
+  if (seconds > SOFT) console.error(`  !! commit lane took ${seconds.toFixed(1)} s (soft ${SOFT} s, typecheck hard ${TYPECHECK_HARD} s, others ${HARD} s)`);
 }
 console.error(`  - ${lane} lane green in ${seconds.toFixed(1)} s`);

@@ -121,7 +121,7 @@ its steps in `tmp/worktree-setup.json`. Every repo tool skips `.worktrees/`
 | --- | --- | --- |
 | commit-msg | Conventional Commits subject ≤ 50, body ≤ 72, one `Assisted-by: AGENT:MODEL` trailer, no AI `Co-Authored-By` | `SKIP_ATTRIB=1` (human-only commit) |
 | pre-commit | `main` in the main checkout, `plan/<slug>` in `.worktrees/<slug>` (D27, J240), staged set echo, whitespace, 1 MB cap, credentials, sh / mjs syntax, new-plan Status line, journal (D25) | `ALLOW_BRANCH=1`, `ALLOW_BIG=1`, `ALLOW_SECRET=1`, `SKIP_JOURNAL=1` |
-| pre-commit | lint + format:check on staged code, typecheck; 8 s budget | `SKIP_BUDGET=1` (time only), `SKIP_CHECK=1` |
+| pre-commit | Clean copy of the staged tree. Lint and format each have an 8 s budget. Typecheck has 45 s. | `SKIP_BUDGET=1` (time only), `SKIP_CHECK=1` |
 | pre-push | outgoing commits: size, credentials, syntax; then `pnpm check` (a push that only deletes `plan/*` branches skips it) | `ALLOW_BIG=1`, `ALLOW_SECRET=1`, `SKIP_CHECK=1` |
 
 Bypasses are for the case they name, never for a red gate: fix the code,

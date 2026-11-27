@@ -93,6 +93,41 @@ test('commits only the named files, syncs past another lane, pushes, and leaves 
   notMidRebase(a);
 });
 
+test('the early gate and the push keep the FS18 marker for a lane-only pin change', () => {
+  write(a, 'other.md', 'owned by lane B\n');
+  git(a, 'commit', '--quiet', '-m', 'Lane B edit', '-m', 'Lane: lane-b', '--', 'other.md');
+  const markerLog = join(work, 'pin-markers');
+  const hook = `#!/bin/bash
+set -eu
+refs="$(cat)"
+read -r local tip remote old <<< "$refs"
+printf '%s %s\\n' "$WS_LAND_MAIN_PUSH" "$tip" >> "$WS_TEST_FS18_LOG"
+printf '%s\\n' "$refs" | "$WS_TEST_FS18_NODE" "$WS_TEST_FS18_HOOK"
+`;
+  for (const file of ['.githooks/pre-push', '.hooks/pre-push']) {
+    write(a, file, hook);
+    chmodSync(join(a, file), 0o755);
+  }
+  write(a, 'test/pins/rings.json', '{"rings":1}\n');
+  const result = spawnSync(process.execPath, [SCRIPT, '--wait', '0', '-m', 'fix(pins): record rings', 'test/pins/rings.json'], {
+    cwd: a, encoding: 'utf8',
+    env: {...env, ...ID, ALLOW_PIN_PUSH: '', WS_TEST_FS18_LOG: markerLog, WS_TEST_FS18_NODE: process.execPath,
+      WS_TEST_FS18_HOOK: fileURLToPath(new URL('pin-provenance.mjs', import.meta.url))},
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /gate green before the lock/u);
+  const gated = readFileSync(markerLog, 'utf8').trim().split('\n');
+  assert.equal(gated.length, 2);
+  for (const row of gated) {
+    const [marker, tip] = row.split(' ');
+    assert.match(tip, /^[a-f0-9]{40}$/u);
+    assert.equal(marker, `main-push:${tip}`);
+  }
+  assert.equal(remoteFile('test/pins/rings.json'), '{"rings":1}');
+  assert.equal(remoteFile('other.md'), 'other.md line 1');
+  assert.equal(read(a, 'other.md'), 'owned by lane B\n');
+});
+
 test('a real conflict holds only its lane with exact committed bytes and prints its recovery command', () => {
   otherLanePushes('plan.md', 'B wrote line 1\n');
   write(a, 'plan.md', 'A wrote line 1\n');

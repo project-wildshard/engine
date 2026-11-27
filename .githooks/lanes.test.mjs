@@ -2,7 +2,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ENV, ok, roots, sandbox } from './test-helpers.mjs';
@@ -11,8 +11,12 @@ describe('check lanes', () => {
   const MSG = ok('feat: add code');
   const toolchain = (box, scripts) => {
     box.write('package.json', JSON.stringify({ name: 'sandbox', private: true, scripts }));
+    box.write('.gitignore', 'node_modules/\ntmp/\n');
     mkdirSync(join(box.root, 'node_modules'), { recursive: true });
-    box.commit({}, MSG, { env: { SKIP_CHECK: '1' } });
+    symlinkSync(join(import.meta.dirname, '../src/scripts/push-gate-copy.mjs'), join(box.root, 'src/scripts/push-gate-copy.mjs'));
+    assert.equal(box.git(['add', '--', '.gitignore', 'package.json', '.githooks/commit-typecheck.mjs']).status, 0);
+    const setup = box.git(['-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'Install test toolchain']);
+    assert.equal(setup.status, 0, setup.stderr);
   };
   // `true` ignores the file arguments the commit lane appends.
   const pass = { typecheck: 'true', lint: 'true', 'format:check': 'true', check: 'true' };
@@ -33,7 +37,7 @@ describe('check lanes', () => {
   });
   test('lint and format see only the staged code files under src/', () => {
     const box = sandbox();
-    toolchain(box, { ...pass, lint: record('lint.args'), 'format:check': record('format.args') });
+    toolchain(box, { ...pass, lint: record(join(box.root, 'lint.args')), 'format:check': record(join(box.root, 'format.args')) });
     box.write('unstaged.ts', 'export {};\n');
     const result = box.commit({ 'src/a.ts': 'export {};\n', 'src/b.json': '{}\n', 'c.md': '# c\n', 'docs/d.json': '{}\n' }, MSG);
     assert.equal(result.status, 0, result.stderr);
@@ -85,7 +89,7 @@ describe('check lanes', () => {
   // QA 11-25 row 92: the stale npm-bin-deps runner rewrote tracked .bin-deps files after a pull moved the lockfile.
   test('a lane refuses an install behind the lockfile before any tool runs, and leaves the tree as it was', () => {
     const box = sandbox();
-    toolchain(box, { ...pass, typecheck: record('ran.args') });
+    toolchain(box, { ...pass, typecheck: record(join(box.root, 'ran.args')) });
     const lagSource = readFileSync(join(import.meta.dirname, '../src/scripts/install-lag.mjs'), 'utf8');
     box.write('node_modules/.pnpm/lock.yaml', "lockfileVersion: '9.0'\n");
     box.commit({ 'src/scripts/install-lag.mjs': lagSource, 'pnpm-lock.yaml': "lockfileVersion: '9.0'\n" }, MSG, { env: { SKIP_CHECK: '1' } });

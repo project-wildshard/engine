@@ -104,8 +104,8 @@ export function sweepDeadCopies(root,directory=join(root,GATE_DIR)){
 /** Make the clean copy of `sha`. Returns its path and a remover; on failure removes what it made and throws.
  * @param {string} root the pushing checkout @param {string} sha
  * An isolated J400 copy uses its own pnpm layout and keeps only verified pin and build outputs.
- * @param {{say?:(line:string)=>void,env?:NodeJS.ProcessEnv,directory?:string,installIsolated?:boolean}} [options] */
-export function makeGateCopy(root,sha,{say=line=>process.stderr.write(`${line}\n`),env=process.env,directory=join(root,GATE_DIR),installIsolated=false}={}){
+ * @param {{say?:(line:string)=>void,env?:NodeJS.ProcessEnv,directory?:string,installIsolated?:boolean,syncLock?:boolean}} [options] */
+export function makeGateCopy(root,sha,{say=line=>process.stderr.write(`${line}\n`),env=process.env,directory=join(root,GATE_DIR),installIsolated=false,syncLock=true}={}){
  const path=join(directory,`${sha.slice(0,12)}-${process.pid}`),began=performance.now();
  /** @type {string[]} */const steps=[];
  /** @param {string} step @param {() => (string|void)} work */
@@ -152,7 +152,7 @@ export function makeGateCopy(root,sha,{say=line=>process.stderr.write(`${line}\n
     const child=withStoreUse(env,'isolated land install',()=>spawnSync('pnpm',args,{cwd:path,env:Object.fromEntries(Object.entries(env).filter(([key])=>!key.startsWith('GIT_'))),stdio:['ignore','pipe','pipe'],encoding:'utf8',maxBuffer:64<<20}));
     if(child.status!==0)throw new Error(`pnpm install in the isolated land gate failed: ${(child.error?.message??`${child.stderr}${child.stdout}`).trim().split('\n').slice(-3).join(' | ')}`);
    });
-  }else if(existsSync(lock)&&existsSync(join(path,'node_modules'))&&(lockMoved||brokenLink(join(path,'node_modules')))){
+  }else if(existsSync(lock)&&existsSync(join(path,'node_modules'))&&(lockMoved?syncLock:brokenLink(join(path,'node_modules')))){
    timed('install',()=>{
     const child=spawnSync('pnpm',['install','--frozen-lockfile','--offline'],{cwd:path,env:Object.fromEntries(Object.entries(env).filter(([key])=>!key.startsWith('GIT_'))),stdio:['ignore','ignore','pipe'],encoding:'utf8'});
     if(child.status!==0)throw new Error(`pnpm install in the gate copy exited ${String(child.status)}: ${child.stderr.trim().split('\n').slice(-3).join(' | ')}`);

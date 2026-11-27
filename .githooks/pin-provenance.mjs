@@ -29,6 +29,23 @@ const git = (cwd, args) => {
 /** The tree id of test/pins in a tree-ish, or '' when it has none. */
 const pinsTree = (cwd, treeish) => git(cwd, ['rev-parse', '--verify', '--quiet', `${treeish}:${PINS}`]).out;
 
+/** @typedef {(cwd: string, old: string, head: string, env: NodeJS.ProcessEnv) => {sha: string}} SelectMainPush */
+/** @param {string} cwd @param {string} old @param {string} head
+ * @param {string} pushed @param {NodeJS.ProcessEnv} env @param {SelectMainPush|undefined} select */
+function mainPushTree(cwd, old, head, pushed, env, select) {
+  if (head === pushed) return true;
+  if (!env.WS_LANE_NAME || select === undefined) return false;
+  // Main-push can replay this lane's commits without the other lanes' local commits (QA 11-25 row 58).
+  // A replay can get a new committer timestamp. Compare the selected tree that both gates check.
+  try {
+    const {sha} = select(cwd, old, head, env);
+    const selected = git(cwd, ['rev-parse', `${sha}^{tree}`]).out;
+    return selected !== '' && selected === git(cwd, ['rev-parse', `${pushed}^{tree}`]).out;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * The plan-branch tips whose merge with `old` gives the pushed commit's test/pins.
  * @param {string} cwd @param {string} old @param {string} pushed @returns {{ ref: string, sha: string }[]}
@@ -49,10 +66,10 @@ export function matchingPlanTips(cwd, old, pushed) {
 
 /**
  * The verdict for one push. `ciState(sha)` returns 'green', 'red', 'pending' or throws when GitHub can't be asked.
- * @param {{ cwd: string, refs: string, ciState: (sha: string) => string, env?: NodeJS.ProcessEnv }} input
+ * @param {{ cwd: string, refs: string, ciState: (sha: string) => string, env?: NodeJS.ProcessEnv, selectMainPush?: SelectMainPush }} input
  * @returns {{ ok: true, note?: string } | { ok: false, problems: string[] }}
  */
-export function checkPinPush({ cwd, refs, ciState, env = process.env }) {
+export function checkPinPush({ cwd, refs, ciState, env = process.env, selectMainPush }) {
   // Match landMainMode's single-main-ref rule without importing engine
   // tooling into the standalone installed hook. Seed repos have no scripts/.
   const localOnly = !env.CI && !env.GITHUB_ACTIONS && refs.trim().split('\n').filter(Boolean).length === 1;
@@ -74,11 +91,11 @@ export function checkPinPush({ cwd, refs, ciState, env = process.env }) {
       return { ok: true, note: `plan HEAD ${pushed.slice(0, 10)} through land's push gate; main ci judges it (J422)` };
     }
     // FS18 (meta FLOW-SIMPLE, J443): a no-plan fix re-recording a pin goes through main-push.mjs from a clone on main
-    // (engine-quickfix), the same push gate as land (J422 Decision 2). main-push names its own HEAD; a hand push has
-    // no marker and still needs a plan branch.
-    if (localOnly && env.WS_LAND_MAIN_PUSH === `main-push:${pushed}` && head === pushed && branch === 'refs/heads/main'
-      && gitDir === common && git(cwd, ['merge-base', '--is-ancestor', old, pushed]).ok) {
-      return { ok: true, note: `main HEAD ${pushed.slice(0, 10)} through main-push's push gate; main ci judges it (FS18, J422)` };
+    // (engine-quickfix). The marker names the outgoing commit, and its tree must match the current lane's selection.
+    if (localOnly && env.WS_LAND_MAIN_PUSH === `main-push:${pushed}` && branch === 'refs/heads/main'
+      && gitDir === common && git(cwd, ['merge-base', '--is-ancestor', old, pushed]).ok
+      && mainPushTree(cwd, old, head, pushed, env, selectMainPush)) {
+      return { ok: true, note: `main commit ${pushed.slice(0, 10)} through main-push's push gate; main ci judges it (FS18, J422)` };
     }
     if (env.ALLOW_PIN_PUSH === '1') return { ok: true, note: `ALLOW_PIN_PUSH=1: ${changed.length} test/pins file(s) pushed to main without a green plan branch (J375); say so in your receipt` };
     const tips = matchingPlanTips(cwd, old, pushed);
@@ -138,9 +155,14 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   const { readFileSync } = await import('node:fs');
   const refs = readFileSync(0, 'utf8');
   const cwd = process.cwd();
+  /** @type {SelectMainPush|undefined} */ let selectMainPush;
+  const marker = process.env.WS_LAND_MAIN_PUSH;
+  if (marker?.startsWith('main-push:') && marker !== `main-push:${git(cwd, ['rev-parse', 'HEAD']).out}`) {
+    ({ownCommits: selectMainPush} = await import('../src/scripts/.kit/main-push.mjs'));
+  }
   // Most pushes touch no pins: answer them without loading land.mjs or asking GitHub.
   let asked = false;
-  let verdict = checkPinPush({ cwd, refs, ciState: () => { asked = true; throw new Error('not asked yet'); } });
+  let verdict = checkPinPush({ cwd, refs, selectMainPush, ciState: () => { asked = true; throw new Error('not asked yet'); } });
   if (asked) {
     let ciState;
     try {
@@ -149,7 +171,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       const message = String(error?.message ?? error);
       ciState = () => { throw new Error(message); };
     }
-    verdict = checkPinPush({ cwd, refs, ciState });
+    verdict = checkPinPush({ cwd, refs, ciState, selectMainPush });
   }
   if (verdict.ok) {
     if (verdict.note) console.error(`  - pin provenance: ${verdict.note}`);

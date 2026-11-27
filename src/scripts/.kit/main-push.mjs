@@ -84,7 +84,7 @@ export function checkState(cwd) {
 const OWN = new Set();
 /** The run's lane: the CLI refuses to start without one (meta QA 11-25 row 43, scripts/lane-name.mjs); a test that imports
  * these functions directly reads `unnamed`, never the script's own name. */
-const currentLane = () => { const named = laneName(process.env, 'main-push'); return 'lane' in named ? named.lane : 'unnamed'; };
+const currentLane = (env = process.env) => { const named = laneName(env, 'main-push'); return 'lane' in named ? named.lane : 'unnamed'; };
 
 /** The outgoing commits (`%h %s` rows) this run did not make: another lane's, carried along (M1).
  * @param {string} cwd @param {string} range */
@@ -117,7 +117,7 @@ export function ownCommits(cwd, base, head, env = process.env) {
   const commits = commitLanes(cwd, `${base}..${head}`);
   // A pusher with no lane name (Jake, a CI fixture) cannot tell an unnamed commit from its own, so it sends them; a named
   // lane leaves unnamed commits, which in a shared checkout may be anyone's.
-  const lane = currentLane();
+  const lane = currentLane(env);
   const left = env.ALLOW_CARRY === '1' ? [] : foreignCommits(commits, lane, { unnamed: lane === 'unnamed' ? 'own' : 'foreign' });
   if (left.length === 0) return { sha: head, own: commits.length, left };
   const skipped = new Set(left.map(row => row.sha));
