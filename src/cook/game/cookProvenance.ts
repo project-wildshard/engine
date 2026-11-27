@@ -19,9 +19,13 @@ export function cookProvenance(tarball: Uint8Array, hash: (bytes: Uint8Array) =>
   } catch { return undefined; }
 }
 
-/** Why the copy disagrees with the API's, or undefined when it agrees, the chains differ, or there is nothing to compare. */
-export function provenanceRefusal(slug: string, provenance: CookProvenance | undefined, expected: ExpectedCopy | undefined): string | undefined {
-  if (provenance === undefined || expected === undefined || expected.chainId !== provenance.chainId || expected.digest === provenance.digest) return undefined;
+/** Why the copy disagrees with the API's, or undefined if there is no conflict. */
+export function provenanceRefusal(slug: string, provenance: CookProvenance | undefined, expected: ExpectedCopy | undefined, shardVersion?: string): string | undefined {
+  if (expected === undefined) return undefined;
+  if (provenance?.chainId !== expected.chainId) {
+    return `${slug} shardVersion ${shardVersion ?? '(unavailable)'}: migration chain mismatch (cook ${provenance?.chainId ?? '(unreadable)'}, API ${expected.chainId})`;
+  }
+  if (expected.digest === provenance.digest) return undefined;
   return `${slug}: the migrated copy's digest ${provenance.digest} differs from the API's ${expected.digest} under chain ${provenance.chainId}`;
 }
 

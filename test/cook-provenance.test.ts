@@ -1,9 +1,12 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook writes into a folder of its own.
 import {join} from 'node:path';
+// oxlint-disable-next-line import/no-nodejs-modules -- A chain mismatch must leave no output directory.
+import {existsSync} from 'node:fs';
 import {describe, expect, it} from 'vitest';
 import {migrateShardfile} from '@wildshard/format/migrate';
 import {readTar, writeTar} from '@wildshard/format/tar';
 import {cookProvenance, provenanceRefusal} from '../src/cook/game/cookProvenance';
+import {checkShardfile} from '../src/server/host/checkShardfile';
 import {runCookJob, ShardfileRefusedError} from '../src/cook/game/cookJob';
 import {hashOf, legacyMigrationFixture, useCookHarness} from './fixtures/cookWorkerHarness';
 
@@ -19,11 +22,12 @@ describe('the cook provenance', () => {
     expect(provenance?.chainId).toMatch(/^[0-9a-f]{64}$/u);
   });
 
-  it('refuses only a different digest under the same chain', () => {
+  it('refuses unequal chains or unequal digests', () => {
     const provenance = cookProvenance(h.real, hashOf);
     if (provenance === undefined) throw new Error('the chain read nothing');
     expect(provenanceRefusal(slug, provenance, {chainId: provenance.chainId, digest: provenance.digest})).toBeUndefined();
-    expect(provenanceRefusal(slug, provenance, {chainId: 'identity', digest: '0'.repeat(64)})).toBeUndefined();
+    expect(provenanceRefusal(slug, provenance, {chainId: 'identity', digest: provenance.digest}, '1.2.3')).toBe(
+      `${slug} shardVersion 1.2.3: migration chain mismatch (cook ${provenance.chainId}, API identity)`);
     expect(provenanceRefusal(slug, provenance, undefined)).toBeUndefined();
     expect(provenanceRefusal(slug, provenance, {chainId: provenance.chainId, digest: '0'.repeat(64)})).toMatch(new RegExp(`^${slug}: the migrated copy's digest`, 'u'));
   });
@@ -35,6 +39,28 @@ describe('the cook provenance', () => {
     const run = runCookJob(h.real, join(h.scratch, 'doctored'), {expected, check: () => Promise.reject(new Error('the check ran')), wireBytes: () => 0, now: () => 0});
     await expect(run).rejects.toThrow(ShardfileRefusedError);
     await expect(run).rejects.toThrow(`${slug}: the migrated copy's digest`);
+  }, 60_000);
+
+  it('refuses a different chain before creating any output', async () => {
+    const provenance = cookProvenance(h.real, hashOf);
+    if (provenance === undefined) throw new Error('the chain read nothing');
+    const expected = {chainId: 'a'.repeat(64), digest: provenance.digest};
+    const out = join(h.scratch, 'wrong-chain');
+    await expect(runCookJob(h.real, out, {
+      expected, shardVersion: '1.2.3', check: () => Promise.reject(new Error('the check ran')), wireBytes: () => 0, now: () => 0,
+    })).rejects.toThrow(`${slug} shardVersion 1.2.3: migration chain mismatch (cook ${provenance.chainId}, API ${expected.chainId})`);
+    expect(existsSync(out)).toBe(false);
+  }, 60_000);
+
+  it('writes the cook when the API recorded the same chain and digest', async () => {
+    const expected = cookProvenance(h.real, hashOf);
+    if (expected === undefined) throw new Error('the chain read nothing');
+    const out = join(h.scratch, 'matching-chain');
+    const report = await runCookJob(h.real, out, {
+      expected, check: (shard, assets, sections) => checkShardfile(shard, assets, {sections}), wireBytes: () => 0, now: () => 0,
+    });
+    expect(report.provenance).toEqual(expected);
+    expect(existsSync(join(out, 'client', report.header))).toBe(true);
   }, 60_000);
 
   it('gives nothing for bytes the chain cannot read, so the validator refusal stands', () => {

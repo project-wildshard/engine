@@ -95,6 +95,7 @@ export interface CookIndex {
   readonly server: CookJobReport['server'];
   readonly serverPack?: NonNullable<CookJobReport['cook']['server']>;
   readonly ktx2?: unknown;
+  readonly provenance?: NonNullable<CookJobReport['provenance']>;
   readonly proof: 'proved' | 'unmeasured';
   /** Absent in legacy indexes: never use them to approve a pending upload. */
   readonly check?: CookJobReport['check'];
@@ -188,7 +189,7 @@ const COOK_PHASE = /^phase (validation|proof|textures|client-packs|server-packs|
 
 /** One child. Its stdout is a report or a refusal; anything else, a crash or a limit, is `killed`. */
 /** FORMAT-PRUNE FP27c: `armed` is the catalogue's word for the shard, which the job passes to validation (`COOK_ARMED`). */
-export function runJob(launcher: JobLauncher, tarball: string, out: string, expectedSlug?: string, reportPhases?: (phases: string) => void, sidecar?: string, armed?: boolean): Promise<JobOutcome> {
+export function runJob(launcher: JobLauncher, tarball: string, out: string, expectedSlug?: string, reportPhases?: (phases: string) => void, sidecar?: string, armed?: boolean, metadata?: Readonly<{shardVersion?: string | undefined; expected?: ExpectedCopy | undefined}>): Promise<JobOutcome> {
   const {root, execPath, loader, script, wrap, limits} = launcher, work = dirname(out);
   const granted = process.env['WS_CPU_SLOTS'];
   const slots = [limits.cpuSlots, granted === undefined ? undefined : Number(granted)].filter((value): value is number => value !== undefined);
@@ -204,7 +205,7 @@ export function runJob(launcher: JobLauncher, tarball: string, out: string, expe
     // No credentials, no home: the cook's only inputs are its arguments. The encoder's cache survives jobs, and each entry
     // is decoded against its hash before use, so one job can't poison the next.
     const child = spawn(command, args, {cwd: work, env: {PATH: process.env['PATH'] ?? '', WILDSHARD_SPAWN_PART_CACHE: cache, NODE_ENV: 'production', ...(launcher.versionedOutput === true ? {COOK_VERSIONED_OUTPUT: '1'} : {}), COOK_MAX_SHARDFILE_BYTES: String(limits.maxBytes ?? MAX_SHARDFILE_BYTES),
-      ...(cpuSlots === undefined ? {} : {COOK_CPU_SLOTS: String(cpuSlots)}), ...(launcher.renderer === undefined ? {} : {COOK_RENDERER: launcher.renderer}), ...(sidecar === undefined ? {} : {COOK_SIDECAR: sidecar}), ...(armed === undefined ? {} : {COOK_ARMED: String(armed)})}, stdio: ['ignore', 'pipe', 'pipe']});
+      ...(cpuSlots === undefined ? {} : {COOK_CPU_SLOTS: String(cpuSlots)}), ...(launcher.renderer === undefined ? {} : {COOK_RENDERER: launcher.renderer}), ...(sidecar === undefined ? {} : {COOK_SIDECAR: sidecar}), ...(armed === undefined ? {} : {COOK_ARMED: String(armed)}), ...(metadata?.shardVersion === undefined ? {} : {COOK_SHARD_VERSION: metadata.shardVersion}), ...(metadata?.expected === undefined ? {} : {COOK_EXPECTED_CHAIN: metadata.expected.chainId, COOK_EXPECTED_DIGEST: metadata.expected.digest})}, stdio: ['ignore', 'pipe', 'pipe']});
     let stdout = '', stderr = '', peak = 0, why: string | undefined;
     const take = (text: string, kept: string): string => (kept + text).slice(-CAPTURE_BYTES);
     child.stdout.setEncoding('utf8').on('data', (text: string) => { stdout = take(text, stdout); });
@@ -635,6 +636,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
       version: 1, build, slug: report.slug, hash, header: report.header, manifests: report.cook.manifests, keys,
       server: report.server, serverPack: report.cook.server, proof: indexProof(report.proof), check: report.check, seconds: report.seconds,
       ...(report.cook.preparation === undefined ? {} : {preparation: report.cook.preparation}),
+      ...(report.provenance === undefined ? {} : {provenance: report.provenance}),
       ...(report.receipt === undefined || options.validator === undefined ? {} : {verdict: {...report.receipt, revision: options.validator}}),
       ...(ktx2 === undefined ? {} : {ktx2}),
       ...(carryKey === undefined ? {} : {cook: carryKey}),
@@ -753,14 +755,14 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     if (versioned === undefined) prefetch();
     const outcome = await runJob(launcher, file, out, shardSlugOf(head.slug), phases => {
       log(`cook ${head.slug} ${head.hash.slice(0, 12)}: phases ${phases}`);
-    }, sidecarPath(launcher.sidecars, head.hash, launcher.renderer), armedWords.get(head.hash));
+    }, sidecarPath(launcher.sidecars, head.hash, launcher.renderer), armedWords.get(head.hash), {...head, expected: expectations.get(head.hash)});
     if (outcome.kind === 'refused') return {...head, state: 'refused', detail: outcome.reason, ...(outcome.check === undefined ? {} : {check: outcome.check})};
     if (outcome.kind === 'killed') return {...head, state: 'failed', detail: outcome.reason};
     if (!outcome.report.check?.pass) return {...head, state: 'failed', detail: 'The job supplied no successful full check'};
     if (outcome.report.hash !== head.hash) return {...head, state: 'failed', detail: 'The job cooked other bytes'};
     if (!new Set([shardSlugOf(head.slug)]).has(outcome.report.slug)) return {...head, state: 'refused', detail: `A shardfile for ${outcome.report.slug} under ${head.slug}`};
     // CP2b2b: the cook and the API ran one chain on one original; a different digest under the same chain is never published.
-    const disagrees = provenanceRefusal(head.slug, outcome.report.provenance, expectations.get(head.hash));
+    const disagrees = provenanceRefusal(head.slug, outcome.report.provenance, expectations.get(head.hash), head.shardVersion);
     if (disagrees !== undefined) return {...head, state: 'refused', detail: disagrees};
     // MAP-NEXT MN5 (J450): a cook always draws both maps (`cookedMapPngs` falls back rather than throw), so a report without one
     // is a job from before it or a broken one: its index would list no cooked-map-v1, and the page would draw the olive plot.
@@ -798,6 +800,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
       if (body === undefined) continue;
       const index = JSON.parse(new TextDecoder().decode(body)) as CookIndex;
       if (index.cook !== carryKey || index.check?.pass !== true || index.hash !== head.hash || !new Set([shardSlugOf(head.slug)]).has(index.slug)) continue;
+      if (provenanceRefusal(head.slug, index.provenance, expectations.get(head.hash), head.shardVersion) !== undefined) continue;
       if (!existsSync(join(serverPacks, index.slug, head.hash))) continue;
       if (index.loose !== undefined && !await store.has(index.loose + index.header)) continue;
       const {carried: _from, ...own} = index, copy: CookIndex = {...own, build, carried: donor};
@@ -826,10 +829,10 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
       try {
         writeFileSync(tar, await source.download(row.head.hash));
         const outcome = await runJob(launcher, tar, out, shardSlugOf(slug), undefined,
-          sidecarPath(launcher.sidecars, row.head.hash, launcher.renderer));
+          sidecarPath(launcher.sidecars, row.head.hash, launcher.renderer), undefined, row.head);
         if (outcome.kind !== 'cooked') throw new Error(`Cook canary ${slug} ${outcome.kind}: ${outcome.reason}`);
         if (outcome.report.hash !== row.head.hash || !outcome.report.check.pass) throw new Error(`Cook canary ${slug} failed validation`);
-        const disagrees = provenanceRefusal(slug, outcome.report.provenance, row.head.expected);
+        const disagrees = provenanceRefusal(slug, outcome.report.provenance, row.head.expected, row.head.shardVersion);
         if (disagrees !== undefined) throw new Error(disagrees);
         return cookOutputDigest(out);
       } finally { rmSync(work, {recursive: true, force: true}); }
@@ -839,11 +842,13 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   };
   const versionedHit = async (recipe: VersionedCook, head: CookHead): Promise<CookRow | undefined> => {
     const ref = versionedRef(recipe, head), existing = await readVersionedCook(recipe.store, ref, head.hash);
-    if (existing !== undefined) return {...head, state: 'present', check: existing.check};
+    const expected = expectations.get(head.hash);
+    if (existing !== undefined && provenanceRefusal(head.slug, existing.provenance, expected, head.shardVersion) === undefined)
+      return {...head, state: 'present', check: existing.check};
     const donor = recipe.sameOutputFrom;
     if (donor === undefined) return undefined;
     const heldDonor = await readVersionedCook(recipe.store, versionedRef(recipe, head, donor), head.hash);
-    if (heldDonor === undefined) return undefined;
+    if (heldDonor === undefined || provenanceRefusal(head.slug, heldDonor.provenance, expected, head.shardVersion) !== undefined) return undefined;
     reuseProof ??= proveReuse(recipe, donor);
     if (!await reuseProof) return undefined;
     await writeVersionedCook(recipe.store, ref, {...heldDonor, ...ref, carried: heldDonor.build});
@@ -859,7 +864,8 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
       const held = await store.get(indexKey(build, head.hash));
       if (held !== undefined) {
         const index = JSON.parse(new TextDecoder().decode(held)) as CookIndex;
-        if (index.check?.pass && index.hash === head.hash && new Set([shardSlugOf(head.slug)]).has(index.slug)) return {...head, state: 'present', check: index.check};
+        if (index.check?.pass && index.hash === head.hash && new Set([shardSlugOf(head.slug)]).has(index.slug)
+          && provenanceRefusal(head.slug, index.provenance, expectations.get(head.hash), head.shardVersion) === undefined) return {...head, state: 'present', check: index.check};
       }
       const carried = await carry(head);
       if (carried !== undefined) return carried;

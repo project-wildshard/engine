@@ -41,6 +41,7 @@ type CookJobPhase = 'validation' | 'proof' | 'server-files' | CookShardPhase;
 export interface CookJobPorts {
   /** Host-owned notice identity; reject a valid product for another shard before its simulation/cook. */
   readonly expectedSlug?: string;
+  readonly shardVersion?: string;
   readonly versionedOutput?: boolean;
   /** SP19: mandatory full check, composed by the host above this layer. */
   readonly check: (shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>, sections: ReadonlyMap<string, unknown>) => Promise<ShardfileCheckReport>;
@@ -177,7 +178,8 @@ export async function runCookJob(tarball: Uint8Array, out: string, ports: CookJo
   if (ports.expectedSlug !== undefined && !new Set([ports.expectedSlug]).has(product.index.identity.slug)) {
     throw new ShardfileRefusedError(`A shardfile for ${product.index.identity.slug} under ${ports.expectedSlug}`);
   }
-  const provenance = cookProvenance(tarball, sha256, ports.migrations), refused = provenanceRefusal(product.index.identity.slug, provenance, ports.expected);
+  const provenance = cookProvenance(tarball, sha256, ports.migrations);
+  const refused = provenanceRefusal(product.index.identity.slug, provenance, ports.expected, ports.shardVersion);
   if (refused !== undefined) throw new ShardfileRefusedError(refused);
   phase('proof');
   const check = await checked(product, ports);

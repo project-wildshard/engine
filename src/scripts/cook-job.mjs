@@ -15,6 +15,10 @@ if (tarball === undefined || out === undefined) throw new Error('usage: cook-job
 try {
   const report = await runCookJob(readFileSync(tarball), resolve(out), {
     ...(expectedSlug === undefined ? {} : {expectedSlug}),
+    ...(process.env.COOK_EXPECTED_CHAIN === undefined || process.env.COOK_EXPECTED_DIGEST === undefined ? {} : {
+      expected: {chainId: process.env.COOK_EXPECTED_CHAIN, digest: process.env.COOK_EXPECTED_DIGEST},
+    }),
+    ...(process.env.COOK_SHARD_VERSION === undefined ? {} : {shardVersion: process.env.COOK_SHARD_VERSION}),
     // SHARD-COMPAT CP10: the API judged this file at upload; the cook only measures what runs on its build.
     check: (shard, assets, sections) => checkShardfile(shard, assets, {sections, judged: 'stored'}),
     now: () => performance.now(),
