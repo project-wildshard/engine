@@ -1,13 +1,16 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Shardfiles are addressed by their real hash.
 import {createHash} from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- Each cook file runs the worker in folders of its own.
-import {closeSync, ftruncateSync, mkdirSync, mkdtempSync, openSync, rmSync} from 'node:fs';
+import {closeSync, ftruncateSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Each cook file runs the worker in folders of its own.
 import {tmpdir} from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- Each cook file runs the worker in folders of its own.
 import {dirname, join} from 'node:path';
 import {afterAll, beforeAll} from 'vitest';
-import {readTar} from '@wildshard/format/tar';
+import {readTar, writeTar} from '@wildshard/format/tar';
+import {migrateShardfile} from '@wildshard/format/migrate';
+import {parseOutputIndex} from '@wildshard/format/outputIndex';
+import {validationSourceBytes} from '@wildshard/format/validationReceipt';
 import {folderTarball} from '../../src/cook/game/folderTarball';
 import {createCookWorker, type JobLauncher, type ShardfileSource} from '../../src/cook/game/cookWorker';
 import {folderStore, type PackStore} from '../../src/cook/game/packStore';
@@ -20,6 +23,29 @@ export const hashOf = (bytes: Uint8Array): string => createHash('sha256').update
 /** ZONE-SNAPSHOTS ZS8 (J507): an old-format product the chain carries forward, made up (shard-format's CLI fixture at
  *  format 0.1, one terrain tile), never a stored zone. */
 export const legacyMigrationFixture = { folder: join('test', 'fixtures', 'made-up-old'), slug: 'cli-fixture' };
+
+/** The one-tile fixture with a real thumbnail and discovery mount for the cook/title contract. */
+export function cookCardTarball(folder: string): Uint8Array {
+  const original = readTar(folderTarball(folder));
+  const files = new Map(migrateShardfile(original, {hash: hashOf}).files);
+  const index = parseOutputIndex(JSON.parse(new TextDecoder().decode(files.get('shard.json'))));
+  const slug = index.identity.slug, prefix = `/shardfiles/${slug}`;
+  const mount = (url: string, bytes: Uint8Array) => {
+    const path = `mounts${url}`;
+    files.set(path, bytes);
+    return {url, path, bytes: bytes.length, hash: hashOf(bytes)};
+  };
+  const image = readFileSync(join('test', 'fixtures', 'world-source', 'image.png'));
+  const thumb = `${prefix}/blobs/image/${hashOf(image)}.png`;
+  const discovery = validationSourceBytes({version: 1, slug, data: {
+    slug, name: index.identity.name, biome: '', status: 'live', shardfile: `${prefix}/shard.json`,
+    card: {thumb, portrait: thumb, landscape: thumb},
+  }});
+  const cook = validationSourceBytes({version: 1, mounts: [mount(thumb, image), mount(`${prefix}/discovery.json`, discovery)]});
+  files.set('cook.json', cook);
+  files.set('shard.json', validationSourceBytes({...index, cook: {path: 'cook.json', bytes: cook.length, hash: hashOf(cook)}}));
+  return writeTar(files);
+}
 
 /** A file of `bytes` that allocates none of its disk space: the page's content and the cook's packed parts in the
  *  publish files (cook-worker-publish*.test.ts). */
@@ -52,7 +78,7 @@ export interface CookHarness {
 }
 
 /** Register the original suite setup in the calling `describe`. */
-export function useCookHarness(productFolder = join('out', slug), productSlug = slug): CookHarness {
+export function useCookHarness(productFolder = join('out', slug), productSlug = slug, pack = folderTarball): CookHarness {
   let scratch: string | undefined, real: Uint8Array | undefined, files: Map<string, Uint8Array> | undefined, store: PackStore | undefined;
   let prepared: Awaited<ReturnType<typeof compileCookWorker>> | undefined, preparing: ReturnType<typeof compileCookWorker> | undefined;
   const preparationScope = new AbortController();
@@ -71,7 +97,7 @@ export function useCookHarness(productFolder = join('out', slug), productSlug = 
   };
   beforeAll(async () => {
     scratch = mkdtempSync(join(tmpdir(), 'cook-worker-'));
-    real = folderTarball(productFolder); files = new Map(readTar(real)); store = folderStore(join(scratch, 'store'));
+    real = pack(productFolder); files = new Map(readTar(real)); store = folderStore(join(scratch, 'store'));
     preparing = compileCookWorker(preparationScope.signal); prepared = await preparing;
   });
   afterAll(async () => { preparationScope.abort(); await preparing?.catch(() => undefined); prepared?.dispose(); if (scratch !== undefined) rmSync(scratch, {recursive: true, force: true}); });

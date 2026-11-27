@@ -4,14 +4,15 @@ import {readdirSync} from 'node:fs';
 import {join} from 'node:path';
 import {describe, expect, it} from 'vitest';
 import {collectGarbage, indexKey, objectHeaders, readCapped, storeUsage, type CookIndex} from '../src/cook/game/cookWorker';
-import {hashOf, slug, useCookHarness} from './fixtures/cookWorkerHarness';
+import {cookCardTarball, hashOf, legacyMigrationFixture, useCookHarness} from './fixtures/cookWorkerHarness';
 
 /** C4 (J28, J29, J30): a real product and hostile ones through real child processes under their real limits. */
 // The cold real cook and the store it leaves. Hostile archives, job limits and the R2 store are in
 // cook-worker-limits.test.ts; the HTTP notice's own cold cook is in cook-worker-publish.test.ts and the pack budget in
 // cook-worker-publish-budget.test.ts and cook-worker-publish-full.test.ts.
 describe('the cook worker', () => {
-  const h = useCookHarness();
+  const {folder, slug} = legacyMigrationFixture;
+  const h = useCookHarness(folder, slug, cookCardTarball);
 
   it('cooks a real shard: parts and index in the store, a server pack for the room, no second cook', async () => {
     const hash = hashOf(h.real), cook = h.worker(new Map([[hash, h.real]]));
@@ -21,8 +22,8 @@ describe('the cook worker', () => {
     const row = await cook.cook({slug, hash});
     expect(row.state, row.detail).toBe('cooked');
     const index = JSON.parse(new TextDecoder().decode(await h.store.get(indexKey('b1', hash)))) as CookIndex;
-    expect(index).toMatchObject({version: 1, build: 'b1', slug, hash, proof: 'unmeasured'});
-    expect(index.check).toMatchObject({slug, pass: true, proof: 'unmeasured'});
+    expect(index).toMatchObject({version: 1, build: 'b1', slug, hash, proof: 'proved'});
+    expect(index.check).toMatchObject({slug, pass: true, proof: {ticks: 240}});
     expect(index.check?.performance.scripts.scripts.samples).toBe(180);
     expect(index.manifests).toHaveLength(4);
     for (const key of index.keys) expect(await h.store.has(key), key).toBe(true);
@@ -36,7 +37,9 @@ describe('the cook worker', () => {
     expect(objectHeaders(`loose/${hash}/${index.header}`).cache).toMatch(/immutable/u);
     const room = join(h.scratch, 'server', slug, hash), held = readdirSync(room, {recursive: true}).map(String);
     expect(held).toContain('shard.json');
-    expect(index.server.bytes).toBeLessThan(h.real.length / 4);
+    // The made-up shard is mostly room data, with one client-only card.
+    expect(index.server.bytes).toBeLessThan(32 * 1024);
+    expect(index.keys.some(key => key.endsWith('.png'))).toBe(true);
     expect(held.filter(path => /\.(?:ktx2|glb|webp|png|jpe?g|mp3|m4a)$/u.test(path))).toEqual([]);
     expect(await cook.cook({slug, hash})).toMatchObject({state: 'present', check: index.check});
     // A new engine build cooks its own index, and its parts are the ones already stored (J83).

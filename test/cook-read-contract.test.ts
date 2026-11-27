@@ -10,7 +10,7 @@ import {stampBuildHtml} from '../src/scripts/app-build/buildIdentity.mjs';
 import {indexKey, type CookIndex} from '../src/cook/game/cookWorker';
 import {packsBookPath} from '../src/shared/game/shardfile/spawnManifest';
 import type {TitleManifest} from '../src/client/game/shard/titleList';
-import {hashOf, slug, useCookHarness} from './fixtures/cookWorkerHarness';
+import {cookCardTarball, hashOf, legacyMigrationFixture, useCookHarness} from './fixtures/cookWorkerHarness';
 
 /**
  * SHARD-COMPAT NB8 (meta NEVER-BREAK-LIVE I4): a path move ships its reader first. `4de1e703e` moved a stored cook's
@@ -21,12 +21,15 @@ import {hashOf, slug, useCookHarness} from './fixtures/cookWorkerHarness';
  * in node, in the push gate's related tests for either side.
  */
 describe('the cook writer and the title reader agree on paths', () => {
-  const h = useCookHarness();
+  const {folder, slug} = legacyMigrationFixture;
+  const h = useCookHarness(folder, slug, cookCardTarball);
   const BASE = 'https://packs.example/';
 
   it('every URL a stored cook\'s title row names is a key its cook published', async () => {
+    expect(h.real.byteLength).toBeLessThan(128 * 1024);
     const hash = hashOf(h.real), cook = h.worker(new Map([[hash, h.real]]));
-    expect((await cook.cook({slug, hash})).state).toBe('cooked');
+    const cooked = await cook.cook({slug, hash});
+    expect(cooked.state, cooked.detail).toBe('cooked');
     const read = async (key: string): Promise<Uint8Array> => {
       const body = await h.store.get(key);
       if (body === undefined) throw new Error(`The store has no ${key}`);

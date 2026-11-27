@@ -3,14 +3,15 @@ import {join} from 'node:path';
 import {describe, expect, it} from 'vitest';
 import {createCookWorker, PACK_BUDGET_BYTES, STORE_FULL_ALARM_MS} from '../src/cook/game/cookWorker';
 import {folderStore} from '../src/cook/game/packStore';
-import {hashOf, slug, sparse, useCookHarness} from './fixtures/cookWorkerHarness';
+import {hashOf, legacyMigrationFixture, sparse, useCookHarness} from './fixtures/cookWorkerHarness';
 
 /** C4 (J28, J29, J30): a real product and hostile ones through real child processes under their real limits. QA 11-25 row 33
  * split the publish proofs into three files, each under the 60 s file budget with its own cold cook: the HTTP notice and two
  * publishes (cook-worker-publish.test.ts), the budget refusal and the mapless report (cook-worker-publish-budget.test.ts), and
  * the full store's alarm (cook-worker-publish-full.test.ts). */
 describe('the cook worker', () => {
-  const h = useCookHarness();
+  const {folder, slug} = legacyMigrationFixture;
+  const h = useCookHarness(folder, slug);
 
   it('still refuses when its own keys are over the default budget, and a full store alarms once a day', async () => {
     const store = join(h.scratch, 'full');

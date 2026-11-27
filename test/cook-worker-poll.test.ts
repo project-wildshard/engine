@@ -7,14 +7,15 @@ import {join} from 'node:path';
 import {afterAll, describe, expect, it} from 'vitest';
 import {bootCook, createCookWorker, indexKey, pollCatalogue, POLL_EVERY_MS, type CatalogueRow, type CookStage, type ShardfileSource} from '../src/cook/game/cookWorker';
 import {folderStore} from '../src/cook/game/packStore';
-import {hashOf, slug, useCookHarness} from './fixtures/cookWorkerHarness';
+import {hashOf, legacyMigrationFixture, useCookHarness} from './fixtures/cookWorkerHarness';
 
 /** SHARD-COMPAT SP6 (J175: "the cook worker polls outbound, no API call into the VPS"). The API sends the box no notice, so
  * an upload cooked only when the cook restarted (opus-ss16f, 2026-11-16 04:06 UTC). The worker now reads the catalogue on a
  * clock and cooks each upload it has not settled; a failed one waits out its own backoff, and a catalogue it can't read
  * backs the poll off. */
 describe('the cook worker polls the catalogue', () => {
-  const h = useCookHarness();
+  const {folder, slug} = legacyMigrationFixture;
+  const h = useCookHarness(folder, slug);
 
   /** A catalogue that can change between sweeps, counting each download. */
   function moving(): {source: ShardfileSource; heads: CatalogueRow[]; blobs: Map<string, Uint8Array>; downloads: string[]} {
