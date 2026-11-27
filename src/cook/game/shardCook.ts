@@ -31,7 +31,7 @@ import {splatTerrainOf} from '@wildshard/format/splatTerrain';
 import {blobKtx2, blobTextureUses, type TextureBlob} from './blobKtx2';
 import {skinLookTextureRefs} from '@wildshard/format/skinAssets';
 import {wasmAstc6} from './astc6Wasm';
-import {desktopKtx2} from './cookedKtx2';
+import {desktopKtx2, heldMapRoles} from './cookedKtx2';
 import {wasmImageKtx2, type ImageKtx2Encode} from './imageKtx2Wasm';
 import {cookedKtx2TableOf, EMPTY_COOKED_KTX2_TABLE, type CookedKtx2Table} from '../../shared/game/shardfile/cookedKtx2Table';
 import {createPartEncoder, packable, writeSpawnParts, type CookedMember, type PartEncoder} from './spawnParts';
@@ -262,7 +262,12 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, folder: st
   // S12b: the phone tier's files, made from the KTX2 table's own targets; the discovery document names them.
   const onTier = mountTiers(new Set(mounts.map(row => row.url))), mountByURL = new Map(mounts.map(row => [row.url, row])), mountOf = (url: string): Uint8Array | undefined => { const row = mountByURL.get(url); return row === undefined ? undefined : shard.read(row.path); };
   // SF15: the cook's desktop KTX2 of each image mount, named in the table; a mount row may keep its image (`keepImage`).
-  const images = tiers.images !== undefined && document !== undefined ? desktopKtx2(shard.read(document.path), mounts.map(row => ({url: row.url, read: () => shard.read(row.path), ...(Reflect.get(row, 'keepImage') === true ? {keepImage: true} : {})})), tiers.images) : undefined;
+  // SF7h: a held rig map is encoded as its held document says (data or normal, unflipped), not by its URL.
+  const held = tiers.images !== undefined && document !== undefined ? heldMapRoles(shard.index, path => shard.read(path)) : new Map<string, never>();
+  const images = tiers.images !== undefined && document !== undefined ? desktopKtx2(shard.read(document.path), mounts.map(row => {
+    const heldMapRole = held.get(row.url);
+    return {url: row.url, read: () => shard.read(row.path), ...(Reflect.get(row, 'keepImage') === true ? {keepImage: true} : {}), ...(heldMapRole === undefined ? {} : {heldMapRole})};
+  }), tiers.images) : undefined;
   // SF16: the cook's KTX2 of each image blob a texture rule names (material maps, prop slots, splat layers), named in the table.
   const imageBytes = images?.discovery ?? (document === undefined ? undefined : shard.read(document.path));
   const blobs = tiers.images !== undefined && imageBytes !== undefined ? blobKtx2(imageBytes, folder, textureBlobs(shard, prefix), tiers.images) : undefined;

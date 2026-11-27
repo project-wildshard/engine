@@ -9,7 +9,16 @@
  *    to its key under `cooks/<cookVersion>/`, as it maps every other URL a manifest lists. The image itself stays a
  *    shardfile file (in `common/`), read by a GPU that can't sample KTX2 (`texMode` 'img').
  *  The client registers it as it registers a discovery document's table: `registerGpuFiles(cookedKtx2Table)`. */
+import type {GraphArmsRow} from '@wildshard/format/graphArmsRows';
 import * as v from 'valibot';
+
+/** SF7h: a held row's map URL, the table's source for it, which the cook (`heldMapRoles`) and the held view both name:
+ *  `<base><name>-<kind>.<ext>`. Format f4acf4e adds `maps.imageExtension` (PNG or WebP); a row without it, and every row
+ *  format 0.82.2 admits, is WebP. */
+export function heldMapUrl(maps: GraphArmsRow['maps'], name: string, kind: 'maps' | 'nrm'): string {
+  const {imageExtension} = maps as GraphArmsRow['maps'] & {readonly imageExtension?: 'png' | 'webp'};
+  return `${maps.base}${name}-${kind}.${imageExtension ?? 'webp'}`;
+}
 
 type Rows = Readonly<Record<string, string>>;
 /** The cooked index's table: per tier, a source URL to the cook's file (see the header). */

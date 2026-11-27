@@ -17,6 +17,9 @@
 import {createHash} from 'node:crypto';
 import {readGlb, trimKtx2, writeGlb, type Gltf, type TextureRole, type TierFile} from './tierTextures';
 import {imageHead, type ImageKtx2Encode} from './imageKtx2Wasm';
+import {parseGraphArms} from '@wildshard/format/graphArmsRows';
+import type {OutputIndex} from '@wildshard/format/outputIndex';
+import {heldMapUrl} from '../../shared/game/shardfile/cookedKtx2Table';
 
 type Json = null | boolean | number | string | readonly Json[] | {readonly [key: string]: Json};
 type StringMap = Record<string, string>;
@@ -50,6 +53,26 @@ export function flipsImage(url: string, gltfFolders: ReadonlySet<string>): boole
 }
 
 /** Per image of a GLB, the strictest role of the slots that sample it (colour over normal over linear). */
+const HELD_JIAN_CONTRACT = '@wildshard/format/heldJianDocument#HeldJianDocumentSchema';
+
+/** SF7h: each held rig map URL a shard's held documents name, with its role. The held view (`heldView.ts` `loadMap`) reads
+ *  these unflipped as `NoColorSpace` data, so the cook encodes them in the file's orientation: the packed `maps` plane
+ *  linear, the `nrm` plane a normal map. By its URL alone (`roleOfImage`, `flipsImage`) the `maps` plane would be colour
+ *  and both would be flipped (Nine's SF7f board: about 8 dB against the hand-made set). */
+export function heldMapRoles(index: {readonly files: readonly Pick<OutputIndex['files'][number], 'kind' | 'jsonSchema' | 'path'>[]},
+  read: (path: string) => Uint8Array): ReadonlyMap<string, 'linear' | 'normal'> {
+  const roles = new Map<string, 'linear' | 'normal'>();
+  for (const file of index.files) {
+    if (file.kind !== 'json' || file.jsonSchema?.['$comment'] !== HELD_JIAN_CONTRACT) continue;
+    const {maps} = parseGraphArms((JSON.parse(new TextDecoder().decode(read(file.path))) as {readonly view: unknown}).view);
+    for (const name of maps.names) {
+      roles.set(heldMapUrl(maps, name, 'maps'), 'linear');
+      roles.set(heldMapUrl(maps, name, 'nrm'), 'normal');
+    }
+  }
+  return roles;
+}
+
 export function glbImageRoles(json: Gltf): ReadonlyMap<number, TextureRole> {
   const rank: Record<TextureRole, number> = {linear: 0, normal: 1, srgb: 2};
   const out = new Map<number, TextureRole>();
@@ -137,7 +160,11 @@ export function ktx2Glb(bytes: Uint8Array, encode: ImageKtx2Encode): Uint8Array 
 }
 
 /** One mount the cook may encode: its URL, its bytes, and whether its row keeps it an image (`keepImage`). */
-export interface CookImageMount {readonly url: string; readonly read: () => Uint8Array; readonly keepImage?: boolean}
+export interface CookImageMount {
+  readonly url: string; readonly read: () => Uint8Array; readonly keepImage?: boolean;
+  /** SF7h: a held rig map's role from its held document (`heldMapRoles`); it is encoded so, in the file's orientation. */
+  readonly heldMapRole?: 'linear' | 'normal';
+}
 
 export interface DesktopKtx2 {
   /** The discovery document with the cook's rows in every desktop and phone map of its KTX2 table. */
@@ -226,7 +253,7 @@ export function desktopKtx2(discovery: Uint8Array, mounts: readonly CookImageMou
     const bytes = mount.read(), head = imageHead(bytes);
     // A block format's top level is whole 4x4 blocks; an image off that grid stays an image.
     if (head === undefined || head.width % 4 !== 0 || head.height % 4 !== 0) continue;
-    const role = roleOfImage(url), flip = flipsImage(url, gltfFolders), served = phoneServed(url);
+    const role = mount.heldMapRole ?? roleOfImage(url), flip = mount.heldMapRole === undefined && flipsImage(url, gltfFolders), served = phoneServed(url);
     const plain = encode(bytes, {role, flip});
     if (plain !== undefined) {
       const target = file(url, stem, plain, 'ktx2');

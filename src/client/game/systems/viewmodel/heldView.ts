@@ -26,6 +26,7 @@ import type { GraphLiteral } from '@wildshard/format/materialGraph';
 import { parseHeldView, type HeldViewRow } from '@wildshard/format/heldView';
 import { toonLighting } from '../../looks/toonLighting';
 import { loadCatalogueFolder, runtimeLookMaterials } from '../../shardfile/runtimeFolder';
+import { heldMapUrl } from '../../../../shared/game/shardfile/cookedKtx2Table';
 import type { ShardFolder } from '../../../../shared/game/shardfile/shardFolder';
 import { createClientScene } from '../../plugin/scene';
 import { worldScenePool } from '../../shardfile/scenePools';
@@ -370,7 +371,7 @@ export class HeldView {
     }
     ownSceneResource(decal, owner, app.assets);
     const maps = new Map(await Promise.all(row.maps.names.map(async name => [name, await Promise.all((['maps', 'nrm'] as const).map(async kind => {
-      const texture = await loadMap(`${row.maps.base}${name}-${kind}.webp`, row.maps.anisotropy);
+      const texture = await loadMap(heldMapUrl(row.maps, name, kind), row.maps.anisotropy);
       ownSceneResource(texture, owner, app.assets); return texture;
     }))] as const)));
     const back = new Set(row.back), additive = new Set(row.additive);

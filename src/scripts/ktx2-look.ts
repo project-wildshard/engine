@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** SF15 (J525): the look check before a zone's hand-made KTX2 sets are deleted. For every texture row of a product's own
  * KTX2 table whose source is a JPG, PNG or WebP (SF19), it encodes the cook's KTX2 from that source with the cook's settings
- * (`desktopKtx2`'s role and flip rules, `loadBasisuImageKtx2`) and draws the same texture three ways on one board: the
+ * (`desktopKtx2`'s role and flip rules, a held rig map's role from its held document (SF7h), `loadBasisuImageKtx2`) and draws the same texture three ways on one board: the
  * source, the hand-made KTX2 and the cooked one, each decoded as a GPU would read it. Each pair gets its PSNR against the
  * source, so the board sorts the worst first and flags a flip the cook got wrong (the cooked copy far from the source while
  * the hand-made is near).
@@ -10,6 +10,8 @@
  * board; this one is texture by texture, the input those views can't separate.
  *
  *   node --import ./src/scripts/bake-loader.mjs src/scripts/ktx2-look.ts --product out/<slug> --out tmp/<lane>/look [--tier desktop|phone] [--only <substr>] [--limit <n>] [--engine]
+ *     [--table <file.json>] [--static <dir>]   a zone's retired hand-made table ({phone, desktop}: source to KTX2 URL) and
+ *     the folder its files sit in (`src/static`), once the product no longer lists them (SF7f)
  *
  * Writes `<out>/board.html`, `<out>/look.json` and one PNG per drawing; prints the worst ten. Sources and targets are read
  * from the product's mounts, then from engine `public/` (the art not yet in its shardfile). */
@@ -22,13 +24,13 @@ import {join, resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- a Node script.
 import {parseArgs} from 'node:util';
 import sharp from 'sharp';
-import {DESKTOP_LAYER_MAX, flipsImage, roleOfImage} from '../cook/game/cookedKtx2';
+import {DESKTOP_LAYER_MAX, flipsImage, heldMapRoles, roleOfImage} from '../cook/game/cookedKtx2';
 import {trimKtx2} from '../cook/game/tierTextures';
 import {decodeWebp, imageHead, loadBasisuImageKtx2} from '../cook/game/imageKtx2Wasm';
 import {cookedKtx2TableOf} from '../shared/game/shardfile/cookedKtx2Table';
 import {GPU_FILES} from '../client/engine/boot/ktx2.generated';
 
-const {values} = parseArgs({options: {product: {type: 'string'}, out: {type: 'string'}, tier: {type: 'string', default: 'desktop'}, only: {type: 'string', default: ''}, limit: {type: 'string', default: '400'}, size: {type: 'string', default: '512'}, engine: {type: 'boolean', default: false}}});
+const {values} = parseArgs({options: {product: {type: 'string'}, out: {type: 'string'}, tier: {type: 'string', default: 'desktop'}, only: {type: 'string', default: ''}, limit: {type: 'string', default: '400'}, size: {type: 'string', default: '512'}, engine: {type: 'boolean', default: false}, table: {type: 'string'}, static: {type: 'string'}}});
 if (values.product === undefined || values.out === undefined) throw new Error('usage: ktx2-look.ts --product out/<slug> --out tmp/<lane>/look [--tier desktop|phone]');
 const product = resolve(values.product), out = resolve(values.out), tier = values.tier === 'phone' ? 'phone' : 'desktop', draw = Number(values.size);
 const engineRoot = resolve(import.meta.dirname, '../..');
@@ -39,13 +41,20 @@ const cook = JSON.parse(readFileSync(join(product, 'cook.json'), 'utf8')) as {mo
 const mounts = new Map(cook.mounts.map(row => [row.url, row.path]));
 const read = (url: string): Uint8Array | undefined => {
   const clean = url.replace(/#.*$/u, ''), mounted = mounts.get(clean);
-  const file = mounted === undefined ? join(engineRoot, 'public', clean) : join(product, mounted);
+  const kept = values.static === undefined || mounted !== undefined ? undefined : join(resolve(values.static), clean);
+  const file = kept !== undefined && existsSync(kept) ? kept : mounted === undefined ? join(engineRoot, 'public', clean) : join(product, mounted);
   return existsSync(file) ? new Uint8Array(readFileSync(file)) : undefined;
 };
 const discovery = [...mounts].find(([url]) => url.endsWith('/discovery.json'));
 if (discovery === undefined) throw new Error(`${product}: no discovery document`);
 // `--engine`: the engine-wide rows too (the shared ground sets and skies a zone reads from engine `public/` today).
-const table = {...(values.engine ? GPU_FILES[tier] : {}), ...cookedKtx2TableOf(JSON.parse(readFileSync(join(product, discovery[1]), 'utf8')))[tier]};
+const retired = values.table === undefined ? {} : (JSON.parse(readFileSync(resolve(values.table), 'utf8')) as Record<'phone' | 'desktop', Record<string, string>>)[tier];
+const table = {...(values.engine ? GPU_FILES[tier] : {}), ...retired, ...cookedKtx2TableOf(JSON.parse(readFileSync(join(product, discovery[1]), 'utf8')))[tier]};
+// SF7h: a held view's rig maps take their roles from the held document, unflipped, as the cook encodes them; a phone copy
+// (`<name>.phone.webp`) takes its desktop map's role.
+const indexFile = join(product, 'shard.json');
+const held = existsSync(indexFile) ? heldMapRoles(JSON.parse(readFileSync(indexFile, 'utf8')) as Parameters<typeof heldMapRoles>[0], path => new Uint8Array(readFileSync(join(product, path)))) : new Map<string, never>();
+const heldRole = (url: string): 'linear' | 'normal' | undefined => held.get(url) ?? held.get(url.replace(/\.phone(\.[a-z0-9]+)$/u, '$1'));
 const gltfFolders = new Set([...mounts.keys()].filter(url => url.endsWith('.gltf')).map(url => url.slice(0, url.lastIndexOf('/'))));
 
 // The transcoder: basisu's own (the vendored build), every KTX2 decoded to RGBA as a GPU would sample its top level.
@@ -86,7 +95,7 @@ for (const [at, [source, target]] of wanted.entries()) {
   if (image === undefined || hand === undefined || imageHead(image) === undefined) { skipped.push(`${source}: ${image === undefined ? 'no source' : hand === undefined ? 'no hand-made file' : 'not a PNG or JPEG'}`); continue; }
   // SF19: a WebP source is encoded from a PNG of its pixels, as the cook's prepare pass makes it
   await decodeWebp([image]);
-  const url = source.replace(/#layer$/u, ''), role = roleOfImage(url), flip = !layer && flipsImage(url, gltfFolders);
+  const url = source.replace(/#layer$/u, ''), rig = heldRole(url), role = rig ?? roleOfImage(url), flip = !layer && rig === undefined && flipsImage(url, gltfFolders);
   // A `#layer` twin is trimmed to the desktop's array size, as `desktopKtx2` writes it.
   const encoded = encode(image, {role, flip}), cooked = layer && encoded !== undefined ? trimKtx2(encoded, DESKTOP_LAYER_MAX) : encoded, handImage = decodeKtx2(hand), cookedImage = cooked === undefined ? undefined : decodeKtx2(cooked);
   if (handImage === undefined || cookedImage === undefined) { skipped.push(`${source}: ${handImage === undefined ? 'hand-made file did not decode' : 'cook encode failed'}`); continue; }
