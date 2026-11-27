@@ -230,11 +230,13 @@ export function desktopKtx2(discovery: Uint8Array, mounts: readonly CookImageMou
     const dot = url.lastIndexOf('.'), stem = url.slice(0, dot);
     return [...urls].find(other => other !== url && PHONE_COPY.test(other) && (other.startsWith(`${stem}.phone.`) || other.startsWith(`${stem}-phone.`))) ?? url;
   };
-  /** The URLs a phone may ask in a file's place: the one it serves, and a ground layer's `_1k` name (`texUrl` on the phone), which
-   *  a shard carrying one image per texture no longer holds. */
+  /** The URLs a phone may ask in a file's place: the one it serves, the file's own name (`loadPBR` asks a slab's `arm.jpg` on the
+   *  phone too: Pine's phone entry 404ed on it while its `arm.phone.webp` copy held the row, SF5d), and a ground layer's `_1k`
+   *  name (`texUrl` on the phone), which a shard carrying one image per texture no longer holds. */
   const phoneKeys = (url: string, served: string): readonly string[] => {
     const small = LAYER_FILE.test(url) && !/_1k\.[a-z]+$/iu.test(url) ? url.replace(/(\.[a-z]+)$/iu, '_1k$1') : undefined;
-    return small === undefined || small === served || urls.has(small) ? [served] : [served, small];
+    const keys = served === url ? [served] : [served, url];
+    return small === undefined || small === served || urls.has(small) ? keys : [...keys, small];
   };
   for (const mount of mounts) {
     const {url} = mount;
@@ -265,9 +267,9 @@ export function desktopKtx2(discovery: Uint8Array, mounts: readonly CookImageMou
       if (twin === undefined) continue;
       const desktop = trimKtx2(twin, DESKTOP_LAYER_MAX), key = `${url}#layer`, target = file(key, `${stem}.layer`, desktop, 'ktx2');
       desktopRow(key, url, target);
-      // The phone's twin is the whole one: a kept row, encoded 6x6 at its own size (`phoneTierSize`).
-      const whole = desktop === twin ? target : file(`${served}#layer`, `${stem}.layer-full`, twin, 'ktx2');
-      for (const asked of phoneKeys(url, served)) phoneRow(`${asked}#layer`, served, whole);
+      // SF5g: the phone reads the trimmed layer too, a kept row encoded 6x6 at its own size (`phoneTierSize`). It read the whole
+      // one, so Pine's nine 2048 ground maps reached a phone at 2048, past desktop's 1024, where its hand-made phone sets were 1k.
+      for (const asked of phoneKeys(url, served)) phoneRow(`${asked}#layer`, served, target);
     }
   }
   if (files.length === 0) return undefined;
