@@ -7,16 +7,16 @@ import {join} from 'node:path';
 import {describe, expect, it} from 'vitest';
 import {COOK_PREFIXES, createCookWorker, notifyServer} from '../src/cook/game/cookWorker';
 import {folderStore} from '../src/cook/game/packStore';
-import {hashOf, slug, sparse, useCookHarness} from './fixtures/cookWorkerHarness';
+import {hashOf, legacyMigrationFixture, sparse, useCookHarness} from './fixtures/cookWorkerHarness';
 
-/** C4 (J28, J29, J30): a real product and hostile ones through real child processes under their real limits. QA 11-25 row 33
- * split the publish proofs into three files, each under the 60 s file budget with its own cold cook: the HTTP notice and two
- * publishes (cook-worker-publish.test.ts), the budget refusal and the mapless report (cook-worker-publish-budget.test.ts), and
- * the full store's alarm (cook-worker-publish-full.test.ts). */
+/** C4 (J28, J29, J30), QA57: the HTTP and listing contract cooks one made-up tile through the real child twice.
+ * Other cook worker tests cover the pinned product. */
 describe('the cook worker', () => {
-  const h = useCookHarness();
+  const {folder: fixture, slug} = legacyMigrationFixture;
+  const h = useCookHarness(fixture, slug);
 
   it('authenticates HTTP notices and publishes twice from one bucket listing', async () => {
+    expect(h.real.byteLength).toBeLessThan(128 * 1024);
     const folder = join(h.scratch, 'listed'), inner = folderStore(folder), hash = hashOf(h.real);
     // The page's content sets exceed the whole default cook budget by themselves.
     sparse(folder, 'content/set-a/blob.bin', 8_000_000_000);

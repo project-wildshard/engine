@@ -52,7 +52,7 @@ export interface CookHarness {
 }
 
 /** Register the original suite setup in the calling `describe`. */
-export function useCookHarness(productFolder = join('out', slug)): CookHarness {
+export function useCookHarness(productFolder = join('out', slug), productSlug = slug): CookHarness {
   let scratch: string | undefined, real: Uint8Array | undefined, files: Map<string, Uint8Array> | undefined, store: PackStore | undefined;
   let prepared: Awaited<ReturnType<typeof compileCookWorker>> | undefined, preparing: ReturnType<typeof compileCookWorker> | undefined;
   const preparationScope = new AbortController();
@@ -64,7 +64,7 @@ export function useCookHarness(productFolder = join('out', slug)): CookHarness {
     get store() { return ready(store); },
     launcher: (script, limits = {}) => ({root, execPath: process.execPath, loader: join(root, 'src/scripts/bake-loader.mjs'), get script() { return script ?? ready(prepared).script; }, wrap: [], limits: {seconds: 120, memoryMB: 4096, heapMB: 2048, ...limits}}),
     source: blobs => ({
-      heads: () => Promise.resolve([...blobs].map(([hash], row) => ({slug, revision: row + 1, hash}))),
+      heads: () => Promise.resolve([...blobs].map(([hash], row) => ({slug: productSlug, revision: row + 1, hash}))),
       download: hash => { const bytes = blobs.get(hash); if (bytes === undefined) throw new Error('No such shardfile'); return Promise.resolve(bytes); },
     }),
     worker: (blobs, build = 'b1', folder = 'store', budgetBytes) => createCookWorker({build, store: folderStore(join(harness.scratch, folder)), source: harness.source(blobs), launcher: harness.launcher(), serverPacks: join(harness.scratch, 'server'), scratch: join(harness.scratch, 'work'), ...(budgetBytes === undefined ? {} : {budgetBytes})}),
