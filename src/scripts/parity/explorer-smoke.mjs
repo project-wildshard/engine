@@ -70,7 +70,8 @@ export function explorerState() {
   const probe = /** @type {import('../../client/engine/debug/probe').EngineProbe | undefined} */ (window.__wildshard);
   const identity = {url:location.href,id:String(Reflect.get(document,'__explorerProofDocumentId')??''),timeOrigin:performance.timeOrigin,slug:probe?.shard.slug??null};
   return {fatal,document:identity,empty:root?.querySelector('.ws-x-empty-models.show')!==null && root!==null,
-    ready:cards!==undefined && cards.length>0 && readyIds.length===cards.length,readyIds};
+    ready:cards!==undefined && cards.length>0 && readyIds.length===cards.length,readyIds,
+    catalogue:{inline:document.getElementById('ws-catalogue')!==null,visible:root!==null,cards:cards?.length??0}};
 }
 
 /** Read pixels and both roster witnesses in one browser task. Model-ready
@@ -87,7 +88,8 @@ export function explorerCapture(){
   const probe = /** @type {import('../../client/engine/debug/probe').EngineProbe | undefined} */ (window.__wildshard);
   const identity = {url:location.href,id:String(Reflect.get(document,'__explorerProofDocumentId')??''),timeOrigin:performance.timeOrigin,slug:probe?.shard.slug??null};
   return {fatal,document:identity,empty:root?.querySelector('.ws-x-empty-models.show')!==null && root!==null,
-    ready:cards!==undefined && cards.length>0 && readyIds.length===cards.length,readyIds};
+    ready:cards!==undefined && cards.length>0 && readyIds.length===cards.length,readyIds,
+    catalogue:{inline:document.getElementById('ws-catalogue')!==null,visible:root!==null,cards:cards?.length??0}};
   }
   function readCards(){
   return [...document.querySelectorAll('.ws-x-grid .ws-x-model')].map(card => {
@@ -147,6 +149,8 @@ export function explorerDiagnostics(){
 }
 
 const CONTEXT_CATALOGUES=4;
+const NETWORK_TAIL=512, CATALOGUE_TAIL=32;
+/** @typedef {{origin:string,path:string,method:string,requestedAt:number,status:number|null,finishedAt:number|null,failure:string|null}} ExplorerRequest */
 
 /** Retain native HTTP/shader caches across a bounded group of world documents.
  * Retiring the native context bounds document/isolate ownership; origin
@@ -206,22 +210,39 @@ async function openExplorerContext(browser,base,faults,lifetime,generation,isola
         storageTypes:'cache_storage,indexeddb,local_storage,service_workers,file_systems,websql,storage_buckets,cookies,shared_storage,interest_groups'});
     };
     /** @type {unknown[]} */ const reports=[];
-    /** @type {Map<import('playwright').Request,{path:string,requestedAt:number,status:number|null}>} */ const pending=new Map();
+    /** @type {Map<import('playwright').Request,ExplorerRequest>} */ const pending=new Map();
+    /** @type {ExplorerRequest[]} */ const network=[];
+    /** @type {ExplorerRequest[]} */ const catalogueRequests=[];
+    let requestCount=0;
     const origin=new URL(base).origin;
     page.on('request',request=>{
-      const url=new URL(request.url());
-      if(request.method()==='GET')pending.set(request,{path:url.pathname,requestedAt:Date.now(),status:null});
-      if(url.origin!==origin || url.pathname!=='/api/errors' || request.method()!=='POST')return;
-      const report=bootErrorReport(url.href,request.method(),request.postData());
+      const url=new URL(request.url()),method=request.method();
+      if(url.protocol==='http:' || url.protocol==='https:'){
+        const row={origin:url.origin,path:url.pathname,method,requestedAt:Date.now(),status:null,finishedAt:null,failure:null};
+        pending.set(request,row);
+        requestCount++;
+        network.push(row);if(network.length>NETWORK_TAIL)network.shift();
+        if(method==='GET' && url.pathname.endsWith('/catalogue.json')){
+          catalogueRequests.push(row);if(catalogueRequests.length>CATALOGUE_TAIL)catalogueRequests.shift();
+        }
+      }
+      if(url.origin!==origin || url.pathname!=='/api/errors' || method!=='POST')return;
+      const report=bootErrorReport(url.href,method,request.postData());
       reports.push(report);
       if(!bootSlowDiagnostic(report))faults.push('Game error report during Explorer proof');
     });
     page.on('pageerror',error=>faults.push(error.message));
     page.on('crash',()=>faults.push('Page crashed'));
     page.on('console',message=>{if(message.type()==='error')faults.push(message.text());});
-    /** @param {import('playwright').Request} request */
-    const settled=request=>{pending.delete(request);};
-    page.on('requestfinished',settled);page.on('requestfailed',settled);
+    /** @param {import('playwright').Request} request @param {string|null} failure */
+    const settled=(request,failure)=>{
+      const row=pending.get(request);
+      if(row===undefined)return;
+      row.finishedAt=Date.now();row.failure=failure;
+      pending.delete(request);
+    };
+    page.on('requestfinished',request=>settled(request,null));
+    page.on('requestfailed',request=>settled(request,request.failure()?.errorText.split('?')[0]?.slice(0,200)??'Request failed'));
     page.on('response',response=>{
       const status=response.status(), request=pending.size===0?undefined:pending.get(response.request());
       if(request!==undefined)request.status=status;
@@ -229,8 +250,12 @@ async function openExplorerContext(browser,base,faults,lifetime,generation,isola
     });
     return {sweep:async(/** @type {string} */slug,/** @type {string} */out,/** @type {number} */catalogue,/** @type {number} */started)=>{
       reports.length=0;
-      await sweepPage(page,faults,reports,base,slug,out,lifetime,async()=>{await reset();pending.clear();},
-        {generation,catalogue,maxCatalogues:isolated?1:CONTEXT_CATALOGUES},started,()=>[...pending.values()].map(({path,requestedAt,status})=>({path,status,ageMs:Date.now()-requestedAt})));
+      await sweepPage(page,faults,reports,base,slug,out,lifetime,async()=>{
+        await reset();pending.clear();network.length=0;catalogueRequests.length=0;requestCount=0;
+      },{generation,catalogue,maxCatalogues:isolated?1:CONTEXT_CATALOGUES},started,()=>({requestCount,
+        network:network.map(row=>({...row})),requests:catalogueRequests.map(row=>({...row})),
+        pending:[...pending.values()].filter(row=>row.method==='GET').map(({path,requestedAt,status})=>({path,status,ageMs:Date.now()-requestedAt})),
+      }));
     },close:()=>context.close()};
   }catch(error){await context.close();throw error;}
 }
@@ -246,12 +271,13 @@ export async function sweepExplorer(browser,base,slug,out,isolated=false){
  * @param {string} base @param {string} slug
  * @param {string} out @param {{previous:string|undefined}} lifetime @param {()=>Promise<void>} reset
  * @param {{generation:number,catalogue:number,maxCatalogues:number}} session @param {number} started
- * @param {()=>{path:string,status:number|null,ageMs:number}[]} readPending */
-async function sweepPage(page,faults,reports,base,slug,out,lifetime,reset,session,started,readPending){
+ * @param {()=>{requestCount:number,network:ExplorerRequest[],requests:ExplorerRequest[],pending:{path:string,status:number|null,ageMs:number}[]}} readNetwork */
+async function sweepPage(page,faults,reports,base,slug,out,lifetime,reset,session,started,readNetwork){
   const hangMs=180000;
   let progressAt=started;
   /** @type {Map<string,number>} */ const firstReady=new Map();
   /** @type {ReturnType<typeof explorerCards>} */ let cards=[];
+  /** @type {ReturnType<typeof explorerState>|null} */ let lastState=null;
   try{
     await withinProgressBudget(reset(),hangMs-(Date.now()-progressAt));
     const url=new URL(base);
@@ -264,6 +290,7 @@ async function sweepPage(page,faults,reports,base,slug,out,lifetime,reset,sessio
     while(Date.now()-progressAt<hangMs){
       if(faults.length>0)throw new Error(faults.join('\n'));
       const state=await withinProgressBudget(page.evaluate(explorerState),hangMs-(Date.now()-progressAt)),observedMs=Date.now()-started;
+      lastState=state;
       // CF5: a software GPU can take longer overall while still drawing new
       // cards. Only a newly drawn identity extends the no-progress hang guard;
       // polling and repeated redraws of the same cards never extend it.
@@ -306,14 +333,16 @@ async function sweepPage(page,faults,reports,base,slug,out,lifetime,reset,sessio
     lifetime.previous=final.document.id;
     console.info(`Explorer ${slug}: ${empty?'explicit empty catalogue':`${cards.length} real thumbnails`} PASS`);
   }catch(error){
-    const failedAt=Date.now(), pending=readPending(), evidenceMs=Math.min(2000,hangMs-(failedAt-progressAt));
-    // The last completed observation survives a dead renderer. A fresh timeline
-    // read can explain a live page's admission failure, but must be bounded.
-    const [bootEntries]=await Promise.all([
-      evidenceMs>0?withinProgressBudget(page.evaluate(bootTimelineEntries),evidenceMs).catch(()=>null):Promise.resolve(null),
-      page.screenshot({path:join(out,`${slug}-failure.jpg`),type:'jpeg',quality:70,timeout:5000}).catch(()=>undefined),
+    const failedAt=Date.now(), {pending,network,requestCount,requests}=readNetwork();
+    const observed=lastState===null?null:{...lastState.catalogue,readyIds:lastState.readyIds,empty:lastState.empty,slug:lastState.document.slug};
+    // The deadline has refused the case. Bound fresh evidence separately so a
+    // live stalled document can still show its roster stage and current frame.
+    const file=`${slug}-failure.jpg`;
+    const [bootEntries,screenshot]=await Promise.all([
+      withinProgressBudget(page.evaluate(bootTimelineEntries),2000).catch(()=>null),
+      page.screenshot({path:join(out,file),type:'jpeg',quality:70,timeout:5000}).then(()=>({file}),error=>({error:String(error)})),
     ]);
-    writeFileSync(join(out,`${slug}-failure.json`),`${JSON.stringify({slug,session,elapsedMs:failedAt-started,hangMs,idleMs:failedAt-progressAt,error:String(error),faults,reports,cards,firstReadyMs:Object.fromEntries(firstReady),bootEntries,pending},null,2)}\n`);
+    writeFileSync(join(out,`${slug}-failure.json`),`${JSON.stringify({slug,session,elapsedMs:failedAt-started,hangMs,idleMs:failedAt-progressAt,error:String(error),faults,reports,cards,firstReadyMs:Object.fromEntries(firstReady),bootEntries,pending,network,requestCount,catalogue:{observed,requests},screenshot},null,2)}\n`);
     throw error;
   }
 }

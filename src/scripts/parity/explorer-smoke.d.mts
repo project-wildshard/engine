@@ -6,7 +6,7 @@ export interface ExplorerSession {sweep:(slug:string,out:string)=>Promise<void>;
 /** Read pixels from actual already-drawn catalogue canvases. */
 export function explorerCards(): ExplorerCardSample[];
 /** Read the displayed catalogue's existing canvases without rendering or reading pixels. */
-export function explorerState(): {fatal:(string|null)[];document:ExplorerDocument;empty:boolean;ready:boolean;readyIds:string[]};
+export function explorerState(): {fatal:(string|null)[];document:ExplorerDocument;empty:boolean;ready:boolean;readyIds:string[];catalogue:{inline:boolean;visible:boolean;cards:number}};
 export function explorerCases(catalogue:readonly {slug:string;status:string;legacy:boolean;shardSelect?:boolean}[]):string[];
 /** Exact even/odd route partition; unknown groups or duplicate routes refuse. */
 export function explorerPartition(cases:readonly string[],group?:string):string[];

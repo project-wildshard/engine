@@ -5,7 +5,7 @@ import {cpSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSy
 import {createServer} from 'node:http';
 import {homedir} from 'node:os';
 import {setTimeout as delay} from 'node:timers/promises';
-import {join, resolve as resolvePath} from 'node:path';
+import {dirname, join, resolve as resolvePath} from 'node:path';
 import {chromium, webkit, type Browser} from "./browser-playwright.mjs";
 import {bootCase} from './parity/boot-smoke.mjs';
 import {captureNightlyBootFrame, nightlyDrawSamples, NIGHTLY_FRAME_LIMIT as HOVER_FRAMES, NIGHTLY_WALL_MS as HOVER_CEILING_MS} from './parity/nightly-frames.mjs';
@@ -292,8 +292,10 @@ try {
       writeFileSync(join(evidence, 'browser-log.json'), JSON.stringify({relayed: process.env.DEBUG?.includes('pw:browser') === true,
         gpu: browserLines.filter(line => !line.includes(':CONSOLE') && GPU_LINE.test(line)).slice(-200),
         tail: browserLines.filter(line => !line.includes(':CONSOLE')).slice(-80)}, null, 2));
+      const explorerEvidenceDir = join(evidence, 'explorer');
       if (result.phases.some(row => !row.ok)) cpSync(evidence, join(out, 'failures', `${browserName}-${groupText}-${head.slug}`),
-        {recursive: true, filter: path => statSync(path).isDirectory() || path.endsWith('.json')});
+        {recursive: true, filter: path => statSync(path).isDirectory() || path.endsWith('.json') ||
+          (dirname(path) === explorerEvidenceDir && path.endsWith('-failure.jpg'))});
       // Own generated outputs only. Reports are checkpointed separately from large packs/captures.
       rmSync(cooked, {recursive: true, force: true}); rmSync(evidence, {recursive: true, force: true});
     }

@@ -327,6 +327,12 @@ hover/blend, equipment ownership/enabled state, installed board/model,
 input context/permission, frame count and clock state. The mount and
 unmount assertions and their existing deadlines are unchanged.
 
+An Explorer failure keeps the most recent HTTP requests and their
+outcomes, the last observed catalogue state, catalogue request states,
+and a screenshot or its capture error. Both head artifacts include the
+screenshot alongside the Explorer failure JSON. Page evidence has a
+short capture budget after the original no-progress deadline.
+
 The full nightly maps the decimal Actions run ID to its low 32 bits for
 `NET_FUZZ_SEEDS`. The network fuzzer keeps its uint32 admission boundary;
 the full run ID remains the report identity. Reproduce the selected seed

@@ -4,7 +4,7 @@ import { explorerCards, explorerCapture, explorerCases, explorerPartition, explo
 import type { Browser, BrowserContext, CDPSession, Page, Request, Response } from 'playwright';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 // oxlint-disable-next-line import/no-nodejs-modules -- Verify the actual required workflow leg, without dispatching it.
-import { readFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { readFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Reproduce Playwright's page event transport in the fixture.
 import { EventEmitter } from 'node:events';
 
@@ -25,7 +25,7 @@ function storageFixture() {
 
 function fixtureBrowser(evaluate: Page['evaluate'], report?: Request, requests: readonly {
   readonly request: Request; readonly response?: Response; readonly settled?: 'requestfinished' | 'requestfailed';
-}[] = []): { browser: Browser; close: ReturnType<typeof vi.fn<BrowserContext['close']>> } {
+}[] = [], screenshot=vi.fn<Page['screenshot']>().mockRejectedValue(new Error('No browser capture in the unit fixture'))): { browser: Browser; close: ReturnType<typeof vi.fn<BrowserContext['close']>> } {
   const events = new EventEmitter();
   const tap = { dispose: (): Promise<void> => Promise.resolve(), [Symbol.asyncDispose]: (): Promise<void> => Promise.resolve() };
   const page: Page = legacyDouble<Page>({ evaluate, addInitScript: vi.fn<Page['addInitScript']>().mockResolvedValue(tap), on: (event, listener) => {
@@ -43,7 +43,7 @@ function fixtureBrowser(evaluate: Page['evaluate'], report?: Request, requests: 
       }
       return Promise.resolve(null);
     }),
-    screenshot: vi.fn<Page['screenshot']>().mockRejectedValue(new Error('No browser capture in the unit fixture')) });
+    screenshot });
   const close = vi.fn<BrowserContext['close']>().mockResolvedValue(undefined);
   const disposable = { dispose: (): Promise<void> => Promise.resolve(), [Symbol.asyncDispose]: (): Promise<void> => Promise.resolve() };
   const context = legacyDouble<BrowserContext>({
@@ -126,6 +126,7 @@ test('an Explorer admission refusal retains the boot wait and pending asset tran
   }).mockResolvedValueOnce(bootEntries);
   const asset = (path: string): Request => legacyDouble<Request>({
     url: () => `https://test.example/assets/${path}?proof=omit-this`, method: () => 'GET',
+    failure: () => ({errorText:'Network request failed'}),
   });
   const body = asset('body'), waiting = asset('waiting');
   const response = legacyDouble<Response>({ request: () => body, status: () => 200, url: () => body.url() });
@@ -157,23 +158,46 @@ test('progress records only appended canvases and still requires the whole displ
   } finally { document.body.replaceChildren(); }
 });
 
-test.each(['state', 'pixels'] as const)('a stuck %s read refuses within the unchanged progress budget', async mode => {
+test.each(['state', 'pixels'] as const)('a stuck %s read keeps failure evidence after the progress deadline', async mode => {
   mkdirSync('tmp/sp-x9-explorer', { recursive: true });
   const out = mkdtempSync('tmp/sp-x9-explorer/stopped-renderer-');
   vi.useFakeTimers();
   const evaluate = vi.fn<Page['evaluate']>();
-  if (mode === 'pixels') evaluate.mockResolvedValueOnce({ document:currentDocument,fatal: [], empty: false, ready: true, readyIds: ['first'] });
+  if (mode === 'pixels') evaluate.mockResolvedValueOnce({ document:currentDocument,fatal: [], empty: false, ready: true, readyIds: ['first'],
+    catalogue: {inline:true,visible:true,cards:1} });
   evaluate.mockImplementation(() => new Promise(() => { /* The renderer never returns a protocol result. */ }));
-  const { browser, close } = fixtureBrowser(evaluate);
+  const request = (path: string): Request => legacyDouble<Request>({ url: () => `https://test.example${path}?token=omit-this`,
+    method: () => 'GET', failure: () => ({errorText:'Connection reset'}) });
+  const catalogue = request('/api/catalogue.json'), waiting = request('/assets/catalogue.json'), failed = request('/assets/model.glb');
+  const response = legacyDouble<Response>({request: () => catalogue, status: () => 200, url: () => catalogue.url()});
+  const jpeg = Buffer.from([255,216,255,217]);
+  const screenshot = vi.fn<Page['screenshot']>().mockImplementation(options => {
+    if (options?.path === undefined) throw new Error('Expected an evidence path');
+    writeFileSync(options.path,jpeg);
+    return Promise.resolve(jpeg);
+  });
+  const { browser, close } = fixtureBrowser(evaluate,undefined,[
+    {request:catalogue,response,settled:'requestfinished'}, {request:waiting}, {request:failed,settled:'requestfailed'},
+  ],screenshot);
   try {
     const refusal = expect(sweepExplorer(browser, 'https://test.example/', 'fixture', out))
       .rejects.toThrow('stalled for 180 seconds without progress');
     await vi.advanceTimersByTimeAsync(180001);
+    expect(screenshot).toHaveBeenCalledExactlyOnceWith({path:`${out}/fixture-failure.jpg`,type:'jpeg',quality:70,timeout:5000});
+    await vi.advanceTimersByTimeAsync(2000);
     await refusal;
-    expect(evaluate).toHaveBeenCalledTimes(mode === 'state' ? 1 : 2);
+    expect(evaluate).toHaveBeenCalledTimes(mode === 'state' ? 2 : 3);
     expect(close).toHaveBeenCalledOnce();
-    const receipt: unknown = JSON.parse(readFileSync(`${out}/fixture-failure.json`, 'utf8'));
-    expect(receipt).toMatchObject({ hangMs: 180000, cards: [] });
+    const receipt = readFileSync(`${out}/fixture-failure.json`, 'utf8');
+    const complete = {path:'/api/catalogue.json',status:200,finishedAt:expect.any(Number),failure:null};
+    const pending = {path:'/assets/catalogue.json',status:null,finishedAt:null,failure:null};
+    expect(JSON.parse(receipt)).toMatchObject({hangMs:180000,idleMs:180000,cards:[],bootEntries:null,requestCount:3,
+      network:[complete,pending,{path:'/assets/model.glb',status:null,finishedAt:expect.any(Number),failure:'Connection reset'}],
+      catalogue:{observed:mode==='state'?null:{inline:true,visible:true,cards:1,readyIds:['first'],slug:'fixture'},requests:[complete,pending]},
+      screenshot:{file:'fixture-failure.jpg'},
+    });
+    expect(receipt).not.toContain('omit-this');
+    expect(readFileSync(`${out}/fixture-failure.jpg`)).toEqual(jpeg);
   } finally { vi.useRealTimers(); rmSync(out, { recursive: true, force: true }); }
 });
 
