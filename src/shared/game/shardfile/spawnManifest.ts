@@ -46,7 +46,7 @@ export function readSpawnManifest(input: unknown): SpawnManifest {
 }
 function spawnFile(file: unknown, seen: Set<string>): SpawnFile {
   if (!object(file) || !path(file['url']) || !size(file['bytes']) || typeof file['hash'] !== 'string' || !/^[a-f0-9]{64}$/u.test(file['hash'])
-    || seen.has(file['url']) || file['wireBytes'] !== undefined && !size(file['wireBytes'])) throw new Error('Invalid spawn file');
+    || seen.has(file['url']) || file['wireBytes'] !== undefined && !size(file['wireBytes'])) throw new Error(`Invalid spawn file${object(file) && seen.has(String(file['url'])) ? ' (named twice)' : ''}: ${JSON.stringify(file).slice(0, 300)}`);
   seen.add(file['url']);
   return {url: file['url'], bytes: file['bytes'], hash: file['hash'], ...(file['wireBytes'] === undefined ? {} : {wireBytes: file['wireBytes']})};
 }

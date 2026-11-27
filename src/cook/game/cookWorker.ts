@@ -124,6 +124,13 @@ export const looseFolder = (hash: string): string => `${LOOSE}${hash}/`;
 
 /** J370 (4): the index says `proved` only for a proof that walked ticks, lanes and steps. Anything else, a 0-lane walk
  * included, is `unmeasured`, which passes. The report crosses the job's process boundary as JSON, so this rechecks it. */
+/** A failed job's stderr in one line: its first error line ahead of the rest, so a code frame or report-only lines printed
+ *  before it can't push the message out of the 600 characters (SF7: three tries of Nine Dragon said only "Invalid spawn file"). */
+export function stderrSummary(stderr: string): string {
+  const lines = stderr.trim().split('\n'), error = lines.find(line => /^\w*Error(?: \[\w+\])?: /u.test(line));
+  return [...error === undefined ? [] : [error], ...lines.filter(line => line !== error).slice(0, 6)].join(' | ').slice(0, 600);
+}
+
 export function indexProof(proof: CookJobReport['proof']): CookIndex['proof'] {
   return typeof proof === 'object' && proof.ticks > 0 && proof.lanes > 0 && proof.steps > 0 ? 'proved' : 'unmeasured';
 }
@@ -238,7 +245,7 @@ export function runJob(launcher: JobLauncher, tarball: string, out: string, expe
         catch { resolve({kind: 'killed', reason: 'Invalid cook result'}); }
         return;
       }
-      resolve({kind: 'killed', reason: `exit ${code ?? signal ?? 'unknown'}: ${stderr.trim().split('\n').slice(0, 6).join(' | ').slice(0, 600)}`});
+      resolve({kind: 'killed', reason: `exit ${code ?? signal ?? 'unknown'}: ${stderrSummary(stderr)}`});
     });
   });
 }
