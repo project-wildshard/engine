@@ -12,3 +12,7 @@ that the replay carries only the original change.
 
 The pin fixture clears the hosted CI flags in its simulated local
 push. Both FS18 regressions pass with the flags set in the parent.
+
+The push-known-red fixtures now exercise the exact certificate too.
+They check that a replay needs a fresh proof and that the early gate
+still uses the selected pin tip for its FS18 marker.

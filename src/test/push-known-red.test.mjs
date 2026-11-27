@@ -10,7 +10,7 @@ import { markGated, pregated } from '../scripts/main-push-gated.mjs';
 import { ownCommits, pregate } from '../scripts/.kit/main-push.mjs';
 
 // Mini coordinator, 2026-11-16 ~17:50 Cancún: a push is never refused for a red main already has, and main-push gates
-// before its lock. Real git: a bare remote, a clone, replayed commits keeping their patch ids.
+// before its lock. Real git: a bare remote, a clone, and replayed commits with new base and tip SHAs.
 const work = join(import.meta.dirname, `../../tmp/push-known-red-test-${process.pid}`);
 afterAll(() => rmSync(work, { recursive: true, force: true }));
 const env = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))),
@@ -59,7 +59,7 @@ test('main\'s reds are run once per origin/main SHA and cached; later pushes rea
   expect(runs).toBe(1);
 });
 
-test('a main-push gated commit stays gated after a replay onto a newer main; an ungated carried commit is not', () => {
+test('a main-push gate proof matches the exact base and tip; a replay needs a fresh proof', () => {
   const remote = join(work, 'remote2.git'), a = join(work, 'a'), b = join(work, 'b');
   git(work, 'init', '--quiet', '--bare', '--initial-branch=main', remote);
   for (const dir of [a, b]) git(work, 'clone', '--quiet', remote, dir);
@@ -67,18 +67,26 @@ test('a main-push gated commit stays gated after a replay onto a newer main; an 
   git(b, 'pull', '--quiet', 'origin', 'main');
   writeFileSync(join(a, 'mine.txt'), 'mine\n'); git(a, 'add', 'mine.txt'); git(a, 'commit', '--quiet', '-m', 'mine');
   const base = git(a, 'rev-parse', 'origin/main');
-  expect(markGated(a, `${base}..HEAD`)).toBe(1);
-  // Another lane pushes; A's commit is replayed onto it: a new SHA, the same patch id.
+  const tip = git(a, 'rev-parse', 'HEAD');
+  const proof = `${base}:${tip}`;
+  expect(markGated(a, base, tip)).toBe(1);
+  expect(pregated(a, `refs/heads/main ${tip} refs/heads/main ${base}`, proof)).toBe(1);
+  // Another lane pushes and A's commit is replayed onto it, changing both SHAs.
   writeFileSync(join(b, 'other.txt'), 'other\n'); git(b, 'add', 'other.txt'); git(b, 'commit', '--quiet', '-m', 'other'); git(b, 'push', '--quiet', 'origin', 'main');
   git(a, 'fetch', '--quiet', 'origin', 'main');
   const upstream = git(a, 'rev-parse', 'origin/main');
   const replayed = git(a, 'replay', '--ref-action=print', '--onto', upstream, `${base}..main`).split(/\s+/u)[2];
-  expect(pregated(a, `refs/heads/main ${replayed} refs/heads/main ${upstream}`)).toBe(1);
+  const replayedRefs = `refs/heads/main ${replayed} refs/heads/main ${upstream}`;
+  const replayedProof = `${upstream}:${replayed}`;
+  expect(pregated(a, replayedRefs, proof)).toBeNull();
+  expect(pregated(a, replayedRefs, replayedProof)).toBeNull();
+  expect(markGated(a, upstream, replayed)).toBe(1);
+  expect(pregated(a, replayedRefs, replayedProof)).toBe(1);
   // A carried commit nobody gated keeps the gate.
   git(a, 'update-ref', 'refs/heads/main', replayed); git(a, 'reset', '--quiet', '--hard', replayed);
   writeFileSync(join(a, 'carried.txt'), 'c\n'); git(a, 'add', 'carried.txt'); git(a, 'commit', '--quiet', '-m', 'carried');
-  expect(pregated(a, `refs/heads/main ${git(a, 'rev-parse', 'HEAD')} refs/heads/main ${upstream}`)).toBeNull();
-  expect(pregated(a, `refs/heads/plan/x ${replayed} refs/heads/plan/x ${upstream}`)).toBeNull();
+  expect(pregated(a, `refs/heads/main ${git(a, 'rev-parse', 'HEAD')} refs/heads/main ${upstream}`, replayedProof)).toBeNull();
+  expect(pregated(a, `refs/heads/plan/x ${replayed} refs/heads/plan/x ${upstream}`, replayedProof)).toBeNull();
 });
 
 // 2026-11-19: opus-of19b0's Brasscap ring re-record (d2cef3cd8) needed ALLOW_PIN_PUSH=1 from engine-quickfix: main-push's
@@ -97,7 +105,11 @@ test('the gate before the lock carries main-push\'s own marker for its HEAD', as
   const before = process.env.WS_LANE_NAME;
   process.env.WS_LANE_NAME = 'push-known-red';
   try {
-    expect(await pregate(clone, () => undefined)).toMatch(/gate green before the lock/u);
+    const base = git(clone, 'rev-parse', 'origin/main'), source = git(clone, 'rev-parse', 'HEAD');
+    const {sha: sent, left} = ownCommits(clone, base, source);
+    expect(await pregate(clone, () => undefined, {base, source, sent, left})).toEqual({
+      line: expect.stringMatching(/gate green before the lock/u), checked: true,
+    });
   } finally {
     if (before === undefined) delete process.env.WS_LANE_NAME; else process.env.WS_LANE_NAME = before;
   }

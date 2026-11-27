@@ -1,7 +1,7 @@
 import {execFileSync,spawn} from 'node:child_process';
 import {availableParallelism,constants,getPriority,homedir,loadavg} from 'node:os';
 import {appendFileSync,mkdirSync,readFileSync,rmSync} from 'node:fs';
-import {dirname,join,resolve,delimiter} from 'node:path';
+import {basename,dirname,join,resolve,delimiter} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {gateTestEnvironment,gateWorkers} from './gate-workers.mjs';
 import {assertHeavyLease} from '../src/scripts/heavy-lane-lease.mjs';
@@ -20,7 +20,11 @@ import {freshenPush} from '../src/scripts/typecheck-fresh.mjs';
 /** Identical proof identity before/inside a real lease; no heavy work is done on reuse.
  * @param {NodeJS.ProcessEnv} [environment] */
 export function pushEnvironment(environment=process.env){
-  const env={...gateEnvironment(environment),PWD:process.cwd(),WS_PUSH_GATE_PROFILE:PUSH_PROFILE,
+  // This environment drops WS_GATE_NODE. Remove the test shim that needs it before running any probes.
+  const searchPath=environment.PATH?.split(delimiter)
+    .filter(path=>basename(path)!=='gate-bin'||basename(dirname(path))!=='.githooks').join(delimiter);
+  const source=searchPath===undefined?environment:{...environment,PATH:searchPath};
+  const env={...gateEnvironment(source),PWD:process.cwd(),WS_PUSH_GATE_PROFILE:PUSH_PROFILE,
     WS_PUSH_LINT_THREADS:String(PUSH_BUDGET.lintThreads),GOMAXPROCS:String(PUSH_BUDGET.lintGo),UV_THREADPOOL_SIZE:'1',WS_CPU_ADMISSION:'1',
     WS_HEAVY_SCHEDULER_ROOT:resolve(environment.WS_HEAVY_SCHEDULER_ROOT??environment.WS_HEAVY_ROOT??resolve(homedir(),'.wildshard-heavy-lanes'))};
   if(environment.WS_LOCAL_LAND_SOURCE_REF!==undefined){
@@ -30,9 +34,9 @@ export function pushEnvironment(environment=process.env){
   }
   // Git prepends its exec directory when it invokes a hook. Execute both gate
   // entries with that same effective search order; duplicate entries add no tool.
-  if(environment.PATH!==undefined){
-    const gitPath=execFileSync('git',['--exec-path'],{env:environment,encoding:'utf8'}).trim();
-    env.PATH=[...new Set([gitPath,...environment.PATH.split(delimiter)])].join(delimiter);
+  if(searchPath!==undefined){
+    const gitPath=execFileSync('git',['--exec-path'],{env:source,encoding:'utf8'}).trim();
+    env.PATH=[...new Set([gitPath,...searchPath.split(delimiter)])].join(delimiter);
   }
   // Apple's Git launcher also selects compiler paths before starting a hook.
   // Observe its real child now so the pre-gate and hook execute under the same
@@ -40,7 +44,7 @@ export function pushEnvironment(environment=process.env){
   if(process.platform==='darwin'){
     const bin=resolve(import.meta.dirname,'bin');
     /** @type {Record<string,unknown>} */
-    const sdk=JSON.parse(execFileSync('git',['wildshard-push-env'],{env:{...env,PATH:[bin,environment.PATH??''].join(delimiter)},encoding:'utf8'}));
+    const sdk=JSON.parse(execFileSync('git',['wildshard-push-env'],{env:{...env,PATH:[bin,searchPath??''].join(delimiter)},encoding:'utf8'}));
     for(const key of ['CPATH','LIBRARY_PATH','MANPATH','SDKROOT']){
       const value=sdk[key];
       if(value!==undefined){if(typeof value!=='string')throw new Error('Invalid Git compiler environment');env[key]=value;}

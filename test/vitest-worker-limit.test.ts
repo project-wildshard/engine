@@ -6,6 +6,8 @@ import { pushWorkers } from '../src/scripts/push-budget.mjs';
 import { Worker } from 'node:worker_threads';
 // oxlint-disable-next-line import/no-nodejs-modules -- The worker message or error settles the actual inheritance probe.
 import { once } from 'node:events';
+// oxlint-disable-next-line import/no-nodejs-modules -- Build the real push-gate shim's search path.
+import { delimiter, resolve } from 'node:path';
 
 test('WASM lifetime workaround is confined to Node 24 test forks', async () => {
   expect(vitestNodeExecArgv('24.21.0')).toEqual(['--no-wasm-code-gc']);
@@ -47,7 +49,8 @@ test('invalid explicit limits still refuse rather than falling back', () => {
 });
 
 test('the engine push profile uses the gate worker override', () => {
-  const env = pushEnvironment({ PATH: process.env['PATH'], WS_GATE_WORKERS: '3' });
+  const path = [resolve('.githooks/gate-bin'), process.env['PATH'] ?? ''].join(delimiter);
+  const env = pushEnvironment({ PATH: path, WS_GATE_WORKERS: '3' });
   expect(env['WS_GATE_WORKERS']).toBe('3');
   expect(pushWorkers(env)).toBe(3);
   expect(env['PATH']).not.toContain('.githooks/gate-bin');
