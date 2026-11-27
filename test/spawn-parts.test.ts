@@ -291,3 +291,23 @@ test('a file whose bytes match a shard cook\'s one-file part takes a part of its
   expect(new Set(parts.map(part => part.url)).size).toBe(2);
   expect(readSpawnManifest({ version: 1, shard: 'x', tier: 'phone', flow: 'client', files: rows, totalBytes: 8192, parts }).parts).toEqual(parts);
 });
+
+test('SF6e: members sharing one placement key cut by their own URLs, not all at once', () => {
+  // Nalati's phone set: hundreds of cooked phone KTX2 blobs whose key, hashes stripped, is the same string.
+  const sizes = new Map<string, number>();
+  const urls = Array.from({ length: 600 }, (_, at) => {
+    const hex = createHash('sha256').update(String(at)).digest('hex');
+    const url = `/assets/nalati-grasslands/blobs/${hex}.t512-${hex.slice(0, 8)}.ktx2`;
+    sizes.set(url, 150_000 + (at % 5) * 1_000); return url;
+  });
+  const keyOf = (url: string): string => placementKey(url, undefined);
+  expect(new Set(urls.map(keyOf)).size).toBe(1);
+  const total = [...sizes.values()].reduce((sum, bytes) => sum + bytes, 0);
+  for (const limits of [PART_LIMITS, WHOLE_PART_LIMITS]) {
+    const parts = placeByKey(urls, url => sizes.get(url) ?? 0, keyOf, limits);
+    expect(parts.flat().sort()).toEqual([...urls].sort());
+    // About total / target parts, as for distinct keys; never one part per member, never one part past the cap.
+    expect(parts.length).toBeLessThan(3 * Math.ceil(total / limits.target));
+    expect(parts.length).toBeGreaterThan(1);
+  }
+});

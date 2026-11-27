@@ -19,7 +19,7 @@ import {existsSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, r
 // oxlint-disable-next-line import/no-nodejs-modules -- The notify endpoint is plain HTTP (J30).
 import {createServer, type IncomingMessage, type Server} from 'node:http';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
-import {dirname, join, relative, resolve as resolvePath, sep} from 'node:path';
+import {basename, dirname, join, relative, resolve as resolvePath, sep} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- SP6: the poll waits between sweeps, and stop() cuts the wait short.
 import {setTimeout as delay} from 'node:timers/promises';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
@@ -192,6 +192,17 @@ async function rssMB(pid: number): Promise<number> {
   try { return Number((await run('ps', ['-o', 'rss=', '-p', String(pid)])).stdout.trim()) / 1024 || 0; } catch { return 0; }
 }
 const CAPTURE_BYTES = 2_000_000;
+/** SF6e: a failed job's whole captured stderr goes to `<scratch>/logs/<job>.stderr.log` beside its work folder, which the
+ *  worker removes, so the error's full stack outlives the 600-character summary (Nalati's "Invalid spawn parts" hid its
+ *  caller). Returns the file, or undefined when nothing was printed or it could not be written. */
+export function keepJobStderr(work: string, stderr: string): string | undefined {
+  if (stderr.trim() === '') return undefined;
+  try {
+    const logs = join(dirname(work), 'logs'), file = join(logs, `${basename(work)}.stderr.log`);
+    mkdirSync(logs, {recursive: true}); writeFileSync(file, stderr);
+    return file;
+  } catch { return undefined; }
+}
 const COOK_PHASE = /^phase (validation|proof|textures|client-packs|server-packs|server-files) (\d{1,8})ms$/gmu;
 
 /** One child. Its stdout is a report or a refusal; anything else, a crash or a limit, is `killed`. */
@@ -246,7 +257,8 @@ export function runJob(launcher: JobLauncher, tarball: string, out: string, expe
         catch { resolve({kind: 'killed', reason: 'Invalid cook result'}); }
         return;
       }
-      resolve({kind: 'killed', reason: `exit ${code ?? signal ?? 'unknown'}: ${stderrSummary(stderr)}`});
+      const log = keepJobStderr(work, stderr);
+      resolve({kind: 'killed', reason: `exit ${code ?? signal ?? 'unknown'}: ${stderrSummary(stderr)}${log === undefined ? '' : ` (full stderr: ${log})`}`});
     });
   });
 }

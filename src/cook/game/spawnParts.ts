@@ -117,6 +117,11 @@ export function spawnPartGroups(manifests: readonly SpawnPartInput[]): Group[] {
 export function placeByKey(urls: readonly string[], size: (url: string) => number, key: (url: string) => string, limits: PartLimits = WHOLE_PART_LIMITS): string[][] {
   const order = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
   const sorted = [...urls].sort((a, b) => order(key(a), key(b)) || order(a, b));
+  // SF6e: a key several members share (content-named blobs whose name is only their hashes, such as a cook's phone
+  // KTX2) draws each member's boundary from its URL too; on the key alone they all cut, or none did. Nalati's phone set
+  // cut after each of its ~150 KB blobs into 142 parts, past a manifest's 128.
+  const shared = new Set<string>(), seen = new Set<string>();
+  for (const url of sorted) { const name = key(url); if (seen.has(name)) shared.add(name); seen.add(name); }
   const parts: string[][] = []; let current: string[] = [], bytes = 0, run = '';
   const cut = (): void => { if (current.length > 0) { parts.push(current); current = []; bytes = 0; } };
   for (const url of sorted) {
@@ -124,7 +129,8 @@ export function placeByKey(urls: readonly string[], size: (url: string) => numbe
     if (kind !== run) { cut(); run = kind; }
     if (current.length > 0 && align(bytes) + size(url) > limits.max) cut();
     current.push(url); bytes = align(bytes) + size(url);
-    if (bytes >= limits.max || Number.parseInt(createHash('sha256').update(name).digest('hex').slice(0, 8), 16) / 2 ** 32 < size(url) / limits.target) cut();
+    const draw = shared.has(name) ? `${name}\0${url}` : name;
+    if (bytes >= limits.max || Number.parseInt(createHash('sha256').update(draw).digest('hex').slice(0, 8), 16) / 2 ** 32 < size(url) / limits.target) cut();
   }
   cut();
   return parts;
