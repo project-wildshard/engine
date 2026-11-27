@@ -8,7 +8,7 @@ import {join, resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- The CLI's usage check runs as a child, before any git or host call.
 import {spawnSync} from 'node:child_process';
 import {afterEach, expect, test} from 'vitest';
-import {CHANNELS, CHECKED_DOCUMENTS, PHASES, PUBLIC_ROOMS, QA_LEGS, RELEASE_PUBLIC_KEY, qaGap, pinnedReleaseKey, RefusedError, runPhase, type Channel, type Deps, type PageHost, type Phase} from '../src/scripts/page-release/flow.mjs';
+import {CHANNELS, CHECKED_DOCUMENTS, PHASES, PUBLIC_ROOMS, QA_LEGS, RELEASE_PUBLIC_KEY, qaGap, pinnedReleaseKey, RefusedError, runPhase, ownTablePath, type Channel, type Deps, type PageHost, type Phase} from '../src/scripts/page-release/flow.mjs';
 import {runRedacted} from '../src/scripts/page-release/redact.mjs';
 import {CONFIG, WORKERS, isVersionUrl, workersHost} from '../src/scripts/page-release/hosts/workers.mjs';
 import {measureAssets} from '../src/scripts/app-build/assetLimits.mjs';
@@ -42,6 +42,9 @@ function page(channel: Channel) {
   const world = JSON.stringify({release: CHANNELS[channel].release, key});
   return Buffer.from(`<script>globalThis.__WS_BUILD_ID__=${JSON.stringify(build)};globalThis.__WS_WORLD__=${world};</script>`);
 }
+
+/** PV16: a staging build writes its own zone table first (none in the rig: its pins name no shard version). */
+const OWN_TABLE = `run node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/zone-table.mjs own /root/tmp/page-release/staging-${build}-zone-table.json --channel=staging --build=${build}`;
 
 function rig(channel: Channel = 'staging') {
   const calls: string[] = [];
@@ -116,7 +119,7 @@ test('the four phases run in order and move the alias last', async () => {
   const {deps, calls, lines} = rig();
   await through(deps, 'go-live');
   expect(fetched(calls)).toEqual([
-    'prepare', 'run pnpm build:game', 'run node src/scripts/app-build/splitOutput.mjs dist --join', 'package', 'state build',
+    OWN_TABLE, 'prepare', 'run pnpm build:game', 'run node src/scripts/app-build/splitOutput.mjs dist --join', 'package', 'state build',
     'packs.publish', 'upload', 'state upload',
     'run node src/scripts/release-cook.mjs --staging --build=' + build,
     'run node --import ./src/scripts/bake-loader.mjs src/scripts/release-placed-ready.mjs staging',
@@ -169,7 +172,7 @@ test('--content publishes the content set before the packs and the page (PAGE-SI
   const stamped = Buffer.from(`${String(files.get('/out/index.html'))}<script type="application/json" id="boot-module-files">{"contentBase":"https://packs.wildshard.io/content/0123456789abcdef/"}</script>`);
   files.set('/out/index.html', stamped);
   await through(deps, 'upload');
-  expect(fetched(calls)).toEqual(['prepare', 'run pnpm build:game', 'run node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/stamp-content.mjs dist', 'package', 'state build', 'content.publish', 'packs.publish', 'upload', 'state upload']);
+  expect(fetched(calls)).toEqual([OWN_TABLE, 'prepare', 'run pnpm build:game', 'run node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/stamp-content.mjs dist', 'package', 'state build', 'content.publish', 'packs.publish', 'upload', 'state upload']);
   expect(seen).toEqual([{dir: '/out-content', cors: CHANNELS.staging.origin, dryRun: false}]);
   expect(state['build']).toMatchObject({contentBase: 'https://packs.wildshard.io/content/0123456789abcdef/'});
   deps.content = {publish: () => Promise.resolve({set: 's', base: 'b', files: 5, bytes: 50, uploaded: 1, uploadedBytes: 10, held: 3, cors: CHANNELS.staging.origin})};
@@ -187,7 +190,7 @@ test('PZ6: a --content build whose page has no content base is refused', async (
   deps.run = (file, args, env) => { envs.push(env); run(file, args, env); };
   await expect(runPhase('build', deps)).rejects.toThrow(/index\.html content base is missing/u);
   // PZ5: the build marks its kept-build graph `content: true`, so the next release carries its code only
-  expect(envs[0]?.['WS_CONTENT_BASE']).toBe('https://packs.wildshard.io/content/');
+  expect(envs[1]?.['WS_CONTENT_BASE']).toBe('https://packs.wildshard.io/content/'); // after PV16's own zone table
 });
 
 test('the build bakes the channel release file from packs.wildshard.io', async () => {
@@ -196,13 +199,13 @@ test('the build bakes the channel release file from packs.wildshard.io', async (
     const seen: Record<string, string>[] = [];
     deps.run = (_file, _args, env) => { seen.push(env); };
     await runPhase('build', deps);
-    expect(seen[0]?.['WILDSHARD_RELEASE_URL']).toBe(`https://releases.wildshard.io/${channel}.json`);
-    expect(seen[0]?.['WS_BUILD_ID']).toBe(build);
+    expect(seen[1]?.['WILDSHARD_RELEASE_URL']).toBe(`https://releases.wildshard.io/${channel}.json`);
+    expect(seen[1]?.['WS_BUILD_ID']).toBe(build);
     // OFF-VERCEL OV3: a release build says so, and carries old builds from its own channel's domain.
-    expect(seen[0]?.['WS_RELEASE']).toBe('1');
-    expect(seen[0]?.['WS_CHANNEL']).toBe(channel);
-    expect(seen[0]?.['WS_PREVIOUS_DEPLOY_ORIGIN']).toBe(channel === 'production' ? 'https://play.wildshard.io' : 'https://staging.wildshard.io');
-    expect(seen[0]?.['VITE_API_ORIGIN']).toBe('https://api.wildshard.io');
+    expect(seen[1]?.['WS_RELEASE']).toBe('1');
+    expect(seen[1]?.['WS_CHANNEL']).toBe(channel);
+    expect(seen[1]?.['WS_PREVIOUS_DEPLOY_ORIGIN']).toBe(channel === 'production' ? 'https://play.wildshard.io' : 'https://staging.wildshard.io');
+    expect(seen[1]?.['VITE_API_ORIGIN']).toBe('https://api.wildshard.io');
   }
 });
 
@@ -498,6 +501,31 @@ test('PV2: preview bakes its zone table and checks the cook before go-live; stag
     deps.zoneTable = 'tmp/preview-zones/zone-table.json';
     await expect(runPhase('build', deps)).rejects.toThrow(/--zone-table is preview's/);
   }
+});
+
+// Fix preview PV16, PV3 per channel: staging and production write their own zone table (their pins, main's cook) and build from it,
+// so no channel's page holds a zone (the build's zoneless check, app-build/zoneless.mjs); its check HEADs the cook before go-live.
+test('PV16: staging and production build zoneless from their own zone table, and check the cook before go-live', async () => {
+  for (const channel of ['staging', 'production'] as const) {
+    const {deps, calls, files} = rig(channel), seen: Record<string, string>[] = [], run = deps.run, own = ownTablePath(deps);
+    expect(own).toBe(`/root/tmp/page-release/${channel}-${build}-zone-table.json`);
+    deps.run = (file, args, env) => { seen.push(env); run(file, args, env); };
+    files.set(own, Buffer.from('{}'));
+    await runPhase('build', deps);
+    const write = calls.indexOf(`run node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/zone-table.mjs own ${own} --channel=${channel} --build=${build}`);
+    expect(write).toBeGreaterThan(-1);
+    expect(write).toBeLessThan(calls.findIndex(call => call.startsWith('run pnpm build:game')));
+    expect(seen.find(env => env['WS_CHANNEL'] === channel)?.['WS_ZONE_TABLE']).toBe(own);
+    // a pin set with no shard versions writes no table (zone-table.mjs own's NOTE): the build bakes its zones, as before RL12
+    const old = rig(channel), envs: Record<string, string>[] = [], runOld = old.deps.run;
+    old.deps.run = (file, args, env) => { envs.push(env); runOld(file, args, env); };
+    await runPhase('build', old.deps);
+    expect(envs.find(env => env['WS_CHANNEL'] === channel)?.['WS_ZONE_TABLE']).toBeUndefined();
+  }
+  const staging = rig('staging');
+  staging.files.set(ownTablePath(staging.deps), Buffer.from('{}'));
+  await through(staging.deps, 'check');
+  expect(staging.calls).toContain(`run node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/zone-table.mjs check ${ownTablePath(staging.deps)} --page=https://staging.wildshard.io`);
 });
 
 // SA35 (opus-place1, 2026-11-13): flow.mjs passed the borrowed catalogue in the environment, and `build:game` set its own on top,

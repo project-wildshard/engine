@@ -8,7 +8,7 @@ import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:
 // oxlint-disable-next-line import/no-nodejs-modules -- Confine the scratch root to this checkout.
 import {join, resolve} from 'node:path';
 import {afterEach, expect, test} from 'vitest';
-import {borrowZoneTable, buildZoneTable, checkCooked, cookSkew, zoneTableOf, STAGING_PLACEMENTS, STAGING_RELEASE} from '../src/scripts/page-release/zone-table.mjs';
+import {borrowZoneTable, buildZoneTable, checkCooked, cookSkew, ownZoneTable, zoneTableOf, STAGING_PLACEMENTS, STAGING_RELEASE} from '../src/scripts/page-release/zone-table.mjs';
 import {bakeZoneTable, zoneTableIn} from '../src/scripts/app-build/zoneTable.mjs';
 import {readZoneTable} from '../src/shared/game/grid/zoneTable.ts';
 import {COOKED_ORIGIN} from '../src/shared/game/shardfile/cookedPackPaths.ts';
@@ -135,4 +135,17 @@ test('a build given a zone table bakes it as a file and inline in index.html; on
   expect(JSON.parse(readFileSync(join(out, 'zone-table.json'), 'utf8'))).toEqual(table);
   // PV14 (codex-cookkeys): beside the build's code too, so its chunk graph carries it
   expect(JSON.parse(readFileSync(join(out, 'builds/0.1.97/b1-x/zone-table.json'), 'utf8'))).toEqual(table);
+});
+
+// Fix preview PV16: staging and production take their own table from the pins they bake and main's cook.
+test('a staging build\'s own table names each pinned and placed zone at its shard version under main\'s cook; an old pin set has none', () => {
+  const cook = {version: '1.0.0', hash: 'c'.repeat(64)}, build = 'b'.repeat(40);
+  const catalogue = {shards: [{slug: 'driftwood-isle', shardVersion: '0.3.1'}, {slug: '_pine-hollow', shardVersion: '1.0.0'}], placements: [{slug: 'driftwood-isle'}]};
+  const {table} = ownZoneTable({channel: 'staging', build, serial: 8, catalogue, cook});
+  expect(table?.from).toEqual({channel: 'staging', serial: 8, engineBuild: build});
+  expect(table?.zones.map(row => [row.slug, row.shardVersion, row.index])).toEqual([
+    ['driftwood-isle', '0.3.1', `shards/driftwood-isle/0.3.1/cooks/1.0.0/${cook.hash}/index.json`],
+    ['pine-hollow', '1.0.0', `shards/pine-hollow/1.0.0/cooks/1.0.0/${cook.hash}/index.json`]]);
+  expect(ownZoneTable({channel: 'production', build, serial: 1, catalogue: {shards: [{slug: 'driftwood-isle'}], placements: [{slug: 'far-reach'}]}, cook}))
+    .toEqual({missing: ['driftwood-isle', 'far-reach']});
 });

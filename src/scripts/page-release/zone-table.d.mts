@@ -15,5 +15,7 @@ export function buildZoneTable(options: Parameters<typeof borrowZoneTable>[0] & 
 export function zoneTableOf(release: ReleaseFile, placements: PlacementFile | null): ZoneTable;
 export function cookSkew(mainCookVersion: string, table: Pick<ZoneTable, 'cookVersion' | 'from'>): string | undefined;
 export function mainCookVersion(root: string): string;
+export function mainCook(root: string): { version: string; hash: string };
+export function ownZoneTable(options: { channel: 'staging' | 'production'; build: string; serial: number; catalogue: { shards: readonly { slug: string; shardVersion?: string }[]; placements?: readonly { slug: string }[] }; cook: { version: string; hash: string } }): { table: ZoneTable; missing?: undefined } | { table?: undefined; missing: string[] };
 export function checkCooked(table: ZoneTable, options?: { read?: Read; origin?: string; page?: string; concurrency?: number }): Promise<{ zones: number; objects: number; missing: string[] }>;
 export function borrowZoneTable(options: { release?: string; placements?: string; cookVersion: string; read?: Read; releaseKey?: string; placementKey?: string }): Promise<ZoneTable>;

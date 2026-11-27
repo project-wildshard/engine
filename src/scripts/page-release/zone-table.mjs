@@ -12,6 +12,7 @@
 //
 //   node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/zone-table.mjs build <out.json> [--release=<url>] [--placements=<url>] [--cook-version=<x.y.z>]
 //   node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/zone-table.mjs check <table.json> [--origin=<url>] [--page=<origin>]
+//   node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/zone-table.mjs own <out.json> --channel=<staging|production> --build=<sha>
 import {execFileSync} from 'node:child_process';
 import {appendFileSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {homedir} from 'node:os';
@@ -85,6 +86,34 @@ export function cookSkew(mainCookVersion, table) {
 /** Main's cook version (PV1). @param {string} root @returns {string} */
 export function mainCookVersion(root) {
   return v.parse(v.object({cookVersion: v.string()}), JSON.parse(readFileSync(resolve(root, COOK_VERSION_FILE), 'utf8'))).cookVersion;
+}
+
+/** PV16: main's cook version and cook hash (PV1's file), the key a staging or production build's own cook writes under.
+ * @param {string} root @returns {{version: string, hash: string}} */
+export function mainCook(root) {
+  const file = v.parse(v.object({cookVersion: v.string(), cookHash: v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/u))}), JSON.parse(readFileSync(resolve(root, COOK_VERSION_FILE), 'utf8')));
+  return {version: file.cookVersion, hash: file.cookHash};
+}
+
+/**
+ * Fix preview PV16: a staging or production build's own zone table, from the pins it bakes (each shard at its raw shard version)
+ * and the cook this build's release runs (main's, PV1), so the page reads every zone from the cook, as preview does. `serial` is the
+ * release this build becomes (the live one's plus one). A pin set that names no shard version for some zone (pins from before R2
+ * layout RL12) has none yet: `missing` names those zones, and the build bakes its zones as before.
+ * @param {{channel: 'staging' | 'production', build: string, serial: number, catalogue: {shards: readonly {slug: string, shardVersion?: string}[],
+ *   placements?: readonly {slug: string}[]}, cook: {version: string, hash: string}}} options
+ * @returns {{table: ZoneTable, missing?: undefined} | {table?: undefined, missing: string[]}}
+ */
+export function ownZoneTable({channel, build, serial, catalogue, cook}) {
+  const shards = new Map(catalogue.shards.map(shard => [bare(shard.slug), shard.shardVersion]));
+  const slugs = [...new Set([...catalogue.shards, ...catalogue.placements ?? []].map(row => bare(row.slug)))];
+  const missing = slugs.filter(slug => shards.get(slug) === undefined);
+  if (missing.length > 0) return {missing};
+  const zones = slugs.map(slug => {
+    const shardVersion = String(shards.get(slug));
+    return {slug, shardVersion, index: cookedIndexKey({slug, shardVersion, cookVersion: cook.version, cookHash: cook.hash})};
+  });
+  return {table: readZoneTable({version: 1, from: {channel, serial, engineBuild: build}, cookVersion: cook.version, cookHash: cook.hash, zones})};
 }
 
 const IndexObjects = v.object({objects: v.record(v.string(), v.string())});
@@ -197,6 +226,24 @@ export async function buildZoneTable({root = process.cwd(), receipts = process.e
 async function main(argv) {
   const flag = (/** @type {string} */ name) => argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
   const [verb, file] = argv.filter(arg => !arg.startsWith('--'));
+  if (verb === 'own' && file !== undefined) {
+    // PV16: `own <out.json> --channel=<staging|production> --build=<sha> [--catalogue=<pins>]`, the live release's serial plus one
+    const channel = flag('channel'), build = flag('build');
+    if ((channel !== 'staging' && channel !== 'production') || build === undefined) throw new Error('usage: zone-table.mjs own <out.json> --channel=<staging|production> --build=<sha> [--catalogue=<file>]');
+    const catalogue = JSON.parse(readFileSync(resolve(flag('catalogue') ?? 'test/pins/catalogue.json'), 'utf8'));
+    let serial = 1;
+    try { serial = readPublication(await fetchText(`${RELEASES_ORIGIN}${channel}.json`, agentFetch), RELEASE_PUBLIC_KEY).serial + 1; }
+    catch (error) { if (!(error instanceof ZoneTableRefusal && error.message.endsWith(' 404'))) throw error; }
+    const own = ownZoneTable({channel, build, serial, catalogue, cook: mainCook(process.cwd())});
+    if (own.table === undefined) {
+      console.log(`NOTE zone table: ${channel}'s pins name no shard version for ${own.missing.length} zone(s) (${own.missing.slice(0, 6).join(', ')}): the build bakes its zones (PV16 waits on R2 layout RL12)`);
+      return;
+    }
+    mkdirSync(dirname(resolve(file)), {recursive: true});
+    writeFileSync(resolve(file), `${JSON.stringify(own.table)}\n`);
+    console.log(`zone table: ${own.table.zones.length} zones for ${channel} serial ${serial}, cook ${own.table.cookVersion} ${own.table.cookHash.slice(0, 12)}; wrote ${file}`);
+    return;
+  }
   if ((verb !== 'build' && verb !== 'check') || file === undefined) throw new Error('usage: zone-table.mjs build <out.json> [--release=<url>] [--placements=<url>] [--cook-version=<x.y.z>] | check <table.json> [--origin=<url>] [--page=<origin>]');
   if (verb === 'build') {
     const table = await buildZoneTable({release: flag('release') ?? STAGING_RELEASE, placements: flag('placements') ?? STAGING_PLACEMENTS, cookVersion: flag('cook-version') ?? mainCookVersion(process.cwd())});

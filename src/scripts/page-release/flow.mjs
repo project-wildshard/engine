@@ -204,7 +204,13 @@ export async function runPhase(phase, deps) {
         if (expected === '' || sha256(deps.readFile(deps.catalogue)) !== sha256(Buffer.from(expected))) refuse('Explore catalogue differs from the live staging build');
       }
     }
-    const env = buildEnv(channel, deps);
+    // PV16: staging and production read every zone from the cook too, at their own build's key (their pins, main's cook)
+    const own = channel.solo ? undefined : ownTablePath(deps);
+    if (own !== undefined) {
+      plan(`write ${channel.channel}'s zone table from its pins and main's cook to ${own} (PV16; none while a pin names no shard version)`);
+      if (!dry) deps.run('node', ['--import', './src/scripts/bake-loader.mjs', 'src/scripts/page-release/zone-table.mjs', 'own', own, `--channel=${channel.channel}`, `--build=${deps.build}`], {});
+    }
+    const env = buildEnv(channel, own !== undefined && heldFile(deps, own) ? {...deps, zoneTable: own} : deps);
     for (const line of deps.host.describe('prepare', context)) plan(line);
     if (!dry) await deps.host.prepare(context);
     plan(`run pnpm build:game with ${channel.solo ? 'no release file (solo)' : `WILDSHARD_RELEASE_URL=${env.WILDSHARD_RELEASE_URL}`} WILDSHARD_CATALOGUE=${env.WILDSHARD_CATALOGUE} WS_BUILD_ID=${deps.build} WS_CHANNEL=${channel.channel}`);
@@ -295,10 +301,11 @@ export async function runPhase(phase, deps) {
       plan('ready every signed extra placement for this exact build before checking the page');
       if (!dry) deps.run('node', ['--import', './src/scripts/bake-loader.mjs', 'src/scripts/release-placed-ready.mjs', 'staging'], {WS_BUILD_ID: deps.build});
     }
-    if (deps.zoneTable !== undefined) {
+    const table = deps.zoneTable ?? (channel.solo || !heldFile(deps, ownTablePath(deps)) ? undefined : ownTablePath(deps));
+    if (table !== undefined) {
       // PV2: no 404 at go-live. One missing index or object refuses, and preview keeps its last build.
-      plan(`HEAD every cooked index and object ${deps.zoneTable} names, with ${channel.origin}'s Origin (PV2)`);
-      if (!dry) deps.run('node', ['--import', './src/scripts/bake-loader.mjs', 'src/scripts/page-release/zone-table.mjs', 'check', deps.zoneTable, `--page=${channel.origin}`], {});
+      plan(`HEAD every cooked index and object ${table} names, with ${channel.origin}'s Origin (PV2, PV16)`);
+      if (!dry) deps.run('node', ['--import', './src/scripts/bake-loader.mjs', 'src/scripts/page-release/zone-table.mjs', 'check', table, `--page=${channel.origin}`], {});
     }
     for (const line of deps.host.describe('deployedDigests', deployed)) plan(line);
     if (!dry) await checkDeployed(deps, deployed, refuse);
@@ -366,13 +373,21 @@ export async function runPhase(phase, deps) {
   return {refusals};
 }
 
+/** PV16: where a staging or production build writes its own zone table, one per build. @param {Deps} deps */
+export const ownTablePath = deps => `${deps.root}/tmp/page-release/${deps.channel}-${deps.build}-zone-table.json`;
+
+/** Whether `path` exists (readFile throws on a missing file). @param {Deps} deps @param {string} path */
+function heldFile(deps, path) {
+  try { deps.readFile(path); return true; } catch { return false; }
+}
+
 /** @param {ChannelConfig} channel @param {Deps} deps @returns {Record<string, string>} */
 export function buildEnv(channel, deps) {
   const common = {
     // SA35: preview bakes the grid it borrowed from staging when the workflow names one; staging and production bake the pin.
     WS_BUILD_ID: deps.build, WILDSHARD_CATALOGUE: (channel.solo ? deps.catalogue : undefined) ?? 'test/pins/catalogue.json',
-    // PV2: preview bakes the zone table it took from staging's release
-    ...(channel.solo && deps.zoneTable !== undefined ? {WS_ZONE_TABLE: deps.zoneTable} : {}),
+    // PV2: preview bakes the zone table it took from staging's release; PV16: staging and production their own (runPhase)
+    ...(deps.zoneTable !== undefined ? {WS_ZONE_TABLE: deps.zoneTable} : {}),
     WS_PREVIOUS_DEPLOY_ORIGIN: channel.origin, WS_RELEASE: '1', WS_CHANNEL: channel.channel,
     // API-CLOUDFLARE AC11: errors, telemetry and the inbox go to the api-server Worker on every channel.
     VITE_API_ORIGIN: API_ORIGIN, WILDSHARD_RELEASE_KEY: deps.releaseKey ?? RELEASE_PUBLIC_KEY,

@@ -321,9 +321,8 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
       ...(previousOrigin === undefined ? {} : { previousOrigin }),
       optional,
       contentBase,
-      ...(solo ? {} : { keepFile: path => !standaloneServerFile(path) }),
-      // PV3: a zoneless page carries no earlier build's zone file either
-      ...(zoneless ? { keepFile: (shards => path => !isZoneFile(path, shards))(shardNames(outDir)) } : {}),
+      // a world page carries no standalone server file; PV3, PV16: a zoneless page (any channel) no earlier build's zone file either
+      ...(solo && !zoneless ? {} : { keepFile: (shards => path => (solo || !standaloneServerFile(path)) && !(zoneless && isZoneFile(path, shards)))(shardNames(outDir)) }),
       ...(budget === undefined ? {} : { budget }),
     }),
   );
