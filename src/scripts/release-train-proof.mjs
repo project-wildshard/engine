@@ -61,6 +61,13 @@ export function provesTrainCi(run, build) {
       run.jobs.some(job => job.name === name && job.status === 'completed' && job.conclusion === 'success'));
 }
 
+/** Main's qualification dispatch runs the same ci.yml jobs on its own exact commit.
+ * @param {import('./release-train-proof.mjs').Run} run @param {string} build */
+export function provesTrainSource(run, build) {
+  return run.workflowName === 'ci' && run.headBranch === 'main' &&
+    (run.event === 'push' || run.event === 'workflow_dispatch') && provesTrainCi(run, build);
+}
+
 /** Why repo-kit's prepare would refuse this environment's commit, or undefined. Checked before local QA (opus-rel86,
  *  v0.1.86: the train spent its local QA, then prepare stopped on a missing ASSISTED_BY and removed its log).
  * @param {Record<string, string | undefined>} env @param {boolean} prepared @returns {string | undefined} */

@@ -9,7 +9,7 @@ import { dirname, join, resolve as absolute } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
-import { attributionGap, cutTree, fullCommitArgs, treeDirt, writeHold, gateInputsMoved, localAttemptDir, nextAdmission, releaseCiAdmission, provesNpmNext, provesReleaseReuse, provesTrainCi, retryRead, trainSha as sha, trainTag as tagPattern, watchTrainRun,
+import { attributionGap, cutTree, fullCommitArgs, treeDirt, writeHold, gateInputsMoved, localAttemptDir, nextAdmission, releaseCiAdmission, provesNpmNext, provesReleaseReuse, provesTrainCi, provesTrainSource, retryRead, trainSha as sha, trainTag as tagPattern, watchTrainRun,
   type Alias, type Leg, type Run } from './release-train-proof.mjs';
 import { CHANNELS, localQaGap, RELEASE_PUBLIC_KEY, type QaVerdict } from './page-release/flow.mjs';
 import { pidLock } from './.kit/pid-lock.mjs';
@@ -178,13 +178,13 @@ async function main(args: string[]) {
 
   const intended = prepared ? git(['rev-parse', `${prepared}^`]) : undefined;
   const candidates = JSON.parse(gh(['run', 'list', '-R', repo, '--workflow', 'ci.yml', '--branch', 'main',
-    '--event', 'push', ...(intended ? ['--commit', intended] : []), '--limit', '100',
+    '--status', 'success', ...(intended ? ['--commit', intended] : []), '--limit', '100',
     '--json', 'databaseId,headSha,status,conclusion'])) as Run[];
   const green = candidates.filter(row => row.conclusion === 'success' && row.status === 'completed' &&
     sha.test(row.headSha) && (!intended || row.headSha === intended) && ancestor(previous, row.headSha) &&
     ancestor(row.headSha, mainRef) && required.every(commit => ancestor(commit, row.headSha)));
   green.sort((a, b) => a.headSha === b.headSha ? b.databaseId - a.databaseId : ancestor(a.headSha, b.headSha) ? 1 : -1);
-  const source = green.find(row => provesTrainCi(runView(row.databaseId), row.headSha));
+  const source = green.find(row => provesTrainSource(runView(row.databaseId), row.headSha));
   if (!source) throw new Error('No eligible green main CI contains the previous release');
   if (!prepared && Number(git(['rev-list', '--no-merges', '--count', `${cadence.build}..${source.headSha}`])) === 0) {
     throw new Error(`Newest eligible green main has no changes since ${cadence.tag}`);

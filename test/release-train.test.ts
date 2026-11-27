@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, test } from 'vitest';
-import { attributionGap, cutTree, fullCommitArgs, treeDirt, writeHold, gateInputsMoved, localAttemptDir, nextAdmission, provesNpmNext, releaseCiAdmission, provesReleaseReuse, provesTrainCi, retryRead, watchTrainRun } from '../src/scripts/release-train-proof.mjs';
+import { attributionGap, cutTree, fullCommitArgs, treeDirt, writeHold, gateInputsMoved, localAttemptDir, nextAdmission, provesNpmNext, releaseCiAdmission, provesReleaseReuse, provesTrainCi, provesTrainSource, retryRead, watchTrainRun } from '../src/scripts/release-train-proof.mjs';
 import { createTempRepo } from '../src/test/helpers/git';
 
 const build = 'a'.repeat(40);
@@ -58,6 +58,22 @@ test('train CI proves the exact build after running packed tests and the require
   expect(provesTrainCi({ ...run, conclusion: 'failure' }, build)).toBe(false);
   expect(provesTrainCi({ ...run, jobs: jobs.slice(1) }, build)).toBe(false);
   expect(provesTrainCi({ ...run, jobs: jobs.slice(0, -1) }, build)).toBe(false);
+});
+
+test('the release source accepts a green qualification on the exact main SHA', () => {
+  const green = { conclusion: 'success', status: 'completed' };
+  const jobs = [
+    ...['boundaries', 'nine-ring1-build', 'memory-client-build'].map(name => ({ name, ...green })),
+    { name: 'tests (1)', ...green, steps: [{ name: "Run this job's packed share", ...green }] },
+  ];
+  const run = { headSha: build, databaseId: ci, workflowName: 'ci', headBranch: 'main', event: 'workflow_dispatch', ...green, jobs };
+  expect(provesTrainSource(run, build)).toBe(true);
+  expect(provesTrainSource({ ...run, event: 'push' }, build)).toBe(true);
+  for (const change of [
+    { headSha: 'b'.repeat(40) }, { headBranch: 'release/v0.1.65' }, { workflowName: 'preview' },
+    { event: 'pull_request' }, { status: 'in_progress' }, { conclusion: 'cancelled' },
+    { jobs: jobs.slice(0, -1) },
+  ]) expect(provesTrainSource({ ...run, ...change }, build)).toBe(false);
 });
 
 
