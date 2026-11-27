@@ -51,7 +51,7 @@ if (process.argv[1] === import.meta.filename) {
   for (const flow of o.only?.split(',') ?? WATCHED) {
     const [shard = '', tier = 'phone'] = flow.split(':'), file = join(out, `${flow.replace(':', '-')}.json`), grid = shard === 'grid';
     const meter = spawnSync(process.execPath, [join(root, 'src/scripts/shard-wire-meter.mjs'), '--root', root, '--upstream', o.upstream, '--shard', grid ? 'driftwood-isle' : shard,
-      '--tier', tier, '--flow', grid ? 'grid' : 'select', '--settle', '12000', '--out', file], { cwd: root, encoding: 'utf8', maxBuffer: 1 << 26 });
+      '--tier', tier, '--flow', grid ? 'grid' : 'zone', '--settle', '12000', '--out', file], { cwd: root, encoding: 'utf8', maxBuffer: 1 << 26 });
     const row = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null;
     if (row !== null && row.build !== build) {
       build = row.build;

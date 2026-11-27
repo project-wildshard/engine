@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 // SHARD-SIZE: what a player really downloads, measured on the socket. A counting HTTP proxy sits between a fresh Chromium
 // profile and a served build (or production), so page, worker and service-worker traffic all count, on the bytes actually
-// sent. It enters one shard as a player does, with Hold at loading screen on, and stops when the network has gone quiet.
+// sent. It enters one shard by its name, with Hold at loading screen on, and stops when the network has gone quiet.
 // budgets/shard-size-baseline.json's numbers came from this; its `method` says how to redo them from the baseline commit.
 //
 //   node src/scripts/shard-wire-meter.mjs --root <built checkout> --shard <slug> --tier phone|desktop --out <file.json>
-//     [--flow select|grid] [--upstream https://play.wildshard.io] [--settle ms] [--timeout ms] [--shot file.jpg]
+//     [--flow zone|select|grid] [--upstream https://play.wildshard.io] [--settle ms] [--timeout ms] [--shot file.jpg]
+//     --flow zone (the default) enters --shard by its name through zone-entry.mjs, as the zone-cook and ship proofs do;
+//     select taps the deck's card for --shard, grid taps the grid. QA 11-26 row 30: the deck's dots show no selected card
+//     past the first, so select reached only Driftwood; zone enters every zone the page holds, open plots included.
 //     [--last <slug>]   a returning player whose last pick was <slug>, with nothing stored yet
 //     [--dwell ms]      time on the title before the tap
 //     [--card n]        enter the deck's nth card instead of --shard's benchmark card (PAGE-SIZE PZ7 meters every card)
@@ -21,8 +24,9 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { KEYCHAIN_ARGS } from './.kit/chromium-keychain.mjs';
+import { enterZone } from './zone-entry.mjs';
 
-const { values: o } = parseArgs({ options: { root: { type: 'string' }, shard: { type: 'string' }, card: { type: 'string' }, tier: { type: 'string', default: 'phone' }, flow: { type: 'string', default: 'select' },
+const { values: o } = parseArgs({ options: { root: { type: 'string' }, shard: { type: 'string' }, card: { type: 'string' }, tier: { type: 'string', default: 'phone' }, flow: { type: 'string', default: 'zone' },
   out: { type: 'string' }, upstream: { type: 'string' }, settle: { type: 'string', default: '20000' }, timeout: { type: 'string', default: '420000' }, shot: { type: 'string' }, last: { type: 'string' }, dwell: { type: 'string', default: '3000' } } });
 const require = createRequire(join(o.root, 'package.json'));
 const { chromium, devices } = await admittedPlaywright(require('playwright'));
@@ -77,6 +81,13 @@ const summary = () => {
   return { requests: rows.length, wireBytes: sum(rows), byStage, byClass };
 };
 try {
+  if (o.flow === 'zone') {
+    // The tap is written on the page's origin, then the home page boots straight into the zone.
+    stage = 'entry';
+    await enterZone(page, { zone: o.shard, base: url, flags: 'mute=1&nolock=1&skipintro=1&sw=0', waitUntil: 'commit', timeout });
+    result.card = { zone: o.shard };
+    result.build = await page.evaluate(() => fetch('/version.json').then(r => r.json()).then(v => v.build ?? v.sha ?? null)).catch(() => null);
+  } else {
   await page.goto(url, { waitUntil: 'commit', timeout });
   result.build = await page.evaluate(() => fetch('/version.json').then(r => r.json()).then(v => v.build ?? v.sha ?? null)).catch(() => null);
   await page.locator('.ws-main-select').waitFor({ timeout });
@@ -104,6 +115,7 @@ try {
   stage = 'entry';
   const explicit = page.locator('.ws-menu-shardfile');
   await (await explicit.isVisible() ? explicit : page.locator('.ws-menu-play')).click({ timeout });
+  }
   }
   const started = Date.now(), settle = Number(o.settle);
   for (;;) {
