@@ -122,7 +122,7 @@ test('a build given a zone table bakes it as a file and inline in index.html; on
   mkdirSync(resolve('tmp'), {recursive: true});
   const out = mkdtempSync(join(resolve('tmp'), 'zone-table-')); scratch.push(out);
   writeFileSync(join(out, 'index.html'), '<html><head></head><body></body></html>');
-  writeFileSync(join(out, 'version.json'), JSON.stringify({build: 'b1-x'}));
+  writeFileSync(join(out, 'version.json'), JSON.stringify({build: 'b1-x', clientVersion: '0.1.97'}));
   bakeZoneTable(out, undefined);
   expect(zoneTableIn(readFileSync(join(out, 'index.html'), 'utf8'))).toBeUndefined();
   const table = zoneTableOf(release(), null), file = join(out, 'in.json');
@@ -134,5 +134,5 @@ test('a build given a zone table bakes it as a file and inline in index.html; on
   expect(html.match(/id="ws-zone-table"/gu)).toHaveLength(1);
   expect(JSON.parse(readFileSync(join(out, 'zone-table.json'), 'utf8'))).toEqual(table);
   // PV14 (codex-cookkeys): beside the build's code too, so its chunk graph carries it
-  expect(JSON.parse(readFileSync(join(out, 'b/b1-x/zone-table.json'), 'utf8'))).toEqual(table);
+  expect(JSON.parse(readFileSync(join(out, 'builds/0.1.97/b1-x/zone-table.json'), 'utf8'))).toEqual(table);
 });

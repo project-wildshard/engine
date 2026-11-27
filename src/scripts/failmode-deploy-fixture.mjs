@@ -2,7 +2,7 @@
 // signed deploy and code-retirement transitions over the same executable bytes.
 import { constants, cpSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { sourceBuildId } from './app-build/buildIdentity.mjs';
+import { codeDirectory, engineVersionOf, sourceBuildId } from './app-build/buildIdentity.mjs';
 
 /** @param {string} first @param {string} next */
 export function nextFailmodeDeploy(first, next) {
@@ -24,10 +24,12 @@ export function nextFailmodeDeploy(first, next) {
       .replace(`globalThis.__WS_BUILT_AT__=${at};`, `globalThis.__WS_BUILT_AT__=${nextAt};`)
       .replace(`name="ws-built-at" content="${version.time}"`, `name="ws-built-at" content="${nextTime}"`));
   }
-  // A page loads its online bundle from /b/{its build}/ (oneWayIn's onlineGate, Zone select, the worker client). Without that
-  // folder under the second build's name, a page booted on it never goes online (meta QA 11-25 row 65: 10b's held tap).
-  const own = join(next, 'b', build);
-  if (existsSync(own)) cpSync(own, join(next, 'b', nextBuild), { recursive: true, mode: constants.COPYFILE_FICLONE, verbatimSymlinks: true, force: false, errorOnExist: true });
+  // A page loads its online bundle from its build's folder (oneWayIn's onlineGate, Zone select, the worker client). Without
+  // that folder under the second build's name, a page booted on it never goes online (meta QA 11-25 row 65: 10b's held tap).
+  // PV9: builds/<engineVersion>/<build>/; a fixture from before it has b/<build>/.
+  for (const [own, copy] of [[codeDirectory(build, version.clientVersion ?? engineVersionOf()), codeDirectory(nextBuild, version.clientVersion ?? engineVersionOf())], [`b/${build}`, `b/${nextBuild}`]]) {
+    if (existsSync(join(next, own))) cpSync(join(next, own), join(next, copy), { recursive: true, mode: constants.COPYFILE_FICLONE, verbatimSymlinks: true, force: false, errorOnExist: true });
+  }
   const assets = join(next, 'assets/spawn');
   for (const name of ['packs', 'server']) {
     const firstBook = join(assets, `${name}-${build}.json`);

@@ -288,7 +288,7 @@ test('native title routes use exact same-origin bare GETs and the existing cache
   await worker.dispatch('install'); await worker.dispatch('activate');
   const pattern = (pathname: string): object => ({protocol: 'https', hostname: 'worker.test', port: '', pathname, search: ''});
   expect(worker.routes).toHaveBeenCalledExactlyOnceWith([
-    ...['script', 'style'].map(requestDestination => ({condition: {urlPattern: pattern('/b/*'), requestDestination, requestMethod: 'GET'}, source: {cacheName: ASSET_CACHE_NAME}})),
+    ...['/builds/*', '/b/*'].flatMap(path => ['script', 'style'].map(requestDestination => ({condition: {urlPattern: pattern(path), requestDestination, requestMethod: 'GET'}, source: {cacheName: ASSET_CACHE_NAME}}))),
     {condition: {urlPattern: pattern('/assets/title/*'), requestDestination: 'image', requestMethod: 'GET'}, source: {cacheName: ASSET_CACHE_NAME}},
     {condition: {urlPattern: pattern('/fonts/*'), requestDestination: 'font', requestMethod: 'GET'}, source: {cacheName: 'ws-shell-v3-A'}},
   ]);

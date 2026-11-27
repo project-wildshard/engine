@@ -4,17 +4,21 @@
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {readZoneTable, ZONE_TABLE_ELEMENT_ID, ZONE_TABLE_FILE} from '../../shared/game/grid/zoneTable.ts';
+import {codeDirectory, engineVersionOf} from './buildIdentity.mjs';
 
 /** @typedef {import('../../shared/game/grid/zoneTable.ts').ZoneTable} ZoneTable */
 const ELEMENT = new RegExp(`<script type="application/json" id="${ZONE_TABLE_ELEMENT_ID}">[^<]*</script>`, 'u');
 const inline = (/** @type {string} */ text) => `<script type="application/json" id="${ZONE_TABLE_ELEMENT_ID}">${text.replaceAll('<', String.raw`\u003c`)}</script>`;
 
-/** The build id `version.json` names, or undefined before it is written. @param {string} outDir @returns {string | undefined} */
-function readBuildId(outDir) {
+/** The build's code folder (PV9: `builds/<engineVersion>/<build>/`) from `version.json`, or undefined before it is written.
+ *  @param {string} outDir @returns {string | undefined} */
+function buildFolder(outDir) {
   const file = join(outDir, 'version.json');
   if (!existsSync(file)) return undefined;
-  const build = JSON.parse(readFileSync(file, 'utf8'))?.build;
-  return typeof build === 'string' && /^[\w.-]{1,64}$/u.test(build) ? build : undefined;
+  const version = JSON.parse(readFileSync(file, 'utf8'));
+  const build = version?.build;
+  if (typeof build !== 'string' || !/^[\w.-]{1,64}$/u.test(build)) return undefined;
+  return codeDirectory(build, typeof version.clientVersion === 'string' ? version.clientVersion : engineVersionOf());
 }
 
 /** @param {string} outDir @param {ZoneTable} table */
@@ -22,8 +26,8 @@ export function writeZoneTable(outDir, table) {
   const text = JSON.stringify(readZoneTable(table));
   writeFileSync(join(outDir, ZONE_TABLE_FILE), text);
   // PV14 (codex-cookkeys): also beside the build's code, so its chunk graph (deploy-chunks.json) carries it and the prune keeps it
-  const build = readBuildId(outDir);
-  if (build !== undefined) { mkdirSync(join(outDir, 'b', build), {recursive: true}); writeFileSync(join(outDir, 'b', build, ZONE_TABLE_FILE), text); }
+  const folder = buildFolder(outDir);
+  if (folder !== undefined) { mkdirSync(join(outDir, folder), {recursive: true}); writeFileSync(join(outDir, folder, ZONE_TABLE_FILE), text); }
   const file = join(outDir, 'index.html'), html = readFileSync(file, 'utf8');
   if (!html.includes('</head>')) throw new Error('No document head for the zone table');
   writeFileSync(file, ELEMENT.test(html) ? html.replace(ELEMENT, () => inline(text)) : html.replace('</head>', () => `${inline(text)}</head>`));

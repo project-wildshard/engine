@@ -150,7 +150,8 @@ workerScope.listen(self, 'install', event => {
   const pattern = pathname => ({ protocol: self.location.protocol.slice(0, -1), hostname: self.location.hostname,
     port: self.location.port, pathname, search: '' });
   const routes = typeof event.addRoutes === 'function' ? event.addRoutes([
-    ...['script', 'style'].map(requestDestination => ({ condition: { urlPattern: pattern('/b/*'), requestDestination, requestMethod: 'GET' }, source: { cacheName: ASSETS } })),
+    // PV9: code lives under /builds/<engineVersion>/<build>/ and /builds/shared/; /b/ is a carried build's legacy folder
+    ...['/builds/*', '/b/*'].flatMap(path => ['script', 'style'].map(requestDestination => ({ condition: { urlPattern: pattern(path), requestDestination, requestMethod: 'GET' }, source: { cacheName: ASSETS } }))),
     { condition: { urlPattern: pattern('/assets/title/*'), requestDestination: 'image', requestMethod: 'GET' }, source: { cacheName: ASSETS } },
     { condition: { urlPattern: pattern('/fonts/*'), requestDestination: 'font', requestMethod: 'GET' }, source: { cacheName: SHELL } },
   ]) : undefined;
