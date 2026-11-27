@@ -658,15 +658,25 @@ async function waitForGate(channel, deps, refuse, signedOnly = false) {
 
 /**
  * After the alias move the channel's own domain serves this build and this channel's release file.
- * @param {ChannelConfig} channel @param {Deps} deps @param {(message: string) => void} refuse */
+ * @param {ChannelConfig} channel @param {Deps} deps */
+async function domainGap(channel, deps) {
+  const version = /** @type {{build?: string, saveEpoch?: number}|null} */ (await deps.fetchJSON(`${channel.origin}/version.json`).catch(() => null));
+  if (version?.build !== deps.build || version.saveEpoch !== deps.manifest.saveEpoch) return `${channel.origin} still serves ${version?.build} after the alias move`;
+  const html = await deps.fetchText(`${channel.origin}/`).catch(() => undefined);
+  if (html === undefined) return `${channel.origin} page is unreadable after the alias move`;
+  if (!html.includes(`globalThis.__WS_BUILD_ID__=${JSON.stringify(deps.build)};`)) return `${channel.origin} page is not stamped with ${deps.build} yet`;
+  if (channel.solo) return html.includes(RELEASES_ORIGIN) ? `${channel.origin} page names a release file, but the channel is solo` : undefined;
+  if (!html.includes(channel.release) || html.includes(`${RELEASES_ORIGIN}/${channel.other}.json`)) return `${channel.origin} page does not name only ${channel.release}`;
+  return undefined;
+}
+
+/** @param {ChannelConfig} channel @param {Deps} deps @param {(message: string) => void} refuse */
 async function waitForDomain(channel, deps, refuse) {
   for (let attempt = 0;; attempt++) {
-    const version = /** @type {{build?: string, saveEpoch?: number}} */ (await deps.fetchJSON(`${channel.origin}/version.json`).catch(() => ({})));
-    if (version.build === deps.build && version.saveEpoch === deps.manifest.saveEpoch) break;
-    if (attempt >= 12) { refuse(`${channel.origin} still serves ${version.build} after the alias move`); return; }
+    // QA59: version.json and HTML can propagate separately across the edge.
+    const problem = await domainGap(channel, deps);
+    if (problem === undefined) return;
+    if (attempt >= 12) { refuse(problem); return; }
     await deps.sleep(10_000);
   }
-  const html = await deps.fetchText(`${channel.origin}/`);
-  if (channel.solo) { if (html.includes(RELEASES_ORIGIN)) refuse(`${channel.origin} page names a release file, but preview is solo`); return; }
-  if (!html.includes(channel.release) || html.includes(`${RELEASES_ORIGIN}/${channel.other}.json`)) refuse(`${channel.origin} page does not name only ${channel.release}`);
 }

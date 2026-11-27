@@ -167,6 +167,8 @@ Each phase refuses until the one before it has run for the same SHA
 SHA and `staging.wildshard.io` already serving it; `go-live` needs
 `--qa=<verdict.json>` from `staging go-live` for the exact build,
 including the J476 zone-entry result on the staging origin.
+After aliasing, the domain check waits for both `version.json` and the
+HTML to name the new build and for the HTML to name its release URL.
 The staging verdict replaced `--after-staging-proofs` (Doctor and the live
 two-player proof), `verify-staging.sh`'s eight journeys and two zone
 sweeps, and `--smoke`: about 42 minutes a release (J427). Go-live

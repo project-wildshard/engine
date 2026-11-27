@@ -331,6 +331,24 @@ test('production needs its tag, staging live on the build and the strict staging
   expect(fetched(calls).at(-2)).toBe('goLive');
 });
 
+test('QA59 production waits for the exact HTML after version.json reaches the edge', async () => {
+  const {deps, calls, state} = rig('production');
+  await through(deps, 'check');
+  deps.qa = qaOn();
+  const current = page('production').toString(), pauses: number[] = [];
+  const responses = [current.replace(build, 'f'.repeat(40)), current.replace(CHANNELS.production.release, CHANNELS.staging.release), current];
+  deps.fetchText = () => Promise.resolve(responses.shift() ?? current);
+  deps.sleep = ms => { pauses.push(ms); return Promise.resolve(); };
+  await runPhase('go-live', deps);
+  expect(pauses).toEqual([10000, 10000]);
+  expect(calls.filter(call => call === `fetch ${CHANNELS.production.origin}/version.json`)).toHaveLength(3);
+  expect(state['go-live']).toMatchObject({build});
+
+  deps.fetchText = () => Promise.resolve(current.replace(CHANNELS.production.release, CHANNELS.staging.release));
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/page does not name only/u);
+  expect(pauses).toHaveLength(14);
+});
+
 // Production go-live reads one staging deploy verdict with J451's full phone walk. A P0 or P1 holds it.
 test('production go-live needs one clean staging QA verdict for this build', async () => {
   const {deps, calls} = rig('production');
@@ -785,7 +803,7 @@ test('Explore deploys the live staging SHA without publishing a new world releas
   const {deps, calls, files, live} = rig('explore');
   const catalogue = '/staging/catalogue.json', body = '{"placements":[]}';
   files.set(catalogue, Buffer.from(body));
-  const explore = {...deps, catalogue, fetchText: () => Promise.resolve(body)};
+  const explore = {...deps, catalogue, fetchText: (url: string) => Promise.resolve(url.endsWith('/catalogue.json') ? body : page('explore').toString())};
   for (const step of PHASES) await runPhase(step, explore);
   expect(calls).toContain('goLive');
   expect(calls).toContain('fetch https://releases.wildshard.io/staging.json');
