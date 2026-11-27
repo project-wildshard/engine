@@ -25,9 +25,10 @@ export interface ReleaseFile {
 }
 const Whole = v.pipe(v.number(), v.integer(), v.minValue(0));
 const Semver = v.pipe(v.string(), v.regex(/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/u));
+const CookVersion = v.pipe(v.string(), v.regex(/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u, 'Invalid cook version'));
 /** A release file's body, once its signature has held. */
 export const ReleaseSchema: v.GenericSchema<ReleaseFile> = v.object({ channel: v.picklist(['production', 'staging', 'preview']), serial: Whole, engineBuild: v.pipe(v.string(), v.minLength(1)), saveEpoch: v.pipe(Whole, v.minValue(1)), shards: v.array(v.object({ slug: v.string(), revision: Whole, shardVersion: v.exactOptional(Semver) })),
-  cook: v.exactOptional(v.strictObject({ version: Semver, hash: v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/u)) })),
+  cook: v.exactOptional(v.strictObject({ version: CookVersion, hash: v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/u)) })),
   bundle: v.exactOptional(v.object({ name: v.pipe(v.string(), v.minLength(1)), sha256: v.pipe(v.string(), v.regex(/^[0-9a-f]{64}$/u)) })), socket: v.exactOptional(v.string()),
   items: v.exactOptional(v.pipe(v.strictObject({ path: v.pipe(v.string(), v.regex(/^assets\/catalogue\/items-[0-9a-f]{64}\.json$/u)), sha256: v.pipe(v.string(), v.regex(/^[0-9a-f]{64}$/u)), bytes: v.pipe(v.number(), v.safeInteger(), v.minValue(1), v.maxValue(1_048_576)) }), v.check(row => row.path === `assets/catalogue/items-${row.sha256}.json`, 'Item catalogue digest and path disagree'))) });
 /** The file on R2: the body as signed, and its signature in hex (C20). */

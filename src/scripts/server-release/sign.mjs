@@ -23,6 +23,10 @@ export function publication(value) {
     if (row.socket !== undefined || row.bundle !== undefined) throw new Error('Preview publication must be solo');
     return row;
   }
+  if (row.cook !== undefined) {
+    const missing = row.shards.find(shard => shard.shardVersion === undefined);
+    if (missing !== undefined) throw new Error(`Signed cook address is incomplete for ${missing.slug}`);
+  }
   if (row.bundle === undefined || !/^[\w][\w.+-]*\/[\w][\w.+-]*\.tar\.gz$/u.test(row.bundle.name)
     || row.socket === undefined) throw new Error('Invalid server publication');
   const socket = new URL(row.socket);
@@ -77,4 +81,14 @@ export function releaseShards(pins, names) {
     // Deployed readers of the signed release still use the old field.
     return {slug, revision: uploadNumber, ...(row?.shardVersion === undefined ? {} : {shardVersion: row.shardVersion})};
   });
+}
+
+/** PV25. A mixed pin set still uses the legacy room books. A complete set names the exact source's recorded cook.
+ * @param {ReleaseFile['shards']} shards
+ * @param {() => unknown} readCook
+ * @returns {Pick<ReleaseFile, 'cook'>} */
+export function releaseCook(shards, readCook) {
+  if (shards.some(shard => shard.shardVersion === undefined)) return {};
+  const row = v.parse(v.object({cookVersion: v.string(), cookHash: v.string()}), readCook());
+  return {cook: {version: row.cookVersion, hash: row.cookHash}};
 }

@@ -9,3 +9,4 @@ export function bundleDescriptor(archive: string, tag: string): { name: string; 
 export const DEFAULT_SERVER_SHARDS: string;
 export function servedSlug(slug: string): string;
 export function releaseShards(pins: unknown, names: string): ReleaseFile['shards'];
+export function releaseCook(shards: ReleaseFile['shards'], readCook: () => unknown): Pick<ReleaseFile, 'cook'>;

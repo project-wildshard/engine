@@ -7,7 +7,7 @@ import { parseArgs } from 'node:util';
 import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client, S3ServiceException } from '@aws-sdk/client-s3';
 import * as v from 'valibot';
 import { readServerPackBook, serverPackBookPath } from '../../shared/game/shardfile/serverPack.ts';
-import { bundleDescriptor, COMMIT, DEFAULT_SERVER_SHARDS, publication, readPublication, releasePublicKey, releaseShards, signRelease } from './sign.mjs';
+import { bundleDescriptor, COMMIT, DEFAULT_SERVER_SHARDS, publication, readPublication, releaseCook, releasePublicKey, releaseShards, signRelease } from './sign.mjs';
 import { copyItemCatalogue, itemBytesMatch } from './items.mjs';
 import { preparedReleaseFollows } from './history.mjs';
 
@@ -146,8 +146,9 @@ async function main() {
   if (bucket !== 'wildshard-packs') throw new Error('R2_BUCKET_PACKS must be wildshard-packs (C26)');
   const epoch = v.parse(v.object({ saveEpoch: v.pipe(v.number(), v.integer(), v.minValue(1)) }), JSON.parse(sourceFile('save-epoch.json'))).saveEpoch;
   const shardNames = process.env.E7_SERVER_SHARDS?.trim();
+  const shards = releaseShards(JSON.parse(sourceFile('test/pins/shardfiles.json')), shardNames === undefined || shardNames === '' ? DEFAULT_SERVER_SHARDS : shardNames);
   const candidate = publication({ channel: values.channel, serial: 1, engineBuild: values.build, saveEpoch: epoch,
-    shards: releaseShards(JSON.parse(sourceFile('test/pins/shardfiles.json')), shardNames === undefined || shardNames === '' ? DEFAULT_SERVER_SHARDS : shardNames),
+    shards, ...releaseCook(shards, () => JSON.parse(sourceFile('src/cook/game/cook-version.json'))),
     bundle: bundleDescriptor(values.bundle, values.tag), socket: need('E7_RELEASE_SOCKET') });
   if (releasePublicKey(privateKey) !== publicKey.toLowerCase()) throw new Error('Signing key does not match E7_RELEASE_PUBLIC_KEY');
   if (values.check) { console.log('Server release configuration admitted'); return; }

@@ -13,7 +13,7 @@ import { join, resolve } from 'node:path';
 import { S3Client } from '@aws-sdk/client-s3';
 import { afterAll, expect, test } from 'vitest';
 import { createTempRepo } from '../src/test/helpers/git.ts';
-import { bundleDescriptor, releasePublicKey, releaseShards, signRelease } from '../src/scripts/server-release/sign.mjs';
+import { bundleDescriptor, releaseCook, releasePublicKey, releaseShards, signRelease } from '../src/scripts/server-release/sign.mjs';
 import { GridAssembly } from '../src/shared/game/grid/assembly';
 import { worldCells } from '../src/server/host/dedicated/gridCells';
 import { publishChannel, serverPacksReady } from '../src/scripts/server-release/publish.mjs';
@@ -71,6 +71,18 @@ test('QA58 signed release readers accept additive fields and validate the known 
   const malformed = signedBody({...expected,shards:[{slug:'fixture',revision:11,shardVersion:'bad-version'}]});
   expect(()=>readReleaseFile(malformed,publicKey)).toThrow();
   await expect(readSignedRelease(malformed,publicKey)).rejects.toThrow();
+});
+
+test('PV25 signs the source cook only when every served pin has a cooked address', async () => {
+  const pins = [{slug:'driftwood-isle',revision:3,shardVersion:'0.0.13'}];
+  const record = () => ({cookVersion:'1.17.0',cookHash:'b'.repeat(64)});
+  const signed = signRelease({...release(),shards:pins,...releaseCook(pins,record)},pem);
+  const expected = {shards:pins,cook:{version:'1.17.0',hash:'b'.repeat(64)}};
+  expect(readReleaseFile(signed,publicKey)).toMatchObject(expected);
+  expect(await readSignedRelease(signed,publicKey)).toMatchObject(expected);
+  expect(releaseCook([...pins,{slug:'other',revision:1}],()=>{throw new Error('legacy does not read the cook record');})).toEqual({});
+  expect(()=>signRelease({...release(),cook:expected.cook},pem)).toThrow(/incomplete for driftwood-isle/u);
+  expect(()=>signRelease({...release(),shards:pins,cook:{...expected.cook,version:'1.17.0-next'}},pem)).toThrow(/Invalid cook version/u);
 });
 
 test('preview signs the same envelope without a socket or server bundle', async () => {
