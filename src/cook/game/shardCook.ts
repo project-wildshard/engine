@@ -27,6 +27,7 @@ import {serverSkinRigs} from '../../shared/game/shardfile/serverSkinRigs';
 import { entryReadSet } from '@wildshard/format/entryReadSet';
 import {phoneTier, splatPhoneTier, type Astc6Encode, type SplatPhoneLayer} from './tierTextures';
 import {splatTerrainOf} from '@wildshard/format/splatTerrain';
+import {blobKtx2, blobTextureUses, type TextureBlob} from './blobKtx2';
 import {wasmAstc6} from './astc6Wasm';
 import {desktopKtx2} from './cookedKtx2';
 import {wasmImageKtx2, type ImageKtx2Encode} from './imageKtx2Wasm';
@@ -247,15 +248,18 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, folder: st
   const onTier = mountTiers(new Set(mounts.map(row => row.url))), mountByURL = new Map(mounts.map(row => [row.url, row])), mountOf = (url: string): Uint8Array | undefined => { const row = mountByURL.get(url); return row === undefined ? undefined : shard.read(row.path); };
   // SF15: the cook's desktop KTX2 of each image mount, named in the table; a mount row may keep its image (`keepImage`).
   const images = tiers.images !== undefined && document !== undefined ? desktopKtx2(shard.read(document.path), mounts.map(row => ({url: row.url, read: () => shard.read(row.path), ...(Reflect.get(row, 'keepImage') === true ? {keepImage: true} : {})})), tiers.images) : undefined;
-  const cooked = new Map(images?.files.map(file => [file.url, file.bytes]));
-  const ownBytes = images?.discovery ?? (document === undefined ? undefined : shard.read(document.path));
+  // SF16: the cook's KTX2 of each image blob a texture rule names (material maps, prop slots, splat layers), named in the table.
+  const imageBytes = images?.discovery ?? (document === undefined ? undefined : shard.read(document.path));
+  const blobs = tiers.images !== undefined && imageBytes !== undefined ? blobKtx2(imageBytes, folder, textureBlobs(shard, prefix), tiers.images) : undefined;
+  const cooked = new Map([...images?.files ?? [], ...blobs?.files.values() ?? []].map(file => [file.url, file.bytes]));
+  const ownBytes = blobs?.discovery ?? imageBytes;
   const phone = tiers.phone === true && ownBytes !== undefined ? phoneTier(ownBytes, url => cooked.get(url) ?? mountOf(url), undefined, tiers.encode) : undefined;
   const tieredBytes = phone?.discovery ?? ownBytes;
   // S12f2b1: a splat ground's own phone layers (product blobs) get 6×6 files too, named in the same table
   const layers = tiers.phone === true && tiers.encode !== undefined && tieredBytes !== undefined ? splatPhoneTier(tieredBytes, folder, splatPhoneLayers(shard, prefix), tiers.encode) : undefined;
   const documentBytes = layers?.discovery ?? tieredBytes;
   const discovery: readonly SpawnFile[] = document === undefined || documentBytes === undefined ? [] : [(() => {
-    const hash = images === undefined && phone === undefined && layers === undefined ? document.hash : sha256(documentBytes);
+    const hash = images === undefined && blobs === undefined && phone === undefined && layers === undefined ? document.hash : sha256(documentBytes);
     return {url: `${document.url}?v=${hash.slice(0, 8)}`, bytes: documentBytes.length, hash, wireBytes: wireBytes(document.url, documentBytes, hash)};
   })()];
   for (const row of discovery) if (documentBytes !== undefined) sources.set(row.url, () => documentBytes);
@@ -288,6 +292,19 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, folder: st
     const own = !tierRows.has(url) ? [url] : phone?.kept.has(url) === true ? [url, `tier:${url}`] : [`tier:${url}`];
     return [...own, ...(images?.phoneTargets.get(url) ?? []).map(target => (tierRows.has(target) ? `tier:${target}` : `cooked:${target}`))];
   };
+  /** SF16: the cooked files of the texture blobs a set reads (every one for a whole set): the desktop's KTX2, or the phone's 6x6. */
+  const blobRows = (tier: CookTier, hashes: ReadonlySet<string> | undefined): SpawnFile[] => {
+    const out: SpawnFile[] = [];
+    for (const [hash, file] of blobs?.files ?? []) {
+      if (hashes !== undefined && !hashes.has(hash)) continue;
+      const cookedRow = cookedRows.get(file.url);
+      if (tier === 'phone' && tierRows.has(file.url)) {
+        out.push(...tierRows.get(file.url) ?? []);
+        if (phone?.kept.has(file.url) === true && cookedRow !== undefined) out.push(cookedRow);
+      } else if (cookedRow !== undefined) out.push(cookedRow);
+    }
+    return out;
+  };
   const ktx2Table = documentBytes === undefined ? EMPTY_COOKED_KTX2_TABLE : cookedKtx2TableOf(JSON.parse(new TextDecoder().decode(documentBytes)));
   return {shard, header, ktx2Table, tierFiles: [...cookedRows.values(), ...[...tierRows.values()].flat(), ...layerRows.values()], discovery: discovery[0] === undefined || documentBytes === undefined ? undefined : {row: discovery[0], bytes: documentBytes},
     read: url => { const read = sources.get(url); if (read === undefined) throw new Error(`Spawn file has no source: ${url}`); return read(); },
@@ -310,8 +327,17 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, folder: st
         if (url.startsWith('tier:')) return tierRows.get(url.slice(5)) ?? [];
         if (url.startsWith('cooked:')) { const row = cookedRows.get(url.slice(7)); return row === undefined ? [] : [row]; }
         const row = mountRow.get(url); return row === undefined ? [] : [row()];
-      }), ...tier === 'phone' ? layerRows.values() : []];
+      }), ...tier === 'phone' ? layerRows.values() : [], ...blobRows(tier, wholeSet(tier, set) ? undefined : fence.hashes)];
     }};
+}
+
+/** SF16: each PNG or JPEG product blob a texture rule names, with how the page samples it (`blobTextureUses`). */
+function textureBlobs(shard: OpenShardfile, prefix: string): readonly TextureBlob[] {
+  const uses = blobTextureUses(shard.source.look, shard.source.props);
+  return shard.index.files.flatMap(row => {
+    const use = uses.get(row.hash);
+    return use === undefined || row.kind !== 'image' || row.commons === true ? [] : [{hash: row.hash, url: `${prefix}${row.path}`, bytes: shard.read(row.path), use}];
+  });
 }
 
 /** S12f2b1: the splat ground's phone colour and normal layers (`splat.phone`), as product blobs; a file the desktop set names

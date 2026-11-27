@@ -38,3 +38,21 @@ is rebuilt in its own order on 16-byte steps, every other byte kept; a GLB
 whose ranges partly overlap, or whose image view an accessor also reads, is
 left alone. The phone pass then trims it to 512 and writes 6x6, as for any
 KTX2 GLB. Cook 1.2.0.
+
+## Slice: textures named by hash (SF16)
+
+Many of a shard's textures are product blobs named by hash: a look's
+material maps, prop material slots, `props.textures` and the splat
+ground's layers. The page admits those by hash, so the cook can't swap
+their bytes. `blobKtx2.ts` reads each blob's role from the rule that names
+it (`blobTextureUses`), encodes each PNG or JPEG one unflipped to
+`/assets/<folder>/blobs/<hash>-<hash8>.ktx2`, and names it in both tiers
+of the table under the blob's URL (`#layer` added for a splat layer). The
+phone pass then makes the 6x6 copy, trimmed to 512 except a layer.
+
+The client reads that file in the blob's place when it loads KTX2
+(`blobGpuFile`, `splatLayerFile` on either tier for an image layer), and
+decodes the image itself when it doesn't (`blobTextures.ts`). A KTX2 blob,
+as every hand-made set is, reads as before. The desktop still admits an
+image splat layer's blob as well as its KTX2: the format's skip rule
+(`cookedSplatLayers`) only drops phone layers. Cook 1.3.0.

@@ -8,16 +8,14 @@
  *
  * The source layer textures are never uploaded: their mips are copied into the arrays, then released.
  */
-import { CompressedArrayTexture, CompressedTexture, DefaultLoadingManager, LinearFilter, LinearMipmapLinearFilter, NoColorSpace, RepeatWrapping, SRGBColorSpace, type Material, type Texture } from 'three';
+import { CompressedArrayTexture, CompressedTexture, LinearFilter, LinearMipmapLinearFilter, NoColorSpace, RepeatWrapping, SRGBColorSpace, type Material, type Texture } from 'three';
 import { layerArrayMips, releaseAfterUpload } from '@wildshard/engine/core/ktx2';
 import { splatDrawTier } from '@wildshard/engine/boot/gpuFiles';
 import { splatTerrainMaterial, type SplatLayers } from '@wildshard/engine/world/Terrain';
 import type { PropSurfaceBinding } from '@wildshard/engine/world/declaredProps';
 import type { Scope } from '@wildshard/engine/app/scope';
-import { waitFor } from '@wildshard/engine/boot/waits';
-import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
 import { SPLAT_CHANNELS, SPLAT_ROLES, splatLayers, type SplatRole, type SplatTerrain } from '@wildshard/format/splatTerrain';
-import { contentHash } from '../../../shared/game/shardfile/contentHash';
+import { readCookedTexture } from './blobTextures';
 
 /** The largest array edge the client builds (the live terrain's `loadPBRArray(…, 1024)`). */
 export const SPLAT_LAYER_SIZE = 1024;
@@ -68,27 +66,19 @@ export function withSplatSurface(splat: { readonly name: string; readonly bindin
   };
 }
 
-/** S12f2b2: a splat phone layer's cooked file (`/assets/<folder>/splat/<hash>.t<max>-<hash8>.ktx2`), read as three's loaders
- *  read a URL (the page's modifier: its version and content base; a phone part answers it), checked against its name. */
-export async function readSplatLayer(url: string, resolve: (url: string) => string = path => DefaultLoadingManager.resolveURL(path)): Promise<Uint8Array> {
-  const resolved = resolve(url);
-  const response = await waitFor('Reading splat layer', fetch(resolved), 'file', resolved);
-  if (!response.ok) throw new Error(`Splat layer ${url} answered ${String(response.status)}`);
-  // a layer is copied into its texture array (clientSplatTerrain), so its file is wire bytes the transcode lets go
-  const chunks: Uint8Array[] = [], reader = response.body?.getReader();
-  for (let read = await reader?.read(); read !== undefined && !read.done; read = await reader?.read()) chunks.push(read.value);
-  const bytes = ownedArray(Uint8Array, chunks.reduce((sum, chunk) => sum + chunk.length, 0), { owner: 'splat-layer', asset: url, kind: 'wire' });
-  chunks.reduce((at, chunk) => { bytes.set(chunk, at); return at + chunk.length; }, 0);
-  if (/-([a-f0-9]{8})\.ktx2$/u.exec(url)?.[1] !== (await contentHash(bytes)).slice(0, 8)) throw new Error(`Splat layer ${url} differs from its name`);
-  return bytes;
-}
+/** S12f2b2: a splat layer's cooked file (`/assets/<folder>/splat/<hash>.t<max>-<hash8>.ktx2`, or SF16's
+ *  `/assets/<folder>/blobs/<hash>-<hash8>.ktx2`), read and checked against its name (`readCookedTexture`). */
+export const readSplatLayer: typeof readCookedTexture = readCookedTexture;
 
 /** S12f2b2: the cooked file of each splat layer this device draws that has one (`layer`), read by URL (`read`), by the
- *  layer's hash; none when it draws the desktop set or the shard has no phone set. Its blob was never admitted here. */
+ *  layer's hash. A KTX2 layer's is read only by a phone drawing the phone set (its blob was never admitted there); an image
+ *  layer's (`image`, SF16) on either tier, since the arrays take compressed layers only. */
 export async function cookedSplatBytes(splat: SplatTerrain | undefined, drawn: ReadonlySet<string>, tier: 'phone' | 'desktop', layer: (hash: string) => string | undefined,
-  read: (url: string) => Promise<Uint8Array> = readSplatLayer): Promise<ReadonlyMap<string, Uint8Array>> {
+  read: (url: string) => Promise<Uint8Array> = readSplatLayer, image: (hash: string) => boolean = () => false): Promise<ReadonlyMap<string, Uint8Array>> {
   const cooked = new Map<string, Uint8Array>();
-  if (splat?.phone === undefined || tier !== 'phone') return cooked;
-  await Promise.all([...drawn].map(async ref => { const url = layer(ref); if (url !== undefined) cooked.set(ref, await read(url)); }));
+  if (splat === undefined) return cooked;
+  // a KTX2 layer's row is the phone set's 6x6; an image layer's (SF16) is read on either tier, as its blob can't be drawn
+  const phoneSet = splat.phone !== undefined && tier === 'phone';
+  await Promise.all([...drawn].map(async ref => { const url = phoneSet || image(ref) ? layer(ref) : undefined; if (url !== undefined) cooked.set(ref, await read(url)); }));
   return cooked;
 }

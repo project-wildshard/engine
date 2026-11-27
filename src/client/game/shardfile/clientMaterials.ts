@@ -34,7 +34,8 @@ import { skinTextureRefs } from './clientSkins';
 import type { PropSurfaceBinding } from '@wildshard/engine/world/declaredProps';
 import { propMaterialTextureRefs, propMaterialsOf } from '@wildshard/format/propMaterials';
 import { ownedGraph, propSurfaces } from './clientPropMaterials';
-import { splatDrawTier, splatLayerFile } from '@wildshard/engine/boot/gpuFiles';
+import { blobGpuFile, splatDrawTier, splatLayerFile } from '@wildshard/engine/boot/gpuFiles';
+import { cookedBlobBytes, imageTexture, isKtx2Bytes } from './blobTextures';
 import { splatTerrainOf, splatTextureRefs } from '@wildshard/format/splatTerrain';
 
 
@@ -126,7 +127,8 @@ function releaseRawAfterUpload(texture: DataTexture): void {
  */
 export async function clientMaterials(shard: Shardfile, input: ReadonlyMap<string, Uint8Array>, renderer: Renderer, scope: Scope, options: { graphs?: boolean; sources?: GraphSources;
   /** LS8 (J204): counted completions for the caller's loading step, given the unit total */ units?: (total: number) => (done: number, detail?: string) => void;
-  /** S12f2b2: the cook's own file for a splat phone layer (default: the registered tables' row, `splatLayerFile`) */ splatLayer?: (hash: string) => string | undefined } = {}): Promise<{
+  /** S12f2b2: the cook's own file for a splat phone layer (default: the registered tables' row, `splatLayerFile`) */ splatLayer?: (hash: string) => string | undefined;
+  /** SF16: the cook's KTX2 of an image blob (default: the registered tables' row when the page loads KTX2, `blobGpuFile`) */ blobFile?: (hash: string) => string | undefined } = {}): Promise<{
   /** Live toon family shared by classic and graph materials; a day clock may update it in place. */
   readonly toon: ToonLook;
   /** SS8c: this shard's swing uniforms, which its swinging surfaces bind and its page's `SwingField` writes */
@@ -162,23 +164,25 @@ export async function clientMaterials(shard: Shardfile, input: ReadonlyMap<strin
   const units = options.units?.(refs.size + (loadsCompiler ? 1 : 0)) ?? ((): void => undefined);
   let unitsDone = 0;
   if (refs.size > 0) {
-    // S12f2b2: only phone splats need the cooked file reader. Finish its reads
-    // before owning a decoder, so a refused file cannot strand one.
-    const cooked = splat?.phone !== undefined && splatTier === 'phone'
-      ? await groundLayers?.cookedSplatBytes(splat, splatRefs, splatTier, options.splatLayer ?? splatLayerFile)
-      : undefined;
+    // S12f2b2: a splat layer the table names (a phone's 6x6, or an image layer's KTX2, SF16) and an image blob's KTX2 (SF16)
+    // are read by URL. Finish those reads before owning a decoder, so a refused file cannot strand one.
+    const [cooked, blobs] = await Promise.all([groundLayers?.cookedSplatBytes(splat, splatRefs, splatTier, options.splatLayer ?? splatLayerFile, undefined, ref => { const bytes = assets.get(ref); return bytes !== undefined && !isKtx2Bytes(bytes); }),
+      cookedBlobBytes([...refs].filter(ref => !splatRefs.has(ref)), assets, options.blobFile ?? (hash => blobGpuFile(hash)))]);
     if (scope.disposed) throw new Error('Material scope unloaded before transcode');
-    const bytesOf = (ref: string): Uint8Array | undefined => cooked?.get(ref) ?? assets.get(ref);
+    const bytesOf = (ref: string): Uint8Array | undefined => cooked?.get(ref) ?? blobs.get(ref) ?? assets.get(ref);
     const loader = detectKtx2Support(new KTX2Loader().setTranscoderPath(BASIS_PATH), renderer);
     let retired = false;
     const retire = (): void => { if (retired) return;retired = true;loader.dispose(); };
     const forget = scope.capture('disposers', retire);
     try {
-      prepareKtx2Decode([...refs].map(bytesOf));
+      prepareKtx2Decode([...refs].map(bytesOf).filter(bytes => bytes !== undefined && isKtx2Bytes(bytes)));
     for (const ref of refs) {
       const bytes = bytesOf(ref); if (bytes === undefined) throw new Error(`Missing admitted material texture ${ref} (${shard.identity.slug})`);
       // NB6: a named wait, so the boot timeline (and the props stall ratchet) knows the page waits on the transcoder
-      const texture = await waitFor('Material texture transcode', new Promise<Texture>((resolve, reject) => { loader.parse(Uint8Array.from(bytes).buffer, resolve, reject); }), 'worker');
+      // SF16: an image blob with no cooked KTX2 here (a page reading images, or an older cook) is decoded as an image
+      const texture = isKtx2Bytes(bytes)
+        ? await waitFor('Material texture transcode', new Promise<Texture>((resolve, reject) => { loader.parse(Uint8Array.from(bytes).buffer, resolve, reject); }), 'worker')
+        : await waitFor('Material image decode', imageTexture(bytes), 'worker');
       if (scope.disposed) { texture.dispose(); throw new Error('Material scope unloaded during transcode'); }
       // a splat layer is copied into its array, never uploaded itself (clientSplatLayers)
       texture.flipY = false; texture.name = `shardfile:${ref}`;

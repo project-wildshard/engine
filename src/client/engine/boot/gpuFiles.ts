@@ -47,26 +47,37 @@ import { pageURL } from './contentBase';
 import { PAGE_LEVEL, PHONE_PLAYING_BYTES } from '../../../shared/engine/core/config';
 import { harnessPins } from '../../../shared/engine/app/identity';
 import { ktx2Probe, ktx2ProbeResult, type Ktx2Probe } from '../render/ktx2Probe';
-import { splatLayerFiles } from '../../../shared/engine/boot/splatLayerRows';
+import { imageBlobKeys, splatLayerFiles } from '../../../shared/engine/boot/splatLayerRows';
 
 export interface Ktx2Table { readonly phone: Readonly<Record<string, string>>; readonly desktop: Readonly<Record<string, string>> }
 const GPU_FILES = { phone: { ...ENGINE_GPU_FILES.phone }, desktop: { ...ENGINE_GPU_FILES.desktop } };
 /** S12f2b2: the registered phone tables' cooked splat layers by blob hash (`splatLayerFile`), read again after a registration. */
 let splatLayers: ReadonlyMap<string, string> | null = null;
+/** SF16: the registered tables' image blobs by hash (`blobGpuFile`), read again after a registration. */
+let imageBlobs: ReadonlyMap<string, string> | null = null;
 let registered = { phone: new Set(Object.values(GPU_FILES.phone)), desktop: new Set(Object.values(GPU_FILES.desktop)) };
 export function registerGpuFiles(table: Ktx2Table): void {
   Object.assign(GPU_FILES.phone, table.phone);
   Object.assign(GPU_FILES.desktop, table.desktop);
   registered = { phone: new Set(Object.values(GPU_FILES.phone)), desktop: new Set(Object.values(GPU_FILES.desktop)) };
-  splatLayers = null;
+  splatLayers = null; imageBlobs = null;
 }
-/** SHARD-SOURCE S12f2b2: the cook's 6×6 file a registered phone table names for a splat ground's phone layer blob (by its
- *  hash), which a phone drawing the phone set reads in the blob's place; undefined off the phone tier or with no row (an
- *  older cook), and the blob is read as before. A table registers before its shard's admission (`prepareShardAssets`). */
+/** SHARD-SOURCE S12f2b2: the cook's file a registered table names for a splat ground's layer blob (by its hash), which the
+ *  page reads in the blob's place: a phone's 6x6 for a KTX2 phone layer, either tier's KTX2 for an image layer (SF16).
+ *  Undefined with no row (an older cook, or a desktop KTX2 layer), and the blob is read as before. A table registers
+ *  before its shard's admission (`prepareShardAssets`). */
 export function splatLayerFile(hash: string): string | undefined {
-  if (TIER !== 'phone') return undefined;
-  splatLayers ??= splatLayerFiles(GPU_FILES.phone);
+  splatLayers ??= splatLayerFiles(GPU_FILES[TIER]);
   return splatLayers.get(hash);
+}
+
+/** SF16: the cook's KTX2 a registered table names for an image blob (a material map or a prop slot, by its hash), when
+ *  this page loads KTX2 (or `tex` asks for it); undefined otherwise, and the page decodes the image. */
+export function blobGpuFile(hash: string, tex?: TexMode): string | undefined {
+  imageBlobs ??= imageBlobKeys(GPU_FILES[TIER]);
+  const key = imageBlobs.get(hash);
+  if (key === undefined) return undefined;
+  return tex === undefined ? gpuFile(key) : standIn(key, tex);
 }
 
 /** Whether this tier's registered KTX2 mappings name a URL, including shard overlays outside /assets/gpu/. */
