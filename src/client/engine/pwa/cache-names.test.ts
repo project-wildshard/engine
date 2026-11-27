@@ -9,6 +9,7 @@ test('OF12: the stamp names the channel, and every channel but production carrie
   expect(ownsCache('ws-explore-shell-v3-A', 'production')).toBe(false);
   expect(ownsCache('ws-explore-shell-v3-A', 'preview')).toBe(false);
   expect(cacheChannel({ release: 'https://releases.wildshard.io/production.json', key: 'k' })).toBe('production');
+  expect(cacheChannel({ release: 'https://packs.wildshard.io/releases/production.json', key: 'k' })).toBe('production');
   expect(cacheChannel({ release: 'https://releases.wildshard.io/staging.json', key: 'k' })).toBe('staging');
   expect(['ws-assets-v1', 'ws-builds-v1', 'ws-shell-v3-', 'ws-content-v1'].map(base => cacheName(base, 'production')))
     .toEqual(['ws-assets-v1', 'ws-builds-v1', 'ws-shell-v3-', 'ws-content-v1']);

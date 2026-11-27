@@ -68,6 +68,29 @@ test('a healthy world passes every link and the doctor takes no seat', { timeout
   expect(report).toContain('  5. join · pass');
 });
 
+test('RL10: the doctor reads the release and the server book from their respective origins', { timeout: 30_000 }, async () => {
+  bench = await roomBench(); answerHealth(bench);
+  const page = await serveOrigin(signed(releaseFor(bench.url)));
+  const release = 'https://releases.wildshard.io/production.json';
+  const book = 'https://packs.wildshard.io/assets/spawn/server-bench.json', part = `https://packs.wildshard.io${PART}`;
+  const read = globalThis.fetch, calls: string[] = [];
+  globalThis.fetch = (input, init) => {
+    const url = String(input);
+    if (url === release || url === book || url === part) {
+      calls.push(`${init?.method ?? 'GET'} ${url}`);
+      return read(`${page}${url === release ? '/release.json' : new URL(url).pathname}`, init);
+    }
+    if (new URL(url).hostname.endsWith('.wildshard.io')) throw new Error(`Unexpected test request to ${url}`);
+    return read(input, init);
+  };
+  try {
+    const rows = await run(config(page, { world: { release, key: publicHex(key) } }));
+    expect(rows['release']?.state).toBe('pass');
+    expect(rows['packs']?.state).toBe('pass');
+    expect(calls).toEqual([`GET ${release}`, `GET ${book}`, `HEAD ${part}`]);
+  } finally { globalThis.fetch = read; }
+});
+
 test('a release file signed by another key fails on its signature and the rest wait for it', { timeout: 30_000 }, async () => {
   bench = await roomBench();
   const rows = await run(config(await serveOrigin(signed(releaseFor(bench.url), otherKey))));

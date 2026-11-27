@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { isProductionRelease } from '../../shared/engine/app/releaseAddress.ts';
 
 /** J236 (Jake, 2026-11-10): each environment's home-screen icon is framing A (tilt), a real engine render of the
  *  3 × 3 around Driftwood. Production is plain, staging carries an amber S and preview a violet P (J209). Every
@@ -31,7 +32,7 @@ export const homeIconDirectory = channel => `/icons/${channel}/`;
  *  @param {{release: string} | undefined} world */
 export function homeIconChannel(world) {
   if (world === undefined) return 'preview';
-  return /\/releases\/production\.json(?:[?#]|$)/u.test(world.release) ? 'production' : 'staging';
+  return isProductionRelease(world.release) ? 'production' : 'staging';
 }
 
 /** The web manifest's icon rows for one channel.

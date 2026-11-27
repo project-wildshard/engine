@@ -126,6 +126,13 @@ test('a bad signature, another channel, a 404, a 500, a hung read and nonsense a
   expect(await learnPlacedCells(URL_AT, { keep: device, fetch: answering('', 404), publicKey: api.hex })).toEqual({ kept: 'no placement file (404): nothing placed on this channel' });
 });
 
+test('the split release origin still checks the channel of a signed placement file', async () => {
+  const result = await learnPlacedCells('https://releases.wildshard.io/staging-placements.json', {
+    keep: device, fetch: answering(signed(THIN_ICE, 1, 'production')), publicKey: api.hex,
+  });
+  expect(result).toEqual({ kept: 'a production placement file at the staging address' });
+});
+
 test('cells the box would refuse are left out, and the build\'s own cell is kept once', () => {
   const document = installedCatalogue();
   if (document === undefined) throw new Error('no catalogue');

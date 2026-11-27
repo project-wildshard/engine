@@ -34,7 +34,7 @@ export interface PlacedContent { readonly spawn: PlacedSpawn; readonly verdict: 
 export interface PlacedContentPorts {
   readonly fetch: typeof fetch;
   readonly signal: AbortSignal;
-  /** The store's root: the placement file's origin (`https://packs.wildshard.io/`), where the cook writes. */
+  /** The packs store's root (`https://packs.wildshard.io/`), where the cook writes. */
   readonly packs: string;
   /** This page's build (`__BUILD_ID__`), the cook's folder. */
   readonly build: string;

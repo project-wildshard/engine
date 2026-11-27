@@ -1650,6 +1650,7 @@
     "src/shared/engine/app/actor.ts": "shared",
     "src/shared/engine/app/ownership.ts": "shared",
     "src/shared/engine/app/pageSeat.ts": "shared",
+    "src/shared/engine/app/releaseAddress.ts": "shared",
     "src/shared/engine/app/resources.ts": "shared",
     "src/shared/engine/app/scheduler.ts": "shared",
     "src/shared/engine/app/scope.ts": "shared",

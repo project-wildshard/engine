@@ -7,6 +7,7 @@ import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { helloMessage } from '@wildshard/engine/net/wireMessages';
 import { closeReason, decodePong, encodePing, framed, SOCKET_COUNTDOWN, SOCKET_PONG, SOCKET_RELIABLE, SOCKET_RESUME } from '@wildshard/engine/net/socketFrames';
 import { readSignedRelease } from './release';
+import { packsOriginForRelease } from '@wildshard/engine/app/releaseAddress';
 import type { ReleaseFile } from '../../../shared/host/releaseRows';
 
 /** The links, in the order a phone needs them. */
@@ -114,10 +115,10 @@ async function checkRelease(config: DoctorConfig, learned: Learned, ms: number):
   try {
     const response = await limited(learned.scope, ms, signal => fetch(world.release, { cache: 'no-store', signal }));
     if (response.status === 404) return fail('404: no release file', 'No release is published on this channel yet. The release train has not run: tell Jake.');
-    if (!response.ok) return fail(`HTTP ${String(response.status)}`, 'The packs origin answered with an error for the release file. Try again in a minute; if it stays, tell Jake.');
+    if (!response.ok) return fail(`HTTP ${String(response.status)}`, 'The release origin answered with an error. Try again in a minute; if it stays, tell Jake.');
     text = await response.text();
   } catch (error) {
-    return fail(errorText(error), 'Could not fetch the release file from the packs origin. Check this phone has internet; if other sites work, the packs Worker is down.');
+    return fail(errorText(error), 'Could not fetch the release file. Check this phone has internet and try again.');
   }
   try {
     const release = await readSignedRelease(text, world.key);
@@ -138,7 +139,7 @@ async function checkRelease(config: DoctorConfig, learned: Learned, ms: number):
 async function checkPacks(config: DoctorConfig, learned: Learned, ms: number): Promise<Outcome> {
   const release = learned.release, world = config.world;
   if (release === undefined || world === undefined) return skip('needs the release file');
-  const origin = new URL(world.release).origin, book = new URL(`/assets/spawn/server-${release.engineBuild}.json`, origin);
+  const origin = packsOriginForRelease(world.release), book = new URL(`/assets/spawn/server-${release.engineBuild}.json`, origin);
   try {
     const shards = await limited(learned.scope, ms, async signal => {
       const response = await fetch(book, { cache: 'no-store', signal });

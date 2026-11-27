@@ -33,6 +33,10 @@ describe('offline proof rules (OF1)', () => {
     expect(judge({ ...base, rows: greenLog, samples: inPlay, outcome: 'play', layout: true })).toEqual([]);
     expect(mayFail(`${at}/version.json`)).toBe(true);
     expect(mayFail(`${at}/__offline-proof/staging.json`) && mayFail(`${at}/api/errors`)).toBe(true);
+    expect(mayFail('https://releases.wildshard.io/staging-placements.json')).toBe(true);
+    expect(mayFail('https://packs.wildshard.io/releases/staging.json')).toBe(true);
+    expect(mayFail('https://releases.wildshard.io/assets/catalogue/items-0123.json')).toBe(false);
+    expect(mayFail('https://unrelated.example/staging.json')).toBe(false);
     expect(mayFail(`${at}/assets/spawn/code/0123.json`)).toBe(false);
     expect(servedCounts(greenLog)).toEqual({ 'service-worker': 3, failed: 4 });
   });

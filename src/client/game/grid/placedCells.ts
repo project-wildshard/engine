@@ -14,6 +14,7 @@ import * as v from 'valibot';
 import { Scope } from '@wildshard/engine/app/scope';
 import type { Json, jsonSlot } from '@wildshard/engine/saves/slots';
 import { GRID_RADIUS } from '@wildshard/format/contentBounds';
+import { packsOriginForRelease } from '@wildshard/engine/app/releaseAddress';
 import { adoptSlugAliases } from '../../../shared/game/slugNames';
 import { PLACEMENT_PUBLIC_KEY, PlacementSchema, SignedPlacementSchema, placementsURL, type PlacementFile } from '../../../shared/game/grid/placementRows';
 import { bareSlug, installCatalogue, installedCatalogue, type CatalogueDocument } from '../../../shared/game/grid/catalogueSlot';
@@ -157,11 +158,11 @@ export interface PlacedPorts {
   /** The fresh file is kept this long after it is believed (default `KEEP_WRITE_AFTER_MS`; the default keep only). */
   readonly keepWriteAfterMs?: number;
 }
-/** The cook's content for a placed slug, from the store the placement file is in, for this page's build under its own validator. */
+/** The cook's content for a placed slug, from the packs store for this page's build under its own validator. */
 const cookContent = (url: string, read: typeof fetch): NonNullable<PlacedPorts['content']> => (slug, hash, signal) => {
   const build: unknown = Reflect.get(globalThis, '__WS_BUILD_ID__'), validator: unknown = Reflect.get(globalThis, '__WS_SHARDFILE_VALIDATOR__');
   return hash === undefined || typeof build !== 'string' ? Promise.resolve(undefined)
-    : placedContent(slug, hash, { fetch: read, signal, packs: new URL('/', url).href, build, validator: typeof validator === 'string' ? validator : null });
+    : placedContent(slug, hash, { fetch: read, signal, packs: packsOriginForRelease(url), build, validator: typeof validator === 'string' ? validator : null });
 };
 /** HERO-GATE HG4: a carded slug wears the hero its upload carried (`placedContent.ts`); one with none keeps its cell and its
  *  way in (a harness's), but its plain card is Developer only (`hidden`): a player never sees a zone without its picture. */
@@ -180,7 +181,7 @@ export async function learnPlacedCells(url: string, ports: PlacedPorts = {}): Pr
     const abort = new AbortController(), stop = (): void => { abort.abort(); };
     scope.timeout(ports.deadlineMs ?? PLACED_DEADLINE_MS, stop);
     if (ports.signal?.aborted === true) stop(); else if (ports.signal !== undefined) scope.listen(ports.signal, 'abort', stop);
-    const channel = /\/releases\/(staging|production)-placements\.json$/u.exec(new URL(url).pathname)?.[1];
+    const channel = /^(?:.*\/releases)?\/(staging|production)-placements\.json$/u.exec(new URL(url).pathname)?.[1];
     const believe = async (text: string): Promise<PlacementFile> => {
       const read = await readSignedPlacement(text, ports.publicKey);
       if (channel !== undefined && read.channel !== channel) throw new Error(`a ${read.channel} placement file at the ${channel} address`);

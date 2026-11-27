@@ -1,5 +1,6 @@
 // OFFLINE OF1 (meta docs/plans/OFFLINE-PLAN.md, J298): the pass and fail rules of src/scripts/offline-proof.mjs, on a saved
 // request log and the card samples, so a unit test (test/offline-proof-rules.test.ts) pins them without a browser.
+import { RELEASES_ORIGIN } from '../shared/engine/app/releaseAddress.ts';
 
 /** The catalogue shards the proof enters from Shard select, by their deck card's name. */
 export const DECK_SHARDS = Object.freeze([
@@ -49,12 +50,13 @@ export const CRITICAL_PHASES = Object.freeze(['start', 'download', 'load', 'none
 export const screenKey = screen => JSON.stringify([screen.phase, screen.step, screen.error, screen.failCard, screen.title, screen.player, screen.progress]);
 
 /** A request that may fail without the run going red (OF5: telemetry, `/version.json` and the release read). Telemetry is
- *  `/api/telemetry` and the error report `/api/errors`; the release read is the CDN's `/releases/<channel>.json` or the proof's
- *  own copy of it (`/__offline-proof/<channel>.json`).
+ *  `/api/telemetry` and the error report `/api/errors`. The release read can use the release CDN, the old packs path, or
+ *  the proof's own copy (`/__offline-proof/<channel>.json`).
  * @param {string} url */
 export function mayFail(url) {
-  const { pathname, host } = new URL(url);
-  return pathname === '/version.json' || /\/(?:releases|__offline-proof)\/[\w-]+\.json$/u.test(pathname) || pathname === '/api/telemetry' || pathname === '/api/errors'
+  const { pathname, host, origin } = new URL(url);
+  const releaseRead = origin === RELEASES_ORIGIN && /^\/(?:preview|staging|production)(?:-placements)?\.json$/u.test(pathname);
+  return releaseRead || pathname === '/version.json' || /\/(?:releases|__offline-proof)\/[\w-]+\.json$/u.test(pathname) || pathname === '/api/telemetry' || pathname === '/api/errors'
     || host === 'api.wildshard.io' || host.endsWith('.sentry.io') || host.endsWith('.ingest.sentry.io');
 }
 

@@ -332,6 +332,7 @@
     "./app/identity": "./src/shared/engine/app/identity.ts",
     "./app/ownership": "./src/shared/engine/app/ownership.ts",
     "./app/pageSeat": "./src/shared/engine/app/pageSeat.ts",
+    "./app/releaseAddress": "./src/shared/engine/app/releaseAddress.ts",
     "./app/resources": "./src/shared/engine/app/resources.ts",
     "./app/runtime": "./src/client/engine/app/runtime.ts",
     "./app/scheduler": "./src/shared/engine/app/scheduler.ts",

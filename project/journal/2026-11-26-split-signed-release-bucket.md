@@ -15,3 +15,10 @@ The staging smoke drivers reject a page with the new production URL.
 The signed VPS setup moves both room URLs from their exact legacy
 values. It preserves secrets, the placement key and other settings.
 Local file-backed room proofs still resolve item bytes from their packs.
+
+Hosted CI found consumers that still inferred the channel or the packs
+origin from the old release path. Production keeps its original cache
+names and icons on either URL. The offline proof permits unavailable
+signed metadata, and placement and Doctor tests keep cooked content
+on packs while reading signed metadata at the new origin. A signed
+placement file still has to match the channel in its address.

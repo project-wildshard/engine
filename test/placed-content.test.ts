@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // SHARD-AUTHORING SA48: a shard the API placed after this page was built enters from the cook's packs. SA46 cards it from the API's
 // catalogue; this page reads the cook's `index/<build>/<hash>.json` (the hash the signed placement file names, SA47 (1)) from the store
-// beside the placement file, and each manifest it names, and the spawn download then reads the shard from that store on either flow, its
+// in the packs bucket, and each manifest it names. The spawn download then reads the shard from that store on either flow, its
 // header admitted by the cook's verdict under this page's own validator. Anything else leaves the slug out, as SA46 does.
 // oxlint-disable-next-line import/no-nodejs-modules -- It signs as the API does, and hashes as the cook does.
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
@@ -22,7 +22,7 @@ test('a dev map stamp serves the two cook sizes for the local shard', () => {
   expect(devCookedMap(SLUG, 'cell', undefined)).toBeUndefined();
   expect(devCookedMap(SLUG, 'cell', 'another-shard')).toBeUndefined();
 });
-const PACKS = 'https://packs.example/', URL_AT = `${PACKS}releases/staging-placements.json`, API = 'https://api.example';
+const PACKS = 'https://packs.wildshard.io/', URL_AT = 'https://releases.wildshard.io/staging-placements.json', API = 'https://api.example';
 const ENTRY_AT = `${API}/api/catalogue/shards/${SLUG}`, INDEX_AT = `${PACKS}index/${BUILD}/${HASH}.json`;
 const key = generateKeyPairSync('ed25519'), publicKey = key.publicKey.export({ type: 'spki', format: 'der' }).toString('hex');
 const placement = (cells: readonly unknown[]): string => {
@@ -86,10 +86,11 @@ afterEach(() => {
   clearPlacedSpawns();
 });
 
-test('SA48: a carded slug takes the cook\'s content from the store beside the placement file, and its header\'s admission row', async () => {
+test('SA48 and RL10: a carded slug takes signed placement from releases and cooked content from packs', async () => {
   const fetch = store(), read = await learn(fetch);
   expect(read).toMatchObject({ added: [{ instance: SLUG, slug: SLUG, cell: [1, 3] }], left: [], carded: [SLUG] });
   expect(gridSlugs()).toContain(SLUG);
+  expect(fetch.asked.filter(at => at.startsWith('https://releases.wildshard.io/'))).toEqual([URL_AT]);
   // the index asks past the CDN's cached 404; each manifest is read once, by its content name
   expect(fetch.asked.filter(at => at.startsWith(INDEX_AT))).toHaveLength(1);
   expect(fetch.asked.filter(at => at.includes('/assets/spawn/')).sort()).toEqual(ROWS.map(row => `${PACKS}${row.url.slice(1)}`).sort());

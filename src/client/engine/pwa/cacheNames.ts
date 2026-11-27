@@ -1,4 +1,5 @@
 import { exploreChannel } from '../app/view/exploreChannel';
+import { isProductionRelease } from '../../../shared/engine/app/releaseAddress';
 
 /** MF1/MF4: immutable code, content and versioned metadata, keyed by exact absolute URL. Production's name; the other
  *  channels' names carry the channel (`cacheName`). */
@@ -19,7 +20,7 @@ export const CACHE_CHANNELS: readonly CacheChannel[] = ['production', 'staging',
 export function cacheChannel(world: unknown, explore = false): CacheChannel {
   if (typeof world !== 'object' || world === null) return explore ? 'explore' : 'preview';
   const release: unknown = Reflect.get(world, 'release');
-  return typeof release === 'string' && /\/releases\/production\.json(?:[?#]|$)/u.test(release) ? 'production' : 'staging';
+  return typeof release === 'string' && isProductionRelease(release) ? 'production' : 'staging';
 }
 
 /** One cache name for a channel: production's as given; another channel's with the channel after `ws-`. */
