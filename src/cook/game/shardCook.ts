@@ -239,7 +239,9 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, folder: st
   const prefix = `/shardfiles/${folder}/`, {index, source, sections} = shard, named = namedPlaces(sections);
   // D5-4: a preparation-only preview lists the default set alone (no stored fence), so `wildshard prepare` sees the boot's
   // own reads beyond it. Listing the whole level there made every recorded fence the whole level (Pine, Nalati).
-  const fence = fenceHints(shard), fenceSet = shard.preparationOnly === true || shard.cook?.packs === 'fence';
+  // SF5d: an unprepared build (cook data version 1) records no fence (FP23), so a `fence` pack set there would leave the
+  // phone's whole set without the level's mounts: Pine 0.0.18's phone asked code-parts and the navmesh from the page.
+  const fence = fenceHints(shard), fenceSet = shard.preparationOnly === true || (shard.cook?.packs === 'fence' && shard.cook.version !== 1);
   // S3: a shard's `fence` set is a phone's recorded reads, so a desktop always lists its whole level.
   const wholeSet = (tier: CookTier, set: CookSet): boolean => set === 'whole' && (!fenceSet || tier === 'desktop');
   const sources = new Map<string, () => Uint8Array>(), stableKeys = new Map<string, string>(), rows = new Map<string, SpawnFile>();
