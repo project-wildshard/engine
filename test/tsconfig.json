@@ -278,7 +278,6 @@
     "../vite/threeSideBlindPrograms.ts",
     "../src/scripts/app-build/controlChunks.ts",
     "../src/scripts/pin-packs.ts",
-    "../src/scripts/pin-assets.ts",
     "../src/scripts/pins-catalogue.ts",
     "../src/scripts/preview-grid.ts",
     "../src/scripts/nightly-model.ts",
