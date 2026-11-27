@@ -21,6 +21,7 @@ import {checkEngineFloor} from './engineFloor';
 import {SPAWN_PART_ALIGN, readSpawnManifest, type SpawnFile, type SpawnManifest, type SpawnPart} from '../../shared/game/shardfile/spawnManifest';
 import type {Shardfile} from '@wildshard/format/shardSchema';
 import {readTar} from '@wildshard/format/tar';
+import {validationSourceBytes} from '@wildshard/format/validationReceipt';
 import type {ServerPack, ServerPackPart} from '../../shared/game/shardfile/serverPack';
 import { serverReadsFile } from '@wildshard/format/serverReads';
 import {serverSkinRigs} from '../../shared/game/shardfile/serverSkinRigs';
@@ -84,10 +85,11 @@ function parsedCook(bytes: Uint8Array, slug: string): CookData {
   try { return readCookData(JSON.parse(new TextDecoder().decode(bytes))); }
   catch (cause) { throw new Error(`Invalid cook preparation for ${slug}: run wildshard prepare <product-dir> --base <exact-preview-url>`, {cause}); }
 }
-export function openShardfile(tarball: Uint8Array, options: Readonly<{preparationOnly?: boolean; renderer?: string; sidecar?: CookSidecar; warn?: (line: string) => void}> = {}): OpenShardfile {
+export function openShardfile(tarball: Uint8Array, options: Readonly<{preparationOnly?: boolean; renderer?: string; shardVersion?: string; sidecar?: CookSidecar; warn?: (line: string) => void}> = {}): OpenShardfile {
   const files = new Map(readTar(tarball));
   const read = (path: string): Uint8Array => { const bytes = files.get(path); if (bytes === undefined) throw new Error(`No ${path} in the shardfile`); return bytes; };
-  const header = read('shard.json'), raw: unknown = JSON.parse(new TextDecoder().decode(header)), index = parseOutputIndex(raw);
+  const raw: unknown = JSON.parse(new TextDecoder().decode(read('shard.json')));
+  const index = parseOutputIndex(raw);
   checkEngineFloor(index);
   const sections = new Map<string, unknown>();
   for (const row of index.sections) {
@@ -100,7 +102,8 @@ export function openShardfile(tarball: Uint8Array, options: Readonly<{preparatio
   if (cookBytes !== undefined && (cookBytes.length !== index.cook?.bytes || sha256(cookBytes) !== index.cook.hash)) {
     throw new Error(`Stale cook preparation bytes for ${index.identity.slug}: run wildshard prepare <product-dir> --base <exact-preview-url>`);
   }
-  let cook = cookBytes === undefined ? undefined : parsedCook(cookBytes, index.identity.slug);
+  const authoredCook = cookBytes === undefined ? undefined : parsedCook(cookBytes, index.identity.slug);
+  let cook = authoredCook;
   for (const mount of cook?.mounts ?? []) {
     const bytes = files.get(mount.path);
     if (bytes === undefined || bytes.length !== mount.bytes || sha256(bytes) !== mount.hash) throw new Error(`Stale cook preparation mount ${mount.url}: run wildshard prepare <product-dir> --base <exact-preview-url>`);
@@ -120,7 +123,15 @@ export function openShardfile(tarball: Uint8Array, options: Readonly<{preparatio
       } else options.warn?.(sidecarRefusedLine(index.identity.slug, outcome));
     }
   }
-  return {slug: index.identity.slug, index, source: assembleOutputShardfile(raw, sections), sections, cook, header, read, preparationOnly: options.preparationOnly === true, preparation};
+  // Transport metadata is fixed before the client lists and the server packs hash the header.
+  if (options.shardVersion !== undefined) {
+    const bytes = validationSourceBytes({...authoredCook ?? {version: 1, mounts: []}, shardVersion: options.shardVersion});
+    files.set(COOK_DATA_PATH, bytes);
+    const descriptor = {path: COOK_DATA_PATH, hash: sha256(bytes), bytes: bytes.length};
+    if (typeof raw !== 'object' || raw === null) throw new Error('Invalid cooked header');
+    files.set('shard.json', validationSourceBytes({...raw, cook: descriptor}));
+  }
+  return {slug: index.identity.slug, index, source: assembleOutputShardfile(raw, sections), sections, cook, header: read('shard.json'), read, preparationOnly: options.preparationOnly === true, preparation};
 }
 
 /** Each string's first place in the sections (`world/scenes:libraries.24.tiles.0.files.3.file`), in section order: a
@@ -448,6 +459,7 @@ export interface CookShardOptions {
   readonly warn?: (line: string) => void;
   readonly onPhase?: (phase: CookShardPhase) => void;
   readonly versionedOutput?: boolean;
+  readonly shardVersion?: string;
   /** The renderer fingerprint to cook for; this engine's own unless a build names it. */
   readonly renderer?: string;
   /** S12b: per-tier texture files; `defaultCookTiers()` (the phone tier, 6×6) unless a cook names its own. `{}` turns them off. */
@@ -466,7 +478,7 @@ export async function cookShard(tarball: Uint8Array, out: string, options: CookS
 
 async function cookWith(tarball: Uint8Array, out: string, options: CookShardOptions, encoder: PartEncoder): Promise<CookReport> {
   options.onPhase?.('textures');
-  const opened = {...(options.renderer === undefined ? {} : {renderer: options.renderer}), ...(options.sidecar === undefined ? {} : {sidecar: options.sidecar}), ...(options.warn === undefined ? {} : {warn: options.warn})};
+  const opened = {...(options.renderer === undefined ? {} : {renderer: options.renderer}), ...(options.shardVersion === undefined ? {} : {shardVersion: options.shardVersion}), ...(options.sidecar === undefined ? {} : {sidecar: options.sidecar}), ...(options.warn === undefined ? {} : {warn: options.warn})};
   const started = options.now(), shard = openShardfile(tarball, opened);
   if (shard.preparation === 'stale') options.warn?.(stalePreparationLine(shard.slug));
   if (shard.preparation === 'cook') options.warn?.(cookPreparedLine(shard.slug));

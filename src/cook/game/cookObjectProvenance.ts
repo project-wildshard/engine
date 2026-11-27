@@ -78,12 +78,15 @@ export function classifyCookObjects(raw: ReadonlyMap<string, Uint8Array>, out: s
   const server = readServerPack(json(join(client, logicalPath(serverIndex))));
   for (const part of [server, ...server.more ?? []]) {
     const key = logicalPath(part.url);
-    common.add(key);
     parts.add(key);
+    let sourceOnly = true;
     for (const [path, offset, bytes] of part.files) {
-      const digest = hash(serverRead(path));
+      const cooked = serverRead(path), source = raw.get(path);
+      if (source === undefined || !equal(cooked, source)) sourceOnly = false;
+      const digest = hash(cooked);
       if (!packed.has(digest)) packed.set(digest, {part: key, offset, bytes, hash: digest});
     }
+    if (sourceOnly) common.add(key);
   }
 
   const members = new Map<string, CookedPartMember>(), publishedMounts: string[] = [];

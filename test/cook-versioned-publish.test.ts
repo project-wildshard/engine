@@ -7,6 +7,9 @@ import {createHash} from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- Compare the bytes inside real cooked parts with loose files.
 import {brotliDecompressSync} from 'node:zlib';
 import {afterAll, expect, test, vi} from 'vitest';
+import {readTar, writeTar} from '@wildshard/format/tar';
+import {migrateShardfile} from '@wildshard/format/migrate';
+import {parseOutputIndex} from '@wildshard/format/outputIndex';
 import {folderStore} from '../src/cook/game/packStore';
 import {folderTarball} from '../src/cook/game/folderTarball';
 import {runCookJob} from '../src/cook/game/cookJob';
@@ -92,17 +95,27 @@ test('a room reads the signed cook address and accepts the placement version for
 
 test('a versioned cook stores no loose bytes that already belong to a client or server part', {timeout: 120_000}, async () => {
   const out = join(root, 'single-copy'), client = join(out, 'client');
-  const report = await runCookJob(folderTarball(resolve('test/fixtures/made-up-old')), out, {
+  const original = readTar(folderTarball(resolve('test/fixtures/made-up-old')));
+  const source = new Map(migrateShardfile(original, {hash: digest}).files);
+  const header = source.get('shard.json'), staleReceipt = original.get('validation.json');
+  if (header === undefined || staleReceipt === undefined) throw new Error('Test product needs a header and a receipt');
+  const parse = (bytes: Uint8Array): unknown => JSON.parse(new TextDecoder().decode(bytes));
+  const receipt = {...Object(parse(staleReceipt)), sourceHash: parseOutputIndex(parse(header)).build?.sourceHash, indexHash: digest(header)};
+  source.set('validation.json', new TextEncoder().encode(JSON.stringify(receipt)));
+  const report = await runCookJob(writeTar(source), out, {
     check: (shard, assets, sections) => checkShardfile(shard, assets, {sections}),
-    versionedOutput: true, wireBytes: (_url, bytes) => bytes.length, now: () => 0,
+    versionedOutput: true, shardVersion: '1.2.3', wireBytes: (_url, bytes) => bytes.length, now: () => 0,
   });
-  const packed = new Set<string>(), parts = new Set<string>();
+  const packed = new Set<string>(), parts = new Set<string>(), headerHashes: string[] = [];
   const partBody = (url: string): Buffer => {
     const file = join(client, url.slice(1)); parts.add(file);
     return brotliDecompressSync(readFileSync(file));
   };
   for (const row of report.cook.manifests) {
     const manifest = readSpawnManifest(JSON.parse(readFileSync(join(client, row.url.slice(1)), 'utf8')));
+    const header = manifest.files.find(file => file.url.startsWith(`/${report.header}?v=`));
+    if (header === undefined) throw new Error('Manifest lost its header');
+    headerHashes.push(header.hash);
     for (const part of manifest.parts ?? []) {
       const bytes = partBody(part.url);
       for (const [index, offset] of part.members) {
@@ -123,7 +136,10 @@ test('a versioned cook stores no loose bytes that already belong to a client or 
   }
   const alias = report.objects?.members?.[report.header];
   expect(alias).toBeDefined();
-  if (alias === undefined) throw new Error('The unchanged header should use its server part');
+  if (alias === undefined) throw new Error('The header should use its server part');
+  expect(new Set(headerHashes)).toEqual(new Set([alias.hash]));
+  expect(report.receipt?.indexHash).toBe(alias.hash);
+  expect(report.objects?.common).not.toContain(alias.part);
   expect(JSON.parse(new TextDecoder().decode(await checkedCookedMember(partBody(`/${alias.part}`), alias))))
-    .toMatchObject({identity: {slug: report.slug}});
+    .toMatchObject({identity: {slug: report.slug}, cook: {path: 'cook.json'}});
 });

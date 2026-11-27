@@ -18,7 +18,7 @@ import type {ShardfileCheckReport, ShardfileEntryProof} from '@wildshard/engine/
 import {migrateShardfile, validateMigrated} from '@wildshard/format/migrate';
 import type {FormatMigration} from '@wildshard/format/formatMigrations';
 import {readTar, writeTar} from '@wildshard/format/tar';
-import {validationSourceBytes} from '@wildshard/format/validationReceipt';
+import {COOK_DATA_PATH} from '@wildshard/format/cookData';
 // D31 (J137), EG-8: the largest shardfile, stored or decoded; shard-format owns it so the API and the cook share it.
 import {MAX_SHARDFILE_BYTES} from '@wildshard/format/uploadCaps';
 import {cookShard, openShardfile, serverRows, type CookReport, type CookShardPhase, type OpenShardfile, type WireBytes} from './shardCook';
@@ -188,25 +188,17 @@ export async function runCookJob(tarball: Uint8Array, out: string, ports: CookJo
   const proof = check.proof === 'refused' ? 'unmeasured' : check.proof;
   const client = join(out, 'client');
   const renderer = ports.renderer === undefined ? {} : {renderer: ports.renderer};
-  const cook = await cookShard(cooked, client, {wireBytes: ports.wireBytes, now: ports.now, onPhase: phase, ...renderer, ...(ports.versionedOutput === true ? {versionedOutput: true} : {}), ...(ports.encoder === undefined ? {} : {encoder: ports.encoder}), ...(ports.warn === undefined ? {} : {warn: ports.warn}), ...(ports.sidecar === undefined ? {} : {sidecar: ports.sidecar})});
+  const opening = {...renderer, ...(shardVersion === undefined ? {} : {shardVersion})};
+  const cook = await cookShard(cooked, client, {wireBytes: ports.wireBytes, now: ports.now, onPhase: phase, ...opening, ...(ports.versionedOutput === true ? {versionedOutput: true} : {}), ...(ports.encoder === undefined ? {} : {encoder: ports.encoder}), ...(ports.warn === undefined ? {} : {warn: ports.warn}), ...(ports.sidecar === undefined ? {} : {sidecar: ports.sidecar})});
   phase('server-files');
-  // Each manifest names the header at its product URL, and no part holds it (DL18); its `?v=` is what caches it.
-  const shard = openShardfile(cooked, renderer), header = `shardfiles/${shard.slug}/shard.json`, file = join(client, header);
+  const shard = openShardfile(cooked, opening), header = `shardfiles/${shard.slug}/shard.json`, file = join(client, header);
   mkdirSync(dirname(file), {recursive: true});
-  if (shardVersion === undefined) {
-    writeFileSync(file, shard.header);
-  } else {
-    const data = {...(shard.cook ?? {version: 1, mounts: []}), shardVersion};
-    const cookBytes = validationSourceBytes(data);
-    writeFileSync(join(dirname(file), 'cook.json'), cookBytes);
-    const cookedHeader: unknown = JSON.parse(new TextDecoder().decode(shard.header));
-    if (!object(cookedHeader)) throw new Error('Invalid cooked header');
-    writeFileSync(file, validationSourceBytes({...cookedHeader, cook: {path: 'cook.json', hash: sha256(cookBytes), bytes: cookBytes.length}}));
-  }
+  writeFileSync(file, shard.header);
+  if (shardVersion !== undefined) writeFileSync(join(dirname(file), COOK_DATA_PATH), shard.read(COOK_DATA_PATH));
   const raw = ports.versionedOutput === true ? readTar(tarball) : undefined;
   const objects = raw === undefined ? undefined
     : classifyCookObjects(raw, out, shard.slug, cook.manifests.map(row => row.url), cook.server.index, shard.cook?.mounts ?? [], shard.read);
   return {slug: product.index.identity.slug, hash: sha256(tarball), proof, check, cook, header, server: writeServerPack(shard, join(out, 'server')), seconds: (ports.now() - started) / 1000,
-    ...(receipt === undefined ? {} : {receipt}), ...(provenance === undefined ? {} : {provenance}),
+    ...(receipt === undefined ? {} : {receipt: {...receipt, indexHash: sha256(shard.header)}}), ...(provenance === undefined ? {} : {provenance}),
     ...(objects === undefined ? {} : {objects}), ...(rawShardVersion === undefined ? {} : {rawShardVersion})};
 }
