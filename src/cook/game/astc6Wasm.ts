@@ -22,12 +22,20 @@ import {availableParallelism} from 'node:os';
 import {join} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {Worker} from 'node:worker_threads';
+import {encodeBudget, runLanes} from './encodeLanes.ts';
 import type {Astc6Encode, TextureRole} from './tierTextures';
 
 /** The vendored build; a new build is a new cache key. */
 export const BASISU_WASM_BUILD = '32c7b74';
 const KEY_PREFIX = `astc6-wasm/1|${BASISU_WASM_BUILD}|ASTC_LDR_6x6 effort 4|`;
 const MAX_LANES = 6;
+/** A 6x6 encode's heap per texel of its top level (measured 2026-11-26: a 2048 grew a heap by about 1.9 GB). */
+const ASTC6_HEAP_PER_TEXEL = 470, HEAP_FLOOR = 32 << 20;
+/** The heap a lane holds after encoding this KTX2 as 6x6 (its header's level 0 size). */
+export function astc6Heap(ktx2: Uint8Array): number {
+  const view = new DataView(ktx2.buffer, ktx2.byteOffset, ktx2.byteLength);
+  return ktx2.byteLength < 28 ? HEAP_FLOOR : HEAP_FLOOR + view.getUint32(20, true) * Math.max(1, view.getUint32(24, true)) * ASTC6_HEAP_PER_TEXEL;
+}
 
 interface Ktx2File {
   readonly isValid: () => boolean; readonly startTranscoding: () => boolean; readonly getLevels: () => number; readonly close: () => void; readonly delete: () => void;
@@ -151,28 +159,16 @@ export async function wasmAstc6(options: {readonly cacheDir?: string; readonly l
   const flush = async (): Promise<void> => {
     const jobs = [...pending]; pending.clear();
     if (jobs.length === 0) return;
-    const count = Math.min(lanes, jobs.length);
     const module = new URL('astc6Wasm.ts', import.meta.url).href;
     const hook = new URL('../../scripts/format-hook.mjs', import.meta.url).href;
-    const workers = Array.from({length: count}, () => new Worker(WORKER, {eval: true, workerData: {module, hook}}));
-    try {
-      await Promise.all(workers.map(worker => new Promise<void>((resolve, reject) => {
-        let id = 0;
-        const next = (): void => {
-          const job = jobs.shift();
-          if (job === undefined) { resolve(); return; }
-          id++;
-          // oxlint-disable-next-line unicorn/require-post-message-target-origin -- a worker_threads port has no origin.
-          worker.postMessage({id, bytes: job[1].bytes, role: job[1].role});
-          // A lane's refusal isn't kept: the real pass encodes that input again on this thread, and counts a failure there.
-          worker.once('message', ({out}: {out?: Uint8Array}) => { if (out !== undefined) keep(job[0], new Uint8Array(out)); next(); });
-        };
-        worker.once('message', () => { next(); });
-        worker.once('error', reject);
-        // A lane that dies leaves its inputs to this thread.
-        worker.once('exit', () => { resolve(); });
-      })));
-    } finally { await Promise.all(workers.map(worker => worker.terminate())); }
+    // SF15: lanes bounded by their heaps as well as their count (`encodeLanes.ts`). A lane's refusal isn't kept: the real
+    // pass encodes that input again on this thread, and counts a failure there.
+    await runLanes(jobs.map(([key, input]) => ({key, input, heap: astc6Heap(input.bytes)})), {
+      lanes, budget: encodeBudget(),
+      spawn: () => new Worker(WORKER, {eval: true, workerData: {module, hook}}),
+      message: (job, id) => ({id, bytes: job.input.bytes, role: job.input.role}),
+      done: (job, out) => { if (out !== undefined) keep(job.key, out); },
+    });
   };
   return {encode, record, flush, stats};
 }

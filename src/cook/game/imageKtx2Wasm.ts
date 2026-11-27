@@ -28,6 +28,7 @@ import {join} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {Worker} from 'node:worker_threads';
 import {BASISU_WASM_BUILD} from './astc6Wasm.ts';
+import {encodeBudget, runLanes} from './encodeLanes.ts';
 import type {TextureRole} from './tierTextures';
 
 /** How one image is encoded: its texels' read and whether its loader flipped it. */
@@ -39,6 +40,13 @@ export type ImageKtx2Encode = (image: Uint8Array, as: ImageEncodeAs) => Uint8Arr
 export const IMAGE_KTX2_SETTINGS = 'uastc-ldr-4x4 level 2, no rdo, box mips, zstd';
 const KEY_PREFIX = `image-ktx2-wasm/1|${BASISU_WASM_BUILD}|${IMAGE_KTX2_SETTINGS}|`;
 const MAX_LANES = 6;
+/** A UASTC encode's heap per texel (measured 2026-11-26: a 2048 JPG grew a heap by about 230 MB). */
+const IMAGE_HEAP_PER_TEXEL = 60, HEAP_FLOOR = 32 << 20;
+/** The heap a lane holds after encoding this image (the largest first, so a 4096 panorama never runs last). */
+export function imageKtx2Heap(image: Uint8Array): number {
+  const head = imageHead(image);
+  return HEAP_FLOOR + (head === undefined ? 0 : head.width * head.height * IMAGE_HEAP_PER_TEXEL);
+}
 /** basisu's UASTC pack level 2 (`-uastc_level 2`): `cPackUASTCLevelDefault`. */
 const UASTC_LEVEL_2 = 2;
 /** basisu's box mip filter (`-mip_filter box`): index 0 of its filter table. */
@@ -162,29 +170,16 @@ export async function wasmImageKtx2(options: {readonly cacheDir?: string; readon
   const flush = async (): Promise<void> => {
     const jobs = [...pending]; pending.clear();
     if (jobs.length === 0) return;
-    // The largest first, so the last lane to finish isn't the one holding a 4096 panorama.
-    jobs.sort((left, right) => right[1].bytes.length - left[1].bytes.length);
-    const count = Math.min(lanes, jobs.length);
     const module = new URL('imageKtx2Wasm.ts', import.meta.url).href;
     const hook = new URL('../../scripts/format-hook.mjs', import.meta.url).href;
-    const workers = Array.from({length: count}, () => new Worker(WORKER, {eval: true, workerData: {module, hook}}));
-    try {
-      await Promise.all(workers.map(worker => new Promise<void>((resolve, reject) => {
-        let id = 0;
-        const next = (): void => {
-          const job = jobs.shift();
-          if (job === undefined) { resolve(); return; }
-          id++;
-          // oxlint-disable-next-line unicorn/require-post-message-target-origin -- a worker_threads port has no origin.
-          worker.postMessage({id, bytes: job[1].bytes, as: job[1].as});
-          // A lane's refusal isn't kept: the real pass encodes that input again on this thread, and counts a failure there.
-          worker.once('message', ({out}: {out?: Uint8Array}) => { if (out !== undefined) keep(job[0], new Uint8Array(out)); next(); });
-        };
-        worker.once('message', () => { next(); });
-        worker.once('error', reject);
-        worker.once('exit', () => { resolve(); });
-      })));
-    } finally { await Promise.all(workers.map(worker => worker.terminate())); }
+    // SF15: lanes bounded by their heaps as well as their count (`encodeLanes.ts`). A lane's refusal isn't kept: the real
+    // pass encodes that input again on this thread, and counts a failure there.
+    await runLanes(jobs.map(([key, input]) => ({key, input, heap: imageKtx2Heap(input.bytes)})), {
+      lanes, budget: encodeBudget(),
+      spawn: () => new Worker(WORKER, {eval: true, workerData: {module, hook}}),
+      message: (job, id) => ({id, bytes: job.input.bytes, as: job.input.as}),
+      done: (job, out) => { if (out !== undefined) keep(job.key, out); },
+    });
   };
   return {encode, record, flush, stats};
 }

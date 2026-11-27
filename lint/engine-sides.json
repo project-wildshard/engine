@@ -1294,6 +1294,7 @@
     "src/client/host/standalone/shell.ts": "client",
     "src/cook/game/astc6Encode.ts": "cook",
     "src/cook/game/astc6Wasm.ts": "cook",
+    "src/cook/game/encodeLanes.ts": "cook",
     "src/cook/game/blobKtx2.ts": "cook",
     "src/cook/game/cookedKtx2.ts": "cook",
     "src/cook/game/imageKtx2Wasm.ts": "cook",

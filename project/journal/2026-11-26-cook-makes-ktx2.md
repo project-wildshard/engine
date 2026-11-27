@@ -56,3 +56,15 @@ decodes the image itself when it doesn't (`blobTextures.ts`). A KTX2 blob,
 as every hand-made set is, reads as before. The desktop still admits an
 image splat layer's blob as well as its KTX2: the format's skip rule
 (`cookedSplatLayers`) only drops phone layers. Cook 1.3.0.
+
+## Encoder lanes bounded by memory
+
+Pine Hollow's images-only cook died past its job's 6 GB in the textures
+phase. Measured: a 2048 UASTC encode grows a worker's WebAssembly heap by
+about 230 MB, a 2048 ASTC 6x6 encode by about 1.9 GB, and a heap never
+shrinks. So three 6x6 lanes on Pine's kept 2048 rows (skies, panoramas,
+splat layers) passed 6 GB. Both pools now run through `encodeLanes.ts`:
+largest job first, a lane takes a job only while every lane's held heap
+stays within `COOK_ENCODE_MB` (4 GB by default), a job above it runs alone,
+and a lane that ran a job above 512 MB is ended so the next starts small.
+Same output: cook 1.3.0 records it as such.

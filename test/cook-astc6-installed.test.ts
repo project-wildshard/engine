@@ -69,6 +69,8 @@ test.concurrent('the cook\'s ASTC 6x6 flush runs its worker lanes from an instal
     mkdirSync(join(engine, 'src/cook/game'), { recursive: true });
     mkdirSync(join(engine, 'src/scripts/vendor'), { recursive: true });
     cpSync('src/cook/game/astc6Wasm.ts', join(engine, 'src/cook/game/astc6Wasm.ts'));
+    // SF15: its lanes are bounded by their heaps (`encodeLanes.ts`), a value import the worker threads resolve too.
+    cpSync('src/cook/game/encodeLanes.ts', join(engine, 'src/cook/game/encodeLanes.ts'));
     cpSync('src/scripts/format-hook.mjs', join(engine, 'src/scripts/format-hook.mjs'));
     symlinkSync(resolve('src/scripts/vendor/basisu'), join(engine, 'src/scripts/vendor/basisu'), 'dir');
     // What a shard repo's cook does: the hook on its own thread, then the engine's encoder, one lane, one input.
