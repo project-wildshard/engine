@@ -40,7 +40,8 @@ const HEX=/^[a-f0-9]{64}$/u;
  * imports is here unless KEY_EXEMPT says why its bytes can't change out/ or public/ (pins-reuse.test.mjs checks). */
 export const KEY_SOURCES=Object.freeze(['src/scripts/pins.ts','src/scripts/pin-packs.ts','src/scripts/pin-assets.ts','src/scripts/pin-format.ts',
  'src/scripts/bake-loader.mjs','src/scripts/built-shards.mjs','src/scripts/format-hook.mjs','src/scripts/shardfile-validation-revision.mjs','src/scripts/pins-reuse.mjs',
- 'src/scripts/tracked-public.mjs','src/scripts/pin-local.ts','src/scripts/local-candidates.ts','src/scripts/pin-admit.ts','pnpm-lock.yaml',PINS,'test/pins/assets.json']);
+ 'src/scripts/tracked-public.mjs','src/scripts/pin-local.ts','src/scripts/local-candidates.ts','src/scripts/pin-admit.ts',
+ 'src/shared/game/grid/uploadIdentity.ts','pnpm-lock.yaml',PINS,'test/pins/assets.json']);
 export const KEY_EXEMPT=Object.freeze({
  'src/scripts/agent-requests.mjs':'adds HTTP request markers; the pinned digest still decides the admitted bytes',
  'src/scripts/pins-exclude.mjs':'writes Git\'s exclude file only',

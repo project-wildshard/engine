@@ -33,7 +33,7 @@ describe('FP27c: the catalogue armed word reaches the cook', () => {
     const api: CookApi = {pending: async function* feed() { yield job; yield {...older, uploadId: '44444444-4444-4444-4444-444444444444', hash: 'b'.repeat(64)}; }, activations: async function* none() {}, download: () => Promise.resolve(bytes), verdict: () => Promise.resolve(), acknowledge: () => Promise.resolve()};
     const delivery = uploadDelivery({api, source: {bind: () => undefined}, worker: {cook: head => { heads.push(head); return Promise.resolve({slug: head.slug, hash: head.hash, state: 'failed', detail: 'fixture'}); }}, outbox: new VerdictOutbox(scratch()), build: 'b1'});
     await delivery.sweep(); await delivery.idle();
-    expect(heads).toEqual([{slug: job.slug, hash, armed: true}, {slug: job.slug, hash: 'b'.repeat(64)}]);
+    expect(heads).toEqual([{slug: job.slug, hash, uploadNumber: job.uploadNumber, armed: true}, {slug: job.slug, hash: 'b'.repeat(64), uploadNumber: job.uploadNumber}]);
   });
 
   it.each([[true, 'true'], [false, 'false'], [undefined, 'unset']] as const)('the worker gives its job armed %s as COOK_ARMED', async (armed, seen) => {
