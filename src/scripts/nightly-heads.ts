@@ -86,10 +86,11 @@ try {
     };
     try {
       if (!await phase('cook', () => {
-        // Use the same production worker limit as the Ring 2 CLI, including cold phone ASTC encodes.
-        const timeout = DEFAULT_LIMITS.seconds * 1000;
-        execFileSync(process.execPath, ['src/scripts/ring-cook.mjs', '--ring2', `--only=${head.slug}`, `--out=${cooked}`, `--build=${build}`, `--timeout-ms=${timeout}`],
-          {stdio: 'inherit', timeout: timeout + 30_000});
+        // QA54: the worker owns each attempt and may retry from kept encodes.
+        // The whole hosted head job and its browser lease still bound the run.
+        const attemptMs = DEFAULT_LIMITS.seconds * 1000;
+        execFileSync(process.execPath, ['src/scripts/ring-cook.mjs', '--ring2', `--only=${head.slug}`, `--out=${cooked}`, `--build=${build}`, `--timeout-ms=${attemptMs}`],
+          {stdio: 'inherit'});
         const cookedReceipt = (read(join(cooked, 'receipt.json')) as {indexes: CookIndex[]});
         const index = cookedReceipt.indexes[0];
         if (index?.hash !== head.hash || index.slug !== head.slug || index.build !== build || index.keys.length === 0) throw new Error('Wrong or empty cooked product');

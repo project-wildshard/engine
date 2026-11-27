@@ -65,6 +65,15 @@ test('FS30 the browser lease cannot end a hosted head job before its own deadlin
   const leaseMinutes = /src\/scripts\/browser-lane\.sh --max (\d+) node src\/scripts\/nightly-heads\.ts/u.exec(heads)?.[1];
   expect(jobMinutes).toBeDefined();
   expect(leaseMinutes).toBe(jobMinutes);
+  expect(Number(jobMinutes) * 60_000).toBeGreaterThan(2 * DEFAULT_LIMITS.seconds * 1000);
+});
+
+test('QA54 the head waits while the worker retries within its production attempt limit', () => {
+  const source = readFileSync('src/scripts/nightly-heads.ts', 'utf8');
+  const launch = /execFileSync\(process\.execPath, \['src\/scripts\/ring-cook\.mjs',([^\]]+)\],\s*(\{[^}]+\})\);/u.exec(source);
+  expect(source).toContain('const attemptMs = DEFAULT_LIMITS.seconds * 1000;');
+  expect(launch?.[1]).toContain('`--timeout-ms=${attemptMs}`');
+  expect(launch?.[2]).toBe("{stdio: 'inherit'}");
 });
 
 test('FS30 begins recording live draws before running the hover journey', () => {

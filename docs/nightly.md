@@ -333,6 +333,10 @@ and a screenshot or its capture error. Both head artifacts include the
 screenshot alongside the Explorer failure JSON. Page evidence has a
 short capture budget after the original no-progress deadline.
 
+The Ring 2 cook worker applies production's per-attempt deadline and
+can retry after saving new encodes. The heads runner waits for the cook
+to return. The hosted job and its browser lease bound the entire run.
+
 The full nightly maps the decimal Actions run ID to its low 32 bits for
 `NET_FUZZ_SEEDS`. The network fuzzer keeps its uint32 admission boundary;
 the full run ID remains the report identity. Reproduce the selected seed
