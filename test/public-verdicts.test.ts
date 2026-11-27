@@ -48,3 +48,9 @@ test('the committed lists are sorted, unique and disjoint', () => {
   expect([...engine].some(path => path.startsWith('assets/practice/'))).toBe(true);
   expect([...engine].some(path => path.startsWith('assets/music/piano/'))).toBe(true);
 });
+
+// SF13: a file goes on the delete list only to leave engine git; this fails while a listed file is still tracked.
+test('nothing on the delete list is still in engine git', () => {
+  const remove = readList('src/scripts/public-delete.json'), tracked = new Set(publicVerdicts('.').filter(row => row.source === 'engine git').map(row => row.path));
+  expect([...remove].filter(path => tracked.has(path))).toEqual([]);
+});
