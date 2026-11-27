@@ -1,4 +1,4 @@
-import { texBase } from '../../../shared/engine/boot/zoneAssets';
+import { gltfModelFiles, texBase } from '../../../shared/engine/boot/zoneAssets';
 import { GPU_FILES as ENGINE_GPU_FILES } from './ktx2.generated';
 import { publicBytes } from '../../../shared/engine/boot/tables';
 import type { Tier } from '../core/tier';
@@ -90,7 +90,7 @@ export function resolveBootFiles(recipes: BootFileRecipes, name: string, tier: T
     else if ('concat' in src) urls = src.concat.flatMap(ref => run(ref, next));
     else if ('publicPrefix' in src) urls = Object.keys(inventory).filter(url => url.startsWith(src.publicPrefix));
     else if ('pbr' in src) urls = src.pbr.flatMap(policy.pbr);
-    else if ('gltf' in src) urls = src.gltf.flatMap(assetId => [`/assets/models/${assetId}/${assetId}.gltf`, `/assets/models/${assetId}/${assetId}.bin`, ...['diff', 'nor_gl', 'arm'].map(kind => `/assets/models/${assetId}/textures/${assetId}_${kind}_1k.jpg`)]);
+    else if ('gltf' in src) urls = src.gltf.flatMap(gltfModelFiles);
     else if ('tablePrefix' in src) urls = tex === 'ktx2' ? Object.keys(table[tier]).filter(url => url.startsWith(src.tablePrefix)).sort().flatMap(url => table[tier][url] ?? []) : [];
     else if ('pages' in src) {
       const pages = inputs.pages?.[src.pages]?.[tier];

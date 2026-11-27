@@ -56,6 +56,13 @@ export const bakedFile = (slug: string, file: string): string => zoneFirst(slug,
 export const texBase = (id: string, kind: string): string => id.startsWith('/assets/') ? `${id}/${kind}` : `/assets/tex/${id}/${kind}`;
 /** SF4: a sky named by its stem URL, `/assets/<slug>/hdri/<name>`, or by an engine-wide name (`/assets/hdri/<name>`). */
 export const hdriStem = (hdri: string): string => hdri.startsWith('/assets/') ? hdri : `/assets/hdri/${hdri}`;
+/** SF5: a glTF model named by its folder URL, `/assets/<slug>/models/<id>`, or by an engine-wide id
+ *  (`/assets/models/<id>`): its `.gltf`, `.bin` and three 1k maps, each named after the folder's last part. */
+export function gltfModelFiles(model: string): string[] {
+  const base = model.startsWith('/assets/') ? model.replace(/\/+$/u, '') : `/assets/models/${model}`;
+  const id = base.slice(base.lastIndexOf('/') + 1);
+  return [`${base}/${id}.gltf`, `${base}/${id}.bin`, ...['diff', 'nor_gl', 'arm'].map(kind => `${base}/textures/${id}_${kind}_1k.jpg`)];
+}
 
 /** An audio manifest's table row from its URL: legacy `/assets/<kind>/<key>/<kind>.json` (no `dir`, the engine-wide
  *  folder) or zone `/assets/<slug>/<kind>/<key>/<kind>.json` (its folder as `dir`); null for any other URL. */

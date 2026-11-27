@@ -4,12 +4,12 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
-import { ZONE_DIR, audioDirOf, audioManifestRow, bakedFile, hdriStem, isAudioUrl, texBase, useZoneDownloadListing, zoneAssetUrl, zoneFileListed, zoneFirst, zoneFolderFirst } from '../src/shared/engine/boot/zoneAssets';
+import { ZONE_DIR, audioDirOf, audioManifestRow, bakedFile, gltfModelFiles, hdriStem, isAudioUrl, texBase, useZoneDownloadListing, zoneAssetUrl, zoneFileListed, zoneFirst, zoneFolderFirst } from '../src/shared/engine/boot/zoneAssets';
 import { navmeshUrl } from '../src/shared/engine/physics/navmeshUrl';
 import { bakedTerrainUrl } from '../src/shared/engine/world/BakedTerrain';
 import { lutUrl } from '../src/client/engine/world/lut';
 import { bakedNearFiles } from '../src/client/game/grid/nearPlaceholderView';
-import { filePolicy } from '../src/client/engine/boot/filePolicy';
+import { filePolicy, resolveBootFiles } from '../src/client/engine/boot/filePolicy';
 import { bakedSkyUrls } from '../src/client/engine/world/BakedSky';
 import { musicDir, sfxDir, cueFile } from '../src/shared/engine/audio/bootAudio';
 import { withAssetTables } from '../src/shared/engine/boot/tables';
@@ -132,4 +132,17 @@ test('ground layers and skies: a URL is the zone copy, a bare name the engine-wi
     expect(bakedSkyUrls('/assets/nalati-grasslands/hdri/k')).toEqual({ color: '/assets/nalati-grasslands/hdri/k_2k.sky.jpg', gain: '/assets/nalati-grasslands/hdri/k_2k.gain.png' });
     expect(bakedSkyUrls('k')).toBeNull();
   });
+});
+
+// SF5 (Pine Hollow): a boot recipe's `gltf` source names a zone's own model by its folder URL, so a re-packed zone needs
+// no `urls` list for it; a bare id is still the engine-wide `/assets/models/<id>/`.
+test('glTF models: a folder URL is the zone copy, a bare id the engine-wide one', () => {
+  const pit = '/assets/pine-hollow/models/stone_fire_pit';
+  expect(gltfModelFiles(pit)).toEqual([`${pit}/stone_fire_pit.gltf`, `${pit}/stone_fire_pit.bin`,
+    `${pit}/textures/stone_fire_pit_diff_1k.jpg`, `${pit}/textures/stone_fire_pit_nor_gl_1k.jpg`, `${pit}/textures/stone_fire_pit_arm_1k.jpg`]);
+  expect(gltfModelFiles(`${pit}/`)).toEqual(gltfModelFiles(pit));
+  expect(gltfModelFiles('arch').slice(0, 2)).toEqual(['/assets/models/arch/arch.gltf', '/assets/models/arch/arch.bin']);
+  const recipes = { cabins: { source: { gltf: [pit, 'arch'] } } };
+  expect(resolveBootFiles(recipes, 'cabins', 'desktop', 'img', { phone: {}, desktop: {} }, { inventory: {} }))
+    .toEqual([...gltfModelFiles(pit), ...gltfModelFiles('arch')]);
 });
