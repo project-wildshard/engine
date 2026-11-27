@@ -364,8 +364,11 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, folder: st
       // Muted author preparation can read the score manifest without playing its recordings.
       const ownScore = (url: string): boolean => scoreDirs.some(dir => url.startsWith(dir));
       const sfxDirs = ownSfxDirs(mounts.map(row => row.url), shard.slug), ownSfx = (url: string): boolean => sfxDirs.some(dir => url.startsWith(dir));
+      // SF11: and every phone-only mount past its fence (Pine's `baked/rain.phone.bin`, its props' `.phone.glb` LODs): no desktop
+      // set carries a phone-only file and no pin copies it under public/ any more, so outside this set no phone could read it.
+      const phoneOnly = (url: string): boolean => onTier(url, 'phone') && !onTier(url, 'desktop');
       const urls = wholeSet(tier, set) ? mounts.map(row => row.url).filter(url => onTier(url, tier))
-        : set === 'whole' ? [...new Set([...fence.mounts, ...mounts.map(row => row.url).filter(url => (ownFarView(url, shard.slug) || ownScore(url) || ownSfx(url)) && onTier(url, tier))])] : fence.mounts;
+        : set === 'whole' ? [...new Set([...fence.mounts, ...mounts.map(row => row.url).filter(url => (ownFarView(url, shard.slug) || ownScore(url) || ownSfx(url) || phoneOnly(url)) && onTier(url, tier))])] : fence.mounts;
       // A phone file whose target no phone list names (a fence shard's file read past its fence) rides in the phone's whole
       // set: no other tier's part holds it, and it costs less than the target a phone read from a desktop part before.
       const textures = blobRows(tier, wholeSet(tier, set) ? undefined : fence.hashes);

@@ -35,15 +35,18 @@ test("a fence shard's phone whole set carries its own sfx folder, not another zo
   expect(listed('desktop', 'whole')).toEqual(mounts.map(row => row.url));
 });
 
-// The guard behind the cook version: the golden cook takes a prepared fence shard with its own sfx set (made-up-fence), so
-// a change to what a fence shard's phone whole set carries moves the golden digest (44ab5ec53 left made-up-old's unmoved).
-test('the golden cook takes a fence shard whose phone whole set carries its own sfx', () => {
+// The guard behind the cook version: the golden cook takes a prepared fence shard with its own sfx set and a phone-only mount
+// past its fence (made-up-fence), so a change to what a fence shard's phone whole set carries moves the golden digest
+// (44ab5ec53 left made-up-old's unmoved; Pine's phone rain and prop LODs were in no set before 1.19.0).
+test('the golden cook takes a fence shard whose phone whole set carries its own sfx and phone-only mounts', () => {
   expect(GOLDEN_FIXTURES).toContain('made-up-fence');
   const half = shardHalf(openShardfile(folderTarball('test/fixtures/made-up-fence')), (_url, bytes) => bytes.length);
   const listed = (set: 'entry' | 'whole'): string[] => half.mountRows('phone', set).map(row => row.url.split('?')[0] ?? '');
   expect(listed('entry')).toEqual(['/assets/cli-fixture/props/fenced.bin']);
   expect(listed('whole')).toEqual(['/assets/cli-fixture/props/fenced.bin', '/assets/cli-fixture/sfx/cli-fixture/sfx.json',
-    '/assets/cli-fixture/sfx/cli-fixture/gull-1-1a358b4e.m4a']);
+    '/assets/cli-fixture/sfx/cli-fixture/gull-1-1a358b4e.m4a', '/assets/cli-fixture/baked/rain.phone.bin']);
+  // SF11 (cook 1.19.0): its phone-only mount past the fence rides in the phone whole set; no desktop set carries it
+  for (const set of ['entry', 'whole'] as const) expect(half.mountRows('desktop', set).map(row => row.url.split('?')[0])).not.toContain('/assets/cli-fixture/baked/rain.phone.bin');
 });
 
 // SF11: the app build lists a zone's own boot recordings and inventory rows from its shardfile, not from public/.
