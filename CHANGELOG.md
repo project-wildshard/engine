@@ -13,6 +13,12 @@ it into main while other lanes continue landing.
 `src/scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.100 (2026-11-27)
+
+- Fix the figure atlas that held the online crossing into Nalati Grasslands.
+- Pin shard format 0.82.4 for the next SDK update and keep cook 1.17.0.
+- Use Pine Hollow's prepared phone models when a rig has a phone copy.
+
 ## v0.1.97 (2026-11-26)
 
 - Nine Dragon no longer shows a false "World not drawn" reload card after it loads.
