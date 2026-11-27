@@ -4,12 +4,13 @@
 import { describe, expect, test, vi } from 'vitest';
 import type { SplatTerrain } from '@wildshard/format/splatTerrain';
 import { blobGpuFile, registerGpuFiles } from '../src/client/engine/boot/gpuFiles';
-import { cookedBlobBytes, isKtx2Bytes } from '../src/client/game/shardfile/blobTextures';
+import { cookedBlobBytes, isKtx2Bytes, textureKind } from '../src/client/game/shardfile/blobTextures';
+import { ktx2Fixture } from './helpers/ktx2Fixture';
 import { cookedSplatBytes } from '../src/client/game/shardfile/clientSplatLayers';
 import { imageBlobKeys, splatLayerFiles, splatLayerKey } from '../src/shared/engine/boot/splatLayerRows';
 
 const hash = (c: string): string => c.repeat(64);
-const KTX2 = new Uint8Array([0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a, 0]);
+const KTX2 = ktx2Fixture(0);
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0, 0, 0, 0, 0]);
 const table = {
   [`/shardfiles/z/blobs/image/${hash('a')}.jpg`]: `/assets/z/blobs/${hash('a')}-0123abcd.ktx2`,
@@ -50,5 +51,14 @@ describe('SF16: the table names an image blob\'s KTX2', () => {
     const cooked = await cookedSplatBytes(splat, new Set([hash('b'), hash('c')]), 'desktop', ref => rows.get(ref), read, (ref: string) => ref === hash('b'));
     expect([...cooked.keys()]).toEqual([hash('b')]);
     expect(read).toHaveBeenCalledTimes(1);
+  });
+
+  test('the page refuses bytes that are neither KTX2 nor an image, so a fixture of made-up bytes fails by name', () => {
+    expect(textureKind(ktx2Fixture(1))).toBe('ktx2');
+    expect(textureKind(JPEG)).toBe('image');
+    expect(textureKind(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0]))).toBe('image');
+    // the stand-ins that turned main red (run 45924093166): no magic, no decoder
+    expect(textureKind(new Uint8Array([1]))).toBeUndefined();
+    expect(textureKind(new Uint8Array([2]))).toBeUndefined();
   });
 });

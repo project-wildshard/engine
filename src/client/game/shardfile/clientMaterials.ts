@@ -35,7 +35,7 @@ import type { PropSurfaceBinding } from '@wildshard/engine/world/declaredProps';
 import { propMaterialTextureRefs, propMaterialsOf } from '@wildshard/format/propMaterials';
 import { ownedGraph, propSurfaces } from './clientPropMaterials';
 import { blobGpuFile, splatDrawTier, splatLayerFile } from '@wildshard/engine/boot/gpuFiles';
-import { cookedBlobBytes, imageTexture, isKtx2Bytes } from './blobTextures';
+import { cookedBlobBytes, imageTexture, isKtx2Bytes, textureKind } from './blobTextures';
 import { splatTerrainOf, splatTextureRefs } from '@wildshard/format/splatTerrain';
 
 
@@ -180,7 +180,9 @@ export async function clientMaterials(shard: Shardfile, input: ReadonlyMap<strin
       const bytes = bytesOf(ref); if (bytes === undefined) throw new Error(`Missing admitted material texture ${ref} (${shard.identity.slug})`);
       // NB6: a named wait, so the boot timeline (and the props stall ratchet) knows the page waits on the transcoder
       // SF16: an image blob with no cooked KTX2 here (a page reading images, or an older cook) is decoded as an image
-      const texture = isKtx2Bytes(bytes)
+      const kind = textureKind(bytes);
+      if (kind === undefined) throw new Error(`Material texture ${ref} is neither KTX2 nor a PNG or JPEG (${shard.identity.slug})`);
+      const texture = kind === 'ktx2'
         ? await waitFor('Material texture transcode', new Promise<Texture>((resolve, reject) => { loader.parse(Uint8Array.from(bytes).buffer, resolve, reject); }), 'worker')
         : await waitFor('Material image decode', imageTexture(bytes), 'worker');
       if (scope.disposed) { texture.dispose(); throw new Error('Material scope unloaded during transcode'); }

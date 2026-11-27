@@ -68,3 +68,11 @@ largest job first, a lane takes a job only while every lane's held heap
 stays within `COOK_ENCODE_MB` (4 GB by default), a job above it runs alone,
 and a lane that ran a job above 512 MB is ended so the next starts small.
 Same output: cook 1.3.0 records it as such.
+
+## Texture bytes are decoded by their magic
+
+SF16 sent every non-KTX2 texture to the image decoder, so a test fixture
+of made-up bytes standing in for KTX2 reached `createImageBitmap`, which
+Node lacks, and main went red (run 45924093166). The page now decodes by
+magic (`textureKind`: KTX2, PNG or JPEG) and refuses anything else by
+name, and `test/helpers/ktx2Fixture.ts` is the shared KTX2 stand-in.

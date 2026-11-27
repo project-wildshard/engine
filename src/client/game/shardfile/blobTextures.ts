@@ -13,6 +13,14 @@ const KTX2_MAGIC = [0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 
 /** Whether the bytes are a KTX2 file (its 12-byte identifier). */
 export const isKtx2Bytes = (bytes: Uint8Array): boolean => KTX2_MAGIC.every((byte, at) => bytes[at] === byte);
 
+const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] as const, JPEG_MAGIC = [0xff, 0xd8, 0xff] as const;
+/** How the page decodes a texture's bytes: a KTX2 transcode, a PNG or JPEG image decode, or neither (undefined), which
+ *  the page refuses by name rather than handing to a decoder (a test fixture of made-up bytes went red that way). */
+export function textureKind(bytes: Uint8Array): 'ktx2' | 'image' | undefined {
+  if (isKtx2Bytes(bytes)) return 'ktx2';
+  return PNG_MAGIC.every((byte, at) => bytes[at] === byte) || JPEG_MAGIC.every((byte, at) => bytes[at] === byte) ? 'image' : undefined;
+}
+
 /** A cooked texture file (`…-<hash8>.ktx2`), read as three's loaders read a URL (the page's modifier: its version and
  *  content base), checked against its name. */
 export async function readCookedTexture(url: string, resolve: (url: string) => string = path => DefaultLoadingManager.resolveURL(path)): Promise<Uint8Array> {
