@@ -143,9 +143,10 @@
     },
     {
       "slug": "sunscar-dunes",
-      "uploadNumber": 8,
-      "hash": "08d0da0e061fb02e0b3ec6a1d68314dde66ab80e7fd8f9292d619d2f92a4f239",
-      "bytes": 11457536
+      "uploadNumber": 10,
+      "shardVersion": "0.0.9",
+      "hash": "724d296da9faa1cb4099e8cfcdd518b7efd9e2561bf85ed8a9a7ce0b452f6529",
+      "bytes": 14446592
     },
     {
       "slug": "mossgate",

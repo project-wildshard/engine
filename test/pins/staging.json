@@ -2,8 +2,8 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "f31197b3c05d4026ca366cfb5966ea531ba27cec2c4fd25c81ae7434815bd920",
-  "releaseHash": "a6666973241134b9938ab07e03c65bc02560c0bd5c45ee928799b11a87cbafd9",
+  "catalogueHash": "175dbca41965772a423785e85d3d22335e1466f3c05e181c99d339e3716cf595",
+  "releaseHash": "5a8bf2abd195a130765b2968566091bcb2554982709b783c05cd3d07ada4919c",
   "catalogue": {
     "version": 0,
     "placements": [
@@ -621,9 +621,9 @@
       {
         "slug": "mossgate",
         "name": "Mossgate Hollow",
-        "uploadNumber": 25,
-        "shardVersion": "0.1.21",
-        "hash": "f0e3a7601391e6f0709db806f37b7c6ea052f0508a74b22741e5679c1a6dc02d"
+        "uploadNumber": 27,
+        "shardVersion": "0.1.23",
+        "hash": "0236e0f219cffcf35a7c7906bd03fbbefe3d9708625e68c8f755e92ad8d9c7c0"
       },
       {
         "slug": "nalati-grasslands",
@@ -754,9 +754,9 @@
       {
         "slug": "sunscar-dunes",
         "name": "Signal Dunes",
-        "uploadNumber": 9,
-        "shardVersion": "0.0.8",
-        "hash": "dc182c5d6283c23514523bc32436b55803f9ddd97d680789dd587aec1f8f0aaf"
+        "uploadNumber": 10,
+        "shardVersion": "0.0.9",
+        "hash": "724d296da9faa1cb4099e8cfcdd518b7efd9e2561bf85ed8a9a7ce0b452f6529"
       }
     ],
     "missing": []
@@ -799,10 +799,10 @@
     },
     {
       "slug": "mossgate",
-      "uploadNumber": 25,
-      "shardVersion": "0.1.21",
-      "hash": "f0e3a7601391e6f0709db806f37b7c6ea052f0508a74b22741e5679c1a6dc02d",
-      "bytes": 35474944
+      "uploadNumber": 27,
+      "shardVersion": "0.1.23",
+      "hash": "0236e0f219cffcf35a7c7906bd03fbbefe3d9708625e68c8f755e92ad8d9c7c0",
+      "bytes": 38217728
     },
     {
       "slug": "nalati-grasslands",
@@ -932,10 +932,10 @@
     },
     {
       "slug": "sunscar-dunes",
-      "uploadNumber": 9,
-      "shardVersion": "0.0.8",
-      "hash": "dc182c5d6283c23514523bc32436b55803f9ddd97d680789dd587aec1f8f0aaf",
-      "bytes": 12323328
+      "uploadNumber": 10,
+      "shardVersion": "0.0.9",
+      "hash": "724d296da9faa1cb4099e8cfcdd518b7efd9e2561bf85ed8a9a7ce0b452f6529",
+      "bytes": 14446592
     }
   ]
 }
