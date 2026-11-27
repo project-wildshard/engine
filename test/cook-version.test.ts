@@ -1,5 +1,12 @@
 import { expect, test, vi } from 'vitest';
 import { checkCookVersion, rebasedCookVersion } from '../src/scripts/cookVersion';
+import { cookHash } from '../src/scripts/cookHash';
+
+test('the encoder cache is hashed without feeding the cook record back into the hash', () => {
+  const {files} = cookHash();
+  expect(files).toContain('src/cook/game/encodeCache.ts');
+  expect(files).not.toContain('src/cook/game/cook-version.json');
+});
 
 const previous = {cookVersion: '1.0.0', cookHash: 'a'.repeat(64), formatVersion: '0.1.0.6', goldenDigest: 'd'.repeat(64)};
 const moved = {...previous, cookHash: 'b'.repeat(64)};

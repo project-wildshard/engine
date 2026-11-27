@@ -16,7 +16,9 @@ export function cookHash(checkout=resolve(import.meta.dirname,'..', '..'),read:(
   const pkg=JSON.parse(new TextDecoder().decode(read(resolve(root,'package.json')))) as Package;
   const pending = ['src/cook/game/cookJob.ts', 'src/cook/game/cookWorker.ts', 'src/scripts/cook-job.mjs'];
   const seen = new Set<string>();
-  const outside = (name: string): boolean => name === 'package.json' || name === 'src/scripts/renderer-revision.mjs'
+  // The generated record is the hash's output; semver and same-output declarations are checked separately.
+  const outside = (name: string): boolean => name === 'package.json' || name === 'src/cook/game/cook-version.json'
+    || name === 'src/scripts/renderer-revision.mjs'
     || name === 'src/server/host/checkShardfile.ts' || name.startsWith('src/client/');
   const external = new Set(['@typescript/typescript6']);
   const sourceFile=(specifier:string,from:string):string|null=>{
