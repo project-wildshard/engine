@@ -202,10 +202,7 @@ export function runJob(launcher: JobLauncher, tarball: string, out: string, expe
   const slots = [limits.cpuSlots, granted === undefined ? undefined : Number(granted)].filter((value): value is number => value !== undefined);
   if (slots.some(value => !Number.isSafeInteger(value) || value < 1)) throw new Error('Invalid cook CPU grant');
   const cpuSlots = slots.length === 0 ? undefined : Math.min(...slots);
-  const cache = join(dirname(work), 'cache');
-  // SF21: the texture encodes survive jobs too (`encodeCache.ts`), in the job's cache folder unless the caller names one
-  // that outlives it (`zone-cook-entry.mjs` keeps one across its runs).
-  const named = process.env['COOK_ENCODE_CACHE'], encodes = named === undefined || named === '' ? join(cache, 'encodes') : resolvePath(named);
+  const cache = join(dirname(work), 'cache'), encodes = encodeFolder(dirname(work));
   // Node takes a path that doesn't exist yet for a file, which would deny the folder.
   mkdirSync(cache, {recursive: true}); mkdirSync(encodes, {recursive: true});
   const outside = encodes.startsWith(cache + sep) ? [] : [`--allow-fs-read=${encodes}`, `--allow-fs-write=${encodes}`];
@@ -526,8 +523,33 @@ const TRANSIENT_TRIES = 3;
 /** SP6: a failed upload is tried again after this, doubling per failure up to FAILED_RETRY_MAX_MS. A failure past its retries
  *  is a real one (a broken file, a full store), so retrying each poll would only cook it again and again. */
 const FAILED_RETRY_MS = 10 * 60_000, FAILED_RETRY_MAX_MS = 6 * 3_600_000;
-/** A retry can't change these: another clock runs out the same way, and a store stays full. */
+/** A retry can't change these: another clock runs out the same way (unless that try kept new encodes, SF21), and a store stays full. */
 const FINAL = /^(?:past |Over the pack budget|Missing raw shardVersion|Cook output changed|Cook object bytes differ)/u;
+/** SF21: a cook that ran out of its clock while it kept new texture encodes is tried again, up to this many more times: each
+ *  try starts from the encodes the last one kept (`encodeCache.ts`), so a big zone's first cold cook on a small box (Pine's
+ *  images-only cook, about 1650 s of a 1500 s clock) finishes on a later try. A try that kept nothing new is final. */
+export const PROGRESS_TRIES = 4;
+const TIMED_OUT = /^past \d+(?:\.\d+)? s$/u;
+
+/** SF21: the texture encode cache of the jobs under `jobs`: `COOK_ENCODE_CACHE` when the caller names one that outlives them
+ *  (`zone-cook-entry.mjs` keeps one across its runs), else the jobs folder's own `cache/encodes`, which every try shares.
+ *  @param {string} jobs */
+export function encodeFolder(jobs: string): string {
+  const named = process.env['COOK_ENCODE_CACHE'];
+  return named === undefined || named === '' ? join(jobs, 'cache', 'encodes') : resolvePath(named);
+}
+
+/** How many encodes a cache folder holds (none when it is missing). */
+function keptEncodes(folder: string): number {
+  try { return readdirSync(folder).filter(name => name.endsWith('.ktx2')).length; } catch { return 0; }
+}
+
+/** SF21: whether a failed try goes again. A timed-out try that kept new encodes does, while `progress` tries remain; any other
+ *  failure follows the transient rule (FINAL failures stop). */
+export function retryAfter(detail: string, before: number, after: number, progress: number): 'progress' | 'transient' | 'stop' {
+  if (TIMED_OUT.test(detail) && after > before && progress < PROGRESS_TRIES) return 'progress';
+  return FINAL.test(detail) ? 'stop' : 'transient';
+}
 /** QA 11-24 row 62: a full pack store alarms at most this often. */
 export const STORE_FULL_ALARM_MS = 86_400_000;
 /** A publish the pack budget refuses; `never` when the upload alone needs more than the whole budget. */
@@ -888,11 +910,20 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   };
   const cook = async (head: CookHead): Promise<CookRow> => {
     let row: CookRow = {...head, state: 'failed', detail: 'never ran'};
-    for (let tries = 0; tries < TRANSIENT_TRIES; tries++) {
+    const encodes = encodeFolder(scratch);
+    for (let tries = 0, progress = 0; tries < TRANSIENT_TRIES; tries++) {
+      const before = keptEncodes(encodes);
       try {
         row = await cookOnce(head);
       } catch (error) { row = {...head, state: 'failed', detail: error instanceof Error ? error.message : 'failed'}; }
-      if (row.state !== 'failed' || FINAL.test(row.detail ?? '')) break;
+      if (row.state !== 'failed') break;
+      const after = keptEncodes(encodes), next = retryAfter(row.detail ?? '', before, after, progress);
+      if (next === 'stop') break;
+      if (next === 'progress') {
+        progress++; tries--;
+        log(`cook ${head.slug} ${head.hash.slice(0, 12)}: ${row.detail ?? ''} with ${after - before} new encodes kept; trying again from them (${progress} of ${PROGRESS_TRIES})`);
+        continue;
+      }
       log(`cook ${head.slug} ${head.hash.slice(0, 12)}: try ${tries + 1} failed: ${row.detail ?? ''}`);
     }
     verdicts.set(head.hash, row);
