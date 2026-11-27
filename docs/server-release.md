@@ -280,6 +280,12 @@ published branch/tree. The next prepare requires this tag in main
 history. The train cuts every four hours plus on demand (J391, FS28).
 
 Pack writes use `wrangler r2 object put` with wrangler's login.
+The page upload puts the build's road strips and grid-only book on
+`cooked.wildshard.io` before publishing the legacy server book the signer
+checks. The check phase verifies the cooked road bytes and channel CORS.
+After `ROOMS_VERSIONED_COOK=1`, the room logs `road.pack` with
+`source: "cooked"` when the road loads. The build ID in the book must
+match the room's release.
 
 The `server-release.yml` author-client job builds
 `devserver-client.tar.gz` and `preparation-client.tar.gz` from the

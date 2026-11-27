@@ -145,7 +145,9 @@ export async function fetchGridCollision(base: string): Promise<readonly GridCol
 }
 /** C2, GC15: the road's collision from `build`'s grid pack beside `root`, through any reader: a page's worker or a dedicated room's. */
 export async function readGridCollisionPack(root: string, build: string, read: ServerRead): Promise<readonly GridCollisionStrip[]> {
-  const { grid } = await serverBook(root, build, read);
+  const book = await serverBook(root, build, read);
+  if (book.build !== build) throw new Error(`Road book names ${book.build}, expected ${build}`);
+  const { grid } = book;
   if (grid === undefined) return [];
   // By its hash, as a product's parts are read: a dedicated room's `file:` origin holds the part still `br` (GC15).
   const body = await read(besideShard(grid.url, root), grid.url, grid.hash), file = (path: string): Uint8Array => {

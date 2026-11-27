@@ -11,7 +11,7 @@ import type { HeadlessRuntimeInput } from '../headlessRuntime';
 import type { GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
 import { readGridCollisionPack, readServerFolder, readServerHeader, type CookedServerSource, type ServerRead } from '../standalone/serverFolder';
 import * as v from 'valibot';
-import { cookedIndexKey } from '@wildshard/engine/game/shardfile/cookedPackPaths';
+import { COOKED_ORIGIN, cookedIndexKey } from '@wildshard/engine/game/shardfile/cookedPackPaths';
 import type { ReleaseFile } from '../../../shared/host/releaseRows';
 import { readPlatformItemCatalogue, type PlatformItemCatalogue } from '@wildshard/engine/game/loot/platformCatalogue';
 import { admitLedgerRewards, type LedgerCatalogueItem } from '@wildshard/engine/game/ledger';
@@ -95,9 +95,10 @@ export function packRead(options: PackReaderOptions, reads: PackReads): ServerRe
     return body;
   };
 }
-/** GC15: the road's strips, from its build's grid pack. */
-export function readPackGrid(build: string, options: PackReaderOptions, reads: PackReads): Promise<readonly GridCollisionStrip[]> {
-  return readGridCollisionPack(new URL('shards/', options.origin.endsWith('/') ? options.origin : `${options.origin}/`).href, build, packRead(options, reads));
+/** GC15: the road's strips, from its build's grid pack. PV25 moves it with the versioned room reader. */
+export function readPackGrid(build: string, options: PackReaderOptions, reads: PackReads, versioned = false): Promise<readonly GridCollisionStrip[]> {
+  const pack = versioned ? {origin:COOKED_ORIGIN, cache:options.cache} : options;
+  return readGridCollisionPack(new URL('shards/', pack.origin.endsWith('/') ? pack.origin : `${pack.origin}/`).href, build, packRead(pack, reads));
 }
 /** ONE-FORMAT OF31h2: one shard's header through its build's book, read before any worker boots for what it declares about its worker. */
 export function readPackHeader(slug: string, build: string, options: PackReaderOptions, reads: PackReads): Promise<unknown> {
