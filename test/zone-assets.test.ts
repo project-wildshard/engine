@@ -4,7 +4,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
-import { ZONE_DIR, audioDirOf, audioManifestRow, bakedFile, hdriStem, isAudioUrl, texBase, zoneAssetUrl, zoneFirst, zoneFolderFirst } from '../src/shared/engine/boot/zoneAssets';
+import { ZONE_DIR, audioDirOf, audioManifestRow, bakedFile, hdriStem, isAudioUrl, texBase, useZoneDownloadListing, zoneAssetUrl, zoneFileListed, zoneFirst, zoneFolderFirst } from '../src/shared/engine/boot/zoneAssets';
 import { navmeshUrl } from '../src/shared/engine/physics/navmeshUrl';
 import { bakedTerrainUrl } from '../src/shared/engine/world/BakedTerrain';
 import { lutUrl } from '../src/client/engine/world/lut';
@@ -91,6 +91,21 @@ test('baked files: the zone copy first, the engine-wide copy second', () => with
   expect(zoneFolderFirst('far-reach', 'baked/tex', '/assets/baked/far-reach/tex/')).toBe('/assets/baked/far-reach/tex/');
   // a name that is no slug never builds a zone path
   expect(zoneFirst('../x', 'baked/terrain.bin', '/assets/baked/x/terrain.bin')).toBe('/assets/baked/x/terrain.bin');
+}));
+
+// SF4: Far Reach entered from a local cook read its far view from the page's engine-wide copy; the cook's download lists
+// the zone's own, and that one wins.
+test("a cooked zone's download listing wins over the page's engine-wide copy", () => withAssetTables({ ...BAKED, bytes: {
+  ...BAKED.bytes, '/assets/baked/far-reach/far.glb': 1 } }, () => {
+  expect(bakedFile('far-reach', 'far.glb')).toBe('/assets/baked/far-reach/far.glb');
+  useZoneDownloadListing(url => url === '/assets/far-reach/baked/far.glb');
+  try {
+    expect(bakedFile('far-reach', 'far.glb')).toBe('/assets/far-reach/baked/far.glb');
+    expect(zoneFileListed('/assets/far-reach/baked/far.glb')).toBe(true);
+    expect(bakedFile('far-reach', 'far.json')).toBe('/assets/baked/far-reach/far.json');
+    expect(zoneFileListed('/assets/baked/far-reach/far.json')).toBe(false);
+  } finally { useZoneDownloadListing(() => false); }
+  expect(bakedFile('far-reach', 'far.glb')).toBe('/assets/baked/far-reach/far.glb');
 }));
 
 test('a near view reads the zone baked folder first', () => {

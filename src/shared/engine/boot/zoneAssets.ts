@@ -27,11 +27,20 @@ export function zoneAssetUrl(slug: string, rest: string): string {
   return `/assets/${slug}/${rest}`;
 }
 
-/** `/assets/<slug>/<rest>` when this page's byte table lists it (the zone carries its own copy), else `legacy`. */
+/** SF4: whether a zone's own file reaches this page another way than its byte table: a cooked zone's spawn download
+ *  lists its mounts at their page URLs (`spawnListed`, lent by the client; none here, so a Node bake reads the table only). */
+let downloadListed: (url: string) => boolean = () => false;
+export function useZoneDownloadListing(listed: (url: string) => boolean): void { downloadListed = listed; }
+/** Whether this page can read `url`: its byte table lists it, or its zone's download does. */
+export const zoneFileListed = (url: string): boolean => url in publicBytes() || downloadListed(url);
+
+/** `/assets/<slug>/<rest>` when this page lists it (the zone carries its own copy: built in, or in its cook's download),
+ *  else `legacy`. A cooked zone's own copy wins over the engine-wide one the page still has (Far Reach entered from a local
+ *  cook read its far view from the page's `/assets/baked/far-reach/`). */
 export function zoneFirst(slug: string, rest: string, legacy: string): string {
   if (!ZONE_SLUG.test(slug)) return legacy;
   const own = `/assets/${slug}/${rest}`;
-  return own in publicBytes() ? own : legacy;
+  return zoneFileListed(own) ? own : legacy;
 }
 /** The folder `/assets/<slug>/<rest>/` when the byte table lists a file under it, else `legacy` (a folder too). */
 export function zoneFolderFirst(slug: string, rest: string, legacy: string): string {

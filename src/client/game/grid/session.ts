@@ -1,4 +1,4 @@
-import { bakedFile } from '@wildshard/engine/boot/zoneAssets';
+import { bakedFile, zoneFileListed } from '@wildshard/engine/boot/zoneAssets';
 import { prelinkGridViews } from './prelinkViews';
 import { cellPresence } from './cellPresence';
 import type { RoadTileBacking } from './roadTileBacking';
@@ -274,7 +274,7 @@ function neighbourTiles(scope: Scope, prepare: (tile: PreparedRingTile) => Promi
 }
 
 /** Whether the page's inventory lists a baked far for `slug` (the build baked one; its server may still not serve it). */
-const bakedFarListed = (slug: string): boolean => publicBytes()[bakedFile(slug, 'far.json')] !== undefined;
+const bakedFarListed = (slug: string): boolean => zoneFileListed(bakedFile(slug, 'far.json'));
 /** The far proxy and its row, fetched from the shard's baked folder (`public/assets/baked/<slug>/far.*`). */
 async function loadFar(slug: string): Promise<{ prepared: FarPrepared; bytes: number }> {
   // Pure authored projects have no repo bake: their proxy comes from their product's sections and far files (O26: read
