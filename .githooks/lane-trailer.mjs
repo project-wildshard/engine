@@ -4,13 +4,14 @@
 // merge, fixup, squash and amend messages, and a commit made under no lane name, are left alone.
 import {readFileSync, writeFileSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
+import {shardPinWorkflowLane} from '../src/scripts/commit-message.mjs';
 
 const LANE = /^[a-z][a-z0-9_-]*$/u;
 const GENERATED = /^(?:Merge |Revert "|fixup! |squash! |amend! )/u;
 
 /** The message with a `Lane:` line for `lane`, or the message unchanged. @param {string} raw @param {string|undefined} lane */
 export function withLane(raw, lane) {
-  if (lane === undefined || !LANE.test(lane)) return raw;
+  if (lane === undefined || !LANE.test(lane) || shardPinWorkflowLane(raw) !== null) return raw;
   const lines = raw.replace(/\r\n/gu, '\n').split('\n');
   const content = lines.filter(line => !line.startsWith('#'));
   if (GENERATED.test(content.find(line => line.trim() !== '') ?? '') || content.some(line => /^Lane: \S/u.test(line))) return raw;

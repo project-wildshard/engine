@@ -29,6 +29,7 @@ with tempfile.TemporaryDirectory(dir=source / 'tmp', prefix='commit-message-') a
     shutil.copy2(wrapper, root / 'src/scripts/.kit/commit.sh')
     (root / '.githooks').mkdir()
     shutil.copy2(source / '.githooks/check-commit-message.mjs', root / '.githooks/check-commit-message.mjs')
+    shutil.copy2(source / 'src/scripts/commit-message.mjs', root / 'src/scripts/commit-message.mjs')
     hook = root / '.githooks/pre-commit'
     hook.write_text('''#!/usr/bin/env python3
 import os, pathlib, sys, time

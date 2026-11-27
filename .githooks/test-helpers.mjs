@@ -10,6 +10,13 @@ import { fileURLToPath } from 'node:url';
 
 const HOOKS = dirname(fileURLToPath(import.meta.url));
 const SCRIPTS = join(HOOKS, '..', 'src', 'scripts', '.kit');
+const COMMIT_MESSAGE = 'src/scripts/commit-message.mjs';
+
+/** Install the hooks and their commit-message parser in a fixture checkout. @param {string} root */
+export function copyHooks(root) {
+  cpSync(HOOKS, join(root, '.githooks'), { recursive: true });
+  cpSync(join(HOOKS, '..', COMMIT_MESSAGE), join(root, COMMIT_MESSAGE));
+}
 export const TRAILER = 'Assisted-by: Claude:claude-opus-5-5';
 export const ok = (subject, body = 'Why this matters.') => `${subject}\n\n${body}\n\n${TRAILER}\n`;
 
@@ -49,7 +56,7 @@ export function sandbox() {
   git(['config', 'user.name', 'Test']);
   git(['config', 'user.email', 'test@example.com']);
   git(['config', 'commit.gpgsign', 'false']);
-  cpSync(HOOKS, join(root, '.githooks'), { recursive: true });
+  copyHooks(root);
   if (existsSync(SCRIPTS)) cpSync(SCRIPTS, join(root, 'src', 'scripts', '.kit'), { recursive: true }); // ask tooling
   git(['config', 'core.hooksPath', '.githooks']);
   const write = (path, content) => {

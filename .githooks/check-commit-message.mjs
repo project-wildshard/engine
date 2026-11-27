@@ -7,7 +7,8 @@
 //     trailer in the final trailer block, AGENT exactly `Claude` or
 //     `Codex` (not `Claude Code`, `Claude-Code` or `claude`; meta
 //     META-CLEAN-2 C7). No `Co-Authored-By:` for an AI and no
-//     "Generated with" / robot banners.
+//     "Generated with" / robot banners. The two shard-pin workflow
+//     messages carry their own automation trailer (QA67).
 // SKIP_ATTRIB=1 drops only the trailer requirement (human-only commit).
 //   - An escape hatch is named (J381, meta QA 11-25 row 51): a commit made
 //     while any SKIP_* or ALLOW_* variable is set names that variable in
@@ -18,6 +19,9 @@
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
+import { clean, shardPinWorkflowLane } from '../src/scripts/commit-message.mjs';
+
+export { clean } from '../src/scripts/commit-message.mjs';
 
 export const TYPES = ['feat', 'fix', 'docs', 'chore', 'refactor', 'test', 'perf', 'build', 'ci', 'style', 'revert'];
 const SUBJECT = new RegExp(`^(?:${TYPES.join('|')})(?:\\([a-z0-9][a-z0-9._/-]*\\))?!?: \\S.*$`);
@@ -27,21 +31,8 @@ const ASSISTED = new RegExp(`^Assisted-by: (${AGENTS.join('|')}):(\\S+)$`);
 const FORM = 'Assisted-by: Claude:<model> or Assisted-by: Codex:<model>, e.g. Assisted-by: Claude:claude-opus-5-5';
 const PLACEHOLDER = /^(unknown|actual-model|model|model_version|latest|default|auto|n\/a|null|undefined)$/i;
 const AI = /claude|codex|chatgpt|openai|anthropic|cursor|copilot|gemini/i;
-const SCISSORS = /^# -+ >8 -+$/;
 
 const length = (line) => Array.from(new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(line)).length;
-
-/** Drop comments and everything below a `commit -v` scissors line. */
-export function clean(raw) {
-  const lines = [];
-  for (const line of raw.replace(/\r\n/g, '\n').split('\n')) {
-    if (SCISSORS.test(line)) break;
-    if (!line.startsWith('#')) lines.push(line.trimEnd());
-  }
-  while (lines.length && !lines.at(-1)) lines.pop();
-  while (lines.length && !lines[0]) lines.shift();
-  return lines;
-}
 
 /** @returns {string | null} the first rule broken, or null when the message passes. */
 export function validate(raw, { human = false } = {}) {
@@ -78,6 +69,7 @@ export function validate(raw, { human = false } = {}) {
   if (start < 2 || !block.every((line) => TRAILER.test(line))) {
     return 'Assisted-by must sit in the final trailer block, after a blank line.';
   }
+  if (shardPinWorkflowLane(raw) !== null) return null;
   const match = ASSISTED.exec(assisted[0]);
   if (!match) return `Sign as ${FORM}; the agent name is exactly Claude or Codex.`;
   if (PLACEHOLDER.test(match[2])) return `Use the real model, not "${match[2]}".`;

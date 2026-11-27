@@ -417,6 +417,36 @@ test('two lanes\' commits in one checkout: each push sends only its own lane\'s,
   assert.equal(git(a, 'log', '--format=%s', 'origin/main..HEAD'), 'docs: unnamed');
 });
 
+test('QA67: the shard-pin lane sends the exact workflow commit through the gate', () => {
+  const path = 'test/pins/shardfiles.json';
+  const subject = 'test(pins): pin nalati-grasslands rev 12';
+  const body = 'From shard-pin.yml.';
+  const trailer = 'Assisted-by: shard-pin:workflow';
+  write(b, path, '{}\n');
+  git(b, 'add', '--', path);
+  git(b, 'commit', '--quiet', '--author', 'shard-pin <shard-pin@users.noreply.github.com>', '-m', subject, '-m', body, '-m', trailer, '--', path);
+  const pin = git(b, 'rev-parse', 'HEAD');
+  const base = git(remote, 'rev-parse', 'main');
+  git(a, 'fetch', '--quiet', b, 'main');
+  git(a, 'merge', '--quiet', '--ff-only', 'FETCH_HEAD');
+  const ordinary = push(a);
+  assert.equal(ordinary.status, 0, ordinary.stderr);
+  assert.equal(git(remote, 'rev-parse', 'main'), base, 'other lanes leave workflow commits local');
+  const gate = '#!/bin/sh\nread -r local tip remote old\ntest "$WS_LAND_MAIN_PUSH" = "main-push:$tip"\n';
+  for (const file of ['.githooks/pre-push', '.hooks/pre-push']) {
+    write(a, file, gate);
+    chmodSync(join(a, file), 0o755);
+  }
+  const result = spawnSync(process.execPath, [SCRIPT, '--wait', '0'], {
+    cwd: a, encoding: 'utf8', env: { ...env, ...ID, WS_LANE_NAME: 'shard-pin' },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /gate green before the lock/u);
+  assert.equal(git(remote, 'rev-parse', 'main'), pin);
+  assert.equal(git(remote, 'log', '-1', '--format=%an <%ae>'), 'shard-pin <shard-pin@users.noreply.github.com>');
+  assert.equal(git(remote, 'log', '-1', '--format=%B'), `${subject}\n\n${body}\n\n${trailer}`);
+});
+
 test('a lane\'s commit that needs another lane\'s local commit stops, naming it, and nothing goes out', () => {
   write(a, 'theirs.md', 'lane-b line\n');
   git(a, 'add', 'theirs.md');

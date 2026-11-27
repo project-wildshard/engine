@@ -150,18 +150,16 @@ jobs:
         env:
           BRANCH: ${{ steps.branch.outputs.branch }}
         run: |
-          slug_dir="pin-$SLUG-r$REVISION"
           {
             echo "### $BRANCH"
             echo
-            echo "Land it from either machine:"
+            echo "After darwin-digest finishes (if scheduled), land it through main-push:"
             echo
             echo '~~~sh'
-            echo 'cd ~/projects/games/wildshard/engine'
-            echo "node src/scripts/.kit/worktree.mjs new $slug_dir"
-            echo "cd .worktrees/$slug_dir && git fetch origin $BRANCH && git merge --ff-only FETCH_HEAD"
+            echo 'cd ~/projects/games/wildshard/engine-quickfix'
+            echo "git fetch origin $BRANCH && git merge --ff-only FETCH_HEAD"
             echo 'pnpm pins   # gen:inputs refuses the old revision still in out/'
-            echo 'WS_LANE_NAME=<lane> node src/scripts/.kit/land.mjs'
+            echo 'WS_LANE_NAME=shard-pin node src/scripts/.kit/main-push.mjs'
             echo '~~~'
           } >> "$GITHUB_STEP_SUMMARY"
   # Ring 1 digests are kept per platform (J97) and the MacBook's push gate checks darwin-arm64's. The pin job records

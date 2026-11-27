@@ -3,14 +3,15 @@
 // A commit's lane is its `Lane:` trailer: main-push writes one on every commit it makes (M11), and the commit-msg hook
 // adds one from WS_LANE_NAME to a commit made by hand (.githooks/lane-trailer.mjs).
 import {spawnSync} from 'node:child_process';
+import {shardPinWorkflowLane} from './commit-message.mjs';
 
 /** @typedef {{sha:string,subject:string,lane:string|null}} LaneCommit */
 
-/** The lane a commit message names: its last `Lane: <lane>` line. Read from the whole body, not git's trailer block:
- * main-push writes `Lane:` in its own paragraph above `Assisted-by:`, which `%(trailers)` never sees.
+/** The last explicit lane, or the lane implied by a shard-pin workflow message. Read from the whole body: main-push
+ * writes `Lane:` in its own paragraph above `Assisted-by:`, which `%(trailers)` never sees.
  * @param {string} message @returns {string|null} */
 export function messageLane(message){
- return messageLanes(message).at(-1)??null;
+ return messageLanes(message).at(-1)??shardPinWorkflowLane(message);
 }
 
 /** Every lane a commit message names in `Lane: <lane>` lines, in order. @param {string} message @returns {string[]} */

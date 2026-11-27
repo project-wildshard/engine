@@ -37,7 +37,7 @@ import {installLag} from '../install-lag.mjs';
 import {holdRefusal} from '../land-hold.mjs';
 import {withStoreUse} from './worktree.mjs';
 import { laneName } from '../lane-name.mjs';
-import { commitLanes, foreignCommits, nameCommits } from '../lane-commits.mjs';
+import { commitLanes, foreignCommits, messageLane, nameCommits } from '../lane-commits.mjs';
 
 export class StopError extends Error {
   /** @param {string} message @param {boolean} [retry] a later try may succeed */
@@ -175,7 +175,7 @@ function replayLanes(cwd, upstream, head) {
     if (parents.length !== 1) throw new StopError(`local commit ${sha.slice(0, 10)} is a merge, which git replay cannot move; ask the coordinator`);
     if (duplicates.has(sha)) { dropped.push(sha); continue; }
     const message = git(cwd, ['show', '-s', '--format=%B', sha]);
-    const lane = /^Lane: ([a-z][a-z0-9_-]*)$/mu.exec(message)?.[1] ?? `unnamed-${sha.slice(0, 10)}`;
+    const lane = messageLane(message) ?? `unnamed-${sha.slice(0, 10)}`;
     const replayed = stopped.has(lane) ? null : run(cwd, ['replay', '--ref=refs/heads/main', '--ref-action=print', '--onto', target, `${parents[0]}..${sha}`]);
     if (replayed?.status === 0) {
       const next = replayed.stdout.trim().split('\n').find(row => /^update(-ref)? refs\/heads\/main /u.test(row))?.split(/\s+/u)[2] ?? '';

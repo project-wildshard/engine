@@ -1,9 +1,9 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { ENV, ok, roots, sandbox } from './test-helpers.mjs';
+import { ENV, copyHooks, ok, roots, sandbox } from './test-helpers.mjs';
 
 describe('pre-commit hook', () => {
   const MSG = ok('feat: add files');
@@ -38,7 +38,7 @@ describe('pre-commit hook', () => {
     const wt = `${root}-wt`;
     roots.push(wt);
     git(['worktree', 'add', '-q', '--detach', wt]);
-    cpSync(join(root, '.githooks'), join(wt, '.githooks'), { recursive: true }); // tracked in the real repo
+    copyHooks(wt); // tracked in the real repo
     writeFileSync(join(wt, 'b.txt'), 'b\n');
     const run = (args) => spawnSync('git', args, { cwd: wt, encoding: 'utf8', env: ENV });
     run(['add', 'b.txt']);
@@ -52,7 +52,7 @@ describe('pre-commit hook', () => {
     commit({ 'a.txt': 'a\n' }, MSG);
     const wt = join(root, '.worktrees', slug);
     git(['worktree', 'add', '-q', '-b', branch, wt]);
-    cpSync(join(root, '.githooks'), join(wt, '.githooks'), { recursive: true }); // tracked in the real repo
+    copyHooks(wt); // tracked in the real repo
     const run = (args, env = {}) => spawnSync('git', args, { cwd: wt, encoding: 'utf8', env: { ...ENV, ...env } });
     const write = (path, text) => { writeFileSync(join(wt, path), text); run(['add', path]); };
     return { root, git, wt, run, write };
@@ -113,7 +113,7 @@ describe('pre-commit hook', () => {
     // A worktree placed under the store's parent folder is not the canonical checkout's .worktrees/.
     const fake = join(dirname(store), '.worktrees', 'foo');
     git(['worktree', 'add', '-q', '-b', 'plan/foo', fake]);
-    cpSync(join(root, '.githooks'), join(fake, '.githooks'), { recursive: true });
+    copyHooks(fake);
     writeFileSync(join(fake, 'b.txt'), 'b\n');
     const run = (args) => spawnSync('git', args, { cwd: fake, encoding: 'utf8', env: ENV });
     run(['add', 'b.txt']);

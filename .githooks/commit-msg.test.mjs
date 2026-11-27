@@ -67,6 +67,12 @@ describe('commit message', () => {
     assert.equal(validate('fix: x\n\nBody.\n\nAssisted-by: Claude:claude-opus-5-5\n'), null);
     assert.equal(validate('fix: x\n\nBody.\n\nAssisted-by: Codex:gpt-6.2-sol\n'), null);
   });
+  test('the shard-pin trailer is specific to workflow subjects and one final trailer block', () => {
+    const trailer = 'Assisted-by: shard-pin:workflow';
+    assert.match(validate(`fix(pins): hand edit\n\n${trailer}\n`), /Claude or Codex/u);
+    assert.match(validate(`test(pins): pin nalati-grasslands rev 12\n\n${trailer}\n${TRAILER}\n`), /exactly one/u);
+    assert.match(validate(`test(pins): pin nalati-grasslands rev 12\n\n${trailer}\n\nBody.\n`), /final trailer block/u);
+  });
   test('refuses any other agent name, and names the accepted form', () => {
     for (const name of ['Claude Code', 'Claude-Code', 'claude-code', 'claude', 'codex', 'Cursor', 'Claude Opus']) {
       const error = validate(`fix: x\n\nBody.\n\nAssisted-by: ${name}:claude-opus-5-5\n`);
@@ -93,6 +99,20 @@ describe('commit message', () => {
 });
 
 describe('commit-msg hook', () => {
+  test('QA67: the hook keeps the shard-pin workflow message without adding an operator lane', () => {
+    const { commit, git } = sandbox();
+    const env = { WS_LANE_NAME: 'test-operator' };
+    const trailer = 'Assisted-by: shard-pin:workflow';
+    for (const [subject, path] of [
+      ['test(pins): pin nalati-grasslands rev 12', 'test/pins/shardfiles.json'],
+      ['test(pins): nalati-grasslands darwin Ring 1 digest', 'test/pins/ring-digests.json'],
+    ]) {
+      const message = `${subject}\n\nFrom shard-pin.yml.\n\n${trailer}`;
+      const result = commit({ [path]: '{}\n' }, message, { env });
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(git(['log', '-1', '--format=%B']).stdout.trim(), message);
+    }
+  });
   test('lets a good commit through', () => {
     const { commit } = sandbox();
     const result = commit({ 'a.txt': 'a\n' }, ok('feat: add a'));

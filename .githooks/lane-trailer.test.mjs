@@ -1,12 +1,12 @@
 // Meta QA 11-25 row 58: a commit made under WS_LANE_NAME names its lane, in main-push's shape, through the real hook.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { fileURLToPath } from 'node:url';
 import { withLane } from './lane-trailer.mjs';
+import { copyHooks } from './test-helpers.mjs';
 import { messageLane } from '../src/scripts/lane-commits.mjs';
 
 const TRAILER = 'Assisted-by: Claude:claude-opus-5-5';
@@ -30,7 +30,7 @@ test('the commit-msg hook writes the lane of a commit made by hand, and the mess
   const env = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_') && !/^(?:SKIP|ALLOW)_/u.test(key))), GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' };
   const git = (...args) => spawnSync('git', args, { cwd: root, encoding: 'utf8', env: { ...env, WS_LANE_NAME: 'opus-guard' } });
   git('init', '-q', '-b', 'main');
-  cpSync(fileURLToPath(new URL('.', import.meta.url)), join(root, '.githooks'), { recursive: true, filter: path => !path.endsWith('.test.mjs') });
+  copyHooks(root);
   git('config', 'core.hooksPath', '.githooks');
   writeFileSync(join(root, 'a.md'), 'a\n');
   git('add', 'a.md');
