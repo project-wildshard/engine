@@ -100,9 +100,9 @@ if (lane === 'push' && scripts.check && existsSync(join(root, 'src/scripts/push-
   for(const key of Object.keys(process.env))if(key.startsWith('GIT_'))Reflect.deleteProperty(process.env,key);
   const {copyReason,makeGateCopy,pushedCommit}=await import('../src/scripts/push-gate-copy.mjs');
   const sha=pushedCommit(root,env.WS_PUSH_REFS),why=copyReason(root,sha,env,undefined,landMain==='push');
-  // main-push gated these commits before it took the lock (src/scripts/main-push-gated.mjs): the push under the lock
-  // skips the gate when every outgoing commit carries its mark. Read from the hook's own environment.
-  const pregated=process.env.WS_MAIN_PUSH_GATED==='1'?(await import('../src/scripts/main-push-gated.mjs')).pregated(root,env.WS_PUSH_REFS):null;
+  // Reuse the early gate only for its exact base and tip. Read the proof from the hook's own environment.
+  const mainProof=process.env.WS_MAIN_PUSH_GATED;
+  const pregated=mainProof?(await import('../src/scripts/main-push-gated.mjs')).pregated(root,env.WS_PUSH_REFS,mainProof):null;
   let copy=null;
   if(pregated===null&&why!==null&&sha!==null){
     console.error(`  - gate in a clean copy of ${sha.slice(0,10)}: ${why}`);
@@ -122,7 +122,7 @@ if (lane === 'push' && scripts.check && existsSync(join(root, 'src/scripts/push-
     // Outgoing history/secrets have already passed in pre-push. Reusing a proved
     // tree starts no heavy work, so it must not wait behind a later full suite.
     if(pregated!==null){
-      console.error(`  - pre-gated by main-push: all ${pregated} outgoing commit(s) passed this gate before the lock (patch ids match); no gate under the lock`);
+      console.error(`  - pre-gated by main-push: the exact base and tip passed before the lock (${pregated} commits)`);
       code=0;
     }else if(proof!==null){
       console.error(`  - exact-tree green reuse before lease: ${proof.tree}; run ${proof.run}; commit ${proof.commit}; ${proof.mode}; ${proof.seconds.toFixed(1)} s; ${proof.finished}`);

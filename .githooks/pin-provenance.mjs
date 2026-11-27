@@ -158,7 +158,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   /** @type {SelectMainPush|undefined} */ let selectMainPush;
   const marker = process.env.WS_LAND_MAIN_PUSH;
   if (marker?.startsWith('main-push:') && marker !== `main-push:${git(cwd, ['rev-parse', 'HEAD']).out}`) {
-    ({ownCommits: selectMainPush} = await import('../src/scripts/.kit/main-push.mjs'));
+    ({selectMainPushCommit: selectMainPush} = await import('../src/scripts/.kit/main-push.mjs'));
   }
   // Most pushes touch no pins: answer them without loading land.mjs or asking GitHub.
   let asked = false;

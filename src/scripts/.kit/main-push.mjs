@@ -196,6 +196,43 @@ function replayLanes(cwd, upstream, head) {
   return { target, dropped, held, count: commits.length };
 }
 
+/** @typedef {{base:string,source:string,sent:string,left:import('../lane-commits.mjs').LaneCommit[]}} PushSnapshot */
+
+/** @param {string} cwd @param {string} remote @returns {PushSnapshot} */
+function selectPush(cwd, remote) {
+  const source = git(cwd, ['rev-parse', 'HEAD']);
+  const base = git(cwd, ['rev-parse', `refs/remotes/${remote}/main`]);
+  if (run(cwd, ['merge-base', '--is-ancestor', source, base]).status === 0) return {base, source, sent:base, left:[]};
+  const {sha:sent, left} = ownCommits(cwd, base, source);
+  return {base, source, sent, left};
+}
+
+/** Reuse only the selected changes in a race. A different base needs its own gate.
+ * @param {string} cwd @param {string} base @param {Pick<PushSnapshot,'base'|'sent'>} snapshot */
+function replayPush(cwd, base, snapshot) {
+  if (base === snapshot.base) return snapshot.sent;
+  if (run(cwd, ['merge-base', '--is-ancestor', snapshot.base, base]).status !== 0) {
+    throw new StopError('origin/main no longer descends from the gated base; nothing was pushed');
+  }
+  const {target, held} = replayLanes(cwd, base, snapshot.sent);
+  const [conflict] = held;
+  if (conflict !== undefined) throw new StopError(`origin/main changed a gated commit's files: ${conflict.files.join(', ')}. Your later commits stayed local.`);
+  return target;
+}
+
+/** Let FS18 verify the snapshot from which this process selected the pin update.
+ * @param {string} cwd @param {string} base @param {string} head @param {NodeJS.ProcessEnv} env */
+export function selectMainPushCommit(cwd, base, head, env) {
+  const [old = '', source = ''] = (env.WS_MAIN_PUSH_SNAPSHOT ?? '').split(':');
+  if (/^[a-f0-9]{40}$/u.test(old) && /^[a-f0-9]{40}$/u.test(source)
+      && run(cwd, ['merge-base', '--is-ancestor', old, source]).status === 0
+      && run(cwd, ['merge-base', '--is-ancestor', source, head]).status === 0) {
+    const {sha} = ownCommits(cwd, old, source, env);
+    return {sha:replayPush(cwd, base, {base:old, sent:sha})};
+  }
+  return ownCommits(cwd, base, head, env);
+}
+
 /** One `lane-receipts.log` line, `<HH:MM Cancún> <lane> <text>` (the Mac's clock is Cancún time). WS_MAIN_PUSH_RECEIPT=0
  * (the tests) writes none. @param {string} text */
 function receipt(text) {
@@ -235,16 +272,19 @@ export function commitFiles(cwd, files, messages) {
   return made;
 }
 
-/**
- * Bring main up to origin/main without touching unrelated files (engine's main-pull.mjs).
- * @param {string} cwd @param {string} [remote] @returns {string} what it did
- */
-export function syncMain(cwd, remote = 'origin') {
-  checkState(cwd);
+/** @param {string} cwd @param {string} remote */
+function fetchMain(cwd, remote) {
   const fetched = run(cwd, ['fetch', '--quiet', remote, 'main']);
   if (fetched.status !== 0) throw new StopError(`git fetch ${remote} main: ${firstLines(fetched.stderr)}`, true);
+  return git(cwd, ['rev-parse', `refs/remotes/${remote}/main`]);
+}
+
+/** Bring main up to origin/main without touching unrelated files.
+ * @param {string} cwd @param {string} [remote] */
+export function syncMain(cwd, remote = 'origin') {
+  checkState(cwd);
+  const upstream = fetchMain(cwd, remote);
   const head = git(cwd, ['rev-parse', 'HEAD']);
-  const upstream = git(cwd, ['rev-parse', `refs/remotes/${remote}/main`]);
   if (run(cwd, ['merge-base', '--is-ancestor', upstream, head]).status === 0) return `main current at ${head.slice(0, 8)}`;
   let target = upstream;
   let how = 'fast-forward';
@@ -292,28 +332,36 @@ export function syncMain(cwd, remote = 'origin') {
   return `main ${head.slice(0, 8)} -> ${target.slice(0, 8)} (${how}); other lanes' files untouched`;
 }
 
-/** Push main. A push race retries; a refused pre-push stops. @param {string} cwd @param {string} [remote] */
-export function pushMain(cwd, remote = 'origin') {
+/** Push main. A push race retries; a refused pre-push stops.
+ * @param {string} cwd @param {string} [remote] @param {{snapshot?:PushSnapshot,checked?:boolean}} [options] */
+export function pushMain(cwd, remote = 'origin', {snapshot, checked = false} = {}) {
   // What this push sends: this lane's commits over origin/main (row 58). Another lane's commit, made in this shared
   // checkout but not yet pushed, stays on local main and the receipt names it; ALLOW_CARRY=1 carries it along (M1).
   const local = git(cwd, ['rev-parse', 'HEAD']), base = git(cwd, ['rev-parse', `refs/remotes/${remote}/main`]);
   // Row 58: another lane's local commits stay on local main; only this lane's go out.
-  const { sha: sent, left } = ownCommits(cwd, base, local);
-  if (sent === base) return `nothing of this lane's to push; left on local main for their lane (row 58): ${nameCommits(left)}`;
+  const scope = snapshot ?? selectPush(cwd, remote);
+  const sent = replayPush(cwd, base, scope);
+  const {left} = scope;
+  if (sent === base) return left.length === 0 ? 'nothing to push' : `nothing of this lane's to push; left on local main for their lane (row 58): ${nameCommits(left)}`;
+  const range = `${base}..${sent}`;
   // Meta QA 11-25 row 37: an open engine land HOLD in the receipts stops every pusher but the lander it names.
   // Row 67: a hold binds only a push touching the red's files; a disjoint one says so and goes.
-  const held = holdRefusal({ lane: currentLane(), bodies: run(cwd, ['log', '--format=%B', `refs/remotes/${remote}/main..${sent}`]).stdout,
-    files: run(cwd, ['diff', '--name-only', `refs/remotes/${remote}/main...${sent}`]).stdout.split('\n').filter(Boolean), say: line => receipt(`main-push ${line}`) });
+  const held = holdRefusal({ lane: currentLane(), bodies: run(cwd, ['log', '--format=%B', range]).stdout,
+    files: run(cwd, ['diff', '--name-only', base, sent]).stdout.split('\n').filter(Boolean), say: line => receipt(`main-push ${line}`) });
   if (held !== null) { receipt(`main-push STOP ${held}`); throw new StopError(held); }
-  const outgoing = run(cwd, ['log', '--format=%h %s', `refs/remotes/${remote}/main..${sent}`]).stdout.trim().split('\n').filter(Boolean);
+  const outgoing = run(cwd, ['log', '--format=%h %s', range]).stdout.trim().split('\n').filter(Boolean);
   // The pre-push's whole output (the gate) goes to a log in the git dir: its RED lines are the cause on a refusal.
   const log = resolve(cwd, git(cwd, ['rev-parse', '--git-path', `main-push-${process.pid}.log`]));
   const fd = openSync(log, 'w');
   let pushed;
   try {
     // FS18: the pre-push's pin provenance passes a test/pins change that main-push itself sends from main.
-    const { env } = gateEnv({ ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))), WS_LAND_MAIN_PUSH: `main-push:${sent}` },
-      carriedRows(cwd, `refs/remotes/${remote}/main..${sent}`));
+    const { env } = gateEnv({
+      ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))),
+      WS_LAND_MAIN_PUSH: `main-push:${sent}`,
+      WS_MAIN_PUSH_SNAPSHOT: `${scope.base}:${scope.source}`,
+      WS_MAIN_PUSH_GATED: checked && base === scope.base && sent === scope.sent ? `${base}:${sent}` : '',
+    }, carriedRows(cwd, range));
     pushed = spawnSync('git', ['push', remote, `${sent}:refs/heads/main`], { cwd, env, encoding: 'utf8', maxBuffer: 64 << 20, stdio: ['ignore', fd, fd] });
   } finally {
     closeSync(fd);
@@ -365,21 +413,26 @@ export function freshInstall(cwd, { env = process.env, install } = {}) {
 /**
  * Sync and push, trying again on a retryable stop. `afterSync` runs once, after the first sync that succeeds (the
  * --onto commit).
- * @param {string} cwd @param {{ tries?: number, wait?: number, sleep?: (s: number) => void, log?: (line: string) => void, afterSync?: () => void }} [options]
+ * @param {string} cwd @param {{ tries?: number, wait?: number, sleep?: (s: number) => void, log?: (line: string) => void, afterSync?: () => void, snapshot?:PushSnapshot, checked?:boolean }} [options]
  */
-export function syncAndPush(cwd, { tries = 8, wait = 5, sleep = sleepSeconds, log = () => { /* No logging requested. */ }, afterSync = () => { /* No deferred commit. */ } } = {}) {
+export function syncAndPush(cwd, { tries = 8, wait = 5, sleep = sleepSeconds, log = () => { /* No logging requested. */ }, afterSync = () => { /* No deferred commit. */ }, snapshot, checked = false } = {}) {
   let synced = false;
   for (let attempt = 1; ; attempt++) {
     try {
-      log(syncMain(cwd));
-      const installed = freshInstall(cwd);
-      if (installed !== '') log(installed);
+      if (snapshot === undefined) {
+        log(syncMain(cwd));
+        const installed = freshInstall(cwd);
+        if (installed !== '') log(installed);
+      } else {
+        checkState(cwd);
+        fetchMain(cwd, 'origin');
+      }
       if (!synced) {
         synced = true;
         afterSync();
       }
-      if (run(cwd, ['merge-base', '--is-ancestor', 'HEAD', 'refs/remotes/origin/main']).status === 0) return 'nothing to push';
-      return pushMain(cwd);
+      if (snapshot === undefined && run(cwd, ['merge-base', '--is-ancestor', 'HEAD', 'refs/remotes/origin/main']).status === 0) return 'nothing to push';
+      return pushMain(cwd, 'origin', {snapshot, checked});
     } catch (error) {
       if (!(error instanceof StopError) || !error.retry || attempt >= tries) throw error;
       const seconds = wait * 2 ** (attempt - 1);
@@ -533,17 +586,14 @@ export function parseArgs(argv) {
  * Run the pre-push on local main's outgoing commits now, outside the lock, and mark them gated (scripts/main-push-gated.mjs):
  * the push under the lock then skips its gate when nothing but these commits goes out. Exit 0 or a StopError with the
  * gate's RED lines. WS_MAIN_PUSH_PREGATE=0 turns it off (the gate runs under the lock, as before).
- * @param {string} cwd @param {(line: string) => void} log @param {string} [remote]
+ * @param {string} cwd @param {(line: string) => void} log @param {PushSnapshot} snapshot @param {string} [remote]
  */
-export async function pregate(cwd, log, remote = 'origin') {
-  const local = git(cwd, ['rev-parse', 'HEAD']), base = git(cwd, ['rev-parse', `refs/remotes/${remote}/main`]);
-  if (run(cwd, ['merge-base', '--is-ancestor', local, base]).status === 0) return 'nothing to gate';
-  // Row 58: the gate checks what goes out, this lane's commits without another lane's.
-  const { sha: head, left } = ownCommits(cwd, base, local);
+export async function pregate(cwd, log, snapshot, remote = 'origin') {
+  const {base, source, sent:head, left} = snapshot;
   if (left.length > 0) log(`another lane's local commit(s) stay on local main (row 58): ${nameCommits(left)}`);
-  if (head === base) return 'nothing of this lane\'s to gate';
+  if (head === base) return {line:'nothing to gate', checked:false};
   const hook = join(cwd, '.githooks/pre-push');
-  if (!existsSync(hook)) return 'no pre-push to run early';
+  if (!existsSync(hook)) return {line:'no pre-push to run early', checked:false};
   const url = git(cwd, ['remote', 'get-url', '--push', remote]);
   const logFile = resolve(cwd, git(cwd, ['rev-parse', '--git-path', `main-push-gate-${process.pid}.log`]));
   const fd = openSync(logFile, 'w');
@@ -551,7 +601,13 @@ export async function pregate(cwd, log, remote = 'origin') {
   // Row 53: a carried commit drops SKIP_CHECK, so its gate runs; a gate skipped by SKIP_CHECK marks nothing, or a later
   // push carrying these commits would skip its gate on the mark.
   const carried = carriedRows(cwd, `${base}..${head}`);
-  const { env, dropped } = gateEnv({ ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))), WS_MAIN_WATCH: '0', WS_LAND_MAIN_PUSH: `main-push:${head}` }, carried);
+  const { env, dropped } = gateEnv({
+    ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))),
+    WS_MAIN_WATCH: '0',
+    WS_LAND_MAIN_PUSH: `main-push:${head}`,
+    WS_MAIN_PUSH_SNAPSHOT: `${base}:${source}`,
+    WS_MAIN_PUSH_GATED: '',
+  }, carried);
   if (dropped) log(`SKIP_CHECK=1 dropped: ${carried.length} commit(s) of another lane ride along (M1), so the gate runs: ${carried.join('; ')}`);
   let gated;
   try {
@@ -568,10 +624,10 @@ export async function pregate(cwd, log, remote = 'origin') {
     throw new StopError(`the gate (run before the lock) refused: ${(red.length > 0 ? red : lines.slice(-8)).join(' | ')}. Whole output: ${logFile}`);
   }
   rmSync(logFile, { force: true });
-  if (env.SKIP_CHECK === '1') return 'SKIP_CHECK=1: the gate skipped this lane\'s own commits; nothing marked gated';
+  if (env.SKIP_CHECK === '1') return {line:'SKIP_CHECK=1: the gate skipped this lane\'s own commits; nothing marked gated', checked:false};
   const { markGated } = await import('../main-push-gated.mjs');
-  const marked = markGated(cwd, `${base}..${head}`);
-  return `gate green before the lock in ${Math.round((Date.now() - began) / 1000)} s; ${marked} commit(s) marked`;
+  const marked = markGated(cwd, base, head);
+  return {line:`gate green before the lock in ${Math.round((Date.now() - began) / 1000)} s; ${marked} commit(s) marked`, checked:true};
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
@@ -614,22 +670,30 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
       }
     } else {
       if (options.files.length > 0) commit();
+      /** @type {PushSnapshot|undefined} */ let snapshot;
+      let checked = false;
       if (process.env.WS_MAIN_PUSH_PREGATE !== '0') {
         // Sync once under the lock, so the gate sees the commits on today's main; then gate with the lock free.
+        let ready = true;
         try {
           log(syncMain(cwd));
         } catch (error) {
           if (!(error instanceof StopError) || !error.retry) throw error;
-          log(`sync before the gate: ${error.message}; the gate runs on local main as it is`);
+          log(`sync before the gate: ${error.message}; retrying before selecting a push`);
+          ready = false;
         }
-        const installed = freshInstall(cwd);
-        if (installed !== '') log(installed);
-        unlock();
-        log(await pregate(cwd, log));
-        process.env.WS_MAIN_PUSH_GATED = '1';
-        lock();
+        if (ready) {
+          const installed = freshInstall(cwd);
+          if (installed !== '') log(installed);
+          snapshot = selectPush(cwd, 'origin');
+          unlock();
+          const result = await pregate(cwd, log, snapshot);
+          log(result.line);
+          checked = result.checked;
+          lock();
+        }
       }
-      log(syncAndPush(cwd, { tries: options.tries, wait: options.wait, log, sleep: sleepUnlocked }));
+      log(syncAndPush(cwd, { tries: options.tries, wait: options.wait, log, sleep: sleepUnlocked, snapshot, checked }));
     }
     if (options.onto) {
       for (const row of pending.filter(heldRow => heldRow.files.every(file => options.files.includes(file)))) {

@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { after, beforeEach, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { gateEnv, heldCommits, parseArgs } from '../src/scripts/.kit/main-push.mjs';
+import { pregated } from '../src/scripts/main-push-gated.mjs';
 
 const SCRIPT = fileURLToPath(new URL('../src/scripts/.kit/main-push.mjs', import.meta.url));
 const repoDir = fileURLToPath(new URL('..', import.meta.url));
@@ -127,6 +128,82 @@ printf '%s\\n' "$refs" | "$WS_TEST_FS18_NODE" "$WS_TEST_FS18_HOOK"
   assert.equal(remoteFile('test/pins/rings.json'), '{"rings":1}');
   assert.equal(remoteFile('other.md'), 'other.md line 1');
   assert.equal(read(a, 'other.md'), 'owned by lane B\n');
+});
+
+test('pushes the exact early-gated pin commit when another lane commits during the gate', () => {
+  const early = join(work, 'early-refs');
+  const final = join(work, 'final-refs');
+  const proof = join(work, 'final-proof');
+  write(a, '.githooks/pre-push', `#!/bin/bash
+set -eu
+refs="$(cat)"
+printf '%s\\n' "$refs" > "$WS_TEST_EARLY_REFS"
+printf '%s\\n' 'late lane B edit' > other.md
+git commit --quiet -m 'Late edit' -m 'Lane: lane-b' -- other.md
+printf '%s\\n' "$refs" | "$WS_TEST_NODE" "$WS_TEST_PIN_HOOK"
+`);
+  write(a, '.hooks/pre-push', `#!/bin/bash
+set -eu
+refs="$(cat)"
+printf '%s\\n' "$refs" > "$WS_TEST_FINAL_REFS"
+printf '%s\\n' "$WS_MAIN_PUSH_GATED" > "$WS_TEST_PROOF"
+printf '%s\\n' "$refs" | "$WS_TEST_NODE" "$WS_TEST_PIN_HOOK"
+`);
+  chmodSync(join(a, '.hooks/pre-push'), 0o755);
+  write(a, 'test/pins/rings.json', '{"rings":2}\n');
+  const result = spawnSync(process.execPath, [SCRIPT, '--wait', '0', '-m', 'fix(pins): record rings', 'test/pins/rings.json'], {
+    cwd: a, encoding: 'utf8',
+    env: {...env, ...ID, ALLOW_CARRY: '1', ALLOW_PIN_PUSH: '', SKIP_CHECK: '', WS_MAIN_PUSH_PREGATE: '1',
+      WS_TEST_EARLY_REFS: early, WS_TEST_FINAL_REFS: final, WS_TEST_PROOF: proof, WS_TEST_NODE: process.execPath,
+      WS_TEST_PIN_HOOK: fileURLToPath(new URL('pin-provenance.mjs', import.meta.url))},
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const checked = readFileSync(early, 'utf8').trim().split(/\s+/u);
+  const pushed = readFileSync(final, 'utf8').trim().split(/\s+/u);
+  assert.deepEqual(pushed.slice(1), checked.slice(1));
+  const exact = readFileSync(proof, 'utf8').trim();
+  assert.equal(pregated(a, readFileSync(final, 'utf8'), exact), 1);
+  assert.equal(git(remote, 'rev-parse', 'main'), checked[1]);
+  assert.equal(remoteFile('test/pins/rings.json'), '{"rings":2}');
+  assert.equal(remoteFile('other.md'), 'other.md line 1');
+  assert.equal(git(a, 'show', 'HEAD:other.md'), 'late lane B edit');
+  const untested = `HEAD ${git(a, 'rev-parse', 'HEAD')} refs/heads/main ${checked[3]}\n`;
+  assert.equal(pregated(a, untested, exact), null);
+});
+
+test('an upstream race gates the replay of the original selection', () => {
+  const early = join(work, 'early-refs');
+  const final = join(work, 'final-refs');
+  write(a, '.githooks/pre-push', `#!/bin/bash
+set -eu
+cat > "$WS_TEST_EARLY_REFS"
+echo late > other.md
+git commit --quiet -m 'Late edit' -m 'Lane: lane-a' -- other.md
+echo upstream > "$WS_TEST_OTHER/shared.md"
+git -C "$WS_TEST_OTHER" commit --quiet -m 'Upstream raced' -- shared.md
+git -C "$WS_TEST_OTHER" push --quiet origin main
+`);
+  write(a, '.hooks/pre-push', `#!/bin/bash
+set -eu
+test -z "$WS_MAIN_PUSH_GATED"
+cat > "$WS_TEST_FINAL_REFS"
+`);
+  chmodSync(join(a, '.hooks/pre-push'), 0o755);
+  write(a, 'plan.md', 'checked source\n');
+  const result = spawnSync(process.execPath, [SCRIPT, '--wait', '0', '-m', 'fix: checked source', 'plan.md'], {
+    cwd: a, encoding: 'utf8',
+    env: {...env, ...ID, WS_MAIN_PUSH_PREGATE: '1', WS_TEST_EARLY_REFS: early, WS_TEST_FINAL_REFS: final, WS_TEST_OTHER:b},
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const checked = readFileSync(early, 'utf8').trim().split(/\s+/u);
+  const pushed = readFileSync(final, 'utf8').trim().split(/\s+/u);
+  assert.notEqual(pushed[1], checked[1]);
+  assert.notEqual(pushed[3], checked[3]);
+  assert.equal(git(remote, 'rev-parse', 'main'), pushed[1]);
+  assert.equal(remoteFile('plan.md'), 'checked source');
+  assert.equal(remoteFile('shared.md'), 'upstream');
+  assert.equal(remoteFile('other.md'), 'other.md line 1');
+  assert.equal(git(a, 'show', 'HEAD:other.md'), 'late');
 });
 
 test('a real conflict holds only its lane with exact committed bytes and prints its recovery command', () => {
