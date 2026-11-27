@@ -1,5 +1,5 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Ephemeral Ed25519 keys and a real body digest.
-import { createHash, generateKeyPairSync } from 'node:crypto';
+import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- Run the real asset CLI on test-owned Git history.
 import { spawnSync } from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- Real local publication boundary.
@@ -54,6 +54,23 @@ test('CI signer agrees with the server and WebCrypto for both complete channels'
     expect(() => signRelease({ ...release(), bundle: undefined }, pem)).toThrow();
     expect(() => signRelease({ ...release(), socket: undefined }, pem)).toThrow();
   } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('QA58 signed release readers accept additive fields and validate the known rows', async () => {
+  const expected: ReleaseFile = {...release(), channel:'production',
+    shards:[{slug:'fixture',revision:11,shardVersion:'1.2.3'}]};
+  const signedBody = (value: unknown): string => {
+    const body = JSON.stringify(value);
+    return JSON.stringify({body,signature:sign(null,Buffer.from(body),pair.privateKey).toString('hex')});
+  };
+  const extended = signedBody({...expected, futureReleaseField:1,
+    shards:expected.shards.map(shard=>({...shard,futureShardField:1}))});
+  expect(readReleaseFile(extended,publicKey)).toEqual(expected);
+  expect(await readSignedRelease(extended,publicKey)).toEqual(expected);
+
+  const malformed = signedBody({...expected,shards:[{slug:'fixture',revision:11,shardVersion:'bad-version'}]});
+  expect(()=>readReleaseFile(malformed,publicKey)).toThrow();
+  await expect(readSignedRelease(malformed,publicKey)).rejects.toThrow();
 });
 
 test('preview signs the same envelope without a socket or server bundle', async () => {

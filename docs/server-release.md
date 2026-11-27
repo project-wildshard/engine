@@ -40,6 +40,13 @@ server moves (its poller preloads, counts down 60 s and restarts), then
 alias the staging page to the same build. If a step fails, the previous
 signed file stays live and the server keeps serving it.
 
+Release readers verify the signature over the full body, validate known
+fields and accept additive fields (QA58). If a running older poller
+rejects an additive field after preloading, verify the signed bundle
+and confirm the room count is zero. Restart the affected room service
+through the existing allowlist. Its startup pull verifies and activates
+the bundle. Read the exact build and serial from health before aliasing.
+
 **A placed cell is not a release (SA33).** A new slug the API places on
 the grid (SA30) reaches a running `WORLD_CELLS=grid` server through a
 second signed file, the placement file (`placementFile.ts`): `channel`,
