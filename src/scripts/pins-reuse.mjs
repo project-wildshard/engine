@@ -135,7 +135,9 @@ function readManifest(root){
 export function verifiedPinsOutputs(root){
  const manifest=readManifest(root);
  if(manifest===undefined||manifest.key!==pinsKey(root,shardfileValidationRevision(root)))return {paths:new Set(),key:''};
- return {paths:manifestMounts(root,manifest),key:manifest.key};
+ const paths=ledgerMounts(root,manifest);
+ if(paths===undefined)return {paths:new Set(),key:''};
+ return {paths,key:manifest.key};
 }
 
 /**
@@ -146,11 +148,18 @@ export function verifiedPinsOutputs(root){
  * @param {string} root @param {Manifest|undefined} [manifest] @returns {Set<string>}
  */
 export function manifestMounts(root,manifest=readManifest(root)){
- /** @type {Set<string>} */const paths=new Set();
- if(manifest===undefined)return paths;
+ return manifest===undefined?new Set():ledgerMounts(root,manifest)??new Set();
+}
+
+/** The mounts proved by a readable publication ledger, which may publish zero mounts.
+ * @param {string} root @param {Manifest} manifest @returns {Set<string>|undefined}
+ */
+function ledgerMounts(root,manifest){
  /** @type {unknown} */let ledger;
- try{ledger=JSON.parse(readFileSync(join(root,LEDGER),'utf8')).published;}catch{return paths;}
- for(const path of Array.isArray(ledger)?ledger:[]){
+ try{ledger=JSON.parse(readFileSync(join(root,LEDGER),'utf8')).published;}catch{return undefined;}
+ if(!Array.isArray(ledger))return undefined;
+ /** @type {Set<string>} */const paths=new Set();
+ for(const path of ledger){
   if(typeof path!=='string'||!mountPath(path)||!Object.hasOwn(manifest.mounts,path))continue;
   try{
    insideTree(root,dirname(path));

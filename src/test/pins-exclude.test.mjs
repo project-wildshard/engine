@@ -77,7 +77,7 @@ describe('pins exclude block', () => {
     // No exclude block was ever written: the published mount shows as untracked.
     publish(root, 'public/assets/a/m.bin');
     mkdirSync(join(root, 'out'), {recursive: true});
-    writeFileSync(join(root, 'out/.pins.json'), JSON.stringify({revision: 'r', published: ['public/assets/a/m.bin', '../escape', 'public/../x']}));
+    const ledger = join(root, 'out/.pins.json');
     const hash = createHash('sha256').update('mount\n').digest('hex');
     // No manifest, or one for other pins: nothing is passed over.
     expect([...verifiedPinsOutputs(root).paths]).toEqual([]);
@@ -85,6 +85,12 @@ describe('pins exclude block', () => {
     expect([...verifiedPinsOutputs(root).paths]).toEqual([]);
     const key = pinsKey(root, shardfileValidationRevision(root));
     writeManifest(root, key, {}, {'public/assets/a/m.bin': hash});
+    expect(verifiedPinsOutputs(root)).toEqual({paths: new Set(), key: ''});
+    writeFileSync(ledger, JSON.stringify({published: null}));
+    expect(verifiedPinsOutputs(root)).toEqual({paths: new Set(), key: ''});
+    writeFileSync(ledger, JSON.stringify({published: []}));
+    expect(verifiedPinsOutputs(root)).toEqual({paths: new Set(), key});
+    writeFileSync(ledger, JSON.stringify({revision: 'r', published: ['public/assets/a/m.bin', '../escape', 'public/../x']}));
     expect(verifiedPinsOutputs(root)).toEqual({paths: new Set(['public/assets/a/m.bin']), key});
     const capture = () => capturePushTree('p', {WS_PUSH_REFS: `refs/heads/main ${head} refs/heads/main ${'0'.repeat(40)}`}, root);
     const clean = (() => { try { capture(); return ''; } catch (error) { return error instanceof Error ? error.message : String(error); } })();
