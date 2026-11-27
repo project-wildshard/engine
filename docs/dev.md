@@ -127,22 +127,13 @@ its steps in `tmp/worktree-setup.json`. Every repo tool skips `.worktrees/`
 Bypasses are for the case they name, never for a red gate: fix the code,
 not the gate.
 
-Frozen product image fallbacks may be listed in `test/pins/assets.json`.
-Their small files live under `test/pins/assets/`, with immutable producer
-Git provenance, SHA-256 and byte count. `pins.ts install` validates them
-before publishing through its ordinary mount ledger. Remove an old
-bridge pin when refreshing to a product that carries the same URL; a
-different body is a hard publication collision, never an override. The
-app build checks every declared baked texture mode before bundling and
-again in final output, including the native image fallback.
-
-Larger original model fallbacks use `remote: true` pins from an immutable
-public producer commit (including the frozen singleplayer source). The
-installer downloads them to the normal pins cache, bounds the stream to
-the declared length, and verifies SHA-256 plus the source Git blob before
-publication. No mutable branch, token or private checkout is needed.
-Native model-map source keys are checked as well as the boot file lists;
-CPU model fallbacks must survive final output pruning too.
+A pins install takes every zone's art from its shardfile and fetches
+nothing from a shard repo (SF10): `test/pins/assets.json` and its fetcher
+are gone, and `test/no-pinned-art.test.ts` keeps them gone. The app build
+checks every declared baked texture mode before bundling and again in
+final output, including the native image fallback. Native model-map source
+keys are checked as well as the boot file lists; CPU model fallbacks must
+survive final output pruning too.
 
 ## Exact item-model admission
 

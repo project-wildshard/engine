@@ -49,7 +49,6 @@ function fixture() {
   addLocalMount(source);
   mkdirSync(join(root, 'test/pins'), {recursive: true});
   writeFileSync(join(root, 'test/pins/shardfiles.json'), JSON.stringify({api: 'local', shards: [product.pin]}));
-  writeFileSync(join(root, 'test/pins/assets.json'), JSON.stringify({version: 1, assets: []}));
   return {root, source, product};
 }
 function cli(root: string, args: readonly string[], env: NodeJS.ProcessEnv = {}) {

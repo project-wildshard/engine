@@ -2,8 +2,8 @@
 // STANDALONE-SHARDFILES SF1 (meta plan): what every file under `public/` is, after a pins install. Each file's verdict is
 // `engine` (on the committed allowlist, `public-engine.json`: what stays when SF12 cuts `public/` to it), `delete` (on
 // `public-delete.json`: read by nothing, SF13) or `zone` (the slugs whose art it is), with its source: engine git, a
-// shardfile mount a pin published, a shard repo file engine fetched (`test/pins/assets.json`), or a cook's output.
-// A zone file is one a pin published, one `test/pins/assets.json` names, or a tracked file a pinned product names or whose
+// shardfile mount a pin published, or a cook's output.
+// A zone file is one a pin published or a tracked file a pinned product names or whose
 // path names a pinned slug. A file on no list, and no pin's, has no owner: `--check` fails on it, as the test does.
 //
 //   node src/scripts/public-verdicts.mjs [--root .] [--out <file.json>] [--check]
@@ -34,7 +34,7 @@ export function isArt(path) {
  *   engine: ReadonlySet<string>,
  *   remove: ReadonlySet<string>,
  * }} input paths are under public/ with no leading `public/`; `published` maps a path to the pin slug that wrote it,
- *   `fetched` to the slug `test/pins/assets.json` names, `named` to the slugs whose product names its URL
+ *   `fetched` to the slug of a shard repo file engine fetched (none since SF10), `named` to the slugs whose product names its URL
  * @returns {Verdict[]} */
 export function verdicts({files, tracked, published, fetched, named, slugs, engine, remove}) {
   return files.map(({path, bytes}) => {
@@ -135,8 +135,6 @@ export function publicVerdicts(root) {
   const writes = existsSync(ledger) ? JSON.parse(readFileSync(ledger, 'utf8')).published ?? [] : [];
   for (const row of writes) { const path = String(row).replace(/^public\//u, ''); const slug = carried.get(path); if (slug !== undefined) published.set(path, slug); }
   /** @type {Map<string, string>} */ const fetched = new Map();
-  const assets = join(root, 'test/pins/assets.json');
-  if (existsSync(assets)) for (const row of JSON.parse(readFileSync(assets, 'utf8')).assets ?? []) fetched.set(String(row.url).slice(1), String(row.slug));
   const engine = readList(join(root, 'src/scripts/public-engine.json')), remove = readList(join(root, 'src/scripts/public-delete.json'));
   for (const path of engine) if (remove.has(path)) throw new Error(`${path} is on both the engine and the delete list`);
   return verdicts({files: files.sort((a, b) => a.path.localeCompare(b.path)), tracked, published, fetched, named, slugs: slugs.sort(), engine, remove});

@@ -24,7 +24,6 @@ test.each([
   f.commit(wt, 'pnpm-lock.yaml', 'lockfileVersion: 9.0\n', 'test: fixture lockfile');
   f.commit(wt, 'package.json', '{"scripts":{"pins":"fixture"}}\n', 'chore: add pins');
   f.commit(wt, 'test/pins/shardfiles.json', '{"shards":[]}\n', 'test: shard pins');
-  f.commit(wt, 'test/pins/assets.json', '{"assets":[]}\n', 'test: public pins');
   const tracked = 'public/assets/tracked.bin', mount = 'public/assets/pinned.bin';
   f.commit(wt, tracked, 'tracked', 'test: tracked asset');
   const original = 'export const bytes = { previous: 20 };\n';

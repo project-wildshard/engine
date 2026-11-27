@@ -47,7 +47,6 @@ import { rendererRevision } from './renderer-revision.mjs';
 import { excludePublished } from './pins-exclude.mjs';
 import { dropManifest, folderName, insideTree, lockPins, mountPath, pinDescriptor, pinsCompatibilityKey, pinsKey, pruneStalePinProducts, reusePins, reuseUnchangedPins, writeManifest, type PinOwner } from './pins-reuse.mjs';
 import type { PackedIndex } from './pin-packs.ts';
-import { fetchPinnedPublicAssets, pinnedPublicAssets } from './pin-assets.ts';
 import { assertKtx2TableTargets } from '../shared/game/shardfile/ktx2Targets.ts';
 import { trackedPublic } from './tracked-public.mjs';
 import { catalogueSlugs, documentSlugs, pinnedSlugs, releaseNamed, unlistedMessage, unlistedSlugs } from './pins-catalogue.ts';
@@ -358,16 +357,13 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
   if (toAdmit.length > 0) await prepareAssetDecoders();
   const unknown = only.filter(slug => !shards.some(row => row.slug === slug));
   if (unknown.length > 0) throw new Error(`Not pinned: ${unknown.join(', ')}`);
-  const remoteSlugs = pins.filter(row => row.slug !== dependency?.pin.slug).map(row => row.slug);
-  if (remoteSlugs.length > 0) await fetchPinnedPublicAssets(process.cwd(), remoteSlugs);
-  const publicAssets = remoteSlugs.length > 0 ? pinnedPublicAssets(process.cwd(), remoteSlugs) : [];
   // T2E-1: --from-format adds Template 2 beside whatever is installed, so `pnpm test:e2e` never strips a worktree's other
   // pins (their public assets feed the committed boot tables); only the Template 2 it replaces leaves. Every other
   // install replaces the whole set.
   const replaced = dependency === undefined || !overlay ? new Set<string>() : mountsOf(resolve('out', local?.folder ?? dependency.pin.slug));
   for (const path of local?.preservedMounts ?? []) replaced.delete(path);
   const before = existsSync(LEDGER) ? (readJson(LEDGER) as Ledger).published : [];
-  const shared = trackedPublic(), publicUrls = new Set(publicAssets.map(asset => asset.url));
+  const shared = trackedPublic();
   const published = new Set([...mountHashes.keys()].filter(path => !shared.has(path)));
   // Mark before writing: a failed local install must still prevent publication.
   if (local !== undefined) recordLocalCandidate(root, {slug: local.pin.slug, ...local.source});
@@ -415,7 +411,7 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
         // SS12: a grandfathered product (Pine's page.life, SERVER-PARITY SS11) is admitted with a warning; say it.
         for (const warning of admitted.warnings) console.warn(`warning ${pin.slug}: ${warning}`);
         // S11: every target of the KTX2 table is in the product, a tracked engine file or a pinned public asset.
-        assertKtx2TableTargets({ paths: () => files.keys(), read: fileNamed }, url => shared.has(`public${url}`) || publicUrls.has(url));
+        assertKtx2TableTargets({ paths: () => files.keys(), read: fileNamed }, url => shared.has(`public${url}`));
       } catch (error) {
         failed++;
         console.error(`refused ${pin.slug}: ${error instanceof Error ? error.message : String(error)}`);
@@ -463,7 +459,6 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
       if (preparation === 'stale') console.warn(`stale preparation: ${pin.slug}`);
       if (preparation === 'cook') console.warn(`prepared by cook: ${pin.slug}`);
     }
-    for (const asset of publicAssets) publish(`public${asset.url}`, asset.body);
   } finally {
     // The install lock has created out/. Keep cleanup information even if publication stopped midway.
     const kept = overlay ? before.filter(path => !replaced.has(path) && existsSync(path)) : [];
@@ -472,6 +467,8 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
     excludePublished(paths);
   }
   if (failed > 0) process.exitCode = 1;
+  // the saves of every pin this install took from the API (a --from-format product brings none)
+  const remoteSlugs = pins.filter(row => row.slug !== dependency?.pin.slug).map(row => row.slug);
   if (remoteSlugs.length > 0) await installSaves(remoteSlugs);
   if (full) pruneStale(root);
   if (source === 'staging') pruneStalePinProducts(root, pins.map(pin => pin.hash));

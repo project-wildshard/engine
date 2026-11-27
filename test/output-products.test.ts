@@ -7,7 +7,6 @@ import {cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, r
 import {dirname, join, resolve} from 'node:path';
 import {checkPublishedMounts, copyDeferredPublic, deferredPublicCopy, copyOutputFolders, pruneLooseCopies} from '../src/scripts/app-build/outputFolders.mjs';
 import {checkBakedTextures} from '../src/scripts/app-build/bakedTextures.mjs';
-import {pinnedPublicAssets} from '../src/scripts/pin-assets.ts';
 
 function write(root: string, name: string, body: string): void {
   mkdirSync(dirname(join(root,name)),{recursive:true});writeFileSync(join(root,name),body);
@@ -47,27 +46,6 @@ it('publishes every declared baked mode for both tiers and refuses a missing fal
     write(root,'out/dawn/mounts/shardfiles/dawn/discovery.json',JSON.stringify({rows:{bootBindings:{models:[model]}},native:{ktx2:{phone:{[npc]:'/assets/gpu/dawn-isle/npc-01234567.glb'}}}}));
     expect(checkBakedTextures(root,join(root,'public'))).toBe(2);
     rmSync(join(root,`public${npc}`));expect(()=>checkBakedTextures(root,join(root,'public'))).toThrow(npc);
-  }finally{rmSync(root,{recursive:true,force:true});}
-});
-it('refuses corrupt pinned image bytes in public and final output even when each file exists',()=>{
-  const root=mkdtempSync(resolve('tmp/app-baked-pins-'));
-  try{
-    mkdirSync(join(root,'test/pins'),{recursive:true});
-    const local=JSON.parse(readFileSync('test/pins/assets.json','utf8')) as {version:number;assets:{remote?:true}[]};
-    writeFileSync(join(root,'test/pins/assets.json'),JSON.stringify({...local,assets:local.assets.filter(row=>row.remote!==true)}));
-    cpSync('test/pins/assets',join(root,'test/pins/assets'),{recursive:true});
-    const assets=pinnedPublicAssets(root),first=assets[0];
-    if(first===undefined)throw new Error('Expected a real frozen image pin');
-    write(root,'out/owner/shard.json','{}');
-    write(root,'out/owner/mounts/shardfiles/owner/discovery.json',JSON.stringify({rows:{bootBindings:{files:{modes:{phone:{img:[first.url]},desktop:{img:[first.url]}}}}}}));
-    for(const row of assets){mkdirSync(dirname(join(root,`public${row.url}`)),{recursive:true});writeFileSync(join(root,`public${row.url}`),row.body);}
-    copyDeferredPublic(root,join(root,'dist'));
-    expect(checkBakedTextures(root,join(root,'public'))).toBe(1);
-    expect(checkBakedTextures(root,join(root,'dist'))).toBe(1);
-    writeFileSync(join(root,`public${first.url}`),new Uint8Array());
-    expect(()=>checkBakedTextures(root,join(root,'public'))).toThrow('Published pinned baked texture bytes differ');
-    writeFileSync(join(root,`dist${first.url}`),Buffer.concat([first.body,Buffer.from([0])]));
-    expect(()=>checkBakedTextures(root,join(root,'dist'))).toThrow('Published pinned baked texture bytes differ');
   }finally{rmSync(root,{recursive:true,force:true});}
 });
 describe('app public copy before final product publication',()=>{

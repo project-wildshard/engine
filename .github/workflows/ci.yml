@@ -583,7 +583,7 @@ jobs:
         continue-on-error: true
         env:
           CODEC_INPUTS: ${{ hashFiles('src/cook/game/spawnParts.ts', 'src/cook/game/astc6Wasm.ts') }}
-          PART_INPUTS: ${{ hashFiles('test/pins/shardfiles.json', 'test/pins/catalogue.json', 'test/pins/assets.json', 'src/cook/game/entryDownloads.ts', 'src/cook/game/entryTotals.ts', 'src/cook/game/shardCook.ts', 'src/scripts/app-build/appCook.ts') }}
+          PART_INPUTS: ${{ hashFiles('test/pins/shardfiles.json', 'test/pins/catalogue.json', 'src/cook/game/entryDownloads.ts', 'src/cook/game/entryTotals.ts', 'src/cook/game/shardCook.ts', 'src/scripts/app-build/appCook.ts') }}
         run: |
           codec=$(node -p 'process.versions.brotli')
           [[ "$codec" =~ ^[0-9]+(\.[0-9]+)+$ ]] || exit 1

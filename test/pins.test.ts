@@ -3,12 +3,11 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve as resolvePath } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 import { restorePacks, type PackedIndex } from '../src/scripts/pin-packs.ts';
-import { fetchPinnedPublicAssets, pinnedPublicAssets } from '../src/scripts/pin-assets.ts';
 import {wholeBrasscapProduct} from '../src/scripts/pin-format.ts';
 import {writeTar} from '@wildshard/format/tar';
 import {openShardfile, serverRows} from '../src/cook/game/shardCook';
@@ -29,70 +28,6 @@ const servers: Server[] = [], folders: string[] = [];
 afterEach(() => {
   for (const server of servers.splice(0)) server.close();
   for (const folder of folders.splice(0)) rmSync(folder, { recursive: true, force: true });
-});
-
-test('frozen product image fallbacks retain exact producer bytes and reject a corrupted pin',()=>{
-  const root=mkdtempSync(resolvePath('tmp/pinned-images-'));folders.push(root);
-  mkdirSync(join(root,'test/pins'),{recursive:true});
-  const local=JSON.parse(readFileSync('test/pins/assets.json','utf8')) as {version:number;assets:{remote?:true}[]};
-  writeFileSync(join(root,'test/pins/assets.json'),JSON.stringify({...local,assets:local.assets.filter(row=>row.remote!==true)}));
-  cpSync('test/pins/assets',join(root,'test/pins/assets'),{recursive:true});
-  const manifest=JSON.parse(readFileSync(join(root,'test/pins/assets.json'),'utf8')) as {assets:{file:string;slug:string;url:string;source:{path:string}}[]};
-  const owners=[...new Set(manifest.assets.map(row=>row.slug))];
-  const all=pinnedPublicAssets(root,owners);
-  expect(all.map(row=>row.url)).toEqual(manifest.assets.map(row=>row.url));
-  for(const owner of owners)expect(pinnedPublicAssets(root,[owner]).map(row=>row.url)).toEqual(manifest.assets.filter(row=>row.slug===owner).map(row=>row.url));
-  const first=manifest.assets[0];if(first===undefined)throw new Error('Expected a real fallback asset');
-  const file=join(root,first.file),body=readFileSync(file);
-  writeFileSync(file,Buffer.concat([body,Buffer.from([0])]));
-  expect(()=>pinnedPublicAssets(root,owners)).toThrow('Pinned public asset bytes differ');
-  writeFileSync(file,body);
-  const alias=first.url.replace('/tex/','/tex/./');
-  manifest.assets[0]={...first,url:alias,source:{...first.source,path:`public${alias}`}};
-  writeFileSync(join(root,'test/pins/assets.json'),JSON.stringify({version:1,...manifest}));
-  expect(()=>pinnedPublicAssets(root,owners)).toThrow('Invalid pinned public asset');
-  manifest.assets[0]={...first,file:'../outside.jpg'};
-  writeFileSync(join(root,'test/pins/assets.json'),JSON.stringify({version:1,...manifest}));
-  expect(()=>pinnedPublicAssets(root,owners)).toThrow('Invalid pinned public asset');
-});
-
-test('remote fallback publication refuses wrong and oversized HTTP bodies and verifies its held cache',async()=>{
-  const root=mkdtempSync(resolvePath('tmp/pinned-http-'));folders.push(root);
-  const body=Buffer.from('authored fallback model'),sha256=createHash('sha256').update(body).digest('hex');
-  const row={slug:'dawn-isle',url:'/assets/dawn-isle/model.glb',file:`test/pins/assets/${sha256}.glb`,sha256,bytes:body.length,remote:true,
-    source:{repo:'shard-dawn',commit:'a'.repeat(40),path:'public/assets/dawn-isle/model.glb',blob:createHash('sha1').update(`blob ${body.length}\0`).update(body).digest('hex')}};
-  mkdirSync(join(root,'test/pins'),{recursive:true});writeFileSync(join(root,'test/pins/assets.json'),JSON.stringify({version:1,assets:[row]}));
-  let reply=Buffer.from('wrong'),requests=0;
-  const server=createServer((_,response)=>{requests++;response.end(reply);});servers.push(server);
-  await new Promise<void>(resolve=>{server.listen(0,'127.0.0.1',()=>{resolve();});});
-  const address=server.address();if(address===null||typeof address==='string')throw new Error('No fixture port');
-  let expectedUrl=`https://raw.githubusercontent.com/project-wildshard/shard-dawn/${'a'.repeat(40)}/public/assets/dawn-isle/model.glb`;
-  const request:typeof fetch=(input,init)=>{expect(input).toBe(expectedUrl);return fetch(`http://127.0.0.1:${address.port}`,init);};
-  const cache=join(root,'cache');
-  await expect(fetchPinnedPublicAssets(root,undefined,cache,request)).rejects.toThrow('Pinned public asset bytes differ');
-  expect(existsSync(cache)).toBe(false);
-  reply=Buffer.concat([body,Buffer.from('extra')]);
-  await expect(fetchPinnedPublicAssets(root,undefined,cache,request)).rejects.toThrow('Pinned public asset bytes differ');
-  expect(existsSync(cache)).toBe(false);
-  reply=body;await fetchPinnedPublicAssets(root,undefined,cache,request);
-  expect(Buffer.from(pinnedPublicAssets(root,undefined,cache)[0]?.body??[])).toEqual(body);
-  await fetchPinnedPublicAssets(root,undefined,cache,request);expect(requests).toBe(3);
-  writeFileSync(join(cache,`${sha256}.glb`),Buffer.alloc(body.length));
-  await expect(fetchPinnedPublicAssets(root,undefined,cache,request)).rejects.toThrow('Pinned public asset bytes differ');
-  expect(requests).toBe(3);
-  const held=join(cache,`${sha256}.glb`),temporary=`${held}.${process.pid}`,victim=join(root,'unrelated-file');
-  rmSync(held);writeFileSync(victim,'untouched');symlinkSync(victim,temporary);
-  await expect(fetchPinnedPublicAssets(root,undefined,cache,request)).rejects.toThrow('EEXIST');
-  expect(readFileSync(victim,'utf8')).toBe('untouched');expect(existsSync(temporary)).toBe(true);
-  rmSync(temporary);
-  const legacy={...row,source:{...row.source,repo:'Raynos/project-wildshard-singleplayer'}};
-  const unselected={...row,slug:'night-isle',url:'/assets/night-isle/model.glb',sha256:'f'.repeat(64),file:`test/pins/assets/${'f'.repeat(64)}.glb`,source:{...row.source,path:'public/assets/night-isle/model.glb'}};
-  writeFileSync(join(root,'test/pins/assets.json'),JSON.stringify({version:1,assets:[legacy,unselected]}));
-  expectedUrl=`https://raw.githubusercontent.com/Raynos/project-wildshard-singleplayer/${'a'.repeat(40)}/public/assets/dawn-isle/model.glb`;
-  await fetchPinnedPublicAssets(root,['absent'],cache,request);expect(requests).toBe(4);
-  await fetchPinnedPublicAssets(root,['dawn-isle'],cache,request);expect(requests).toBe(5);
-  expect(pinnedPublicAssets(root,['dawn-isle'],cache).map(asset=>asset.url)).toEqual([row.url]);
-  expect(existsSync(join(cache,`${'f'.repeat(64)}.glb`))).toBe(false);
 });
 
 test('every pin names a live head by its hash, and the catalogue holds the same heads', () => {

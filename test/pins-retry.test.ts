@@ -1,6 +1,7 @@
 // Meta QA 11-25 row 39 (J505): engine CI's pins install went red on one 503 for a pinned Nalati asset, the second infra
 // failure there after 11-24's mirror 404 (run 45404606407). Pins install now tries a 5xx again (3 tries over about
 // 30 s), a mirror 404 falls back to the API, and a final failure names every URL it could not fetch.
+// SF10 retired the public-asset pins (pin-assets.ts), so only the shardfile pin cases remain here.
 // oxlint-disable-next-line import/no-nodejs-modules -- pins.ts runs as its CLI against a local fake server.
 import { spawn } from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- Pins are proved by their hashes.
@@ -14,7 +15,6 @@ import { tmpdir } from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
 import { join, resolve } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { fetchPinnedPublicAssets, pinnedPublicAssets } from '../src/scripts/pin-assets.ts';
 
 const servers: Server[] = [], folders: string[] = [];
 afterEach(() => {
@@ -38,40 +38,6 @@ async function fakeServer(body: Buffer, script: Record<string, number[]>): Promi
   if (address === null || typeof address === 'string') throw new Error('No fixture port');
   return { base: `http://127.0.0.1:${String(address.port)}`, seen };
 }
-
-/** One remote public asset pin, fetched through `request` mapped onto the fake server. */
-function assetTree(body: Buffer): { root: string; cache: string } {
-  const root = mkdtempSync(join(tmpdir(), 'pins-retry-'));
-  folders.push(root);
-  const sha256 = createHash('sha256').update(body).digest('hex');
-  const row = { slug: 'nalati-grasslands', url: '/assets/gpu/nalati/cards.ktx2', file: `test/pins/assets/${sha256}.ktx2`, sha256, bytes: body.length, remote: true,
-    source: { repo: 'shard-nalati', commit: 'c'.repeat(40), path: 'public/assets/gpu/nalati/cards.ktx2', blob: createHash('sha1').update(`blob ${String(body.length)}\0`).update(body).digest('hex') } };
-  mkdirSync(join(root, 'test/pins'), { recursive: true });
-  writeFileSync(join(root, 'test/pins/assets.json'), JSON.stringify({ version: 1, assets: [row] }));
-  return { root, cache: join(root, 'cache') };
-}
-const RAW = `/project-wildshard/shard-nalati/${'c'.repeat(40)}/public/assets/gpu/nalati/cards.ktx2`;
-const CONTENTS = '/repos/project-wildshard/shard-nalati/contents/public/assets/gpu/nalati/cards.ktx2';
-const onto = (base: string): typeof fetch => (input, init) => fetch(`${base}${new URL(String(input)).pathname}${new URL(String(input)).search}`, init);
-
-test('a pinned public asset: a 503 is tried again, a 404 falls back to the API, a hard failure names each URL', async () => {
-  const body = Buffer.from('nalati card bytes');
-  // 503 then 200 from the raw mirror: two raw requests, no API request.
-  let tree = assetTree(body), fake = await fakeServer(body, { [RAW]: [503, 200] });
-  await fetchPinnedPublicAssets(tree.root, undefined, tree.cache, onto(fake.base), [1, 1]);
-  expect(fake.seen.map(request => request.url?.split('?')[0])).toEqual([RAW, RAW]);
-  expect(Buffer.from(pinnedPublicAssets(tree.root, undefined, tree.cache)[0]?.body ?? [])).toEqual(body);
-  // A raw 404 moves to GitHub's contents API at the pinned commit, asking for the raw bytes, at once.
-  tree = assetTree(body); fake = await fakeServer(body, { [RAW]: [404], [CONTENTS]: [200] });
-  await fetchPinnedPublicAssets(tree.root, undefined, tree.cache, onto(fake.base), [1, 1]);
-  expect(fake.seen.map(request => request.url)).toEqual([RAW, `${CONTENTS}?ref=${'c'.repeat(40)}`]);
-  expect(fake.seen[1]?.headers.accept).toBe('application/vnd.github.raw');
-  // Three 503s from each source: the error names both URLs and what they answered.
-  tree = assetTree(body); fake = await fakeServer(body, { [RAW]: [503, 503, 503], [CONTENTS]: [503, 503, 503] });
-  await expect(fetchPinnedPublicAssets(tree.root, undefined, tree.cache, onto(fake.base), [1, 1])).rejects.toThrow(
-    `Pinned public asset unavailable: /assets/gpu/nalati/cards.ktx2: could not fetch https://raw.githubusercontent.com${RAW} (503 after 3 tries), then https://api.github.com${CONTENTS}?ref=${'c'.repeat(40)} (503 after 3 tries)`);
-  expect(fake.seen).toHaveLength(6);
-});
 
 /** pins.ts's stderr once it exits. */
 const pinsTool = (cwd: string, env: NodeJS.ProcessEnv, ...args: readonly string[]): Promise<string> => new Promise(done => {

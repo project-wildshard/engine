@@ -142,8 +142,8 @@ const NO_CURRENT_PIN_PUBLICATION='no current full pin publication. Run pnpm pins
 /** DS22 may commit only after the tracked assets and the full pin publication are present.
  * @param {string} root @param {NodeJS.ProcessEnv} env @returns {string|undefined} */
 function bootStampInputProblem(root,env){
- const assets='public/assets/',assetPins='test/pins/assets.json';
- const tracked=new Set(git(root,['ls-files','-z','--',assets,assetPins,'test/pins/shardfiles.json'],env).split('\0').filter(Boolean));
+ const assets='public/assets/',assetPins='test/pins/shardfiles.json';
+ const tracked=new Set(git(root,['ls-files','-z','--',assets,assetPins],env).split('\0').filter(Boolean));
  for(const path of tracked){
   try{if(lstatSync(join(root,path)).isFile())continue;}catch{/* Missing tracked input, including sparse checkouts. */}
   return `tracked boot input ${path} is missing or is not a regular file. Materialize it in this worktree and retry`;

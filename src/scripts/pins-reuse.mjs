@@ -38,10 +38,10 @@ const VERSION=2,KEY_VERSION='pins-reuse/3',LEDGER='out/.pins.json',LOCK='out/.pi
 const HEX=/^[a-f0-9]{64}$/u;
 /** Every tracked file whose bytes decide what a full install writes. A local module `pins.ts` or `bake-loader.mjs`
  * imports is here unless KEY_EXEMPT says why its bytes can't change out/ or public/ (pins-reuse.test.mjs checks). */
-export const KEY_SOURCES=Object.freeze(['src/scripts/pins.ts','src/scripts/pin-packs.ts','src/scripts/pin-assets.ts','src/scripts/pin-format.ts',
+export const KEY_SOURCES=Object.freeze(['src/scripts/pins.ts','src/scripts/pin-packs.ts','src/scripts/pin-format.ts',
  'src/scripts/bake-loader.mjs','src/scripts/built-shards.mjs','src/scripts/format-hook.mjs','src/scripts/shardfile-validation-revision.mjs','src/scripts/pins-reuse.mjs',
  'src/scripts/tracked-public.mjs','src/scripts/pin-local.ts','src/scripts/local-candidates.ts','src/scripts/pin-admit.ts',
- 'src/shared/game/grid/uploadIdentity.ts','pnpm-lock.yaml',PINS,'test/pins/assets.json']);
+ 'src/shared/game/grid/uploadIdentity.ts','pnpm-lock.yaml',PINS]);
 export const KEY_EXEMPT=Object.freeze({
  'src/scripts/agent-requests.mjs':'adds HTTP request markers; the pinned digest still decides the admitted bytes',
  'src/scripts/pins-exclude.mjs':'writes Git\'s exclude file only',
@@ -70,10 +70,6 @@ export function pinsCompatibilityKey(root,revision){
   if(path===PINS)continue;
   const file=join(root,path);
   hash.update(`${path}\0`).update(existsSync(file)?readFileSync(file):'absent').update('\0');
- }
- const assets=join(root,'test/pins/assets');
- if(existsSync(assets)&&lstatSync(assets).isDirectory())for(const entry of readdirSync(assets,{withFileTypes:true}).sort((a,b)=>a.name<b.name?-1:1)){
-  hash.update(`asset:${entry.name}\0`).update(entry.isFile()?readFileSync(join(assets,entry.name)):'not a file').update('\0');
  }
  for(const path of [...trackedPublic(undefined,root)].sort())hash.update(`tracked:${path}\0`);
  return hash.digest('hex');
