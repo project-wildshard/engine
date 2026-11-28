@@ -37,6 +37,7 @@ import {AMBER,parseAmber,parseAudioAmber,parseMemoryWarnings} from './test-amber
 import {RATE_LIMITED,quotaReset,readerEnv} from './gh-limit.mjs';
 import {budgetReport,budgetSourceRun,confirmBudgetResults,parseBudgetResults} from './budgets/watch.mjs';
 import {messageLanes} from './lane-commits.mjs';
+import {runnerAgent} from './runner-agent.mjs';
 
 export const REPO='project-wildshard/engine';
 const KEEP=500;
@@ -462,8 +463,8 @@ export function sharedRuns(cache,fetch,now=Date.now(),freshMs=45_000){
 /** The real world: GitHub through gh, git, the receipts log and hc. Tests pass their own.
  * @param {NodeJS.ProcessEnv} env */
 /** Meta QA 11-26 (Jake: "make the agent a mandatory parameter", "dont hardcode opus"): meta's QA writer names its
- * author only from --agent, so main-watch passes the runner's own WS_AGENT (`claude:<model>` or `codex:<model>`) and
- * never a default. With none set it writes no QA row, only a receipt saying so.
+ * author only from --agent, so main-watch passes the runner's own agent (`claude:<model>` or `codex:<model>`: WS_AGENT,
+ * else its session log, row 11) and never a default. With none found it writes no QA row, only a receipt saying so.
  * @param {string|undefined} agent @param {readonly MemoryQa[]} rows @returns {{args:string[]}|{skipped:string}} */
 export function memoryQaCall(agent,rows){
   const named=agent?.trim()??'';
@@ -560,7 +561,8 @@ export function liveIo(env=process.env){
     nativeRuns:()=>sharedRuns(`${runsCache}.memory-footprint`,()=>/** @type {Run[]} */(
       JSON.parse(read(['api',`repos/${repo}/actions/workflows/memory-footprint.yml/runs?branch=main&per_page=15`])).workflow_runs)),
     memoryQa:(/** @type {MemoryQa[]} */rows)=>{
-      const call=memoryQaCall(env.WS_AGENT,rows);
+      // Row 11: WS_AGENT, else the model in the runner's own session log (src/scripts/runner-agent.mjs).
+      const call=memoryQaCall(runnerAgent(env),rows);
       if('skipped' in call)return call.skipped;
       const meta=env.WS_META_ROOT??join(homedir(),'projects/games/project-wildshard-meta');
       const script=join(meta,'scripts/memory-gate-qa.mjs');

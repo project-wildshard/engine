@@ -2,6 +2,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { expect, test } from 'vitest';
+import { runnerAgent } from '../runner-agent.mjs';
 import { attribute, failurePaths, KEEPER_MS, landers, liveIo, memoryQaCall, readState, redMessage, redRecipients, redSuspect, shouldPromptRed, sweep } from '../main-watch.mjs';
 
 const older = 'a'.repeat(40), newer = 'b'.repeat(40), other = 'c'.repeat(40);
@@ -245,6 +246,45 @@ test('memoryQaCall passes WS_AGENT as --agent, and with none set skips the QA ro
     const call=memoryQaCall(agent,rows);
     expect(call).toEqual({skipped:expect.stringMatching(/^memory QA skipped for run\(s\) 45837215166: no WS_AGENT/u)});
   }
+});
+
+// Meta QA 11-26 row 11: nothing set WS_AGENT where main-watch runs (land, main-push and the pre-push start it from an
+// agent's shell), so main-watch names the runner from its own session log, and a budget alarm's QA call names it.
+test('row 11: a budget alarm passes the runner from its session log, never a default', () => {
+  const scratch = mkdtempSync(join(resolve('tmp'), 'main-watch-runner-'));
+  const jsonl = rows => `${rows.map(row => JSON.stringify(row)).join('\n')}\n`;
+  try {
+    const home = join(scratch, 'home'), claude = join(home, '.claude/projects/-x-meta');
+    mkdirSync(claude, { recursive: true });
+    writeFileSync(join(claude, 'abc-1.jsonl'), jsonl([
+      { type: 'assistant', message: { model: 'claude-opus-5-1' } },
+      { type: 'user', message: { content: 'model: opus' } },
+      { type: 'assistant', message: { model: 'claude-opus-5-5', content: [{ type: 'tool_use', input: { model: 'opus' } }] } },
+      { type: 'assistant', message: { model: '<synthetic>' } },
+    ]));
+    const codex = join(home, '.codex/sessions/2026/11/27');
+    mkdirSync(codex, { recursive: true });
+    writeFileSync(join(codex, 'rollout-2026-11-27T03-42-52-t-9.jsonl'), jsonl([
+      { type: 'session_meta', payload: { id: 't-9' } },
+      { type: 'turn_context', payload: { model: 'gpt-6.2-sol' } },
+    ]));
+    expect(runnerAgent({ CLAUDE_CODE_SESSION_ID: 'abc-1' }, home)).toBe('claude:claude-opus-5-5');
+    expect(runnerAgent({ CODEX_THREAD_ID: 't-9' }, home)).toBe('codex:gpt-6.2-sol');
+    expect(runnerAgent({ WS_AGENT: ' codex:gpt-x ', CLAUDE_CODE_SESSION_ID: 'abc-1' }, home)).toBe('codex:gpt-x');
+    for (const env of [{}, { CLAUDE_CODE_SESSION_ID: 'gone' }, { CLAUDE_CODE_SESSION_ID: '../abc-1' }, { CODEX_THREAD_ID: 'gone' }]) {
+      expect(runnerAgent(env, home)).toBeUndefined();
+    }
+    // The live writer call: a stand-in for meta's memory-gate-qa records the argv it was given.
+    const meta = join(scratch, 'meta'), argv = join(scratch, 'argv.json');
+    mkdirSync(join(meta, 'scripts'), { recursive: true }); // script-paths: a fake meta (WS_META_ROOT), whose scripts/ never moved
+    writeFileSync(join(meta, 'scripts/memory-gate-qa.mjs'), // script-paths: the fake meta's QA writer
+      `import {writeFileSync} from 'node:fs';writeFileSync(${JSON.stringify(argv)},JSON.stringify(process.argv.slice(2)));`);
+    const rows = [{ id: 46000000001, sha: newer, created: '2026-11-27T14:15:46Z', results: [] }];
+    const env = { PATH: process.env.PATH, HOME: home, WS_MAIN_WATCH_ROOT: scratch, WS_META_ROOT: meta, CLAUDE_CODE_SESSION_ID: 'abc-1' };
+    expect(liveIo(env).memoryQa(rows)).toBeUndefined();
+    expect(JSON.parse(readFileSync(argv, 'utf8'))).toEqual(['--agent', 'claude:claude-opus-5-5', JSON.stringify(rows)]);
+    expect(liveIo({ ...env, CLAUDE_CODE_SESSION_ID: 'gone' }).memoryQa(rows)).toMatch(/^memory QA skipped for run\(s\) 46000000001: no WS_AGENT/u);
+  } finally { rmSync(scratch, { recursive: true, force: true }); }
 });
 
 test('a skipped QA write leaves its receipt and clears the queue', () => withRedSpan(({io,receipts})=>{
