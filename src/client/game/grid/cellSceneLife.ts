@@ -167,8 +167,9 @@ export class CellSceneLife {
     const group = lampLights(rows, lit, swingsOf);
     group.visible = false; // named 'look-light-lamps' as on a standalone page (lampLights), so tools find it the same way
     root.add(group);
-    pool.show(group.children as PointLight[], scope);
-    scope.onDispose(() => { group.removeFromParent(); for (const light of group.children as PointLight[]) light.dispose(); });
+    pool.show(group.lights, scope);
+    // QA 11-25 row 153: the group also holds the lamps' glow cards (an instanced draw); its dispose frees both
+    scope.onDispose(() => { group.removeFromParent(); group.dispose(); });
     return group;
   }
 

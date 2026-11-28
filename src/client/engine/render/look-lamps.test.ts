@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { expect, test } from 'vitest';
 import type { LookLamp } from '@wildshard/format/look-light';
-import { DESKTOP_LAMPS, LAMP_FADE_S, PHONE_LAMPS, lampLights, lookLightManifest, setLampFollow, setLampPanels } from './lookLight';
+import { DESKTOP_LAMPS, LAMP_CARD_GLOW, LAMP_CARD_SIZE, LAMP_FADE_S, PHONE_LAMPS, lampLights, lookLightManifest, setLampFollow, setLampPanels } from './lookLight';
 
 const lamp = (x: number, extra: Partial<LookLamp> = {}): LookLamp => ({ at: [x, 3, 0], colour: [1, 0.6, 0.3], intensity: 5, distance: 9, ...extra });
 const lights = (group: THREE.Group): THREE.PointLight[] => group.children.filter((child): child is THREE.PointLight => child instanceof THREE.PointLight);
@@ -130,4 +130,71 @@ test('a teleport sets the nearest lamps at once, at full strength', () => {
   group.update?.(2, new THREE.Vector3(100, 1.7, 0));
   expect(litX(group)).toEqual([96, 100, 104]);
   expect(lights(group).map((light) => light.intensity)).toEqual([5, 5, 5]);
+});
+
+// QA 11-25 row 153 (Jake, 11-26: 5 lights + glow cards): every lamp past the reserve keeps a glow card, so it still reads lit
+const cards = (group: THREE.Group): THREE.InstancedMesh => {
+  const mesh = group.children.find((child): child is THREE.InstancedMesh => child instanceof THREE.InstancedMesh);
+  if (mesh === undefined) throw new Error('no glow cards');
+  return mesh;
+};
+const cardGlow = (group: THREE.Group): number[] => {
+  const glow = cards(group).geometry.getAttribute('aGlow');
+  return Array.from({ length: glow.count }, (_, i) => Number(glow.getX(i).toFixed(4)));
+};
+
+test('a crowded look gives every lamp past the lit reserve a glow card, and the lit ones none', () => {
+  const street = Array.from({ length: 8 }, (_, i) => lamp(i * 4));
+  const group = lampLights(street, 3);
+  expect(group.lights).toHaveLength(3);
+  expect(cards(group).count).toBe(8);
+  group.update?.(0, new THREE.Vector3(0, 1.7, 0));
+  expect(litX(group)).toEqual([0, 4, 8]);
+  const card = Number(LAMP_CARD_GLOW.toFixed(4));
+  expect(cardGlow(group)).toEqual([0, 0, 0, card, card, card, card, card]);
+  // a card sits at its lamp, its halo's size or the default
+  const at = new THREE.Matrix4();
+  cards(group).getMatrixAt(5, at);
+  expect(new THREE.Vector3().setFromMatrixPosition(at).toArray()).toEqual([20, 3, 0]);
+  expect(new THREE.Vector3().setFromMatrixScale(at).x).toBeCloseTo(LAMP_CARD_SIZE);
+});
+
+test('a card fades out as its lamp takes a light and in as the lamp gives it up, never popping', () => {
+  const street = Array.from({ length: 16 }, (_, i) => lamp(i * 4));
+  const group = lampLights(street, 5);
+  const eye = new THREE.Vector3(0, 1.7, 0);
+  group.update?.(0, eye);
+  let before = cardGlow(group), worst = 0;
+  for (let frame = 1; frame <= 600; frame++) {
+    eye.x = frame * 0.1;
+    group.update?.(frame / 60, eye);
+    const now = cardGlow(group);
+    now.forEach((value, i) => { worst = Math.max(worst, Math.abs(value - (before[i] ?? 0))); });
+    // a lamp's light and its card add up to one lamp's worth of glow: never both whole, never neither
+    lights(group).forEach((light) => { expect(light.intensity).toBeLessThanOrEqual(5 + 1e-9); });
+    before = now;
+  }
+  expect(worst).toBeLessThanOrEqual(LAMP_CARD_GLOW / (LAMP_FADE_S * 60) + 1e-3);
+});
+
+test('a dark lamp shows no card, and a page that draws halos leaves a fixed haloed lamp to its halo', () => {
+  const street = [...Array.from({ length: 4 }, (_, i) => lamp(i * 4)), lamp(40, { panel: 'mossgate.flame-a' }), lamp(44, { halo: { size: 2, opacity: 0.5 } })];
+  const group = lampLights(street, 2, undefined, { halos: true });
+  group.update?.(0, new THREE.Vector3(0, 1.7, 0));
+  const glow = cardGlow(group);
+  expect(glow[4]).toBe(0); // its panel is shut: dark
+  expect(glow[5]).toBe(0); // its halo glows instead
+  expect(glow[2]).toBeGreaterThan(0);
+  const grid = lampLights(street, 2);
+  grid.update?.(0, new THREE.Vector3(0, 1.7, 0));
+  expect(cardGlow(grid)[5]).toBeGreaterThan(0); // a grid page draws no halos: its card glows
+  const at = new THREE.Matrix4();
+  cards(grid).getMatrixAt(5, at);
+  expect(new THREE.Vector3().setFromMatrixScale(at).x).toBeCloseTo(2);
+});
+
+test('a look within its reserve has no cards and draws as before', () => {
+  const group = lampLights([lamp(0), lamp(4)], 5);
+  expect(group.children.some((child) => child instanceof THREE.InstancedMesh)).toBe(false);
+  expect(group.lights).toHaveLength(2);
 });

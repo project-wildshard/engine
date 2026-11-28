@@ -341,9 +341,10 @@ ${mist ? `
       }
       if (lamps !== null && owned.lamps === null) {
         // B2: real lamps, once per look like the pools
-        const group = lampLights(lamps, spec.light?.lampsLit);
+        const group = lampLights(lamps, spec.light?.lampsLit, undefined, { halos: true });
         owned.lamps = group;
-        scene.add(group); scope.onDispose(() => { group.removeFromParent(); for (const light of group.children) if (light instanceof THREE.Light) light.dispose(); if (owned.lamps === group) owned.lamps = null; });
+        // QA 11-25 row 153: the group's dispose frees its lights and a crowded look's glow cards
+        scene.add(group); scope.onDispose(() => { group.removeFromParent(); group.dispose(); if (owned.lamps === group) owned.lamps = null; });
       }
       const motes = spec.light?.motes ?? null;
       if (owned.glow === null && ((lamps?.some((lamp) => lamp.halo !== undefined) ?? false) || motes !== null)) {

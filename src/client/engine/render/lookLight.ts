@@ -28,6 +28,7 @@ import { currentLampSwings, type SwingField } from '../world/swings';
 import type { LookBounce, LookEnvironment, LookLamp, LookLight, LookPools, LookRim } from '@wildshard/format/look-light';
 import type { LookMotes, LookShadow } from '@wildshard/format/look-render';
 import type { ShaderSource } from './shaderPatches';
+import { ownedArray } from '../../../shared/engine/core/ownedBuffer';
 
 /** the rim's shader patch id */
 export const LOOK_RIM_PATCH = 'engine.look.rim';
@@ -189,6 +190,41 @@ export const LAMP_FADE_S = 0.25;
 /** a frame step this far (seconds) from the last, or at the same time, sets the nearest lamps at once */
 export const LAMP_SNAP_S = 0.5;
 
+/** QA 11-25 row 153 (Jake, 11-26: 5 lights + glow cards): a lamp past a crowded look's light reserve keeps a glow card, its
+ *  colour × this, so it still reads as lit; the card fades out as the lamp takes a light and back in as it gives it up */
+export const LAMP_CARD_GLOW = 0.35;
+/** a glow card's width (metres) for a lamp that declares no halo (one that does takes its halo's size) */
+export const LAMP_CARD_SIZE = 0.8;
+
+const CARD_GLOW_BUFFER = { owner: 'engine/lookLight', asset: 'lamp-cards', kind: 'geometry-cpu' } as const;
+
+/** The glow cards of a crowded look's lamps: one instanced, additive, fogged billboard draw, a card per lamp, each set per
+ *  frame to its lamp's place and to how far that lamp is from holding a light (0: lit or dark, 1: past the reserve). */
+function lampCards(count: number): { mesh: THREE.InstancedMesh<THREE.PlaneGeometry, THREE.ShaderMaterial>; glow: THREE.InstancedBufferAttribute } {
+  const geometry = new THREE.PlaneGeometry(1, 1), glow = new THREE.InstancedBufferAttribute(ownedArray(Float32Array, count * 3, CARD_GLOW_BUFFER), 3);
+  glow.setUsage(THREE.DynamicDrawUsage);
+  geometry.setAttribute('aGlow', glow);
+  const material = new THREE.ShaderMaterial({
+    name: 'engine.look.lamp-cards', transparent: true, depthWrite: false, fog: false, blending: THREE.AdditiveBlending,
+    vertexShader: /* glsl */`
+      attribute vec3 aGlow; varying vec3 vGlow; varying vec2 vDisc;
+      void main() {
+        vGlow = aGlow; vDisc = position.xy * 2.0;
+        vec4 centre = modelViewMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+        float size = length(instanceMatrix[0].xyz);
+        centre.xy += position.xy * size;
+        gl_Position = projectionMatrix * centre;
+      }`,
+    fragmentShader: /* glsl */`
+      varying vec3 vGlow; varying vec2 vDisc;
+      void main() { float r = clamp(1.0 - length(vDisc), 0.0, 1.0); gl_FragColor = vec4(vGlow * r * r * r, 1.0); }`,
+  });
+  const mesh = new THREE.InstancedMesh(geometry, material, count);
+  mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  mesh.name = 'look-light-lamp-cards'; mesh.renderOrder = 2; mesh.castShadow = false; mesh.receiveShadow = false; mesh.frustumCulled = false;
+  return { mesh, glow };
+}
+
 /** a lamp group's frame step: `time` drives the flicker, `eye` (world) picks the nearest lamps when more than `lit` exist */
 export type LampUpdate = (time: number, eye?: THREE.Vector3Like) => void;
 
@@ -200,8 +236,10 @@ export type LampUpdate = (time: number, eye?: THREE.Vector3Like) => void;
  * per lamp, so no two pulse together). It is null when nothing moves: at most `lit` fixed lamps and no flicker, drawn
  * exactly as before.
  */
-export function lampLights(lamps: readonly LookLamp[], lit: number = DESKTOP_LAMPS, swingsOf: () => SwingField | null = currentLampSwings): THREE.Group & { update: LampUpdate | null } {
-  const group = Object.assign(new THREE.Group(), { update: null as LampUpdate | null });
+export function lampLights(lamps: readonly LookLamp[], lit: number = DESKTOP_LAMPS, swingsOf: () => SwingField | null = currentLampSwings,
+  options: { readonly halos?: boolean } = {}): THREE.Group & { update: LampUpdate | null; readonly lights: readonly THREE.PointLight[]; dispose: () => void } {
+  // `dispose` frees the pool's lights and, on a crowded look, its glow cards (QA 11-25 row 153)
+  const group = Object.assign(new THREE.Group(), { update: null as LampUpdate | null, lights: [] as THREE.PointLight[], dispose: (): void => { for (const light of group.lights) light.dispose(); } });
   group.name = 'look-light-lamps';
   const rows = lamps.map((lamp, i) => ({ lamp, phase: i * 2.399, at: new THREE.Vector3(...lamp.at), place: new THREE.Vector3(...lamp.at), live: lamp.follow === undefined && lamp.panel === undefined,
     colour: new THREE.Color().setRGB(lamp.colour[0], lamp.colour[1], lamp.colour[2], THREE.LinearSRGBColorSpace) }));
@@ -211,7 +249,14 @@ export function lampLights(lamps: readonly LookLamp[], lit: number = DESKTOP_LAM
     group.add(light);
     return light;
   });
+  group.lights = pool;
   const following = rows.filter((row) => row.lamp.follow !== undefined), crowded = rows.length > pool.length;
+  // QA 11-25 row 153: a crowded look gives every lamp a glow card, lit only while its lamp holds no light
+  const cards = crowded ? lampCards(rows.length) : null;
+  if (cards !== null) {
+    group.add(cards.mesh);
+    group.dispose = () => { for (const light of pool) light.dispose(); cards.mesh.geometry.dispose(); cards.mesh.material.dispose(); };
+  }
   // MZ34: a lamp naming a panel is dark until the page says that panel shows
   const paneled = rows.filter((row) => row.lamp.panel !== undefined);
   const flickers = rows.some((row) => (row.lamp.flicker?.amount ?? 0) > 0);
@@ -219,6 +264,7 @@ export function lampLights(lamps: readonly LookLamp[], lit: number = DESKTOP_LAM
   const swinging = rows.filter((row) => row.lamp.follow === undefined && row.lamp.swing !== undefined);
   if (following.length === 0 && paneled.length === 0 && !crowded && !flickers && swinging.length === 0) return group;
   const eyeLocal = new THREE.Vector3(), chosen: typeof rows = [], swung = new THREE.Vector3();
+  const cardMatrix = new THREE.Matrix4(), cardTurn = new THREE.Quaternion(), cardScale = new THREE.Vector3();
   // QA 11-25 row 153: a crowded look hands its lights between lamps by distance with hysteresis, fading the light out of the
   // lamp it leaves and into the one it takes, so a light never pops as the eye walks past a lamp. Each slot holds a row
   // (`held`), may wait to change to another (`next`) and has a strength (`fade`, 0 to 1). A call at the same time as the last,
@@ -301,6 +347,21 @@ export function lampLights(lamps: readonly LookLamp[], lit: number = DESKTOP_LAM
       const w = Math.sin(time * flicker.rate * 2.1 + row.phase) * 0.6 + Math.sin(time * flicker.rate * 5.3 + row.phase * 1.7) * 0.4;
       light.intensity = row.lamp.intensity * strength * (1 - flicker.amount * 0.5 + flicker.amount * 0.5 * w);
     });
+    if (cards !== null) {
+      // each lamp's share of a light: a handing slot's fade, or whole for the nearest `lit` when no eye picks them
+      const held = new Map<Row, number>();
+      if (handing) for (const slot of slots) { if (slot.held !== null) held.set(slot.held, (held.get(slot.held) ?? 0) + slot.fade); }
+      else for (const row of chosen.slice(0, pool.length)) held.set(row, 1);
+      rows.forEach((row, i) => {
+        // a page that draws the look's halos (`options.halos`) already glows a fixed lamp declaring one (`lampHalos`)
+        const haloed = options.halos === true && row.lamp.halo !== undefined && row.lamp.follow === undefined && row.lamp.panel === undefined;
+        const card = row.live && !haloed ? Math.max(0, 1 - (held.get(row) ?? 0)) * LAMP_CARD_GLOW : 0;
+        cards.glow.setXYZ(i, row.colour.r * card, row.colour.g * card, row.colour.b * card);
+        const size = row.lamp.halo?.size ?? LAMP_CARD_SIZE;
+        cards.mesh.setMatrixAt(i, cardMatrix.compose(row.place, cardTurn, cardScale.set(size, size, size)));
+      });
+      cards.glow.needsUpdate = true; cards.mesh.instanceMatrix.needsUpdate = true;
+    }
   };
   return group;
 }

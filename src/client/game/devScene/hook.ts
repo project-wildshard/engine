@@ -291,7 +291,7 @@ export function createDevHook(ports: DevHookPorts): DevHook & { readonly root: T
         // its lamps still, never off the built page's swing field
         const lamps = lampLights(part.lamps, undefined, () => swings);
         group.add(lamps);
-        owned.push({ dispose: () => { for (const light of lamps.children) if (light instanceof THREE.Light) light.dispose(); } });
+        owned.push({ dispose: () => { lamps.dispose(); } }); // its lights and, past the reserve, its glow cards (QA 11-25 row 153)
         const { update } = lamps;
         if (update !== null) { let time = 0; partScope.onDispose(ports.watchFrames(dt => { time += dt; update(time, ports.player?.()?.position); })); }
       }
