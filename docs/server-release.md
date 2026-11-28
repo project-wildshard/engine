@@ -77,6 +77,12 @@ Use `--dry-run` to check the source and cadence before cutting.
 `--on-demand` opens an early cut when the coordinator requests one.
 Repeat `--require <sha>` to select a green main containing every commit
 in a coordinated batch.
+Before local QA the train runs `src/scripts/cook-prefill.mjs` from the cut:
+the staging page reads every pinned zone at the cut's cook, which the
+staging cook writes only at go-live, so a moved cook hash cooks (or, with
+`sameOutputFrom`, carries) the missing indexes into `wildshard-cooked`
+first, with the keys in `~/.config/wildshard/cook.env`. Without them it
+refuses and names the command.
 The train starts npm next as soon as candidate QA and the signed staging
 alias agree. The live smoke and J451 continue during publication. It verifies
 both immutable client archives and the public npm tarball. Delivery

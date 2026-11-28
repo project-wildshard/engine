@@ -218,6 +218,13 @@ async function main(args: string[]) {
     // QA 11-25 row 88: local QA runs from the train's own clone at the cut, never the canonical checkout.
     if (!existsSync(local)) {
       const cut = await legTree(source.headSha, 'cut-tree');
+      // QA 11-26 row 92: the staging page reads every pinned zone at the cut's cook, which the staging cook only writes at go-live;
+      // v0.1.103 held here when the cook hash moved. Cook the missing indexes first (cook.env holds the scoped cook keys).
+      const cookEnv = join(homedir(), '.config', 'wildshard', 'cook.env');
+      await runLogged(cut, join(out, 'cook-prefill.log'), process.execPath, [
+        ...(existsSync(cookEnv) ? [`--env-file=${cookEnv}`] : []), '--import', './src/scripts/bake-loader.mjs',
+        'src/scripts/cook-prefill.mjs', `--scratch=${join(out, 'cook-prefill')}`,
+      ]);
       await runLogged(cut, join(out, 'local.log'), 'bash', [
         'src/scripts/browser-lane.sh', '--max', '20', process.execPath, 'src/scripts/staging-qa.mjs',
         '--local', '--release', tag, '--build', source.headSha, '--out', localDir,

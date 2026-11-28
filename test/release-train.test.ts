@@ -230,6 +230,15 @@ test('a train leg runs the cut from its own clone while the canonical checkout m
   expect(fromRoot.filter(file => !["'gh'", 'kit'].includes(file ?? ''))).toEqual([]);
 });
 
+// QA 11-26 row 92: v0.1.103's local QA held on a cook hash with no indexes; the train cooks them from the cut before local QA.
+test('the train prefills the cut\'s cook before local QA', () => {
+  const train = readFileSync(join(import.meta.dirname, '../src/scripts/release-train.ts'), 'utf8');
+  const prefill = train.indexOf("'src/scripts/cook-prefill.mjs'"), local = train.indexOf("'src/scripts/staging-qa.mjs'");
+  expect(prefill).toBeGreaterThan(0);
+  expect(prefill).toBeLessThan(local);
+  expect(train.slice(train.lastIndexOf('runLogged(', prefill), prefill)).toMatch(/^runLogged\(cut, join\(out, 'cook-prefill\.log'\)/u);
+});
+
 // J505: v0.1.94's first HOLD named an empty folder and a local.log the scratch cleanup had removed.
 test('a HOLD writes its reason and the failed leg log into the folder it names, even when the clone step fails', () => {
   const work = mkdtempSync(join(tmpdir(), 'train-hold-'));
