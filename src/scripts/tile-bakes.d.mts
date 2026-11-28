@@ -11,7 +11,8 @@ export interface TileBakeFile {
   compressed: number; triangles: number; draws: number;
 }
 /** SF20: `cooked` gives a file's cost once the cook has made its KTX2; a tile is charged its declared cost moved by it. */
-export function tileBakeCensus(tiles: Shardfile['tiles'], files: readonly TileBakeFile[], cooked?: (file: TileBakeFile) => CookedCost | undefined): TileBakeCensus;
+/** Row 55: files in the `library` roots' closure are charged once in the library, never moved onto a tile. */
+export function tileBakeCensus(tiles: Shardfile['tiles'], files: readonly TileBakeFile[], cooked?: (file: TileBakeFile) => CookedCost | undefined, library?: readonly string[]): TileBakeCensus;
 /** SF20: the cook's KTX2 size of each image in a built product, measured by the cook's own encoder. */
 export function measuredKtx2Bytes(folder: string): Ktx2Bytes;
 export function readTileBakeCensus(folder: string, product: string, ktx2Bytes?: Ktx2Bytes): TileBakeCensus;

@@ -33,8 +33,13 @@ const sum = rows => rows.reduce((total, row) => {
  * declared cost moved by each closure file's cooked difference, so a PNG counts as the KTX2 the runtime reads.
  * @param {import('@wildshard/format/shardSchema').Shardfile['tiles']} input
  * @param {readonly {hash:string,commons?:true,kind?:string,dependencies:readonly string[],decoded:number,gpu:number,compressed:number,triangles:number,draws:number}[]} files
- * @param {(file: {hash:string,commons?:true,kind?:string,decoded:number,gpu:number,compressed:number}) => {decoded:number,gpu:number,compressed:number}|undefined} [cooked] */
-export function tileBakeCensus(input, files, cooked) {
+ * @param {(file: {hash:string,commons?:true,kind?:string,decoded:number,gpu:number,compressed:number}) => {decoded:number,gpu:number,compressed:number}|undefined} [cooked]
+ * Meta QA 11-26 row 55: a file in the shard's library closure (`library`, the index's admission.library roots) is
+ * charged once there, never moved again on each tile that names it, as the format's own tile budget does (format
+ * budget.ts ownTileBytes). Pine's twelve terrain layers are library roots each L0 ground GLB depends on; the client
+ * leases the library once and a tile reads only its own files.
+ * @param {readonly string[]} [library] */
+export function tileBakeCensus(input, files, cooked, library = []) {
   const tiles = v.parse(TilesSchema, input), addresses = new Set(), windows = [];
   /** @type {Record<string,number>} */
   const debt = {};
@@ -47,7 +52,14 @@ export function tileBakeCensus(input, files, cooked) {
     inventory.set(ref, next === undefined ? file : { ...file, ...next });
     if (next !== undefined) shift.set(ref, { resident: next.decoded + next.gpu - file.decoded - file.gpu, compressed: next.compressed - file.compressed });
   }
-  /** A tile's declared cost moved by its closure's cooked differences.
+  /** @type {Set<string>} */
+  const shared = new Set();
+  for (const pending = [...library]; pending.length > 0;) {
+    const ref = pending.pop();
+    if (ref === undefined || shared.has(ref)) continue;
+    shared.add(ref); pending.push(...(inventory.get(ref)?.dependencies ?? []));
+  }
+  /** A tile's declared cost moved by its closure's cooked differences, its library files aside (row 55).
    * @param {{files:readonly string[],decoded:number,gpu:number,compressed:number,triangles:number,draws:number}} tile */
   const charged = tile => {
     const own = cost(tile);
@@ -57,7 +69,7 @@ export function tileBakeCensus(input, files, cooked) {
       const ref = pending.pop();
       if (ref === undefined || seen.has(ref)) continue;
       seen.add(ref); pending.push(...(inventory.get(ref)?.dependencies ?? []));
-      const move = shift.get(ref);
+      const move = shared.has(ref) ? undefined : shift.get(ref);
       if (move !== undefined) { own.resident += move.resident; own.compressed += move.compressed; }
     }
     return own;
@@ -139,7 +151,7 @@ export function readTileBakeCensus(folder, product, ktx2Bytes) {
     if (hash(body) !== file.hash) throw new Error(`${product}: tile file ${file.hash} bytes differ`);
     return cookedFileCost(file, new Uint8Array(body.buffer, body.byteOffset, body.byteLength), ktx2Bytes);
   };
-  return tileBakeCensus(v.parse(TilesSchema, Reflect.get(rows, 'tiles')), index.files, cooked);
+  return tileBakeCensus(v.parse(TilesSchema, Reflect.get(rows, 'tiles')), index.files, cooked, index.admission.library);
 }
 
 /** A normal build or reuse cannot introduce new/more costly debt; an image counts as the KTX2 the cook makes of it,

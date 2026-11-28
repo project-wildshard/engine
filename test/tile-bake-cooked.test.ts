@@ -81,3 +81,24 @@ it('the census measures a built product with the cook encoder by default', async
     expect(measuredKtx2Bytes(folder)(image, {standalone: true})).toBe(measured(image));
   } finally { rmSync(folder, {recursive: true, force: true}); }
 }, 120_000);
+
+// Meta QA 11-26 row 55: Pine's twelve terrain layers are library roots each L0 ground GLB depends on. The library is
+// charged once (the client leases it once; a tile reads its own files), so a tile never carries its cooked cost again,
+// as the format's own tile budget already rules (format budget.ts ownTileBytes). A file outside the library still moves.
+it('row 55: a library image a tile depends on moves the library, not the tile', () => {
+  const layer = {hash: 'b'.repeat(64), kind: 'image', dependencies: [], decoded: 4_000_000, gpu: 0, compressed: 400_000, triangles: 0, draws: 0};
+  const ground = {hash: 'c'.repeat(64), kind: 'glb', dependencies: [layer.hash], decoded: 1000, gpu: 1000, compressed: 100_000, triangles: 0, draws: 0};
+  const tile = tiles(ground as unknown as Parameters<typeof tiles>[0]);
+  const cooked = (file: {hash: string; decoded: number; gpu: number; compressed: number}) => (file.hash === layer.hash ? {decoded: 0, gpu: 1_400_000, compressed: 1_100_000} : undefined);
+  const carried = tileBakeCensus(tile, [ground, layer], cooked);
+  expect(carried.debt['tile/0/0/0/compressed']).toBe(100_000 + 700_000);
+  const named = tileBakeCensus(tile, [ground, layer], cooked, [layer.hash]);
+  expect(named.debt['tile/0/0/0/compressed']).toBeUndefined();
+  expect(named.windows[0]?.declared.compressed).toBe(100_000);
+  // A library root's own dependencies are library too; the tile's other files still move.
+  const atlas = {...layer, hash: 'd'.repeat(64)}, sampler = {...ground, hash: 'e'.repeat(64), dependencies: [atlas.hash]};
+  const both = {...ground, dependencies: [layer.hash, sampler.hash]};
+  const moves = (file: {hash: string; decoded: number; gpu: number; compressed: number}) => (file.hash === ground.hash ? undefined : cooked({...file, hash: layer.hash}));
+  expect(tileBakeCensus(tiles(both as unknown as Parameters<typeof tiles>[0]), [both, layer, sampler, atlas], moves, [layer.hash, sampler.hash]).windows[0]?.declared.compressed).toBe(100_000);
+  expect(tileBakeCensus(tiles(both as unknown as Parameters<typeof tiles>[0]), [both, layer, sampler, atlas], moves, [sampler.hash]).windows[0]?.declared.compressed).toBe(100_000 + 700_000);
+});
