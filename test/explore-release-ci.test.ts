@@ -39,9 +39,18 @@ test('explore-release goes live only after check and the domain', () => {
 });
 
 test('a workflow that goes live before check is refused', () => {
-  const early = workflow.replace('explore build,upload,check', 'explore build,upload,go-live').replace('explore go-live --content', 'explore check --content');
+  const early = workflow.replace('explore build,upload,check', 'explore build,upload,go-live').replace('explore go-live', 'explore check');
   expect(orderRefusal(releaseOrder(early))).toBe('go-live runs before check');
   expect(orderRefusal(['build', 'upload', 'check', 'go-live', 'triggers'])).toBe('go-live runs before the domain is attached');
+});
+
+test('PV15: Explore releases from the staging cook with no content set', () => {
+  const commands = workflow.split('\n').filter(line => /page-release\.mjs explore /u.test(line));
+  expect(commands).toHaveLength(2);
+  expect(commands[0]).toContain('--zone-table=tmp/explore-release/zone-table.json');
+  expect(workflow).toContain('zone-table.mjs build tmp/explore-release/zone-table.json');
+  expect(commands.join('\n')).not.toContain('--content');
+  expect(workflow).not.toMatch(/R2_PACKS_/u);
 });
 
 test('the Cloudflare token reaches the steps only from the secret, never argv', () => {

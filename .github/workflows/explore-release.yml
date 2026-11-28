@@ -92,17 +92,15 @@ jobs:
           git update-index --skip-worktree package.json
           echo "$TAG predates the knob: build:game patched locally to WS_BUILD_MAX_MINUTES"
       # The Cloudflare token reaches wrangler only through the environment; page-release.mjs redacts it from all output.
-      # --content publishes dist-content/ to packs.wildshard.io first; a new set copies unchanged files from the last one
-      # on R2 (server side) and puts the rest through S3 with the bucket-scoped keys, as preview.yml does.
+      # PV15: Explore borrows the signed staging cook, like preview. The build and check use the same table.
+      - name: Borrow the staging cook table
+        run: node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/zone-table.mjs build tmp/explore-release/zone-table.json
       - name: Build, upload and check the Explore page
         env:
           WS_BUILD_MAX_MINUTES: 60
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-          R2_PACKS_ACCESS_KEY_ID: ${{ secrets.R2_PACKS_ACCESS_KEY_ID }}
-          R2_PACKS_SECRET_ACCESS_KEY: ${{ secrets.R2_PACKS_SECRET_ACCESS_KEY }}
-        run: node src/scripts/page-release.mjs explore build,upload,check --catalogue=tmp/explore-release/catalogue.json --content
+        run: node src/scripts/page-release.mjs explore build,upload,check --catalogue=tmp/explore-release/catalogue.json --zone-table=tmp/explore-release/zone-table.json
       - name: Attach explore.wildshard.io
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -110,9 +108,6 @@ jobs:
       - name: Go live
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-          R2_PACKS_ACCESS_KEY_ID: ${{ secrets.R2_PACKS_ACCESS_KEY_ID }}
-          R2_PACKS_SECRET_ACCESS_KEY: ${{ secrets.R2_PACKS_SECRET_ACCESS_KEY }}
         run: |
-          node src/scripts/page-release.mjs explore go-live --content
+          node src/scripts/page-release.mjs explore go-live
           echo "explore.wildshard.io serves $TAG ($(git rev-parse HEAD))" >> "$GITHUB_STEP_SUMMARY"
