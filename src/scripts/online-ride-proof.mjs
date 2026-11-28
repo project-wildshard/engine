@@ -5,17 +5,23 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium, devices } from "./browser-playwright.mjs";
-import { enterPage, intoWorld, openRig } from './online-rig.mjs';
+import { RIDE_RIG, enterPage, intoWorld, openRig, typedName } from './online-rig.mjs';
 import { KEYCHAIN_ARGS } from './.kit/chromium-keychain.mjs';
 
 const [dist = '', work = '', keyFile = '', pgBin = '', pgData = ''] = process.argv.slice(2).filter(value => !value.startsWith('--'));
 const SHARD = 'nalati-grasslands', HORSE = { x: 69.1, z: 213.4 }, shots = join(work, 'shots-ride');
+/** Row 83: a seat is real only when the world's frames name a grid cell (a page alone, with no world, reads cell 0 at x 0, z 0).
+ *  @param {{ cell?: number, closed?: string | null, frames?: number }} report */
+const seated = report => (report.cell ?? 0) > 0 && (report.closed ?? null) === null && (report.frames ?? 0) > 30;
 mkdirSync(shots, { recursive: true });
 const steps = /** @type {{ step: string, ok: boolean }[]} */ ([]);
 /** @param {string} step @param {boolean} ok @param {unknown} [detail] */
 const note = (step, ok, detail) => { steps.push({ step, ok }); console.log(`${ok ? 'ok  ' : 'FAIL'} ${step}${detail === undefined ? '' : ` ${JSON.stringify(detail).slice(0, 300)}`}`); };
 
-const rig = await openRig({ dist, work, keyFile, pgBin, pgData, shard: SHARD }), url = { zone: SHARD, base: rig.base };
+// Meta QA 11-26 row 83: the world hosts the grid as production's does (two cells, so its word says so) and is up before a page
+// opens (`isolated`). A one-cell world sent a page that heard it to the one-shard flow, which this build can't boot for Nalati,
+// while a page that opened before the world answered took the grid (J300): the first page played, the second never did.
+const rig = await openRig(RIDE_RIG({ dist, work, keyFile, pgBin, pgData })), url = { zone: SHARD, base: rig.base };
 const launched = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
 const { defaultBrowserType: _engine, ...phone } = devices['iPhone 16 Pro'];
 /** @param {string} name */
@@ -39,7 +45,11 @@ const walkTo = async (page, to) => {
 let code = 1;
 try {
   const jake = await enter('Jake'), matt = await enter('Matt');
-  note('both pages hold a seat on Nalati', true, await jake.page.evaluate(() => { const { serverX, serverZ, cell } = (/** @type {NonNullable<typeof window.__workerClient>} */ (window.__workerClient))(); return { serverX, serverZ, cell }; }));
+  /** @param {import('playwright').Page} page */
+  const seat = page => page.evaluate(() => { const { serverX, serverZ, cell, closed, frames } = (/** @type {NonNullable<typeof window.__workerClient>} */ (window.__workerClient))(); return { serverX, serverZ, cell, closed, frames }; });
+  const seats = { jake: await seat(jake.page), matt: await seat(matt.page) };
+  note('both pages hold a seat on Nalati', seated(seats.jake) && seated(seats.matt), seats);
+  if (!seated(seats.jake) || !seated(seats.matt)) throw new Error('no world seat: see the work folder\'s server.log');
   const [mattLeft, jakeLeft] = await Promise.all([walkTo(matt.page, { x: HORSE.x - 2, z: HORSE.z }), walkTo(jake.page, { x: HORSE.x - 6, z: HORSE.z + 4 })]);
   note('both walked to the camp horses', mattLeft <= 2.2 && jakeLeft <= 2.2, { mattLeft, jakeLeft });
   await matt.page.evaluate(spot => { const { serverX, serverZ } = (/** @type {NonNullable<typeof window.__workerClient>} */ (window.__workerClient))(); (/** @type {NonNullable<typeof window.__wildshard.world>} */ (window.__wildshard.world)).player.yaw = Math.atan2(-(spot.x - serverX), -(spot.z - serverZ)); }, HORSE);
@@ -47,18 +57,18 @@ try {
   await jake.page.waitForTimeout(600);
   await jake.page.screenshot({ path: join(shots, '1-at-the-horses.png') });
   await matt.page.keyboard.press('KeyE');
-  const rode = await seeing(jake.page, rows => rows.some(row => row.name === 'Matt' && row.mounted), 'Matt gets on, and Jake sees him seated');
+  const rode = await seeing(jake.page, rows => rows.some(row => typedName(row.name) === 'Matt' && row.mounted), 'Matt gets on, and Jake sees him seated');
   await matt.page.screenshot({ path: join(shots, '2-matt-in-the-saddle.png') });
   await jake.page.waitForTimeout(500);
   await jake.page.screenshot({ path: join(shots, '3-jake-sees-the-rider.png') });
   if (rode) {
     await matt.page.keyboard.down('KeyW');
-    await seeing(jake.page, rows => rows.some(row => row.name === 'Matt' && row.mounted && row.speed > 0.4), 'Matt rides, and his body goes with the horse');
+    await seeing(jake.page, rows => rows.some(row => typedName(row.name) === 'Matt' && row.mounted && row.speed > 0.4), 'Matt rides, and his body goes with the horse');
     await jake.page.waitForTimeout(500);
     await jake.page.screenshot({ path: join(shots, '4-jake-sees-the-rider-move.png') });
     await matt.page.keyboard.up('KeyW');
     await matt.page.keyboard.press('KeyE');
-    await seeing(jake.page, rows => rows.some(row => row.name === 'Matt' && !row.mounted), 'Matt gets off, and Jake sees him afoot');
+    await seeing(jake.page, rows => rows.some(row => typedName(row.name) === 'Matt' && !row.mounted), 'Matt gets off, and Jake sees him afoot');
   }
   /** @param {string} line */
   const quiet = line => !/WebSocket connection|ERR_CONNECTION|Failed to load resource/u.test(line), faults = [...jake.errors, ...matt.errors].filter(quiet);

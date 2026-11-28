@@ -5,6 +5,7 @@ import { sign } from 'node:crypto';
 import { createWriteStream, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join, resolve as absolute } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { Client } from 'pg';
 import { childListener, databaseFront, listenLoopback, rigFront } from './rig-listeners.mjs';
 import { saveFixture } from './debug-settings.mjs';
@@ -29,6 +30,20 @@ const sleep = ms => new Promise(resolve => { setTimeout(resolve, ms); });
 
 /** @param {string[]} args @param {string} what */
 const run = (args, what) => { const done = spawnSync(process.execPath, args, { cwd: ROOT, stdio: ['ignore', 'pipe', 'inherit'], encoding: 'utf8' }); if (done.status !== 0) throw new Error(`${what} stopped: ${String(done.status)}`); return done.stdout; };
+
+/** Meta QA 11-26 row 83: the `PACK_ORIGIN` a rig's world reads its packs from, a file URL of the absolute folder (a relative
+ *  one names a host, which no file URL on darwin may). @param {string} folder */
+export const packOrigin = folder => `${pathToFileURL(absolute(folder)).href}/`;
+
+/** Meta QA 11-26 row 83: online-ride-proof's rig. The world hosts the grid (two cells, Nalati and Driftwood), so its word sends a
+ *  page to Nalati's grid cell as production's does, and it is up before the first page opens (`isolated`, its own fresh `<work>/rig`: a page that dials a world
+ *  not yet listening takes the grid by J300, and the next page, which hears a one-cell word, takes the one-shard flow).
+ *  @param {{ dist: string, work: string, keyFile: string, pgBin: string, pgData: string }} paths */
+export const RIDE_RIG = paths => ({ ...paths, work: join(paths.work, 'rig'), shard: 'nalati-grasslands', more: ['driftwood-isle'], cells: 'grid', isolated: true });
+
+/** The Name a player typed, from the one everyone reads (`Matt#9741`: MP2.4's claimed Name carries a tag). Row 83: the ride proof
+ *  waited for `Matt` exactly and never saw the rider it was shown. @param {string} name */
+export const typedName = name => /^(?<typed>.+)#\d{4}$/u.exec(name)?.groups?.typed ?? name;
 
 /** The run flags a rig's play page carries; the zone goes in the tap (CP16, J522). */
 export const PLAY_FLAGS = 'mute=1&nolock=1&skipintro=1';
@@ -70,8 +85,11 @@ export async function intoWorld(page) {
  * whose inline catalogue is not the checkout's pins (a tool's one-cell world): a frame names its cell by catalogue order, so a
  * server reading other cells than the page's names another cell, and the page's player never takes its owner block.
  * @param {{ dist: string, nextDist?: string, work: string, keyFile: string, pgBin?: string, pgData?: string, saves?: 'memory', shard?: string, seats?: number, more?: string[], cells?: string, socket?: string, workers?: number, origins?: string[], channel?: string, isolated?: boolean, port?: 0, gridRoot?: string, placement?: {url:string,key:string}, catalogue?: string }} options */
-export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin = '', pgData = '', shard = 'driftwood-isle', seats, more = [], cells = shard, socket = `ws://127.0.0.1:${String(WORLD_PORT)}/`, workers, origins = [], channel = 'production', isolated = false, port, gridRoot = ROOT, placement, catalogue }) {
+export async function openRig({ dist, nextDist = '', work: named, keyFile, saves, pgBin = '', pgData = '', shard = 'driftwood-isle', seats, more = [], cells = shard, socket = `ws://127.0.0.1:${String(WORLD_PORT)}/`, workers, origins = [], channel = 'production', isolated = false, port, gridRoot = ROOT, placement, catalogue }) {
   if (origins.some(origin => new URL(origin).origin !== origin || new URL(origin).hostname !== '127.0.0.1')) throw new Error('A rig lets in loopback page origins only');
+  // Meta QA 11-26 row 83: the world reads its packs at a file URL of `<work>/origin`, so a relative work folder (`tmp/x`) named
+  // the host `tmp`, the world crashed at boot, and the pages played on alone at x 0, z 0, cell 0 (J300: no word takes the grid)
+  const work = absolute(named);
   const { memory } = rigOptions({ saves, pgBin, pgData, socket });
   if (port !== undefined && port !== 0) throw new Error('A rig port option must be zero; use WS_RIG_PORTS for legacy named ports');
   const ephemeral = port === 0;
@@ -183,7 +201,7 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
   };
   const world = (running = build) => {
     const room = spawn(process.execPath, [join(server, 'main.mjs')], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe', waitForWorld ? 'ipc' : 'ignore'],
-      env: { ...worldEnv, RELEASE_CHANNEL: channel, RELEASE_URL: `http://127.0.0.1:${String(releasePort)}/release.json`, RELEASE_PUBLIC_KEY: key.public, PACK_ORIGIN: `file://${origin}/`, PACK_CACHE: join(work, 'packs'), DATABASE_URL: DATABASE, SEAT_SECRET: 'online-proof', HOST: '127.0.0.1', PORT: String(ephemeral ? 0 : worldPort), ALLOWED_ORIGINS: [`http://127.0.0.1:${String(pagePort)}`, ...origins].join(','), WILDSHARD_BUILD: running, WORLD_CELLS: cells, RELEASE_POLL_MS: '500', GRACE_MS: '6000', ...seats === undefined ? {} : { WORLD_SEATS: String(seats) }, ...workers === undefined ? {} : { WORLD_WORKERS: String(workers) } } });
+      env: { ...worldEnv, RELEASE_CHANNEL: channel, RELEASE_URL: `http://127.0.0.1:${String(releasePort)}/release.json`, RELEASE_PUBLIC_KEY: key.public, PACK_ORIGIN: packOrigin(origin), PACK_CACHE: join(work, 'packs'), DATABASE_URL: DATABASE, SEAT_SECRET: 'online-proof', HOST: '127.0.0.1', PORT: String(ephemeral ? 0 : worldPort), ALLOWED_ORIGINS: [`http://127.0.0.1:${String(pagePort)}`, ...origins].join(','), WILDSHARD_BUILD: running, WORLD_CELLS: cells, RELEASE_POLL_MS: '500', GRACE_MS: '6000', ...seats === undefined ? {} : { WORLD_SEATS: String(seats) }, ...workers === undefined ? {} : { WORLD_WORKERS: String(workers) } } });
     room.once('exit', () => { worldFront?.clear(); });
     room.stdout?.pipe(log, { end: false }); room.stderr?.pipe(log, { end: false });
     return room;
