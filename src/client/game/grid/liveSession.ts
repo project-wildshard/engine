@@ -2,6 +2,7 @@ import type { RegionCreatures } from './mapCreatures';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { emitFault } from '@wildshard/engine/core/faults';
+import { isDev } from '@wildshard/engine/core/devMode';
 import { crossingLoadingRows } from '../boot/loadingPaths';
 import { loadingUnits } from '@wildshard/engine/boot/waits';
 /**
@@ -272,6 +273,13 @@ const regionTransferWalls = (shell: RegionShell, radius: number): TransferWalls 
  *  images-only Dunes' player 16 m under its dunes on `wildshard dev`, where the near tiles' faces are culled (SF22). */
 export function homeSpawnFeet(height: number | undefined, terrain: () => number, standing: () => number): number {
   return height === undefined ? standing() + 0.5 : Math.max(height, terrain() + 0.1);
+}
+/** QA 11-25 row 152: the outcome of each play install of an entered data cell, on a developer page a performance mark
+ *  (`DATA_STAY_MARK`) that shard drills read: nine-dragon's GPU restart drill waits for Nine's plan to install. */
+export const DATA_STAY_MARK = 'wildshard.grid.data-stay';
+export type DataStayOutcome = 'installed' | 'left' | 'refused';
+function noteDataStay(kind: string, instance: string, outcome: DataStayOutcome): void {
+  if (isDev()) performance.mark(DATA_STAY_MARK, { detail: { kind, instance, outcome } });
 }
 
 /** The live crossing for one grid page; disposed with the level scope. */
@@ -1068,8 +1076,15 @@ export class LiveGridSession {
     const stay = this.ports.scope.child(`grid.data-${kind}.${instance}`);
     this.dataStays.set(kind, { instance, scope: stay });
     const enter = async (): Promise<void> => {
-      try { await install(stay, () => this.wire === null || this.wire.site() === instance); } catch (error: unknown) {
+      try {
+        await install(stay, () => this.wire === null || this.wire.site() === instance);
+        noteDataStay(kind, instance, stay.disposed || stay.disposing ? 'left' : 'installed');
+      } catch (error: unknown) {
+        // QA 11-25 row 152: feet that leave the cell mid-install end its stay (`leaveDataStays`), so the install meets its
+        // disposed owner ('Tile resident is disposed'). That is the leave, not a refusal: the next entry installs it again
+        if (stay.disposed || stay.disposing) { noteDataStay(kind, instance, 'left'); return; }
         if (this.dataStays.get(kind)?.scope === stay) this.leaveDataStay(kind);
+        noteDataStay(kind, instance, 'refused');
         console.error(`[grid] ${instance}'s declared ${kind} refused`, error);
       }
     };
