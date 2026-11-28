@@ -98,16 +98,12 @@ node src/scripts/page-release.mjs production build|upload|check|go-live --qa=<ve
 node src/scripts/page-release.mjs preview build,upload,check,go-live
 ```
 
-Staging and production publish no content set (fix preview PV17): their
-zones come from the cook, so page-release refuses `--content` for them
-and their build joins engine art only, refusing a `dist-content/` that
-holds shard content. With `--content` (Explore, and a preview proof),
-the content set goes up through R2's S3 API with the packs bucket's keys: `R2_ACCOUNT_ID`,
-`R2_PACKS_ACCESS_KEY_ID` and `R2_PACKS_SECRET_ACCESS_KEY` from the
-environment, else from `~/.config/wildshard/cook.env`. Without them the
-script refuses before the build (meta Cloudflare audit CF2; v0.1.97's
-production upload fell back to `wrangler r2 bulk put` without them and
-stalled).
+No channel publishes a content set (fix preview PV17, then PV15): zones
+come from the cook, page-release refuses `--content`, and the build joins
+`dist-content/` back into the page (staging and production join engine
+art only, refusing shard content). The old sets in wildshard-packs go
+through `src/scripts/content-prune.mjs` (daily, `content-prune.yml`) once
+no live page, retained build or cook index reads them.
 
 A comma list runs the phases in order and stops at the first failure.
 Every channel's page is a Cloudflare Worker (OFF-VERCEL OV6 preview,

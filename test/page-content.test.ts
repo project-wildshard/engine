@@ -1,197 +1,23 @@
 // @vitest-environment node
-// oxlint-disable-next-line import/no-nodejs-modules -- CF2's refusal runs page-release.mjs itself.
+// Fix preview PV15: content sets are history. content.mjs keeps only the packs bucket's names and S3 keys (for
+// content-prune.mjs), and this guard fails if it, or any release path, publishes a content set again.
+// oxlint-disable-next-line import/no-nodejs-modules -- The guard runs page-release.mjs itself.
 import {spawnSync} from 'node:child_process';
-// oxlint-disable-next-line import/no-nodejs-modules -- A read-back compares the decoded bytes' SHA-256.
-import {createHash} from 'node:crypto';
-// oxlint-disable-next-line import/no-nodejs-modules -- The fixture is a built page tree under the repository's tmp.
-import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
+// oxlint-disable-next-line import/no-nodejs-modules -- The guard reads the release sources and workflows.
+import {existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths stay under tmp.
-import {dirname, join, resolve} from 'node:path';
-// oxlint-disable-next-line import/no-nodejs-modules -- A `.pack.br` part is stored Brotli and read back decoded.
-import {brotliCompressSync, brotliDecompressSync} from 'node:zlib';
+import {join, resolve} from 'node:path';
 import {afterEach, expect, test} from 'vitest';
-import {COPY_WIDTH, contentBaseOf, contentHeaders, contentKey, contentKeys, contentSet, missingKeysMessage, publishContent, r2Content, r2Copies, readBack, scanContent, type ContentStore, type Put} from '../src/scripts/page-release/content.mjs';
+import * as content from '../src/scripts/page-release/content.mjs';
+import {contentKeys, missingKeysMessage} from '../src/scripts/page-release/content.mjs';
 
-const ORIGIN = 'https://play.wildshard.io';
-const scratchRoot = resolve(import.meta.dirname, '../tmp/page-content-test');
+const root = resolve(import.meta.dirname, '..');
+const scratchRoot = resolve(root, 'tmp/page-content-test');
 const made: string[] = [];
 afterEach(() => { for (const dir of made.splice(0)) rmSync(dir, {recursive: true, force: true}); });
+const read = (path: string): string => readFileSync(resolve(root, path), 'utf8');
 
-function page(extra: Record<string, string | Uint8Array> = {}) {
-  mkdirSync(scratchRoot, {recursive: true});
-  const dir = mkdtempSync(join(scratchRoot, 'dist-'));
-  made.push(dir);
-  const files: Record<string, string | Uint8Array> = {
-    'index.html': '<html></html>',
-    'sw.js': 'self;',
-    'b/abc/main-0123456789abcdef.js': 'code',
-    'b/abc/main-0123456789abcdef.js.map': '{}',
-    'assets/physics/rapier.wasm': 'wasm',
-    'shardfiles/pine-hollow/shard.json': '{"slug":"pine-hollow"}',
-    'shardfiles/pine-hollow/blobs/glb/aa.glb': 'glb',
-    'shardfiles/pine-hollow/blobs/pack/bb.pack': 'unread pack',
-    'assets/spawn/parts/0123456789abcdef.pack.br': brotliCompressSync(Buffer.from('part bytes')),
-    'assets/spawn/server/fedcba9876543210.pack.br': brotliCompressSync(Buffer.from('server part')),
-    'assets/spawn/server-build.json': '{"build":"x"}',
-    'assets/spawn/packs-build.json': '{}',
-    'programs/pine-hollow.json': '{}',
-    'assets/grid-strip-mesh-0123456789abcdef.bin': 'grid',
-    'assets/pine-hollow/tree.png': 'png',
-    'assets/tex/rock.ktx2': 'ktx2',
-    ...extra,
-  };
-  for (const [path, body] of Object.entries(files)) {
-    mkdirSync(dirname(join(dir, path)), {recursive: true});
-    writeFileSync(join(dir, path), body);
-  }
-  return dir;
-}
-
-/** An in-memory bucket behind a CDN that answers the game's Origin, decoding `Content-Encoding: br` as a browser does. */
-function fakeBucket(objects = new Map<string, {body: Uint8Array, headers: Put['headers']}>()) {
-  const puts: string[] = [];
-  let corrupt: string | undefined, cors: string | undefined;
-  const store: ContentStore = {
-    exists: key => Promise.resolve(objects.has(key)),
-    put: items => {
-      for (const item of items) { puts.push(item.key); objects.set(item.key, {body: readFileSync(item.file), headers: item.headers}); }
-      return Promise.resolve();
-    },
-    read: (key, origin) => {
-      const object = objects.get(key);
-      if (object === undefined) return Promise.resolve({status: 404, cors: origin, bytes: new Uint8Array()});
-      const decoded = object.headers.encoding === 'br' ? brotliDecompressSync(object.body) : object.body;
-      return Promise.resolve({status: 200, cors: cors ?? origin, bytes: key === corrupt ? Buffer.from('other bytes') : decoded});
-    },
-  };
-  return {store, objects, puts, corruptKey: (key: string) => { corrupt = key; }, answerCors: (value: string) => { cors = value; }};
-}
-
-const run = (dir: string, store: ContentStore) => publishContent({dir, store, scratch: join(scratchRoot, 'scratch'), origin: ORIGIN, log: () => undefined, sleep: () => Promise.resolve()});
-
-test('keys: one content-named set mirrors page paths, S1 to S7 and engine art only (no S1 packs, PZ7), with the cook headers', () => {
-  const dir = page(), files = scanContent(dir), set = contentSet(files);
-  expect(set).toMatch(/^[0-9a-f]{16}$/u);
-  expect(Object.fromEntries(files.map(file => [file.path, file.kind]))).toEqual({
-    'assets/grid-strip-mesh-0123456789abcdef.bin': 'S6',
-    'assets/pine-hollow/tree.png': 'S7',
-    'assets/spawn/packs-build.json': 'S4',
-    'assets/spawn/parts/0123456789abcdef.pack.br': 'S2',
-    'assets/spawn/server-build.json': 'S3',
-    'assets/spawn/server/fedcba9876543210.pack.br': 'S3',
-    'assets/tex/rock.ktx2': 'E1',
-    'programs/pine-hollow.json': 'S5',
-    'shardfiles/pine-hollow/blobs/glb/aa.glb': 'S1',
-    'shardfiles/pine-hollow/shard.json': 'S1',
-  });
-  expect(contentKey(set, 'shardfiles/pine-hollow/shard.json')).toBe(`content/${set}/shardfiles/pine-hollow/shard.json`);
-  expect(contentBaseOf(set)).toBe(`https://packs.wildshard.io/content/${set}/`);
-  expect(contentHeaders('assets/spawn/parts/0123456789abcdef.pack.br')).toEqual({type: 'application/octet-stream', encoding: 'br', cache: 'public, max-age=31536000, immutable'});
-  expect(contentHeaders('shardfiles/pine-hollow/shard.json')).toEqual({type: 'application/json', cache: 'public, max-age=31536000, immutable'});
-  // The same content names the same set; one changed byte names another.
-  expect(contentSet(scanContent(page()))).toBe(set);
-  expect(contentSet(scanContent(page({'shardfiles/pine-hollow/shard.json': '{"slug":"pine-hollow","v":2}'})))).not.toBe(set);
-});
-
-test('publish skips present keys, puts the rest with the index last, and a second run uploads nothing', async () => {
-  const dir = page(), set = contentSet(scanContent(dir)), bucket = fakeBucket();
-  const held = contentKey(set, 'assets/spawn/server/fedcba9876543210.pack.br');
-  bucket.objects.set(held, {body: readFileSync(join(dir, 'assets/spawn/server/fedcba9876543210.pack.br')), headers: contentHeaders(held)});
-  const first = await run(dir, bucket.store);
-  expect(first).toMatchObject({set, files: 10, uploaded: 9, held: 1, base: contentBaseOf(set), cors: ORIGIN});
-  expect(bucket.puts).not.toContain(held);
-  expect(bucket.puts.at(-1)).toBe(contentKey(set, 'content.json'));
-  expect(bucket.objects.get(contentKey(set, 'assets/spawn/parts/0123456789abcdef.pack.br'))?.headers.encoding).toBe('br');
-  const index = JSON.parse(Buffer.from(bucket.objects.get(contentKey(set, 'content.json'))?.body ?? []).toString('utf8'));
-  expect(index.files).toHaveLength(10);
-  bucket.puts.length = 0;
-  expect(await run(dir, bucket.store)).toMatchObject({uploaded: 0, uploadedBytes: 0, held: 10});
-  expect(bucket.puts).toEqual([]);
-});
-
-test('a key that exists with other bytes is uploaded again, not skipped', async () => {
-  const dir = page(), set = contentSet(scanContent(dir)), bucket = fakeBucket();
-  const short = contentKey(set, 'assets/spawn/parts/0123456789abcdef.pack.br'), good = contentKey(set, 'assets/tex/rock.ktx2');
-  bucket.objects.set(short, {body: brotliCompressSync(Buffer.from('part')), headers: contentHeaders(short)});
-  bucket.objects.set(good, {body: readFileSync(join(dir, 'assets/tex/rock.ktx2')), headers: contentHeaders(good)});
-  expect(await run(dir, bucket.store)).toMatchObject({uploaded: 9, held: 1});
-  expect(bucket.puts).toContain(short);
-  expect(bucket.puts).not.toContain(good);
-  expect(brotliDecompressSync(bucket.objects.get(short)?.body ?? new Uint8Array()).toString()).toBe('part bytes');
-});
-
-test('a failed put is retried with only the keys still missing', async () => {
-  const dir = page(), bucket = fakeBucket(), put = bucket.store.put, batches: string[][] = [];
-  let failed = false;
-  bucket.store.put = items => {
-    batches.push(items.map(item => item.key));
-    if (failed) return put(items);
-    failed = true;
-    return put(items.slice(0, 4)).then(() => { throw new Error('wrangler r2 exited 1'); });
-  };
-  expect(await run(dir, bucket.store)).toMatchObject({uploaded: 10, held: 0});
-  expect(batches[0]).toHaveLength(10);
-  expect(batches[1]).toEqual(batches[0]?.slice(4));
-});
-
-test('a failed validation pool drains outstanding requests before rejecting', async () => {
-  const dir = page(), bucket = fakeBucket();
-  let release = (): void => {}, started = 0, settled = false;
-  const blocked = new Promise<void>(resolve => { release = resolve; });
-  bucket.store.exists = async key => {
-    if (key.endsWith('/content.json')) return false;
-    if (++started === 1) throw new Error('HTTP 429');
-    await blocked;
-    return false;
-  };
-  const pending = run(dir, bucket.store);
-  void pending.catch(() => { settled = true; });
-  await new Promise<void>(resolve => { setTimeout(resolve, 0); });
-  expect(started).toBe(8);
-  expect(settled).toBe(false);
-  release();
-  await expect(pending).rejects.toThrow('HTTP 429');
-  expect(started).toBe(8);
-  expect(bucket.puts).toEqual([]);
-});
-
-test('persistent rate limits back off and leave the completion index absent', async () => {
-  const dir = page(), bucket = fakeBucket(), waits: number[] = [];
-  bucket.store.put = () => Promise.reject(new Error('HTTP 429'));
-  await expect(publishContent({dir, store: bucket.store, scratch: join(scratchRoot, 'scratch'), origin: ORIGIN,
-    log: () => undefined, sleep: ms => { waits.push(ms); return Promise.resolve(); }})).rejects.toThrow('HTTP 429');
-  expect(waits).toEqual([30_000, 60_000, 90_000, 120_000, 150_000, 180_000]);
-  expect(bucket.objects.has(contentKey(contentSet(scanContent(dir)), 'content.json'))).toBe(false);
-});
-
-test('a read-back with other bytes, or without the game CORS, fails the publish and writes no index', async () => {
-  const dir = page(), set = contentSet(scanContent(dir));
-  const bad = fakeBucket();
-  bad.corruptKey(contentKey(set, 'shardfiles/pine-hollow/shard.json'));
-  await expect(run(dir, bad.store)).rejects.toThrow(/shard\.json read back with different bytes/u);
-  expect(bad.objects.has(contentKey(set, 'content.json'))).toBe(false);
-  const closed = fakeBucket();
-  closed.answerCors('https://elsewhere.example');
-  await expect(run(dir, closed.store)).rejects.toThrow(/CORS is https:\/\/elsewhere\.example, not https:\/\/play\.wildshard\.io/u);
-});
-
-test('the real store reads through packs.wildshard.io cache-busted with the Origin, and refuses a put without the S3 keys (CF2)', async () => {
-  const seen: {url: string, init?: RequestInit | undefined}[] = [];
-  const store = r2Content({
-    fetch: ((url: URL, init?: RequestInit) => { seen.push({url: url.href, init}); return Promise.resolve(new Response('x', {status: 200, headers: {'access-control-allow-origin': ORIGIN}})); }) as typeof fetch,
-  });
-  expect(await store.exists('content/s/a.json')).toBe(true);
-  expect(await store.read('content/s/a.json', ORIGIN)).toMatchObject({status: 200, cors: ORIGIN});
-  expect(seen[0]?.init?.method).toBe('HEAD');
-  expect(seen[1]?.init?.headers).toEqual({Origin: ORIGIN});
-  expect(new Set(seen.map(read => read.url)).size).toBe(2);
-  for (const read of seen) expect(read.url).toMatch(/^https:\/\/packs\.wildshard\.io\/content\/s\/a\.json\?content=/u);
-  // Meta Cloudflare audit CF2: no `wrangler r2 bulk put` fallback (v0.1.97's production stall); the refusal names the keys.
-  await expect(store.put([{key: 'content/s/a.json', file: '/d/a.json', headers: contentHeaders('a.json')}]))
-    .rejects.toThrow(/R2_ACCOUNT_ID, R2_PACKS_ACCESS_KEY_ID, R2_PACKS_SECRET_ACCESS_KEY/u);
-});
-
-test('CF2: the content keys come from the environment, else the keys file, and the names still missing are listed', () => {
+test('CF2: the packs keys come from the environment, else the keys file, and the names still missing are listed', () => {
   mkdirSync(scratchRoot, {recursive: true});
   const dir = mkdtempSync(join(scratchRoot, 'keys-'));
   made.push(dir);
@@ -206,102 +32,42 @@ test('CF2: the content keys come from the environment, else the keys file, and t
   const none = contentKeys({R2_ACCOUNT_ID: ' '}, join(dir, 'absent.env'));
   expect(none.missing).toEqual(['R2_ACCOUNT_ID', 'R2_PACKS_ACCESS_KEY_ID', 'R2_PACKS_SECRET_ACCESS_KEY']);
   expect(missingKeysMessage(none.missing)).toContain('R2_PACKS_SECRET_ACCESS_KEY');
+  expect(missingKeysMessage(none.missing)).not.toContain(hidden);
 });
 
-test('CF2: page-release --content refuses before the build without the keys, naming them', () => {
-  mkdirSync(scratchRoot, {recursive: true});
-  const home = mkdtempSync(join(scratchRoot, 'home-'));
-  made.push(home);
-  const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith('R2_')));
-  const run = spawnSync(process.execPath, [resolve(import.meta.dirname, '../src/scripts/page-release.mjs'), 'explore', 'build,upload', '--content', '--catalogue=x.json'],
-    {cwd: resolve(import.meta.dirname, '..'), env: {...env, HOME: home}, encoding: 'utf8', timeout: 60_000});
+test('PV15 guard: content.mjs names the sets and the keys and writes nothing', () => {
+  expect(Object.keys(content).sort()).toEqual(['BUCKET', 'CONTENT_KEYS', 'CONTENT_ROOT', 'KEYS_FILE', 'contentKeys', 'missingKeysMessage']);
+  const source = read('src/scripts/page-release/content.mjs');
+  expect(source).not.toMatch(/@aws-sdk|PutObject|CopyObject|r2 object put|wrangler|fetch\(/u);
+  expect(existsSync(resolve(root, 'src/scripts/page-release/stamp-content.mjs'))).toBe(false);
+});
+
+test('PV15 guard: no release path publishes a content set or stamps a page with one', () => {
+  const flow = read('src/scripts/page-release/flow.mjs'), release = read('src/scripts/page-release.mjs');
+  for (const source of [flow, release]) {
+    expect(source).not.toMatch(/WS_CONTENT_BASE|stamp-content|deps\.content\b|content\.publish|publishContent|r2Content|r2Copies/u);
+  }
+  // Only content-prune.mjs reaches the packs bucket's content keys, and it writes only its state file.
+  const scripts = (dir: string): string[] => readdirSync(resolve(root, dir), {withFileTypes: true}).flatMap(entry =>
+    entry.isDirectory() ? (entry.name === 'node_modules' ? [] : scripts(join(dir, entry.name)))
+      : /\.(?:mjs|ts|mts)$/u.test(entry.name) && !entry.name.endsWith('.d.mts') ? [join(dir, entry.name)] : []);
+  const importers = scripts('src').filter(path => /from ['"][./]*(?:page-release\/)?content\.mjs['"]/u.test(read(path)));
+  expect(importers).toEqual(['src/scripts/content-prune.mjs']);
+  const prune = read('src/scripts/content-prune.mjs');
+  expect(prune.match(/new PutObjectCommand/gu)?.length).toBe(1);
+  expect([...prune.matchAll(/bucket\.write\(([^,]+),/gu)].map(match => match[1])).toEqual(['STATE_KEY']);
+  // No other R2 writer in the release scripts or the cook names a `content/` key.
+  const writers = [...scripts('src/scripts'), ...scripts('src/cook')]
+    .filter(path => /PutObjectCommand|CopyObjectCommand|'object', 'put'|r2 object put|'PUT'/u.test(read(path)))
+    .filter(path => /[`'"]\/?content\/|CONTENT_ROOT/u.test(read(path)));
+  expect(writers).toEqual(['src/scripts/content-prune.mjs']);
+  // No workflow passes --content to a page release.
+  for (const name of readdirSync(resolve(root, '.github/workflows'))) expect(read(join('.github/workflows', name))).not.toMatch(/page-release\.mjs[^\n]*--content\b/u);
+});
+
+test('PV15 guard: page-release refuses --content before any work', () => {
+  const run = spawnSync(process.execPath, [resolve(root, 'src/scripts/page-release.mjs'), 'preview', 'build,upload', '--content', '--dry-run'],
+    {cwd: root, encoding: 'utf8', timeout: 60_000});
   expect(run.status).toBe(2);
-  expect(run.stderr).toMatch(/a content publish needs R2_ACCOUNT_ID, R2_PACKS_ACCESS_KEY_ID, R2_PACKS_SECRET_ACCESS_KEY/u);
-});
-
-/** PZ6: the fake bucket's `sets` and `copy`, as R2's S3 API answers them (a copy takes the target's headers). */
-function withCopies(bucket: ReturnType<typeof fakeBucket>, failing = new Set<string>()) {
-  const copies: string[] = [];
-  bucket.store.sets = () => Promise.resolve([...new Set([...bucket.objects.keys()].filter(key => key.endsWith('/content.json')).map(key => key.split('/')[1] ?? ''))]);
-  bucket.store.copy = (from, to, headers, bytes) => {
-    const object = bucket.objects.get(from);
-    if (object === undefined || failing.has(to)) return Promise.reject(new Error(`no ${from}`));
-    if (object.body.length !== bytes) return Promise.reject(new Error('size'));
-    copies.push(to); bucket.objects.set(to, {body: object.body, headers});
-    return Promise.resolve();
-  };
-  return copies;
-}
-
-test('PZ6: a new set copies every unchanged file from the last complete set on R2 and uploads only what changed', async () => {
-  const bucket = fakeBucket(), copies = withCopies(bucket);
-  const first = await run(page(), bucket.store);
-  expect(first).toMatchObject({uploaded: 10, copied: 0});
-  bucket.puts.length = 0;
-  // one changed shard file: a new set, one upload, nine server-side copies
-  const dir = page({'shardfiles/pine-hollow/shard.json': '{"slug":"pine-hollow","v":2}'}), set = contentSet(scanContent(dir));
-  const second = await run(dir, bucket.store);
-  expect(set).not.toBe(first.set);
-  expect(second).toMatchObject({set, files: 10, uploaded: 10, held: 0, copied: 9});
-  expect(second.uploadedBytes).toBe(Buffer.byteLength('{"slug":"pine-hollow","v":2}'));
-  expect(bucket.puts).toEqual([contentKey(set, 'shardfiles/pine-hollow/shard.json'), contentKey(set, 'content.json')]);
-  expect(copies).toHaveLength(9);
-  expect(bucket.objects.get(contentKey(set, 'assets/spawn/parts/0123456789abcdef.pack.br'))?.headers.encoding).toBe('br');
-  expect(brotliDecompressSync(bucket.objects.get(contentKey(set, 'assets/spawn/parts/0123456789abcdef.pack.br'))?.body ?? new Uint8Array()).toString()).toBe('part bytes');
-});
-
-test('PZ6: a failed copy is uploaded instead, and with no S3 keys there are no copies', async () => {
-  const bucket = fakeBucket();
-  const first = await run(page(), bucket.store);
-  const dir = page({'shardfiles/pine-hollow/shard.json': '{"v":3}'}), set = contentSet(scanContent(dir));
-  withCopies(bucket, new Set([contentKey(set, 'assets/tex/rock.ktx2')]));
-  bucket.puts.length = 0;
-  expect(await run(dir, bucket.store)).toMatchObject({uploaded: 10, copied: 8});
-  expect(bucket.puts).toContain(contentKey(set, 'assets/tex/rock.ktx2'));
-  expect(first.set).not.toBe(set);
-  expect(r2Copies({})).toBeUndefined();
-  expect(r2Copies({R2_ACCOUNT_ID: 'a'.repeat(32), R2_PACKS_ACCESS_KEY_ID: 'k'})).toBeUndefined();
-  expect(() => r2Copies({R2_ACCOUNT_ID: 'nope', R2_PACKS_ACCESS_KEY_ID: 'k', R2_PACKS_SECRET_ACCESS_KEY: 's'})).toThrow('Invalid R2_ACCOUNT_ID');
-});
-
-// FAST-RELEASE FR-A12: preview spent 18.7 of 24 min HEADing and copying 9,742 files 8 at a time (engine run 45511749250).
-test('FR-A12: a set with no key yet skips the HEAD per file, and copies run up to COPY_WIDTH at once', async () => {
-  const bucket = fakeBucket();
-  await run(page(), bucket.store);
-  withCopies(bucket);
-  let heads = 0, flight = 0, peak = 0;
-  const exists = bucket.store.exists, copy = bucket.store.copy;
-  bucket.store.exists = key => { heads++; return exists(key); };
-  bucket.store.copy = async (from, to, headers, bytes) => {
-    peak = Math.max(peak, ++flight);
-    await new Promise(done => setTimeout(done, 5));
-    try { await copy?.(from, to, headers, bytes); } finally { flight--; }
-  };
-  bucket.store.empty = set => Promise.resolve(![...bucket.objects.keys()].some(key => key.startsWith(contentKey(set, ''))));
-  const extra = Object.fromEntries(Array.from({length: 40}, (_, i) => [`assets/tex/extra-${i}.ktx2`, `tex ${i}`]));
-  await run(page(extra), bucket.store);
-  heads = 0;
-  const dir = page({...extra, 'shardfiles/pine-hollow/shard.json': '{"v":4}'});
-  expect(await run(dir, bucket.store)).toMatchObject({copied: 49});
-  expect(heads).toBeLessThanOrEqual(2);
-  expect(peak).toBeGreaterThan(8);
-  expect(peak).toBeLessThanOrEqual(COPY_WIDTH);
-});
-
-test('FR-A12: a set that already holds a key is still checked file by file', async () => {
-  const bucket = fakeBucket(), dir = page(), set = contentSet(scanContent(dir));
-  const held = contentKey(set, 'assets/tex/rock.ktx2');
-  bucket.objects.set(held, {body: readFileSync(join(dir, 'assets/tex/rock.ktx2')), headers: contentHeaders(held)});
-  bucket.store.empty = () => Promise.resolve(false);
-  expect(await run(dir, bucket.store)).toMatchObject({held: 1});
-});
-
-test('a read-back retries a passing 5xx and still stops on one that stays', async () => {
-  // v0.1.92's staging go-live held on one copied key that answered 500 once, then 200
-  const body = new TextEncoder().encode('{"ok":1}'), hash = createHash('sha256').update(body).digest('hex'), origin = 'https://staging.wildshard.io';
-  const store = (statuses: number[]): ContentStore => ({read: () => Promise.resolve({status: statuses.shift() ?? 200, cors: origin, bytes: body})} as unknown as ContentStore);
-  const sleeps: number[] = [], sleep = (ms: number): Promise<void> => { sleeps.push(ms); return Promise.resolve(); };
-  expect(await readBack(store([500, 503]), 'content/s/a.json', hash, origin, sleep)).toBe(body.length);
-  expect(sleeps).toEqual([3_000, 3_000]);
-  await expect(readBack(store([500, 500, 500, 500]), 'content/s/a.json', hash, origin, sleep)).rejects.toThrow('answered 500');
+  expect(run.stderr).toMatch(/--content is retired: no channel publishes a content set \(fix preview PV15\)/u);
 });

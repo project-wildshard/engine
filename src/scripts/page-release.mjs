@@ -14,9 +14,7 @@
 //   --zone-entry-resume=<file>  rerun failed crossings from this live staging build's held phone smoke or resume a full tour.
 //   --observer-proof=<file>  reuse an exact MS9 transition witness when verifying a staging build already live.
 //   --qa=<verdict.json>      production needs staging go-live's verdict with the J451 phone tour for its exact build.
-//   --content                build: stamp the content set's base into dist/ and keep the split (PZ6); upload: publish
-//                            dist-content/ to packs.wildshard.io first (PAGE-SIZE PZ2,
-//                            page-release/content.mjs); preview.yml passes it (PZ6), staging and production with PZ8
+//   --content                retired (fix preview PV15): no channel publishes a content set; refused
 //   --catalogue=<file>       preview build: bake this catalogue, the grid borrowed from staging (SHARD-AUTHORING SA35,
 //                            src/scripts/preview-grid.ts); default test/pins/catalogue.json. Refused on staging and production
 //   --zone-table=<file>      preview build: bake this zone table, staging's cook (fix preview PV2,
@@ -38,9 +36,7 @@ import {agentFetch} from './agent-requests.mjs';
 import {missingProductionPacks, waitForPacks} from './page-release/production-packs.mjs';
 import {workersHost} from './page-release/hosts/workers.mjs';
 import {r2Packs} from './page-release/packs.mjs';
-import {contentKeys, missingKeysMessage, publishContent, r2Content, r2Copies} from './page-release/content.mjs';
 import {deployStaging} from './page-release/staging-deploy.mjs';
-import {contentReach, fetchAnswer, pageReader, reachProblems, reachSummary} from './page-release/content-reach.mjs';
 import {openReleaseRun} from './release-run.mjs';
 import {phaseTable} from './page-release/phase-times.mjs';
 
@@ -73,7 +69,13 @@ if (flag('print-env') !== undefined) {
   process.exit(0);
 }
 if (channel === undefined || phaseList === undefined || hostName !== 'workers') {
-  console.error('usage: node src/scripts/page-release.mjs <preview|staging|production|explore> <build|upload|check|go-live>[,...] [--host=workers] [--root=<dir>] [--dry-run] [--wait=<minutes>] [--local-qa=<verdict.json>] [--qa=<verdict.json>] [--content] [--catalogue=<file>] [--zone-table=<file>]');
+  console.error('usage: node src/scripts/page-release.mjs <preview|staging|production|explore> <build|upload|check|go-live>[,...] [--host=workers] [--root=<dir>] [--dry-run] [--wait=<minutes>] [--local-qa=<verdict.json>] [--qa=<verdict.json>] [--catalogue=<file>] [--zone-table=<file>]');
+  process.exit(2);
+}
+// Fix preview PV15: content sets are retired (PV17 stopped staging and production, PV13 preview); the old sets go
+// through src/scripts/content-prune.mjs. test/page-content.test.ts holds this refusal.
+if (flag('content') !== undefined) {
+  console.error('page-release: --content is retired: no channel publishes a content set (fix preview PV15); zones come from the cook');
   process.exit(2);
 }
 // A build signs code-retention.json (FM7) after the whole page build; v0.1.96's production build ran minutes before it
@@ -102,16 +104,6 @@ async function fetch200(url) {
 }
 
 const host = workersHost({token: () => cloudflareToken, log});
-// PZ6: a content publish copies unchanged files from an older set on R2 and puts the rest, through R2's S3 API.
-// Meta Cloudflare audit CF2 (v0.1.97's production stall): the keys come from the environment, else ~/.config/wildshard/
-// cook.env, and a publish without them refuses here, before the build, instead of falling back to wrangler.
-const contentEnv = flag('content') === undefined ? undefined : contentKeys(process.env);
-if (contentEnv !== undefined && contentEnv.missing.length > 0 && flag('dry-run') === undefined && phaseList.split(',').some(step => step === 'build' || step === 'upload')) {
-  console.error(`page-release: ${missingKeysMessage(contentEnv.missing)}`);
-  process.exit(2);
-}
-const contentCopies = contentEnv === undefined ? undefined : r2Copies(contentEnv.env, log);
-if (contentCopies !== undefined) secrets.push(...contentCopies.secrets);
 
 let phase = '';
 /** @type {ReturnType<typeof openReleaseRun>|undefined} */
@@ -127,14 +119,9 @@ const manifest = {
 /** @param {import('./page-release/flow.mjs').Phase} step @param {import('./page-release/flow.mjs').QaVerdict} [generatedQa] */
 async function run(step, generatedQa) {
     const qa = generatedQa ?? (value('qa') === undefined ? undefined : readQa(resolve(value('qa') ?? '')));
-    const work = scratch?.work;
     const {refusals} = await runPhase(step, {
       root, channel: /** @type {any} */ (channel), build, host, releaseKey, codeRetention: channel !== 'explore',
       packs: r2Packs({log}),
-      ...(flag('content') === undefined || work === undefined ? {} : {content: {
-        publish: ({dir, cors, dryRun}) => publishContent({dir, origin: cors, dryRun, log,
-          scratch: work, store: r2Content({copies: contentCopies})}),
-      }}),
       run: (file, argv, env) => {
         const signing = file === 'node' && (argv[2] === 'src/scripts/page-release/preview.mjs' || argv[0] === 'src/scripts/code-retention.mjs') && signingKey !== undefined
           ? {E7_RELEASE_SIGNING_KEY: signingKey, E7_RELEASE_PUBLIC_KEY: releaseKey} : {};
@@ -148,15 +135,6 @@ async function run(step, generatedQa) {
       // FR-A17: production moves only when every advertised head has packs for this build.
       productionPacks: channel === 'production' ? missingProductionPacks : undefined,
       allowMissingPacks: process.env.ALLOW_MISSING_PACKS === '1',
-      // QA 11-25 row 131: before the alias moves, the local build's names; after it, the live page's (J205: static reads only).
-      contentReach: channel === 'production' && flag('content') !== undefined ? async (when, stagingBase) => {
-        const origin = CHANNELS.production.origin;
-        const page = when === 'before' ? {page: host.outputDir(/** @type {any} */ ({root}))} : {};
-        const reach = await contentReach({origin, readPage: pageReader({origin, fetcher: agentFetch, ...page}), get: fetchAnswer(agentFetch),
-          ...(stagingBase === undefined ? {} : {stagingBase})});
-        return {summary: reachSummary(reach), problems: reachProblems(reach)};
-      } : undefined,
-      allowContentGaps: process.env.ALLOW_CONTENT_GAPS === '1',
       readFile: path => readFileSync(path),
       state: {
         read: name => readState()[name],
@@ -217,6 +195,5 @@ try {
     const summary = process.env.GITHUB_STEP_SUMMARY;
     if (summary !== undefined && summary !== '') try { appendFileSync(summary, table.summary); } catch { /* a summary never fails the release */ }
   }
-  try { contentCopies?.close(); }
-  finally { scratch?.close(); }
+  scratch?.close();
 }

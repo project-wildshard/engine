@@ -24,8 +24,6 @@ export interface PackStore {
   publish: (context: { root: string; build: string; cors: string; dryRun: boolean }) => Promise<PacksSummary>;
   verify: (context: { root: string; build: string; cors: string }) => Promise<PacksSummary>;
 }
-export interface ContentSummary { set: string; base: string; files: number; bytes: number; uploaded: number; uploadedBytes: number; held: number; cors: string }
-export interface ContentPublisher { publish: (context: { dir: string; cors: string; dryRun: boolean }) => Promise<ContentSummary> }
 export interface Deps {
   root: string;
   channel: Channel;
@@ -33,7 +31,6 @@ export interface Deps {
   host: PageHost;
   codeRetention?: boolean;
     packs: PackStore;
-  content?: ContentPublisher;
   run: (file: string, args: string[], env: Record<string, string>) => void;
   fetchJSON: (url: string) => Promise<unknown>;
   fetchText: (url: string) => Promise<string>;

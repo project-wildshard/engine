@@ -108,11 +108,6 @@ export function pinnedReleaseKey(configured) {
  *   Parts first, the book last; an existing object must already have the same bytes.
  * @property {(context: {root: string, build: string, cors: string}) => Promise<PacksSummary>} verify  Read-only.
  *
- * @typedef {{set: string, base: string, files: number, bytes: number, uploaded: number, uploadedBytes: number, held: number, copied?: number, copiedBytes?: number, cors: string}} ContentSummary
- * @typedef {object} ContentPublisher
- * @property {(context: {dir: string, cors: string, dryRun: boolean}) => Promise<ContentSummary>} publish
- *   PAGE-SIZE PZ2: the page's shard content and engine art to the packs bucket, read back with CORS (content.mjs).
- *
  * @typedef {object} Deps
  * @property {string} root
  * @property {Channel} channel
@@ -120,8 +115,6 @@ export function pinnedReleaseKey(configured) {
  * @property {PageHost} host
  * @property {boolean} [codeRetention] FM7: sign and verify the actual retained-code graph. Legacy callers omit it.
  * @property {PackStore} packs
- * @property {ContentPublisher} [content]  PZ2: publish the page's content set before the page goes up (page-release.mjs
- *   --content). PZ6: the build then stamps the set's base into the page and keeps the split (dist-content/ is published).
  * @property {(file: string, args: string[], env: Record<string, string>) => void} run
  * @property {(url: string) => Promise<unknown>} fetchJSON  200 only, no cache, no redirects.
  * @property {(url: string) => Promise<string>} fetchText
@@ -204,9 +197,8 @@ export async function runPhase(phase, deps) {
         if (expected === '' || sha256(deps.readFile(deps.catalogue)) !== sha256(Buffer.from(expected))) refuse('Explore catalogue differs from the live staging build');
       }
     }
-    // Fix preview PV17: staging and production publish no content set; their zones come from the cook (PV16)
+    // Fix preview PV17: staging and production read zones from the cook (PV16); PV15 retired content sets everywhere
     const zonesFromCook = channel.channel === 'staging' || channel.channel === 'production';
-    if (zonesFromCook && deps.content !== undefined) refuse(`${channel.channel} publishes no content set: its zones come from the cook (fix preview PV17); drop --content`);
     // PV16: staging and production read every zone from the cook too, at their own build's key (their pins, main's cook)
     const own = channel.solo ? undefined : ownTablePath(deps);
     if (own !== undefined) {
@@ -217,22 +209,15 @@ export async function runPhase(phase, deps) {
     for (const line of deps.host.describe('prepare', context)) plan(line);
     if (!dry) await deps.host.prepare(context);
     plan(`run pnpm build:game with ${channel.solo ? 'no release file (solo)' : `WILDSHARD_RELEASE_URL=${env.WILDSHARD_RELEASE_URL}`} WILDSHARD_CATALOGUE=${env.WILDSHARD_CATALOGUE} WS_BUILD_ID=${deps.build} WS_CHANNEL=${channel.channel}`);
-    // PZ5/PZ6: a build that publishes its content names its code only in deploy-chunks.json (`content: true`), so the
-    // next release carries its code only (app-build-pipeline.mjs reads WS_CONTENT_BASE)
-    const contentEnv = deps.content === undefined ? {} : {WS_CONTENT_BASE: `${PACKS_ORIGIN}/content/`};
-    if (!dry) deps.run('pnpm', ['build:game'], {...env, ...contentEnv, ...deps.host.buildEnv(context)});
-    // PAGE-SIZE PZ4: build:game splits the page (dist/) from its content (dist-content/). A release that publishes its
-    // content (--content, PZ6) stamps the set's base into the page and keeps the split; one that doesn't joins the two, so
-    // the page serves its own content.
-    if (deps.content === undefined && zonesFromCook) {
+    if (!dry) deps.run('pnpm', ['build:game'], {...env, ...deps.host.buildEnv(context)});
+    // PAGE-SIZE PZ4: build:game splits the page (dist/) from its content (dist-content/); the release joins the two, so
+    // the page serves its own content (PV15: no content set, no content base)
+    if (zonesFromCook) {
       plan('join build-owned files and engine art into dist/, refusing zone payloads (PV17)');
       if (!dry) deps.run('node', ['src/scripts/app-build/splitOutput.mjs', 'dist', '--join', '--no-shard-content'], {});
-    } else if (deps.content === undefined) {
+    } else {
       plan('join dist-content/ back into dist/ (no content base: the page serves its own content)');
       if (!dry) deps.run('node', ['src/scripts/app-build/splitOutput.mjs', 'dist', '--join'], {});
-    } else {
-      plan(`stamp dist/index.html with the content set's base on ${PACKS_ORIGIN}/content/ and bake its service worker again (PZ6)`);
-      if (!dry) deps.run('node', ['--import', './src/scripts/bake-loader.mjs', 'src/scripts/page-release/stamp-content.mjs', 'dist'], {});
     }
     if (deps.codeRetention === true) {
       plan('sign code-retention.json from the actual deploy-chunks.json; unscheduled retirement has no invented deadline');
@@ -243,13 +228,7 @@ export async function runPhase(phase, deps) {
     plan(`check ${deps.host.outputDir(context)} names ${channel.solo ? 'no release file' : channel.release} and build ${deps.build}`);
     if (dry) return {refusals};
     const files = checkOutput(channel, deps, context, refuse);
-    /** @type {string|undefined} */
-    let contentBase;
-    if (deps.content !== undefined) {
-      contentBase = contentBaseIn(Buffer.from(deps.readFile(`${deps.host.outputDir(context)}/index.html`)).toString('utf8'));
-      if (contentBase === undefined || !contentBase.startsWith(`${PACKS_ORIGIN}/content/`)) refuse(`index.html content base is ${contentBase ?? 'missing'}, not a set on ${PACKS_ORIGIN}`);
-    }
-    deps.state.write('build', {build: deps.build, channel: channel.channel, host: deps.host.name, files, ...(contentBase === undefined ? {} : {contentBase})});
+    deps.state.write('build', {build: deps.build, channel: channel.channel, host: deps.host.name, files});
     deps.log(`PASS ${channel.channel} page built for ${deps.build}; nothing uploaded, alias not moved`);
     return {refusals};
   }
@@ -262,15 +241,6 @@ export async function runPhase(phase, deps) {
   }
 
   if (phase === 'upload') {
-    /** @type {ContentSummary|undefined} */
-    let content;
-    if (deps.content !== undefined) {
-      const contentDir = `${deps.host.outputDir(context)}-content`;
-      plan(`publish the page's content (S1 to S7, E1) from ${contentDir} to ${PACKS_ORIGIN}/content/<set>/ with CORS ${channel.origin} (PZ2, before the page)`);
-      content = await deps.content.publish({dir: contentDir, cors: channel.origin, dryRun: dry});
-      if (!dry && content.held + content.uploaded !== content.files) refuse(`content: ${content.held} held + ${content.uploaded} uploaded is not ${content.files}`);
-      if (!dry && content.base !== built.contentBase) refuse(`content: published ${content.base}, but the page is stamped with ${built.contentBase ?? 'no base'}`);
-    }
     /** @type {PacksSummary|undefined} */
     let packs;
     if (!channel.solo) {
@@ -281,7 +251,7 @@ export async function runPhase(phase, deps) {
     for (const line of deps.host.describe('upload', context)) plan(line);
     if (dry) return {refusals};
     const deployment = await deps.host.upload(context);
-    deps.state.write('upload', {build: deps.build, channel: channel.channel, deployment, ...(packs === undefined ? {} : {packs}), ...(content === undefined ? {} : {content})});
+    deps.state.write('upload', {build: deps.build, channel: channel.channel, deployment, ...(packs === undefined ? {} : {packs})});
     deps.log(`PASS ${channel.channel} uploaded ${deployment.id} ${deployment.url}${packs === undefined ? '; solo, no packs' : `; packs ${packs.parts} parts (${packs.uploaded} uploaded, ${packs.held} held)`}; alias not moved`);
     return {refusals};
   }

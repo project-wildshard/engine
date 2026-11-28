@@ -1,8 +1,6 @@
 // @vitest-environment node
 // oxlint-disable-next-line import/no-nodejs-modules -- The fixture is a built page tree under the repository's tmp.
-import {existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync} from 'node:fs';
-// oxlint-disable-next-line import/no-nodejs-modules -- A real brotli pack for the content scan.
-import {brotliCompressSync} from 'node:zlib';
+import {existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths stay under tmp.
 import {dirname, join, resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Run the CLI as build:game does.
@@ -182,14 +180,6 @@ test('a content path the build shares with a kept unmarked build reaches the set
   expect(contentGaps(dist, held)).toEqual([]);
   // v0.1.92's shape: the set's index without the shared paths. The cut names every gap.
   expect(contentGaps(dist, new Set([...held].filter(path => !shared.includes(path))))).toEqual([...shared].sort());
-  // The stamp, which runs at the cut, refuses the same gap before it stamps anything.
-  writeFileSync(join(contentDirOf(dist), 'assets/spawn/parts/0123456789abcdef.pack.br'), brotliCompressSync('pack'));
-  for (const path of shared) rmSync(join(contentDirOf(dist), path));
-  const page = readFileSync(join(dist, 'index.html'), 'utf8');
-  const refused = spawnSync(process.execPath, ['--import', './src/scripts/bake-loader.mjs', 'src/scripts/page-release/stamp-content.mjs', dist], {encoding: 'utf8'});
-  expect(refused.status).not.toBe(0);
-  expect(refused.stderr).toMatch(/holds 3 content path\(s\) its set lacks/u);
-  expect(readFileSync(join(dist, 'index.html'), 'utf8')).toBe(page);
 });
 
 test('PV17: shardContent names the shard content a content tree holds, never engine art', () => {

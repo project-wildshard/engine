@@ -16,3 +16,11 @@
   still writes it (newest 2026-11-28 01:26 UTC) and its indexes name 2,670 keys under `assets/<shard>/`,
   `assets/models/`, `assets/hdri/`, `assets/horizon/` and `assets/baked/`. It stays with the cook and PV25, with
   `assets/spawn/`, `index/` and `loose/`.
+- The publish path is gone too. Nothing live called it: preview.yml dropped `--content` under PV13, flow.mjs refused
+  it for staging and production under PV17, and Explore borrows the staging cook. page-release.mjs now refuses
+  `--content`, and flow.mjs lost its stamp, upload and `WS_CONTENT_BASE` branches. `stamp-content.mjs` is deleted.
+  `content.mjs` keeps only the bucket names and `contentKeys` (the prune reads them). Production's content-reach gate
+  ran only with `--content`, so its page-release wiring went with it; `content-reach.mjs` and flow's gate stay for
+  PV22. Guard: test/page-content.test.ts fails if `content.mjs` writes again or exports a publish, if a release path
+  stamps or publishes a set, if an R2 writer in `src/scripts` or `src/cook` names a `content/` key (the prune's state
+  file aside), or if `--content` stops being refused.
