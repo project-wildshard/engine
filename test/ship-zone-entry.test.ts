@@ -25,6 +25,10 @@ describe('SF14: zone art from the page', () => {
     expect(zoneArtFromPage('/assets/spawn/common-client-phone-0123456789abcdef.json', known)).toBe(false);
     expect(zoneArtFromPage('/index.html', known)).toBe(false);
     expect(zoneArtFromPage('/zone-table.json', known)).toBe(false);
+    // v0.1.101's staging SF14: the engine's boot tables and road seam plans are the build's own (PV6)
+    expect(zoneArtFromPage('/assets/boot-tables-4101cd17.json', known)).toBe(false);
+    expect(zoneArtFromPage('/assets/grid-seam-plans-aced7c9a.json', known)).toBe(false);
+    expect(zoneArtFromPage('/assets/boot-tables-pine-hollow.json', known)).toBe(true);
   });
 });
 

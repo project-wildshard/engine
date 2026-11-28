@@ -21,8 +21,10 @@ import {isArt, readList} from './public-verdicts.mjs';
 const COOKED = 'https://cooked.wildshard.io/';
 const FINGERPRINT = /-[0-9a-f]{16}(\.[a-z0-9]+)$/u;
 const ENGINE_LIST = 'src/scripts/public-engine.json';
-/** What the build writes under public/ itself: physics, Basis and the spawn packs (SF12's runtime). @param {string} file */
-const isRuntime = file => /^(?:assets\/(?:physics|spawn|packs)\/|basis\/)/u.test(file);
+/** What the build writes itself: physics, Basis and the spawn packs (SF12's runtime), and the engine's own boot tables and grid
+ *  seam plans (PV6: the road is engine, baked at build time). v0.1.101's SF14 counted the last two as zone art.
+ * @param {string} file */
+const isRuntime = file => /^(?:assets\/(?:physics|spawn|packs)\/|basis\/|assets\/(?:boot-tables|grid-seam-plans)-[0-9a-f]{8}\.json$)/u.test(file);
 
 /** The zones and cook origin a page's zone table names (the shape `src/shared/game/grid/zoneTable.ts` reads).
  * @param {unknown} input @returns {{origin: string, zones: string[]}} */
