@@ -28,7 +28,7 @@ export function capFor(caps, key) {
 }
 
 /** Every rule BC2 holds the two files to, as messages; empty when they agree.
- * @param {{ caps: Record<string, any> }} caps @param {{ baselines: Record<string, any> }} baselines */
+ * @param {{ caps: Record<string, any> }} caps @param {{ baselines: Record<string, any>, holds?: Record<string, any> }} baselines */
 export function fileErrors(caps, baselines) {
   const errors = [];
   for (const [key, cap] of Object.entries(caps.caps)) {
@@ -47,6 +47,14 @@ export function fileErrors(caps, baselines) {
     if (typeof row.contentKey !== 'string' || row.contentKey === '') errors.push(`${key}: names the content key it was measured on`);
     if (cap.hard !== null && missesHardLimit(cap.kind, row.value, cap.hard)) errors.push(`${key}: baseline ${row.value} ${cap.kind === 'floor' ? `is below its ${cap.hard} hard floor` : `is over its ${cap.hard} hard cap`}`);
     if (row.declared !== undefined && (typeof row.declared !== 'string' || row.declared.trim() === '')) errors.push(`${key}: a declared raise gives its reason`);
+  }
+  // J381: a hold lets one budget past its hard cap while Jake decides or a fix row lands; it names that row and its content key
+  for (const [key, hold] of Object.entries(baselines.holds ?? {})) {
+    const cap = capFor(caps, key);
+    if (cap === undefined || cap.hard === null) errors.push(`${key}: a hold needs a hard cap entry in ${CAPS_FILE}`);
+    if (typeof hold.contentKey !== 'string' || hold.contentKey === '') errors.push(`${key}: a hold names the content key it holds`);
+    if (typeof hold.row !== 'string' || !/\b[A-Z]{1,6}\d+[a-z]?\b/u.test(hold.row)) errors.push(`${key}: a hold names the plan row it waits on`);
+    if (typeof hold.why !== 'string' || hold.why.trim() === '') errors.push(`${key}: a hold says why`);
   }
   return errors;
 }

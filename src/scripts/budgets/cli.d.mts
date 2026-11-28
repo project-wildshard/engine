@@ -4,7 +4,7 @@ import type { BudgetStatus } from './verdict.mjs';
 
 export interface BudgetMeasure { value?: number; reads?: readonly number[]; contentKey: string; detail?: Record<string, number> }
 export interface BudgetMeasures { commit?: string; measures: Record<string, BudgetMeasure> }
-export interface BudgetRow { key: string; status: BudgetStatus | 'unknown'; value: number | null; baseline: number | null; line: number | null; hard: number | null; target: number | null; ratio: number | null; unit: string; contentKey: string; previousKey?: string | null; detail?: Record<string, number> }
+export interface BudgetRow { key: string; status: BudgetStatus | 'unknown' | 'held'; value: number | null; baseline: number | null; line: number | null; hard: number | null; target: number | null; ratio: number | null; unit: string; contentKey: string; previousKey?: string | null; hold?: string; detail?: Record<string, number> }
 export function judgeAll(caps: BudgetCaps, baselines: BudgetBaselines, measures: BudgetMeasures): BudgetRow[];
 export function budgetTable(rows: readonly BudgetRow[]): string;
 export function failed(rows: readonly BudgetRow[], options?: { hardOnly?: boolean }): boolean;

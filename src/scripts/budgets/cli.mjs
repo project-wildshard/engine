@@ -24,7 +24,7 @@ import { capFor, readBaselines, readCaps, writeBaselines } from './files.mjs';
 import { judgedValue, missesHardLimit, verdict } from './verdict.mjs';
 import { budgetResultLine } from './watch.mjs';
 
-const STATUS = { ok: 'ok', raised: 'raised', regressed: 'REGRESSED', 'over-hard': 'OVER HARD', warning: 'WARNING', confirm: 'WARNING' };
+const STATUS = { ok: 'ok', raised: 'raised', regressed: 'REGRESSED', 'over-hard': 'OVER HARD', held: 'HELD', warning: 'WARNING', confirm: 'WARNING' };
 
 /** @param {number | null | undefined} value @param {string} unit */
 function show(value, unit) {
@@ -45,8 +45,12 @@ export function judgeAll(caps, baselines, measures) {
       continue;
     }
     const recorded = baselines.baselines[key];
-    const result = verdict({ measure: measure.reads ?? /** @type {number} */ (measure.value), baseline: recorded, hard: cap.hard, contentKey: measure.contentKey,
+    const judged = verdict({ measure: measure.reads ?? /** @type {number} */ (measure.value), baseline: recorded, hard: cap.hard, contentKey: measure.contentKey,
       declared: recorded?.declared !== undefined, kind: cap.kind, floor: cap.floor ?? 0, confirm: cap.confirm === true });
+    // J381: a hold on this content key lets it past the hard cap while its plan row waits on Jake; new content is judged again
+    const hold = baselines.holds?.[key];
+    const held = judged.status === 'over-hard' && hold !== undefined && hold.contentKey === measure.contentKey;
+    const result = held ? Object.assign(judged, { status: /** @type {const} */ ('held'), hold: hold.row }) : judged;
     rows.push(Object.assign(result, { key, unit: cap.unit, baseline: recorded?.value ?? null, previousKey: recorded?.contentKey ?? null, hard: cap.hard, target: cap.target ?? null, contentKey: measure.contentKey, detail: measure.detail }));
   }
   return rows;
@@ -60,6 +64,7 @@ export function budgetTable(rows) {
     const notes = [];
     if (row.status === 'unknown') notes.push('no cap entry in budgets/caps.json');
     if (row.status === 'warning') notes.push('within J431 noise margin');
+    if (row.status === 'held') notes.push(`past the hard cap, held: ${row.hold}`);
     if (row.status === 'confirm') notes.push('unconfirmed: needs three fresh reads');
     if (row.status === 'raised') notes.push(row.previousKey === null ? `new: record ${row.contentKey}` : row.previousKey === row.contentKey ? 'declared: record it' : `${row.previousKey} → ${row.contentKey}: record it`);
     if (row.unit !== 'fps' && row.ratio !== null && row.ratio < 0 && row.status === 'ok') notes.push(`${Math.round(-row.ratio * 100)}% under baseline`);

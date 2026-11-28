@@ -77,6 +77,7 @@ export function checkShardSizes({ caps, baselines }, downloads, { contentKeys, c
     if (row.status === 'unknown') errors.push(`shard size: ${row.key} has no cap entry in budgets/caps.json`);
     else if (row.status === 'over-hard') errors.push(`shard size: ${slug} downloads ${MB(row.value ?? 0)} on a phone, past the ${MB(row.hard ?? 0)} hard cap (budgets/caps.json; a hard cap moves only on Jake's word)`);
     else if (row.status === 'regressed' && !hardOnly) errors.push(`shard size: ${slug} regressed: ${MB(row.value ?? 0)} on the same content (${row.contentKey}) as its ${MB(row.baseline ?? 0)} baseline, at or past the ${MB(row.line ?? 0)} soft line. Growth with no new content is a fix row; an engine feature declares it: node src/scripts/budgets/cli.mjs declare ${row.key} --why "<feature>"`);
+    else if (row.status === 'held') notes.push(`shard size: ${slug} downloads ${MB(row.value ?? 0)} on a phone, past the ${MB(row.hard ?? 0)} hard cap, held (J381): ${row.hold}`);
     else if (row.status === 'raised') notes.push(`shard size: ${slug} ${MB(row.value ?? 0)} is new content (${row.previousKey ?? 'no baseline'} -> ${row.contentKey}); record it: node src/scripts/shard-size-gate.mjs dist --record`);
   }
   if (failed(rows, { hardOnly }) && errors.length === 0) errors.push('shard size: the budget verdict failed');

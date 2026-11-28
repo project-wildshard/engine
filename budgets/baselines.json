@@ -2207,5 +2207,17 @@
    "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "declared": "QA 11-25 rows 99, 105 and 110 (J522 (4)): phone frames measure a one-cell world. Its grid systems over the deleted one-shard page (brasscap Low 40 against 34): road and platform (road solid deck, asphalt and junctions, signs, void floor, road sky), cell edges (seam curtain, soft wall, border shimmer) and the home's far views (far proxy, far batch, far impostor), less the one-shard page's own variants. Row 105 cut the far ring's four stand-ins; row 110 lowers this key by the region cinematic install's five programs (volumetric march, god rays with their blur and two copy passes; G321 part 5), which a clean-chain zone with its god rays off never carries, so its one-cell world no longer places them"
   }
+ },
+ "holds": {
+  "download/phone/pine-hollow": {
+   "contentKey": "pine-hollow@19",
+   "row": "meta standalone shardfiles SF27, waiting on Jake",
+   "why": "Its phone whole set counts the zone's own mounts since SF11 (before, a phone fetched the same files from public/ and the gate never counted them), so this is not new growth. Content is never cut to fit (J439) and the hard cap moves only on Jake's word (J338)."
+  },
+  "download/phone/nalati-grasslands": {
+   "contentKey": "nalati-grasslands@12",
+   "row": "meta standalone shardfiles SF28, the unread blob KTX2 fix (opus-batch)",
+   "why": "Its phone whole set lists each texture blob's image and its KTX2, and a phone reads the image: a WebKit phone boot without the unread KTX2s fetched about 91 MB. SF28 counts each image once and removes this hold."
+  }
  }
 }

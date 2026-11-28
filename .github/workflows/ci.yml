@@ -615,6 +615,10 @@ jobs:
           fi
           node src/scripts/gen.mjs --inputs-only
           python3 src/scripts/heavy-lane.py build --max 60 -- node src/scripts/build-app.mjs --mode preview --outDir tmp/memory-ledger/preview/dist
+      # The phone-download hard cap (J338) that build:game judges on dist: build-app.mjs gates only the default output, so
+      # this full pinned build judged nothing and passed while a local build:game failed (engine@719ceebac, Pine).
+      - name: Judge every zone's phone download
+        run: node src/scripts/shard-size-gate.mjs tmp/memory-ledger/preview/dist --hard-only --cooks-after
       # QA 11-26 row 31: a build that fails or runs out of time keeps the encodes it finished (each one is written whole
       # the moment it is done) under a per-run key the next try restores through the prefix, so a cold run gets further
       # on every try instead of starting from nothing (run 45952914915 stopped at 30 min with nothing kept).
