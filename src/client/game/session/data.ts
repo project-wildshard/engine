@@ -15,7 +15,7 @@ import { prepareShardAssets, type LoadStage } from '../shard/load';
 import type { SessionContext, StagedBoot, SessionState, KitPorts } from './context';
 import { currentOwner } from '@wildshard/engine/app/ownership';
 import { app } from '@wildshard/engine/app/runtime';
-import { addBytes, declareTotals, installByteCounter, unsizedFiles } from '@wildshard/engine/boot/bytes';
+import { declareTotals, installByteCounter, sizeDeclaredFiles } from '@wildshard/engine/boot/bytes';
 import { exploreChannel } from '@wildshard/engine/app/view/exploreChannel';
 import { bootFiles, extraFetches, startAudioPreload, startDeferredAudioPreload, startMenuPreload, useDownloadAudio, type Preload, type AudioBanks } from '@wildshard/engine/boot/extras';
 import { spawnHeldBytes, spawnListed, spawnMountSize } from '../boot/spawnDownload';
@@ -60,7 +60,8 @@ async function buildData(ctx: SessionContext) : Promise<{ loading: Loading; audi
   const files = bootFiles(manifest, undefined, audioProfile ?? NO_AUDIO, currentPageMode() !== 'grid'); // Grid never opens the menu card bank.
   useShardSteps(manifest.boot?.steps, manifest.boot?.bytes); // the shard's own loading nouns + weights (src/shared/engine/boot/steps.ts)
   // SF11: a zone's own boot file is sized from its cook (its download or part table), since no pin copies it under public/
-  for (const url of unsizedFiles(files)) { const bytes = await spawnMountSize(url); if (bytes !== undefined) addBytes({ [url]: bytes }); }
+  // (meta QA 11-26 row 86: a hand-made phone copy the cook doesn't ship is declared and read as its original)
+  await sizeDeclaredFiles(files, spawnMountSize);
   const plan = createBootPlan((view) => { loading.paint(view); }, { totals: declareTotals(files) });
   installByteCounter(plan, files);
   // a boot that throws shows WHY: the loading panel's foot line + the uncaught-exception modal (src/client/engine/ui/ErrorModal.ts)

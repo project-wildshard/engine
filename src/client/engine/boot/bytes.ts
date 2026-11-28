@@ -38,6 +38,12 @@ const known = (f: string): boolean => f in EXTRA || f in publicBytes();
 export const unsizedFiles = (files: ChunkFiles): string[] => [...new Set(Object.values(files).flat().filter(f => !known(f)))];
 const sizeOf = (f: string): number | undefined => EXTRA[f] ?? publicBytes()[f];
 
+/** Meta QA 11-26 row 86: a zone's hand-made phone copy that nothing on this page holds, by the original it reads instead.
+ *  A shard may still name its phone copy itself (Nalati's ground material, `texture.phoneUrl`). The cook ships no such copy
+ *  (SF7j: a phone samples the original's KTX2, and the desktop's part holds the original), so a phone in images mode that
+ *  declared and fetched it stopped its one-shard boot on "declares … but public/assets has no such file". */
+const PHONE_ORIGINALS = new Map<string, string>();
+
 export function declareTotals(files: ChunkFiles): Record<ByteKey, { bytes: number; files: number }> {
   const out = {} as Record<ByteKey, { bytes: number; files: number }>;
   for (const key of Object.keys(files) as ByteKey[]) {
@@ -81,7 +87,34 @@ function ktx2StandIn(url: string, tex: TexMode): string | undefined {
 /** the tier's copy of a file (`.phone.webp` / `.phone.glb`), whatever the textures ride as. SF7c: a copy the zone's
  *  cooked download lists counts too (`zoneFileListed`): a cooked zone's page holds no copy of it, so Nine's phone asked
  *  `paint/concrete.jpg`, which its prepared phone set (recorded on a page that did hold `concrete.phone.webp`) leaves out. */
-export function phoneUrl(url: string): string { return phoneCopy(url, file => known(file) || zoneFileListed(file)); }
+export function phoneUrl(url: string): string { return PHONE_ORIGINALS.get(url) ?? phoneCopy(url, file => known(file) || zoneFileListed(file)); }
+
+/** The files a phone copy (`phoneCopy`'s name) may stand for: `name.phone.webp` for a PNG, JPEG or WebP, `.phone.glb` for a GLB. */
+export function phoneCopyOriginals(url: string): string[] {
+  const m = /^(.*)\.phone\.(webp|glb)$/.exec(url);
+  if (m === null) return [];
+  return m[2] === 'glb' ? [`${m[1]}.glb`] : ['webp', 'png', 'jpg'].map(ext => `${m[1]}.${ext}`);
+}
+/** SF11 and row 86: size every declared file the page's tables don't (a zone's own, from its cook through `size`). A phone copy
+ *  nothing sizes is declared, and from then on read (`phoneUrl`, so `tierUrl` and the loaders), as the first original `size`
+ *  answers for. Rewrites `files` in place, so what keys on it stays keyed; a file still unsized is left for `declareTotals`. */
+export async function sizeDeclaredFiles(files: ChunkFiles, size: (url: string) => Promise<number | undefined>): Promise<void> {
+  /** @param url a file to size: true when the page now knows its bytes */
+  const sized = async (url: string): Promise<boolean> => {
+    if (known(url)) return true;
+    const bytes = await size(url);
+    if (bytes !== undefined) addBytes({ [url]: bytes });
+    return bytes !== undefined;
+  };
+  for (const url of unsizedFiles(files)) {
+    if (await sized(url)) continue;
+    for (const original of phoneCopyOriginals(url)) if (await sized(original)) { PHONE_ORIGINALS.set(url, original); break; }
+  }
+  const writable = files as Record<ByteKey, readonly string[]>;
+  for (const key of Object.keys(writable) as ByteKey[]) {
+    if (writable[key].some(url => PHONE_ORIGINALS.has(url))) writable[key] = [...new Set(writable[key].map(url => PHONE_ORIGINALS.get(url) ?? url))];
+  }
+}
 /** `phoneUrl` against another table of files: an aliased model's own (SF5d: a cooked shardfile names its hand-made
  *  `.phone.glb` only in its alias table, never in the page's byte table). */
 export function phoneCopy(url: string, has: (file: string) => boolean): string {
