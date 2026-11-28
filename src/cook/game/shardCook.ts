@@ -28,6 +28,7 @@ import {serverSkinRigs} from '../../shared/game/shardfile/serverSkinRigs';
 import { entryReadSet } from '@wildshard/format/entryReadSet';
 import {phoneTier, splatPhoneTier, type Astc6Encode, type SplatPhoneLayer} from './tierTextures';
 import {splatTerrainOf} from '@wildshard/format/splatTerrain';
+import {tableTextureRefs} from '../../shared/game/shardfile/tableTextureRefs';
 import {blobKtx2, blobTextureUses, type TextureBlob} from './blobKtx2';
 import {skinLookTextureRefs} from '@wildshard/format/skinAssets';
 import {wasmAstc6} from './astc6Wasm';
@@ -359,6 +360,11 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, folder: st
     }
     return out;
   };
+  // SF28: a phone that loads KTX2 reads a material's image as the cook's KTX2 of it (`standInRead.ts`), so its lists name
+  // the KTX2 (`blobRows`) and never the image (Pine 30 images, 7.5 MB; Nalati 19, 9.5 MB). A named image stays listed: a
+  // reader that names it decodes it raw (Nalati's horse atlas is a skin's map and a posed specimen's atlas)
+  const tableRefs = tableTextureRefs(shard.source, 'phone');
+  const phoneStandIns = new Set(shard.index.files.filter(row => row.name === undefined && tableRefs.has(row.hash) && blobs?.files.has(row.hash) === true).map(row => row.hash));
   const ktx2Table = documentBytes === undefined ? EMPTY_COOKED_KTX2_TABLE : cookedKtx2TableOf(JSON.parse(new TextDecoder().decode(documentBytes)));
   return {shard, header, ktx2Table, tierFiles: [...cookedRows.values(), ...[...tierRows.values()].flat(), ...layerRows.values()], discovery: discovery[0] === undefined || documentBytes === undefined ? undefined : {row: discovery[0], bytes: documentBytes},
     read: url => { const read = sources.get(url); if (read === undefined) throw new Error(`Spawn file has no source: ${url}`); return read(); },
@@ -369,7 +375,7 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, folder: st
       for (const row of index.sections) selected.push(folderFile(row.path, row.bytes, row.hash, `section:${row.name}`));
       for (const row of index.schemas ?? []) selected.push(folderFile(row.path, row.bytes, row.hash, `schema:${row.path}`));
       const wanted = entryReadSet(source, tier, index, sections, wholeSet(tier, set), fence.hashes);
-      for (const row of index.files) if ((wanted.has(row.hash) || row.name?.startsWith('ui/images/card-') === true) && (tier !== 'phone' || !layerRows.has(row.hash))) selected.push(folderFile(row.path, row.compressed, row.hash, row.name));
+      for (const row of index.files) if ((wanted.has(row.hash) || row.name?.startsWith('ui/images/card-') === true) && (tier !== 'phone' || (!layerRows.has(row.hash) && !phoneStandIns.has(row.hash)))) selected.push(folderFile(row.path, row.compressed, row.hash, row.name));
       return selected;
     },
     mountRows: (tier, set) => {
@@ -427,7 +433,9 @@ function textureBlobs(shard: OpenShardfile, prefix: string): readonly TextureBlo
   });
   return shard.index.files.flatMap(row => {
     const use = uses.get(row.hash) ?? {role: 'srgb', layer: false};
-    return row.kind !== 'image' || row.commons === true ? [] : [{hash: row.hash, url: `${prefix}${row.path}`, bytes: shard.read(row.path), use}];
+    // SF28: UI art no rule names is read by an `<img>` (C3), never through the table: it gets no KTX2
+    const pageArt = row.name?.startsWith('ui/') === true && !uses.has(row.hash);
+    return row.kind !== 'image' || row.commons === true || pageArt ? [] : [{hash: row.hash, url: `${prefix}${row.path}`, bytes: shard.read(row.path), use}];
   });
 }
 

@@ -2216,8 +2216,8 @@
   },
   "download/phone/nalati-grasslands": {
    "contentKey": "nalati-grasslands@12",
-   "row": "meta standalone shardfiles SF28, the unread blob KTX2 fix (opus-batch)",
-   "why": "Its phone whole set lists each texture blob's image and its KTX2, and a phone reads the image: a WebKit phone boot without the unread KTX2s fetched about 91 MB. SF28 counts each image once and removes this hold."
+   "row": "meta standalone shardfiles SF27, waiting on Jake",
+   "why": "SF28 left a material's image out of the phone's lists (114.6 MB, a WebKit phone boot fetched 115.1 MB of its own files). What is left is the zone's own files a phone always fetched; the gate counts them since SF11, so this is not new growth. Content is never cut to fit (J439) and the hard cap moves only on Jake's word (J338)."
   }
  }
 }

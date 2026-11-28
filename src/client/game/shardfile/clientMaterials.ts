@@ -36,6 +36,7 @@ import { propMaterialTextureRefs, propMaterialsOf } from '@wildshard/format/prop
 import { ownedGraph, propSurfaces } from './clientPropMaterials';
 import { blobGpuFile, splatDrawTier, splatLayerFile } from '@wildshard/engine/boot/gpuFiles';
 import { cookedBlobBytes, imageTexture, isKtx2Bytes, textureKind } from './blobTextures';
+import type { StandInReads } from './standInRead';
 import { splatTerrainOf, splatTextureRefs } from '@wildshard/format/splatTerrain';
 
 
@@ -128,7 +129,9 @@ function releaseRawAfterUpload(texture: DataTexture): void {
 export async function clientMaterials(shard: Shardfile, input: ReadonlyMap<string, Uint8Array>, renderer: Renderer, scope: Scope, options: { graphs?: boolean; sources?: GraphSources;
   /** LS8 (J204): counted completions for the caller's loading step, given the unit total */ units?: (total: number) => (done: number, detail?: string) => void;
   /** S12f2b2: the cook's own file for a splat phone layer (default: the registered tables' row, `splatLayerFile`) */ splatLayer?: (hash: string) => string | undefined;
-  /** SF16: the cook's KTX2 of an image blob (default: the registered tables' row when the page loads KTX2, `blobGpuFile`) */ blobFile?: (hash: string) => string | undefined } = {}): Promise<{
+  /** SF16: the cook's KTX2 of an image blob (default: the registered tables' row when the page loads KTX2, `blobGpuFile`) */ blobFile?: (hash: string) => string | undefined;
+  /** SF28: the reads for a stand-in admission left unread (`standInRead.ts`): its KTX2 checked against the download's sha256,
+   *  or its image by product URL on a page that reads images. Without it, a material texture with no admitted bytes is refused. */ standIns?: StandInReads } = {}): Promise<{
   /** Live toon family shared by classic and graph materials; a day clock may update it in place. */
   readonly toon: ToonLook;
   /** SS8c: this shard's swing uniforms, which its swinging surfaces bind and its page's `SwingField` writes */
@@ -167,7 +170,7 @@ export async function clientMaterials(shard: Shardfile, input: ReadonlyMap<strin
     // S12f2b2: a splat layer the table names (a phone's 6x6, or an image layer's KTX2, SF16) and an image blob's KTX2 (SF16)
     // are read by URL. Finish those reads before owning a decoder, so a refused file cannot strand one.
     const [cooked, blobs] = await Promise.all([groundLayers?.cookedSplatBytes(splat, splatRefs, splatTier, options.splatLayer ?? splatLayerFile, undefined, ref => { const bytes = assets.get(ref); return bytes !== undefined && !isKtx2Bytes(bytes); }),
-      cookedBlobBytes([...refs].filter(ref => !splatRefs.has(ref)), assets, options.blobFile ?? (hash => blobGpuFile(hash)))]);
+      cookedBlobBytes([...refs].filter(ref => !splatRefs.has(ref)), assets, options.blobFile ?? (hash => blobGpuFile(hash)), undefined, options.standIns)]);
     if (scope.disposed) throw new Error('Material scope unloaded before transcode');
     const bytesOf = (ref: string): Uint8Array | undefined => cooked?.get(ref) ?? blobs.get(ref) ?? assets.get(ref);
     const loader = detectKtx2Support(new KTX2Loader().setTranscoderPath(BASIS_PATH), renderer);

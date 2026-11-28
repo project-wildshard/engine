@@ -27,9 +27,10 @@ import { Gunfire } from '@wildshard/engine/fx/gunfire';
 import { holdQuestRewards } from '../quest/reward';
 import { loadSkin } from './skinPlayback';
 import { compileSkinPoseLayers, bindSkinPoseLayers, type CompiledSkinPoseLayers } from './skinLayerPlayback';
-import { resolveSkinLookTier, skinLookParameters, skinLookTierRoots } from '@wildshard/format/skinAssets';
+import { resolveSkinLookTier, skinLookParameters } from '@wildshard/format/skinAssets';
 import { SkinClipNameSchema, type CreatureSkinClipName } from '@wildshard/format/skinData';
 import { SKIN_LOOK_RECIPE, type SkinClipMap, type SkinClipState } from '@wildshard/format/skins';
+import { skinTextureRefsOn } from '../../../shared/game/shardfile/tableTextureRefs';
 import { CREATURE_SKELETONS, skeletonBones, trailBoneNames } from '@wildshard/format/creatureSkeletons';
 import type { CreatureBody } from '@wildshard/format/creatureLayers';
 import type { ShardRows } from '@wildshard/format/rows';
@@ -284,13 +285,8 @@ export class SkinDriver {
  * draws them.
  */
 export function skinTextureRefs(source: Pick<Shardfile, 'rows' | 'files'>, tier: Tier = buildTier()): string[] {
-  const files = new Map(source.files.map((file) => [file.hash, file]));
-  return [...new Set(source.rows.looks.flatMap((look) => {
-    if (look.recipe !== SKIN_LOOK_RECIPE) return [];
-    const [head, table] = skinLookTierRoots(skinLookParameters(look), tier);
-    const skins = [head, ...(table === undefined ? [] : files.get(table)?.dependencies ?? [])];
-    return skins.flatMap((hash) => files.get(hash)?.dependencies.slice(1) ?? []);
-  }))];
+  // SF28: one list with the admission's and the cook's (`tableTextureRefs`)
+  return skinTextureRefsOn(source, tier);
 }
 
 /** Select once for every creature view owner, including entered grid cells. */

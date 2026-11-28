@@ -19,6 +19,7 @@ import {bareSlug} from '../../../shared/game/grid/catalogueSlot';
 import {behindRooms, looseSlug, placedLoose, placedSpawn} from './placedSpawn';
 import {leaveForRoomsRevision} from './roomsAhead';
 import {useZoneDownloadListing, useZoneScoreSetAdoption} from '@wildshard/engine/boot/zoneAssets';
+import {blobKtx2Hash} from '../../../shared/game/shardfile/tableTextureRefs';
 
 /** This leaf statically imports no engine, renderer or worker. The title can start it on
  * the tap; Loading later adopts the same progress rather than recounting IO. */
@@ -389,6 +390,26 @@ function spawnListedBytes(url: string): number | undefined {
   return pageFiles.get(address.origin + address.pathname)?.bytes;
 }
 export const spawnListed = (url: string): boolean => spawnListedBytes(url) !== undefined;
+/** SF28: the sha256 this page's download lists for `url` (its manifest row, or the cooked index's member row), the check a
+ *  stand-in KTX2 is read on (`standInRead.ts`); undefined when neither lists it. */
+export function spawnListedHash(url: string): string | undefined {
+  const address = new URL(pageURL(new URL(url, location.href).href), location.href);
+  return pageFiles.get(address.origin + address.pathname)?.hash ?? cookedMember(address.pathname)?.hash;
+}
+/** SF28: the listed blob KTX2s by the image blob each stands in for (`blobKtx2Hash`), rebuilt when a listing adds files. */
+let listedBlobKtx2s: {readonly generation: number; readonly urls: ReadonlyMap<string, string>} | null = null;
+let pageFilesGeneration = 0;
+/** SF28: the cook's KTX2 of image blob `hash` that this page's download lists, by its listed URL; undefined when none is
+ *  listed (the admission's stand-in rule, `standInRead.ts`). Read from the listing itself, so it answers before the shard's
+ *  KTX2 table is registered or its texture mode is known. */
+export function spawnListedBlobKtx2(hash: string): string | undefined {
+  if (listedBlobKtx2s?.generation !== pageFilesGeneration) {
+    const urls = new Map<string, string>();
+    for (const [key, file] of pageFiles) { const blob = blobKtx2Hash(new URL(key).pathname); if (blob !== undefined) urls.set(blob, file.url); }
+    listedBlobKtx2s = {generation: pageFilesGeneration, urls};
+  }
+  return listedBlobKtx2s.urls.get(hash);
+}
 /** A cooked mount can first be needed on play, outside the selected entry's fence. */
 export async function spawnMountSize(url: string): Promise<number | undefined> {
   const listed = spawnListedBytes(url);
@@ -583,6 +604,7 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
           const listed = new URL(file.url); paths.set(listed.origin + listed.pathname, file.url);
           pageFiles.set(listed.origin + listed.pathname, {url: file.url, bytes: file.bytes, hash: file.hash, read: ports.cached});
         }
+        pageFilesGeneration++;
         jobPaths = paths;
       }
       markListed();

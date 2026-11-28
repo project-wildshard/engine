@@ -6,6 +6,7 @@ import { boundedResponse, type FolderOptions } from './folder';
 import { outputBlobUrl, outputDescriptor } from '../../../shared/game/shardfile/outputDescriptor';
 import { packMissing, packOrLoose, readPackWhole, releasePackWholes } from '../../../shared/game/shardfile/packReads';
 import type { Shardfile } from '@wildshard/format/shardSchema';
+import type { StandInReads } from './standInRead';
 
 /** PZ7: the marker for "read this member loose" */
 const LOOSE = new Uint8Array(0);
@@ -32,6 +33,19 @@ export class ClientAssets {
     return bytes;
   }
   get retained(): ReadonlyMap<string, Uint8Array> { return this.wire; }
+  /** SF28: a material texture `ref` (one of `tableTextureRefs`) not held here whose KTX2 the page's download lists, and not the
+   *  image: a material reads it through `standInReads`, never through `read`, so the image is not fetched. */
+  standsIn(ref: string): boolean {
+    const port = this.options.standIn;
+    if (port === undefined || this.wire.has(ref) || outputDescriptor(this.source) === undefined || !this.source.files.some(file => file.hash === ref)) return false;
+    return port.listed(ref, outputBlobUrl(this.source, ref, new URL('.', this.options.base).href));
+  }
+  /** SF28: the reads `clientMaterials` makes for a stand-in admission left unread: the image by product URL (a page that reads
+   *  images), and the download's sha256 for the KTX2. */
+  standInReads(): StandInReads {
+    const hash = this.options.standIn?.hash;
+    return { image: ref => this.read(ref), ...(hash === undefined ? {} : { hash }) };
+  }
   /** Lease authoritative/library roots for the level; render tiles receive their own shorter leases. */
   pin(): () => void { return this.lease(this.roots()); }
   /** Pin an admitted tile and its dependencies until its render scope is released. */

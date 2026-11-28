@@ -18,6 +18,8 @@ import { builtIndexHash } from '@wildshard/format/builtIndexes';
 import { acceptValidatedCost } from '@wildshard/format/deviceMemoryCost';
 import { saves } from '@wildshard/engine/saves/runtime';
 import { contentHash } from '../../../shared/game/shardfile/contentHash';
+import { tableTextureRefs } from '../../../shared/game/shardfile/tableTextureRefs';
+import type { StandInPort } from './standInRead';
 import { packOrLoose, packReads } from '../../../shared/game/shardfile/packReads';
 import { folderResourceRole } from '../../../shared/game/shardfile/resourceRole';
 import { preflightFolder } from './folderPreflight';
@@ -60,6 +62,14 @@ export interface FolderProgress {
   /** Canonical descriptor/member URI, separate from the player-facing role. */
   resource?: string;
 }
+/** SF28: the hashes among `files` the download stands in for (`FolderOptions.standIn`): an image a material reads through the
+ *  KTX2 table whose KTX2 the download lists, and not the image. A built read leaves them unread. */
+export function standInHashes(files: readonly { readonly hash: string }[], table: ReadonlySet<string>, url: (hash: string) => string,
+  port: StandInPort | undefined): ReadonlySet<string> {
+  const out = new Set<string>();
+  if (port !== undefined) for (const file of files) if (table.has(file.hash) && !out.has(file.hash) && port.listed(file.hash, url(file.hash))) out.add(file.hash);
+  return out;
+}
 /** Connectivity and capabilities are supplied by the host. */
 export interface FolderOptions {
   /** Native built-in build capability. Publication validates the content;
@@ -71,6 +81,10 @@ export interface FolderOptions {
   /** S12f2b2: the cook's own file for a splat phone layer (`splatLayerFile`): a phone drawing the phone set reads it by URL,
    *  so its blob is never admitted. */
   splatLayer?: (hash: string) => string | undefined;
+  /** SF28: the page's download on the cook's KTX2 standing in for an image blob a material reads through the table
+   *  (`tableTextureRefs`): one it lists the KTX2 for, and not the image, is never read here or warmed (GC9), and the material
+   *  reads it as it compiles (`standInRead.ts`). Undefined: every image is read as before. */
+  standIn?: StandInPort;
   /** The spawn manifest names individual files, never transport envelopes. */
   directFiles?: boolean;
   /** Optional live parser; boot and receipts stay on the page. Hashes/validators retain admission. */
@@ -162,7 +176,8 @@ export interface AdmittedFolder {
 }
 
 // Construct outside admission's decoding context: the owner must not retain the temporary hash/transport maps.
-function transportRelease(source: Shardfile, assets: Map<string, Uint8Array>, options: FolderOptions, prepared = false): NonNullable<AdmittedFolder['releaseTransport']> {
+function transportRelease(source: Shardfile, assets: Map<string, Uint8Array>, options: FolderOptions, prepared = false,
+  standIns: ReadonlySet<string> = new Set()): NonNullable<AdmittedFolder['releaseTransport']> {
   // The releasable set walks the whole product (~60 ms at 4x CPU): built on the first release, not on every admission,
   // in paced steps, once (concurrent first releases share it)
   let bound: Promise<ReadonlySet<string>> | undefined;
@@ -180,7 +195,8 @@ function transportRelease(source: Shardfile, assets: Map<string, Uint8Array>, op
     if (cache === undefined && !canFetch) return released;
     const releasing = prepared ? files : await (bound ??= releasable());
     for (const ref of requested) {
-      if (!releasing.has(ref)) continue;
+      // SF28: a stand-in was never read here, so it has nothing to release and nothing to read back
+      if (!releasing.has(ref) || standIns.has(ref)) continue;
       const file = files.get(ref);
       if (file === undefined) continue;
       if (canFetch) { released.push(ref); continue; }
@@ -426,8 +442,11 @@ async function readBuiltFolder(input:unknown,options:FolderOptions,read:NonNulla
   const selected=options.tier===undefined?source.files:await tierFolderFilesPaced(source,options.tier,options.pause,options.splatTier,options.splatLayer);
   const control=options.tier==='phone'?controlFiles(await playLibrarySourcePaced(source,options.pause),selected):selected;
   const deferred=options.deferred===undefined?undefined:new Set(await options.deferred(source));
-  const initial=deferred===undefined?control:control.filter(file=>!deferred.has(file.hash));
   const base=new URL('.',options.base).href,assets=new Map<string,Uint8Array>();
+  // SF28: an image a material reads through the KTX2 table, whose KTX2 the download lists and not the image, is never read
+  // or warmed here: the material reads the KTX2 (or the image, on a page that reads images) as it compiles
+  const standIns=options.standIn===undefined||options.tier===undefined?new Set<string>():standInHashes(control,tableTextureRefs(source,options.tier),hash=>outputBlobUrl(source,hash,base),options.standIn);
+  const initial=control.filter(file=>!standIns.has(file.hash)&&deferred?.has(file.hash)!==true);
   const refs=[...initial.map(file=>({ref:file.hash,bytes:file.compressed})),...source.requires.commons.map(hash=>({ref:`commons:${hash}`,bytes:source.requires.commonsWire[hash]??0}))];
   const unique=new Map(refs.map(row=>[row.ref.replace(/^commons:/u,''),row]));
   const addresses=[...unique.values()],results:({ok:true;bytes:Uint8Array}|{ok:false;error:unknown}|undefined)[]=Array.from({length:addresses.length});
@@ -449,13 +468,13 @@ async function readBuiltFolder(input:unknown,options:FolderOptions,read:NonNulla
     wires.set(row.ref.replace(/^commons:/u,''),result.bytes);
   }
   for(const row of refs){const bytes=wires.get(row.ref.replace(/^commons:/u,''));if(bytes===undefined)throw new Error('Missing built file bytes');holdBytes(bytes);assets.set(row.ref,bytes);}
-  const unread=deferred===undefined?[]:control.filter(file=>deferred.has(file.hash));
+  const unread=deferred===undefined?[]:control.filter(file=>deferred.has(file.hash)&&!standIns.has(file.hash));
   // GC9: the files left unread are fetched once more in the background, low priority and unhashed, so the entry's own
   // verified reads of them find the HTTP cache warm (Pine's scene libraries read them one by one at entry); only after a read
   // that succeeded
   const warm=options.backgroundFetch;
   if(unread.length>0&&warm!==undefined)void warmTransport(unread.map(file=>outputBlobUrl(source,file.hash,base)),warm);
-  return {source,assets,cached:false,...(deferred===undefined?{}:{unread:unread.map(file=>file.hash)}),releaseTransport:transportRelease(source,assets,options),releasePreparedTransport:transportRelease(source,assets,options,true),...(instance===undefined?{}:{instance})};
+  return {source,assets,cached:false,...(deferred===undefined?{}:{unread:unread.map(file=>file.hash)}),releaseTransport:transportRelease(source,assets,options,false,standIns),releasePreparedTransport:transportRelease(source,assets,options,true,standIns),...(instance===undefined?{}:{instance})};
 }
 /** GC9: fetch immutable product files into the HTTP cache, eight at a time, ignoring failures (a later verified read fetches again). */
 async function warmTransport(urls:readonly string[],fetchLow:NonNullable<FolderOptions['backgroundFetch']>):Promise<void>{

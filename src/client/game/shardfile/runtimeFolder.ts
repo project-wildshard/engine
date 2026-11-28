@@ -20,6 +20,7 @@ import { prepareManifestScalarBlocks,type ShardManifest } from '../shard/manifes
 import { outputDescriptor } from '../../../shared/game/shardfile/outputDescriptor';
 import { ktx2TranscodeSupport } from '@wildshard/engine/core/ktx2';
 import { splatDrawTier, splatLayerFile } from '@wildshard/engine/boot/gpuFiles';
+import { standInPort } from './standInRead';
 import { TIER, TIER_CONFIG } from '@wildshard/engine/core/tier';
 import { readFolderDescriptor, browserContentHash, type AdmittedFolder, type FolderOptions } from './folder';
 import type { Shardfile } from '@wildshard/format/shardSchema';
@@ -34,7 +35,7 @@ import { legacyAsset } from './legacyAsset';
 
 import { folderResourceRole } from '../../../shared/game/shardfile/resourceRole';
 import { entryTransport } from './entryTransport';
-import { currentSpawnDownload, releaseSpawnMembers } from '../boot/spawnDownload';
+import { currentSpawnDownload, releaseSpawnMembers, spawnListed, spawnListedBlobKtx2, spawnListedHash } from '../boot/spawnDownload';
 import { contentURL } from '@wildshard/engine/boot/contentBase';
 import { saveRevision } from '@wildshard/engine/game/shardfile/saveRevision';
 
@@ -121,7 +122,9 @@ export function browserShardfileOptions(base: string, granted = false): FolderOp
     }, navigator.serviceWorker?.controller === null || navigator.serviceWorker?.controller === undefined ? storage : undefined), 'file', address);
     entryTransport()?.expand(); return result;
   };
-  return { ...(parseJson === undefined ? {} : { parseJson }), base, ...(spawn === undefined ? {} : {directFiles: true}), tier: TIER, splatTier: splatDrawTier, splatLayer: splatLayerFile, quality, textures: ktx2TranscodeSupport(), offline: !navigator.onLine, hash: verifiedHash,
+  return { ...(parseJson === undefined ? {} : { parseJson }), base, ...(spawn === undefined ? {} : {directFiles: true}), tier: TIER, splatTier: splatDrawTier, splatLayer: splatLayerFile,
+    // SF28: a material's image whose KTX2 the download lists, and not the image, is left unread until the material compiles
+    standIn: standInPort(spawnListedBlobKtx2, spawnListed, spawnListedHash), quality, textures: ktx2TranscodeSupport(), offline: !navigator.onLine, hash: verifiedHash,
     // OF10a4: the build reader serves a product the host trusts or one the build's verdict table lists (its catalogue and the
     // placed uploads' cook rows); an unlisted product has no browser reader and fails closed, as before
     ...(readable ? { buildRead } : {}),
@@ -439,11 +442,12 @@ export async function runtimeLookMaterials(ctx: Pick<ShardContext, 'scope' | 'ga
     for (const ref of graphFiles) files.set(ref, await product.assets.read(ref));
     // OF23a: a skin look's textures (its skin and variant files' maps) are compiled here too (`clientMaterials` reads
     // `skinTextureRefs`), so a native runtime with skin looks (Pine's species rows) reads them like its material maps
-    for (const ref of new Set([...materialTextureRefs(shard.look.materials), ...keptGraphFileTextureRefs(shard.look.materials, hash => files.get(hash)), ...skinTextureRefs(shard)])) files.set(ref, await product.assets.read(ref));
+    // SF28: a stand-in (its KTX2 listed, not the image) is left to `clientMaterials`, which reads the KTX2, never the image
+    for (const ref of new Set([...materialTextureRefs(shard.look.materials), ...keptGraphFileTextureRefs(shard.look.materials, hash => files.get(hash)), ...skinTextureRefs(shard)])) if (!product.assets.standsIn(ref)) files.set(ref, await product.assets.read(ref));
     return files;
   });
   if (ctx.scope.disposed) throw new Error('Runtime look scope unloaded while reading materials');
-  return bootTask(`look:material-compile ${source.identity.slug}`, () => clientMaterials(shard, assets, renderer, ctx.scope, { ...(graphs === undefined ? {} : { graphs }), ...(units === undefined ? {} : { units }) }));
+  return bootTask(`look:material-compile ${source.identity.slug}`, () => clientMaterials(shard, assets, renderer, ctx.scope, { ...(graphs === undefined ? {} : { graphs }), ...(units === undefined ? {} : { units }), standIns: product.assets.standInReads() }));
 }
 
 /** Prepare the requested original graph materials for resident effects and boss storms. */

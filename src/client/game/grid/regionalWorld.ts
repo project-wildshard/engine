@@ -171,14 +171,14 @@ async function prepareRegionalPresentation(admitted: AdmittedFolder, renderer: P
   if (!hasDeclaredClientPage(full)) {
     // OF23e4 (Pine r10): a native page that declares its own species draws them with its data's materials, as standalone
     if (!nativeDeclaresOwnSpecies(shardFolderFromAdmission(admitted, scope))) return null;
-    const presentation = await clientMaterials(withoutRuntimeRows(full), runtimeFolder(full).assets.retained, renderer, scope);
+    const presentation = await clientMaterials(withoutRuntimeRows(full), runtimeFolder(full).assets.retained, renderer, scope, { standIns: runtimeFolder(full).assets.standInReads() });
     if (scope.disposed || scope.disposing) throw new Error('Regional world left while preparing its declared bodies\' materials');
     return { collider: undefined, presentation, bodiesOnly: true };
   }
   const assets = runtimeFolder(full).assets, terrain = full.terrain;
   const collider = terrain === null ? undefined : await assets.read(terrain.collider);
   if (scope.disposed || scope.disposing) throw new Error('Regional world left while reading its presentation collider');
-  const presentation = await clientMaterials({ ...full, state: full.state }, assets.retained, renderer, scope);
+  const presentation = await clientMaterials({ ...full, state: full.state }, assets.retained, renderer, scope, { standIns: assets.standInReads() });
   if (scope.disposed || scope.disposing) throw new Error('Regional world left while preparing its presentation materials');
   return { collider, presentation };
 }

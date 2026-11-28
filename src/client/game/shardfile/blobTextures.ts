@@ -8,6 +8,7 @@ import { DefaultLoadingManager, Texture } from 'three';
 import { waitFor } from '@wildshard/engine/boot/waits';
 import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
 import { contentHash } from '../../../shared/game/shardfile/contentHash';
+import { checkedImage, checkedStandIn, type StandInReads } from './standInRead';
 
 const KTX2_MAGIC = [0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a] as const;
 /** Whether the bytes are a KTX2 file (its 12-byte identifier). */
@@ -37,15 +38,18 @@ export async function readCookedTexture(url: string, resolve: (url: string) => s
 }
 
 /** The cook's KTX2 of each image blob among `refs` that the table names (`file`: undefined when this page reads images or
- *  the blob has no row), read by URL, by the blob's hash. A KTX2 blob, or a ref with no admitted bytes, is never asked. */
+ *  the blob has no row), read by URL, by the blob's hash. A KTX2 blob is never asked. SF28: a ref with no admitted bytes is a
+ *  stand-in admission left unread: its KTX2 is checked against the sha256 the download lists (`standIns.hash`), and on a page
+ *  that reads images its image is read by product URL (`standIns.image`) and checked against its hash. */
 export async function cookedBlobBytes(refs: Iterable<string>, assets: ReadonlyMap<string, Uint8Array>, file: (hash: string) => string | undefined,
-  read: (url: string) => Promise<Uint8Array> = readCookedTexture): Promise<ReadonlyMap<string, Uint8Array>> {
+  read: (url: string) => Promise<Uint8Array> = readCookedTexture, standIns?: StandInReads): Promise<ReadonlyMap<string, Uint8Array>> {
   const cooked = new Map<string, Uint8Array>();
   await Promise.all([...refs].map(async ref => {
     const bytes = assets.get(ref);
-    if (bytes === undefined || isKtx2Bytes(bytes)) return;
+    if (bytes !== undefined && isKtx2Bytes(bytes)) return;
     const url = file(ref);
-    if (url !== undefined) cooked.set(ref, await read(url));
+    if (url !== undefined) cooked.set(ref, bytes === undefined ? await checkedStandIn(url, await read(url), standIns?.hash) : await read(url));
+    else if (bytes === undefined && standIns !== undefined) cooked.set(ref, await checkedImage(ref, await standIns.image(ref)));
   }));
   return cooked;
 }

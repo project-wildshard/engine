@@ -305,7 +305,7 @@ export class ShardfileClient {
     // ordinary data homes account library/commons and tile parts independently in the same allocator.
     if (this.bindings.residency === undefined || this.source.runtime === null) await leaseClientLibrary(this.source, this.assets.retained, { validatedSource: this.validatedSource, scope: ctx.scope, allocator, owner: this.bindings.instance, textures: ktx2TranscodeSupport(world.game.renderer), read: ref => this.assets.read(ref) });
     worldStep(ctx, 'library');
-    const presentation = await clientMaterials({ ...this.source, state: this.curveState }, this.assets.retained, world.game.renderer, ctx.scope);
+    const presentation = await clientMaterials({ ...this.source, state: this.curveState }, this.assets.retained, world.game.renderer, ctx.scope, { standIns: this.assets.standInReads() });
     worldStep(ctx, 'materials');
     this.presentation = presentation;
     if (this.nativeFeatures) presentation.graphs.bind({ hour: () => world.game.sky.dayNight?.hour ?? null });

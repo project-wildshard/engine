@@ -1062,7 +1062,7 @@ export class GridSession {
               const { admitted } = retained, source = admitted.source;
               try {
                 if (scope.disposed) throw new Error('Grid product view disposed during admission');
-                const presentation = await clientMaterials(source, admitted.assets, renderer, scope);
+                const presentation = await clientMaterials(source, admitted.assets, renderer, scope, { standIns: retained.reader.standInReads() });
                 return { source, assets: retained.reader, views: clientTileViews({ terrain: source.terrain, terrainShadow: source.terrain?.shadow, terrainOrder: source.terrain?.order, ...presentation }), compile: presentation.compile,
                   scene: { materials: presentation.materials, swings: presentation.swings }, look: { bind: presentation.graphs.bind, tick: presentation.tick } };
               } catch (error) { retained.release(); throw error; }

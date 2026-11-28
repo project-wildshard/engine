@@ -12,6 +12,7 @@ import {loadBasisuAstc6} from '../src/cook/game/astc6Wasm';
 import type {Astc6Encode} from '../src/cook/game/tierTextures';
 import {gltfImageUrls, openShardfile, shardHalf, type OpenShardfile} from '../src/cook/game/shardCook';
 import {folderTarball} from '../src/cook/game/folderTarball';
+import {blobKtx2Hash} from '../src/shared/game/shardfile/tableTextureRefs';
 
 const digest = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 const pageTable = (): Uint8Array => new TextEncoder().encode(JSON.stringify({version: 1, slug: 'z', native: {ktx2: {$call: 'pageModeKtx2', args: [{shard: {phone: {}, desktop: {}}, grid: {phone: {}, desktop: {}}}]}}}));
@@ -61,4 +62,39 @@ it('lists a cooked image mount as its KTX2 alone on a phone, and keeps what a re
   expect(urls('desktop', 'whole')).toContain(mount);
   // a glTF's texture rides with its document
   expect(phoneWhole).toEqual(expect.arrayContaining([model, modelTexture]));
+}, 60_000);
+
+// SF28: a phone reads a material's image blob as the cook's KTX2 of it (`standInRead.ts`), so a phone set lists that KTX2
+// and never the image; a named one stays listed (a reader that names it decodes it raw: Nalati's horse atlas is a skin's
+// map and a posed specimen's atlas); UI art no rule names is read by an `<img>` and gets no KTX2. The desktop keeps both.
+it('lists a material image blob as its KTX2 alone on a phone, and makes no KTX2 of UI art', () => {
+  const held = openShardfile(folderTarball('test/fixtures/corpus/brasscap-mesa'), {preparationOnly: true});
+  const discovery = pageTable();
+  const mapHash = digest(png), mapPath = `blobs/image/${mapHash}.png`, mapUrl = `/shardfiles/${held.slug}/${mapPath}`;
+  const uiHash = digest(other), uiPath = `blobs/image/${uiHash}.jpg`, uiUrl = `/shardfiles/${held.slug}/${uiPath}`;
+  const atlasHash = digest(jpg), atlasPath = `blobs/image/${atlasHash}.jpg`, atlasUrl = `/shardfiles/${held.slug}/${atlasPath}`;
+  const row = (hash: string, path: string, bytes: Uint8Array, name?: string) => ({kind: 'image' as const, path, hash, compressed: bytes.length, decoded: 0, gpu: 0, triangles: 0, draws: 0, dependencies: [], critical: false, ...(name === undefined ? {} : {name})});
+  const reads = new Map<string, Uint8Array>([[`mounts/shardfiles/${held.slug}/discovery.json`, discovery], [mapPath, png], [uiPath, other], [atlasPath, jpg]]);
+  const look = {...held.source.look, materials: {...held.source.look.materials, ground: {family: 'pbr', maps: {colour: mapHash}}, hide: {family: 'pbr', maps: {colour: atlasHash}}}} as unknown as typeof held.source.look;
+  const fixture: OpenShardfile = {
+    ...held, preparationOnly: false, source: {...held.source, look, files: [...held.source.files, ...[[mapHash, png], [uiHash, other], [atlasHash, jpg]].map(([hash, bytes]) => ({kind: 'image' as const, hash: hash as string, compressed: (bytes as Uint8Array).length, decoded: 0, gpu: 0, triangles: 0, draws: 0, dependencies: [], critical: false}))]}, index: {...held.index, files: [row(mapHash, mapPath, png), row(uiHash, uiPath, other, 'ui/images/card-thumb'), row(atlasHash, atlasPath, jpg, `models/painted/atlas-${atlasHash}.jpg`)]},
+    cook: {version: 3, renderer: mapHash, inputHash: mapHash, packs: 'fence', fence: [mapHash, uiHash, atlasHash],
+      programs: {version: 2, build: 'wire-fixture', lines: ['void main() {}'], shaders: [[0]], programs: [[0, 0]]},
+      mounts: [{url: `/shardfiles/${held.slug}/discovery.json`, path: `mounts/shardfiles/${held.slug}/discovery.json`, hash: digest(discovery), bytes: discovery.length}]},
+    read: path => reads.get(path) ?? held.read(path),
+  };
+  const half = shardHalf(fixture, (_url, bytes) => bytes.length, undefined, {phone: true, encode: astc6, images: encode});
+  const phone = half.ktx2Table.phone;
+  expect(phone[mapUrl]).toMatch(/\.t512-[a-f0-9]{8}\.ktx2$/u);
+  // the page finds a listed stand-in by its path (`spawnListedBlobKtx2`), before any table is registered
+  expect(blobKtx2Hash(phone[mapUrl] ?? '')).toBe(mapHash);
+  expect(phone[uiUrl]).toBeUndefined();
+  const urls = (tier: 'phone' | 'desktop', set: 'entry' | 'whole'): string[] => [...half.folderRows(tier, set), ...half.mountRows(tier, set)].map(file => file.url.split('?')[0] ?? file.url);
+  for (const set of ['whole'] as const) {
+    expect(urls('phone', set)).toContain(phone[mapUrl]);
+    expect(urls('phone', set)).not.toContain(mapUrl);
+    expect(urls('phone', set)).toContain(uiUrl);
+    expect(urls('phone', set)).toEqual(expect.arrayContaining([atlasUrl, phone[atlasUrl]]));
+  }
+  expect(urls('desktop', 'whole')).toEqual(expect.arrayContaining([mapUrl, uiUrl]));
 }, 60_000);
