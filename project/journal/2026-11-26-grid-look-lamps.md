@@ -19,3 +19,9 @@ page's lamps.
 
 Row 154: K6's lamp check reached only Shard Select cards, and Mossgate and Glowfen have none. K6 now enters both by the
 tap (zone-entry.mjs) after the cards, past its card budget, and runs the same dark-lamps check on each.
+
+Row 153: a grid page lights at most its 5 reserved lights of a crowded look's lamps (Glowfen 14, Mossgate 16), so the
+lights move as the eye walks. `lampLights` now hands them over with hysteresis (a lamp takes a light only at 0.8 of the
+held lamp's distance) and fades each out and in over 0.25 s, so none pops; a teleport or a same-time step sets the nearest
+at once. Lamps past the reserve keep only what the shard's own meshes glow. Whether 5 of Glowfen's 14 fen glows is
+still Glowfen's look is Jake's call (the row waits on him).

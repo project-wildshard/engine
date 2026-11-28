@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { expect, test } from 'vitest';
 import type { LookLamp } from '@wildshard/format/look-light';
-import { DESKTOP_LAMPS, PHONE_LAMPS, lampLights, lookLightManifest, setLampFollow, setLampPanels } from './lookLight';
+import { DESKTOP_LAMPS, LAMP_FADE_S, PHONE_LAMPS, lampLights, lookLightManifest, setLampFollow, setLampPanels } from './lookLight';
 
 const lamp = (x: number, extra: Partial<LookLamp> = {}): LookLamp => ({ at: [x, 3, 0], colour: [1, 0.6, 0.3], intensity: 5, distance: 9, ...extra });
 const lights = (group: THREE.Group): THREE.PointLight[] => group.children.filter((child): child is THREE.PointLight => child instanceof THREE.PointLight);
@@ -74,4 +74,60 @@ test('a lamp naming a panel is lit only while that panel shows', () => {
   expect(litX(group), 'A out, B burns').toEqual([0, 8]);
   undo(); group.update?.(0);
   expect(litX(group), 'no page lookup: dark').toEqual([0]);
+});
+
+// QA 11-25 row 153: a grid page lights at most its reserve of a crowded look's lamps, so as the eye walks the lights move
+// between lamps; they fade across, with hysteresis, and never pop.
+test('walking a crowded street, no light pops: each fades out of the lamp it leaves and into the next', () => {
+  const street = Array.from({ length: 16 }, (_, i) => lamp(i * 4));
+  const group = lampLights(street, 5);
+  const eye = new THREE.Vector3(0, 1.7, 0);
+  group.update?.(0, eye);
+  expect(litX(group)).toEqual([0, 4, 8, 12, 16]);
+  let before = lights(group).map((light) => light.intensity), worst = 0, handed = 0;
+  const seen = new Set<number>();
+  for (let frame = 1; frame <= 600; frame++) {
+    eye.x = frame * 0.1; // 6 m/s at 60 fps
+    group.update?.(frame / 60, eye);
+    const now = lights(group).map((light) => light.intensity);
+    now.forEach((value, i) => { worst = Math.max(worst, Math.abs(value - (before[i] ?? 0))); });
+    for (const light of lights(group)) if (light.intensity > 0) seen.add(light.position.x);
+    handed += now.filter((value, i) => value > 0 && (before[i] ?? 0) === 0).length;
+    before = now;
+  }
+  // a frame moves a light by at most its fade step (5 / 0.25 s / 60 fps), never the lamp's whole intensity
+  expect(worst).toBeLessThanOrEqual(5 / (LAMP_FADE_S * 60) + 1e-9);
+  expect(handed).toBeGreaterThan(5);
+  expect(Math.max(...seen)).toBeGreaterThanOrEqual(60);
+});
+
+test('a lamp on the edge of the lit set does not flicker in and out as the eye stands between two', () => {
+  const street = Array.from({ length: 8 }, (_, i) => lamp(i * 4));
+  const group = lampLights(street, 2);
+  const eye = new THREE.Vector3(5.9, 1.7, 0);
+  group.update?.(0, eye);
+  expect(litX(group)).toEqual([4, 8]);
+  // swaying round the midpoint between lamps 0 and 12 (4 and 8 always nearest): the held pair never changes
+  for (let frame = 1; frame <= 120; frame++) {
+    eye.x = 6 + Math.sin(frame / 5) * 0.4;
+    group.update?.(frame / 60, eye);
+    expect(litX(group)).toEqual([4, 8]);
+  }
+  // just past the line where lamp 12 is nearer than lamp 4, the light stays on 4 (hysteresis) ...
+  eye.x = 8.2; for (let frame = 121; frame <= 180; frame++) group.update?.(frame / 60, eye);
+  expect(litX(group)).toEqual([4, 8]);
+  // ... and moves once 12 is clearly nearer
+  eye.x = 10.5; for (let frame = 181; frame <= 240; frame++) group.update?.(frame / 60, eye);
+  expect(litX(group)).toEqual([8, 12]);
+  expect(Math.min(...lights(group).map((light) => light.intensity))).toBe(5);
+});
+
+test('a teleport sets the nearest lamps at once, at full strength', () => {
+  const street = Array.from({ length: 30 }, (_, i) => lamp(i * 4));
+  const group = lampLights(street, 3);
+  group.update?.(0, new THREE.Vector3(0, 1.7, 0));
+  group.update?.(1 / 60, new THREE.Vector3(0, 1.7, 0));
+  group.update?.(2, new THREE.Vector3(100, 1.7, 0));
+  expect(litX(group)).toEqual([96, 100, 104]);
+  expect(lights(group).map((light) => light.intensity)).toEqual([5, 5, 5]);
 });

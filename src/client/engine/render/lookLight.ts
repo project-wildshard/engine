@@ -182,6 +182,13 @@ export function setLampPanels(root: THREE.Object3D, shown: LampPanelShown): () =
   return () => { if (lampPanels.get(root) === shown) lampPanels.delete(root); };
 }
 
+/** QA 11-25 row 153: a lamp waiting for a crowded look's light takes it only once it is this share of the held lamp's distance */
+export const LAMP_HYSTERESIS = 0.8;
+/** the seconds a handed-over light takes to fade out of one lamp, and again into the next */
+export const LAMP_FADE_S = 0.25;
+/** a frame step this far (seconds) from the last, or at the same time, sets the nearest lamps at once */
+export const LAMP_SNAP_S = 0.5;
+
 /** a lamp group's frame step: `time` drives the flicker, `eye` (world) picks the nearest lamps when more than `lit` exist */
 export type LampUpdate = (time: number, eye?: THREE.Vector3Like) => void;
 
@@ -212,6 +219,46 @@ export function lampLights(lamps: readonly LookLamp[], lit: number = DESKTOP_LAM
   const swinging = rows.filter((row) => row.lamp.follow === undefined && row.lamp.swing !== undefined);
   if (following.length === 0 && paneled.length === 0 && !crowded && !flickers && swinging.length === 0) return group;
   const eyeLocal = new THREE.Vector3(), chosen: typeof rows = [], swung = new THREE.Vector3();
+  // QA 11-25 row 153: a crowded look hands its lights between lamps by distance with hysteresis, fading the light out of the
+  // lamp it leaves and into the one it takes, so a light never pops as the eye walks past a lamp. Each slot holds a row
+  // (`held`), may wait to change to another (`next`) and has a strength (`fade`, 0 to 1). A call at the same time as the last,
+  // or after a long gap (a teleport, a cell entered again), sets the nearest at once.
+  type Row = (typeof rows)[number];
+  const slots = pool.map(() => ({ held: null as Row | null, next: null as Row | null, fade: 1 }));
+  let last: number | null = null;
+  const handOver = (time: number): void => {
+    const dt = last === null ? 0 : time - last;
+    last = time;
+    const distance = (row: Row): number => row.place.distanceToSquared(eyeLocal);
+    const wanted = chosen.slice(0, slots.length);
+    if (dt <= 0 || dt > LAMP_SNAP_S) {
+      slots.forEach((slot, i) => { slot.held = wanted[i] ?? null; slot.next = null; slot.fade = 1; });
+      return;
+    }
+    // a newcomer takes an empty slot at once, else the farthest held lamp no longer wanted (or gone dark: a panel shut, its
+    // actor left), only once it is LAMP_HYSTERESIS nearer than that lamp
+    for (const slot of slots) if (slot.next !== null && !wanted.includes(slot.next)) slot.next = null;
+    for (const row of wanted) {
+      if (slots.some((slot) => slot.held === row || slot.next === row)) continue;
+      const empty = slots.find((slot) => slot.held === null && slot.next === null);
+      if (empty !== undefined) { empty.held = row; empty.fade = 0; continue; }
+      let far: (typeof slots)[number] | undefined;
+      for (const slot of slots) {
+        const other = slot.held;
+        if (other === null || slot.next !== null || (other.live && wanted.includes(other))) continue;
+        if (far === undefined || far.held === null || distance(other) > distance(far.held)) far = slot;
+      }
+      const farRow = far?.held ?? null;
+      if (far !== undefined && farRow !== null && (!farRow.live || distance(row) < distance(farRow) * LAMP_HYSTERESIS ** 2)) far.next = row;
+    }
+    const step = dt / LAMP_FADE_S;
+    for (const slot of slots) {
+      if (slot.next !== null || (slot.held !== null && !slot.held.live)) {
+        slot.fade = Math.max(0, slot.fade - step);
+        if (slot.fade === 0) { slot.held = slot.next; slot.next = null; }
+      } else if (slot.held !== null) slot.fade = Math.min(1, slot.fade + step);
+    }
+  };
   group.update = (time, eye) => {
     if (swinging.length > 0) {
       const swings = swingsOf();
@@ -239,18 +286,20 @@ export function lampLights(lamps: readonly LookLamp[], lit: number = DESKTOP_LAM
     }
     chosen.length = 0;
     for (const row of rows) if (row.live) chosen.push(row);
-    if (crowded && eye !== undefined) {
+    const handing = crowded && eye !== undefined;
+    if (handing) {
       group.worldToLocal(eyeLocal.copy(eye));
       chosen.sort((a, b) => a.place.distanceToSquared(eyeLocal) - b.place.distanceToSquared(eyeLocal));
+      handOver(time);
     }
     pool.forEach((light, i) => {
-      const row = chosen[i];
+      const slot = slots[i], row = handing ? slot?.held ?? undefined : chosen[i], strength = handing ? slot?.fade ?? 1 : 1;
       if (row === undefined) { light.intensity = 0; return; }
       const flicker = row.lamp.flicker;
       light.color.copy(row.colour); light.distance = row.lamp.distance; light.decay = row.lamp.decay ?? 2; light.position.copy(row.place);
-      if (flicker === undefined || flicker.amount <= 0) { light.intensity = row.lamp.intensity; return; }
+      if (flicker === undefined || flicker.amount <= 0) { light.intensity = row.lamp.intensity * strength; return; }
       const w = Math.sin(time * flicker.rate * 2.1 + row.phase) * 0.6 + Math.sin(time * flicker.rate * 5.3 + row.phase * 1.7) * 0.4;
-      light.intensity = row.lamp.intensity * (1 - flicker.amount * 0.5 + flicker.amount * 0.5 * w);
+      light.intensity = row.lamp.intensity * strength * (1 - flicker.amount * 0.5 + flicker.amount * 0.5 * w);
     });
   };
   return group;
