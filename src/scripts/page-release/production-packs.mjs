@@ -15,6 +15,9 @@ import {agentFetch} from '../agent-requests.mjs';
 
 export const PRODUCTION_CATALOGUE = 'https://api.wildshard.io/api/catalogue.json?channel=production';
 const PACKS = 'https://packs.wildshard.io';
+const COOKED = 'https://cooked.wildshard.io';
+const RELEASES = 'https://releases.wildshard.io';
+const SHARDFILES = 'https://api.wildshard.io/api/shardfiles';
 /** Each channel's catalogue and the page origin its pack reads carry. */
 const CHANNEL = Object.freeze({
   production: {catalogue: PRODUCTION_CATALOGUE, origin: 'https://play.wildshard.io'},
@@ -43,14 +46,25 @@ async function missingPackRows(build, channel, read) {
   const {catalogue: url, origin} = CHANNEL[channel];
   const response = await read(url, {cache: 'no-store', signal: AbortSignal.timeout(30_000)});
   if (!response.ok) throw new Error(`The ${channel} catalogue answered ${response.status}`);
-  /** @type {{shards?: {slug?: unknown, hash?: unknown}[]}} */
+  /** @type {{shards?: {slug?: unknown, hash?: unknown, shardVersion?: unknown}[]}} */
   const catalogue = await response.json();
   const heads = (catalogue.shards ?? []).filter(head => typeof head.slug === 'string' && typeof head.hash === 'string');
   if (heads.length === 0) throw new Error(`${channel} advertises no heads`);
+  // Fix preview PV16, PV25: a build signed with a cook has its heads in the versioned cook, not under index/<build>
+  // (v0.1.101's staging tour waited 45 min on legacy indexes the versioned cook never writes).
+  const cook = await signedCook(build, channel, read);
+  const versions = cook === undefined ? undefined : await rawVersions(heads, read);
+  const indexURL = (/** @type {{slug: string, hash: string}} */ head) => {
+    if (cook === undefined || versions === undefined) return `${PACKS}/index/${build}/${head.hash}.json`;
+    const version = versions.get(head.hash);
+    return version === undefined ? undefined : `${COOKED}/shards/${head.slug}/${version}/cooks/${cook.version}/${cook.hash}/index.json`;
+  };
   const rows = await Promise.all(heads.map(async head => {
     let status = 0;
     try {
-      const index = await read(`${PACKS}/index/${build}/${String(head.hash)}.json`, {
+      const at = indexURL({slug: String(head.slug), hash: String(head.hash)});
+      if (at === undefined) return {slug: String(head.slug), hash: String(head.hash), status};
+      const index = await read(at, {
         cache: 'no-store', redirect: 'error', headers: {Origin: origin}, signal: AbortSignal.timeout(30_000)});
       status = index.status;
       await index.body?.cancel();
@@ -60,8 +74,49 @@ async function missingPackRows(build, channel, read) {
   return rows.filter(row => row !== undefined);
 }
 
+/**
+ * The cook a signed channel file names for this exact build: the channel's own, else staging's (production checks a build
+ * staging signed first). Undefined for a build signed without one, which keeps the legacy index/<build> check.
+ * @param {string} build @param {'production'|'staging'} channel @param {Fetch} read
+ * @returns {Promise<{version: string, hash: string} | undefined>}
+ */
+async function signedCook(build, channel, read) {
+  for (const name of new Set([channel, 'staging'])) {
+    /** @type {{engineBuild?: unknown, cook?: {version?: unknown, hash?: unknown}}} */
+    let body = {};
+    // An unreadable release file keeps the stricter legacy check; it never waves a head through.
+    try {
+      const response = await read(`${RELEASES}/${name}.json`, {cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(30_000)});
+      /** @type {{body?: unknown}} */
+      const signed = response.ok ? await response.json() : {};
+      if (typeof signed.body === 'string') body = JSON.parse(signed.body);
+    } catch { continue; }
+    if (body.engineBuild !== build) continue;
+    const {version, hash} = body.cook ?? {};
+    return typeof version === 'string' && typeof hash === 'string' ? {version, hash} : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Each head's raw shard version: the catalogue's, else the API's upload row for that hash (an upload from before J524).
+ * @param {{hash?: unknown, shardVersion?: unknown}[]} heads @param {Fetch} read @returns {Promise<Map<string, string>>}
+ */
+async function rawVersions(heads, read) {
+  const versions = new Map(heads.filter(head => typeof head.shardVersion === 'string').map(head => [String(head.hash), String(head.shardVersion)]));
+  if (versions.size === heads.length) return versions;
+  const response = await read(SHARDFILES, {cache: 'no-store', signal: AbortSignal.timeout(30_000)});
+  if (!response.ok) throw new Error(`The API's shardfile list answered ${response.status}`);
+  /** @type {{shardfiles?: {hash?: unknown, shardVersion?: unknown}[]}} */
+  const list = await response.json();
+  for (const row of list.shardfiles ?? []) {
+    if (typeof row.hash === 'string' && typeof row.shardVersion === 'string' && !versions.has(row.hash)) versions.set(row.hash, row.shardVersion);
+  }
+  return versions;
+}
+
 /** @param {MissingPack} pack */
-const describe = ({slug, status}) => `${slug} ${status === 0 ? 'unread' : status}`;
+const describe =({slug, status}) => `${slug} ${status === 0 ? 'unread' : status}`;
 
 /** @param {string} build @param {'production'|'staging'} channel @param {Fetch} [read] */
 export async function missingPacks(build, channel, read = agentFetch) {

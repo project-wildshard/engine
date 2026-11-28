@@ -37,6 +37,33 @@ test('the pack wait passes once every head is cooked, and holds with the missing
     .rejects.toThrow(/still missing on 2 head\(s\) after 3 min: brasscap-mesa 404, glowfen 404/u);
 });
 
+// PV25: v0.1.101's staging tour waited 45 min on index/<build> for heads the versioned cook had already written.
+test('a build signed with a cook waits on each head\'s cooked index at that cook, by its raw version', async () => {
+  const cook = {version: '1.19.0', hash: 'c'.repeat(64)}, at = `cooks/1.19.0/${cook.hash}/index.json`;
+  const signed = (engineBuild: string, withCook = true): Response => Response.json({body: JSON.stringify({engineBuild, ...(withCook ? {cook} : {})}), signature: 'x'});
+  let staging = signed(build), cooked = new Set([`pine-hollow/0.0.18/${at}`]);
+  const seen: string[] = [];
+  const read = (url: string, init?: RequestInit): Promise<Response> => {
+    seen.push(`${url} ${new Headers(init?.headers).get('origin') ?? ''}`.trim());
+    if (url.includes('/api/catalogue.json')) return Promise.resolve(Response.json({shards: [{slug: 'pine-hollow', hash: 'h1', shardVersion: '0.0.18'}, {slug: 'open-plot-sky-race', hash: 'h2', shardVersion: null}]}));
+    if (url.endsWith('/api/shardfiles')) return Promise.resolve(Response.json({shardfiles: [{hash: 'h2', shard: 'open-plot-sky-race', shardVersion: '0.0.4'}]}));
+    if (url === 'https://releases.wildshard.io/staging.json') return Promise.resolve(staging.clone());
+    if (url === 'https://releases.wildshard.io/production.json') return Promise.resolve(signed('b'.repeat(40)));
+    const key = url.replace('https://cooked.wildshard.io/shards/', '');
+    return Promise.resolve(new Response('{}', {status: cooked.has(key) ? 200 : 404}));
+  };
+  const opts = {read, log: () => undefined, limitMs: 0};
+  await expect(waitForPacks(build, 'staging', opts)).rejects.toThrow(/still missing on 1 head\(s\).*open-plot-sky-race 404/u);
+  cooked.add(`open-plot-sky-race/0.0.4/${at}`);
+  await waitForPacks(build, 'staging', opts);
+  expect(seen).toContain(`https://cooked.wildshard.io/shards/open-plot-sky-race/0.0.4/${at} https://staging.wildshard.io`);
+  // Production checks the build staging signed, and a build signed with no cook keeps the legacy index/<build> read.
+  expect(await missingProductionPacks(build, read)).toEqual([]);
+  staging = signed(build, false); cooked = new Set();
+  expect(await missingProductionPacks(build, read)).toEqual(['pine-hollow 404', 'open-plot-sky-race 404']);
+  expect(seen).toContain(`https://packs.wildshard.io/index/${build}/h1.json https://play.wildshard.io`);
+});
+
 test('RL10 staging lists the exact stale heads and still refuses other missing packs', async () => {
   const release = '37db5402c1c5f8424765e2383638bcd556c946b6';
   const nalati = 'b730599048b8a4a2797b3b2ad3a36d90c40870650a3002ca416a5fa09ad9b718';

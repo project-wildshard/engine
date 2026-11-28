@@ -71,3 +71,28 @@ test('a packed road input is recovered from its part and verified before use', a
   writeFileSync(join(bucket, key), brotliCompressSync(Buffer.concat([prefix, Buffer.alloc(bytes.length)])));
   await expect(reader.fetchFile(`/${logical}`)).rejects.toThrow('Cooked member digest differs');
 });
+
+// PV27: the cook packs a zone's sections into the tier parts its whole-set manifest lists; v0.1.101's bake read none of them.
+test('a section packed only in a whole-set manifest part is read from that part', async () => {
+  const dir = root(), bucket = join(dir, 'cooked'), {table, origin} = cookedFixture(dir, bucket, {slugs: ['isle-one']});
+  const [row] = table.zones;
+  if (row === undefined) throw new Error('no zone');
+  const file = join(bucket, row.index), index = JSON.parse(readFileSync(file, 'utf8')) as {objects: Record<string, string>};
+  const logical = 'shardfiles/isle-one/sections/world-edge.json', edgeKey = index.objects[logical];
+  if (edgeKey === undefined) throw new Error('no edge');
+  const bytes = readFileSync(join(bucket, edgeKey)), prefix = Buffer.from('other file');
+  const prefixFor = `shards/isle-one/${row.shardVersion}/common/`;
+  writeFileSync(join(bucket, `${prefixFor}part.pack.br`), brotliCompressSync(Buffer.concat([prefix, bytes])));
+  const manifest = {files: [{url: '/shardfiles/isle-one/other.json?v=1', bytes: prefix.length, hash: await contentHash(prefix)},
+    {url: `/${logical}?v=2`, bytes: bytes.length, hash: await contentHash(bytes)}], parts: [{url: '/assets/spawn/parts/0000000000000001.pack.br', members: [[0, 0], [1, prefix.length]]}]};
+  writeFileSync(join(bucket, `${prefixFor}manifest.json`), JSON.stringify(manifest));
+  delete index.objects[logical];
+  index.objects['assets/spawn/parts/0000000000000001.pack.br'] = `${prefixFor}part.pack.br`;
+  index.objects['assets/spawn/isle-one-whole-desktop-0000000000000001.json'] = `${prefixFor}manifest.json`;
+  const manifests = [{url: '/assets/spawn/isle-one-whole-desktop-0000000000000001.json', tier: 'desktop', set: 'whole'}];
+  writeFileSync(file, JSON.stringify({...index, manifests}));
+  const reader = await cookedReader(table, {origin});
+  expect(await (await reader.fetchFile(`/${logical}?v=2`)).text()).toBe(bytes.toString());
+  writeFileSync(file, JSON.stringify({...index, manifests: [{...manifests[0], url: '/assets/spawn/missing-0000000000000001.json'}]}));
+  await expect(cookedReader(table, {origin})).rejects.toThrow(/maps no \/assets\/spawn\/missing/u);
+});
