@@ -28,7 +28,8 @@ describe('SF14: zone art from the page', () => {
     // v0.1.101's staging SF14: the engine's boot tables and road seam plans are the build's own (PV6)
     expect(zoneArtFromPage('/assets/boot-tables-4101cd17.json', known)).toBe(false);
     expect(zoneArtFromPage('/assets/grid-seam-plans-aced7c9a.json', known)).toBe(false);
-    expect(zoneArtFromPage('/assets/boot-tables-pine-hollow.json', known)).toBe(true);
+    expect(zoneArtFromPage('/assets/grid-seams-b74aa1ec.json', known)).toBe(false);
+    expect(zoneArtFromPage('/assets/world-map-7b71b9dea5ca7165.webp', known)).toBe(false);
   });
 });
 
@@ -60,6 +61,13 @@ describe('SF14: a tier passes only on its zone read from the cook', () => {
     const other = tierReads([{url: `${cook}shards/sunscar-dunes/0.0.9/cooks/1.11.0/abc/index.json`, status: 200},
       {url: `${cook}shards/pine-hollow/0.5.22/cooks/1.11.0/abc/index.json`, status: 404}], where);
     expect(tierFailure({gameplayMs: 5000, ...other})).toBe('no read of the zone from the cook');
+  });
+
+  // v0.1.101: Desert Ruin is in the cook's table but not on the live grid; a tap answers NOT-IN-WORLD by design
+  it('does not judge a zone the live grid has not placed', () => {
+    const none = tierReads([{url: `${page}/index.html`, status: 200}], where);
+    expect(tierFailure({gameplayMs: null, ...none, placed: false})).toBeUndefined();
+    expect(tierFailure({gameplayMs: null, ...none, placed: true})).toBe('no gameplay');
   });
 
   it('passes a tier with gameplay, a zone read from the cook and no zone art from the page', () => {

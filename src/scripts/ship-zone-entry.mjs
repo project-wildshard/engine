@@ -16,15 +16,14 @@ import {mkdirSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
+import {ENGINE_S6} from './app-build/zoneless.mjs';
 import {isArt, readList} from './public-verdicts.mjs';
 
 const COOKED = 'https://cooked.wildshard.io/';
 const FINGERPRINT = /-[0-9a-f]{16}(\.[a-z0-9]+)$/u;
 const ENGINE_LIST = 'src/scripts/public-engine.json';
-/** What the build writes itself: physics, Basis and the spawn packs (SF12's runtime), and the engine's own boot tables and grid
- *  seam plans (PV6: the road is engine, baked at build time). v0.1.101's SF14 counted the last two as zone art.
- * @param {string} file */
-const isRuntime = file => /^(?:assets\/(?:physics|spawn|packs)\/|basis\/|assets\/(?:boot-tables|grid-seam-plans)-[0-9a-f]{8}\.json$)/u.test(file);
+/** What the build writes under public/ itself: physics, Basis and the spawn packs (SF12's runtime). @param {string} file */
+const isRuntime = file => /^(?:assets\/(?:physics|spawn|packs)\/|basis\/)/u.test(file);
 
 /** The zones and cook origin a page's zone table names (the shape `src/shared/game/grid/zoneTable.ts` reads).
  * @param {unknown} input @returns {{origin: string, zones: string[]}} */
@@ -45,6 +44,8 @@ export function tableZones(input) {
  * @returns {boolean} */
 export function zoneArtFromPage(path, {engine, zones}) {
   if (path.startsWith('/shardfiles/')) return true;
+  // The page's own S6 files (PV3, PV6): the road, the boot tables and the world map. v0.1.101's SF14 counted them as zone art.
+  if (ENGINE_S6.test(path.slice(1))) return false;
   const file = path.replace(FINGERPRINT, '$1').slice(1);
   if (!isArt(file) || file.startsWith('assets/title/')) return false;
   return zones.some(slug => file.includes(slug)) || (!engine.has(file) && !isRuntime(file));
@@ -66,8 +67,9 @@ export function tierReads(reads, {page, cook, zone, engine, zones}) {
 }
 
 /** Why a tier fails, or undefined when it passes: gameplay reached, at least one of its zone's reads answered by the cook, and
- *  no zone art from the page. @param {{gameplayMs: number|null, zoneFromCook: number, zoneFromPage: readonly string[]}} verdict */
-export function tierFailure({gameplayMs, zoneFromCook, zoneFromPage}) {
+ *  no zone art from the page. @param {{gameplayMs: number|null, zoneFromCook: number, zoneFromPage: readonly string[], placed?: boolean}} verdict */
+export function tierFailure({gameplayMs, zoneFromCook, zoneFromPage, placed = true}) {
+  if (!placed) return undefined;
   if (gameplayMs === null) return 'no gameplay';
   if (zoneFromCook === 0) return 'no read of the zone from the cook';
   if (zoneFromPage.length > 0) return `zone art from the page (${zoneFromPage.slice(0, 3).join(', ')})`;
@@ -119,27 +121,30 @@ async function main() {
         context.on('requestfailed', request => { reads.push({url: request.url(), status: -1}); });
         page.on('pageerror', error => { errors.push(String(error.message).slice(0, 300)); });
         const started = Date.now();
-        let gameplayMs = null;
+        let gameplayMs = null, placed = true;
         try {
           await enterZone(page, {zone: slug, base, flags, alone: o.alone, waitUntil: 'commit', timeout: Number(o.timeout)});
           for (const deadline = Date.now() + Number(o.timeout); ;) {
             const seen = await page.evaluate(bootObservation).catch(() => null);
             if (seen !== null && seen.fatal.length > 0) throw new Error(`fatal: ${seen.fatal.join(' | ').slice(0, 300)}`);
             if (seen?.ready === true) break;
+            // SF14: the cook holds every zone the table names, but a player reaches only those the live grid places. A tap into
+            // an unplaced one (v0.1.101: Desert Ruin) answers NOT-IN-WORLD, by design: it is recorded as unplaced, not a failure.
+            if (await page.evaluate(() => document.body?.innerText.includes('NOT-IN-WORLD') === true).catch(() => false)) { placed = false; break; }
             if (seen?.revealing === true) await page.locator('.ws-grid-reveal').dispatchEvent('pointerdown').catch(() => undefined);
             if (Date.now() > deadline) throw new Error(`no gameplay in ${o.timeout} ms (app ${seen?.appState ?? 'unavailable'})`);
             await page.waitForTimeout(500);
           }
-          gameplayMs = Date.now() - started;
+          if (placed) gameplayMs = Date.now() - started;
           await page.waitForTimeout(Number(o.settle));
         } catch (error) { errors.push(String(error instanceof Error ? error.message : error).split('\n')[0] ?? ''); }
         await page.screenshot({path: join(out, `${slug}-${tier}.jpg`), type: 'jpeg', quality: 80}).catch(() => undefined);
         await context.close();
-        const verdict = {gameplayMs, ...tierReads(reads, {page: base, cook: table.origin, zone: slug, engine, zones: table.zones}), errors};
+        const verdict = {placed, gameplayMs, ...tierReads(reads, {page: base, cook: table.origin, zone: slug, engine, zones: table.zones}), errors};
         results[slug][tier] = verdict;
         const why = tierFailure(verdict);
         if (why !== undefined) failed = true;
-        console.log(`${slug} ${tier}: ${why === undefined ? 'pass' : `FAIL: ${why}`}; gameplay ${gameplayMs === null ? 'MISSED' : `${gameplayMs} ms`}, ${verdict.requests} reads (${verdict.fromCook} cook, ${verdict.zoneFromCook} of the zone; ${verdict.fromPage} page), zone art from the page ${verdict.zoneFromPage.length}, missing ${verdict.missing.length}`);
+        console.log(`${slug} ${tier}: ${!placed ? 'not placed on the live grid (NOT-IN-WORLD), not judged' : why === undefined ? 'pass' : `FAIL: ${why}`}; gameplay ${gameplayMs === null ? 'MISSED' : `${gameplayMs} ms`}, ${verdict.requests} reads (${verdict.fromCook} cook, ${verdict.zoneFromCook} of the zone; ${verdict.fromPage} page), zone art from the page ${verdict.zoneFromPage.length}, missing ${verdict.missing.length}`);
       }
     }
   } finally { await browser.close(); }

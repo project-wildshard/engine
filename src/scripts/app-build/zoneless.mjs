@@ -9,7 +9,7 @@ import {dirname, join, relative, resolve} from 'node:path';
 import {classify, shardNames} from '../page-size.mjs';
 
 /** The page's own S6 files: the road (grid seams, seam plans, strip books, pages and meshes), the boot tables and the world map. */
-const ENGINE_S6 = /^assets\/(?:grid-(?:seams|seam-plans|strip-(?:book|page|mesh))|boot-tables|world-map)-[\w-]+\.(?:json|bin|webp)$/u;
+export const ENGINE_S6 = /^assets\/(?:grid-(?:seams|seam-plans|strip-(?:book|page|mesh))|boot-tables|world-map)-[\w-]+\.(?:json|bin|webp)$/u;
 /** The engine's own spawn book and manifests (`engine-<build>.json`, `engine-client-*`, `engine-grid-*`): they name engine files only. */
 const ENGINE_SPAWN = /^assets\/spawn\/engine-[\w-]+\.json$/u;
 /** The classes PV3 and PV8 keep out of a zoneless page. */
