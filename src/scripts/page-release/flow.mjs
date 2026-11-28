@@ -99,6 +99,8 @@ export function pinnedReleaseKey(configured) {
  * @property {(context: HostContext & {deployment: Deployment}, names: readonly string[]) => Promise<Map<string, Digest>>} deployedDigests
  *   The uploaded, unaliased deployment's content digest for each of `names`, after the host checks it owns it.
  * @property {(context: HostContext & {deployment: Deployment}) => Promise<void>} goLive  The alias move.
+ * @property {(context: HostContext & {deployment: Deployment}) => Promise<string[]>} [unserved]  PV22: every file of the output
+ *   directory, read from the uploaded version; each one that does not answer 200 is `<path> <status>`.
  * @property {(step: 'prepare'|'package'|'upload'|'deployedDigests'|'goLive', context: HostContext) => string[]} describe
  *   What a step would run, for --dry-run. Never includes a credential.
  *
@@ -286,10 +288,21 @@ export async function runPhase(phase, deps) {
       // QA 82 follow-up: a catalogue may place a cell the table lacks (preview's borrowed table did); its discovery would 404 at
       // every boot. Every channel checks the catalogue it bakes: preview's grid, or the pins.
       const baked = [`--catalogue=${(channel.solo ? deps.catalogue : undefined) ?? 'test/pins/catalogue.json'}`];
-      if (!dry) deps.run('node', ['--import', './src/scripts/bake-loader.mjs', 'src/scripts/page-release/zone-table.mjs', 'check', table, `--page=${channel.origin}`, ...baked], {});
+      // PV22: and every index admits the page's own validator, or the page refuses every zone (v0.1.102's preview, 11-28)
+      const validator = [`--validator-from=${deps.host.outputDir(context)}/index.html`];
+      if (!dry) deps.run('node', ['--import', './src/scripts/bake-loader.mjs', 'src/scripts/page-release/zone-table.mjs', 'check', table, `--page=${channel.origin}`, ...baked, ...validator], {});
     }
     for (const line of deps.host.describe('deployedDigests', deployed)) plan(line);
     if (!dry) await checkDeployed(deps, deployed, refuse);
+    // PV22: the version serves every file the build wrote, not only the documents compared above
+    if (deps.host.unserved !== undefined) {
+      plan(`read every file of ${deps.host.outputDir(context)} from ${deployment.url}: each must answer 200 (PV22)`);
+      if (!dry) {
+        const gone = await deps.host.unserved(deployed);
+        if (gone.length > 0) refuse(`${deployment.id} does not serve ${gone.length} file(s) the build wrote (PV22): ${gone.slice(0, 8).join(', ')}`);
+        else deps.log(`PASS ${channel.channel} ${deployment.id} serves every file the build wrote`);
+      }
+    }
     // Fix-preview PV13 (Jake, 2026-11-26: "preview deploy github action should not write to R2"): preview signs no
     // releases/preview.json and reads no gate of its own; it follows staging (QA 11-26 row 9).
     if (!channel.solo) {

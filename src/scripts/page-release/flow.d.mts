@@ -16,6 +16,8 @@ export interface PageHost {
   package: (context: HostContext) => Promise<void>;
   upload: (context: HostContext) => Promise<Deployment>;
   deployedDigests: (context: HostContext & { deployment: Deployment }, names: readonly string[]) => Promise<Map<string, Digest>>;
+  /** PV22: every output file the uploaded version does not answer 200, as `<path> <status>`. */
+  unserved?: (context: HostContext & { deployment: Deployment }) => Promise<string[]>;
   goLive: (context: HostContext & { deployment: Deployment }) => Promise<void>;
   describe: (step: HostStep, context: HostContext) => string[];
 }

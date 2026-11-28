@@ -6,7 +6,9 @@
 // local half of the same proof (SF5 to SF9); this one runs against the live page once the re-packed zones pin.
 //
 //   node src/scripts/ship-zone-entry.mjs [--base https://staging.wildshard.io] [--zones slug,slug] [--tiers desktop,phone]
-//     [--out tmp/ship-zone-entry] [--timeout ms] [--settle ms] [--alone]
+//     [--out tmp/ship-zone-entry] [--timeout ms] [--settle ms] [--alone] [--candidate https://<id>-<worker>.<sub>.workers.dev]
+// --candidate (fix preview PV22): enter an uploaded Worker version before go-live, served under --base's origin, so the
+// cook's CORS and the page's own paths are the live ones; every page read is answered by the candidate version.
 // The proof is `<out>/ship.json`: per zone and tier, the gameplay time, the reads by origin, `zoneFromCook` (the zone's reads the
 // cook answered), `zoneFromPage` (page-origin zone art) and the missing reads. Exit 1 when any zone and tier misses gameplay,
 // reads nothing of its zone from the cook, or reads zone art from the page.
@@ -63,7 +65,9 @@ export function tierReads(reads, {page, cook, zone, engine, zones}) {
   const fromCook = reads.filter(row => new URL(row.url).origin === cookOrigin);
   const zoneFromCook = fromCook.filter(row => row.status >= 200 && row.status < 300 && new URL(row.url).pathname.includes(`/shards/${zone}/`)).length;
   return {requests: reads.length, fromCook: fromCook.length, zoneFromCook, fromPage: onPage.length,
-    zoneFromPage: [...new Set(zoneFromPage)].sort(), missing: [...new Set(reads.filter(row => row.status === 404 || row.status === -1).map(row => row.url))].sort()};
+    zoneFromPage: [...new Set(zoneFromPage)].sort(), missing: [...new Set(reads.filter(row => row.status === 404 || row.status === -1).map(row => row.url))].sort(),
+    // PV22: a 404 is a file the server lacks; -1 is a read that never answered (aborted, CORS). v0.1.102's preview run read both as one.
+    notFound: [...new Set(reads.filter(row => row.status === 404).map(row => row.url))].sort()};
 }
 
 /** Why a tier fails, or undefined when it passes: gameplay reached, at least one of its zone's reads answered by the cook, and
@@ -79,11 +83,12 @@ export function tierFailure({gameplayMs, zoneFromCook, zoneFromPage, placed = tr
 async function main() {
   const {values: o} = parseArgs({options: {base: {type: 'string', default: 'https://staging.wildshard.io'}, zones: {type: 'string'},
     tiers: {type: 'string', default: 'desktop,phone'}, out: {type: 'string', default: 'tmp/ship-zone-entry'}, timeout: {type: 'string', default: '120000'},
-    settle: {type: 'string', default: '3000'}, alone: {type: 'boolean', default: false}}});
+    settle: {type: 'string', default: '3000'}, alone: {type: 'boolean', default: false}, candidate: {type: 'string'}}});
   const base = new URL(o.base).origin, out = resolve(o.out);
+  const candidate = o.candidate === undefined ? undefined : new URL(o.candidate).origin;
   mkdirSync(out, {recursive: true});
   const {agentHeaders, agentUrl} = await import('./agent-marker.mjs');
-  const response = await fetch(`${base}/zone-table.json`, {headers: agentHeaders()});
+  const response = await fetch(`${candidate ?? base}/zone-table.json`, {headers: agentHeaders()});
   if (!response.ok) throw new Error(`${base}/zone-table.json: HTTP ${response.status}; the page is not zone-free yet`);
   const table = tableZones(await response.json());
   const zones = o.zones === undefined ? table.zones : o.zones.split(',');
@@ -115,6 +120,12 @@ async function main() {
         if (shape === undefined) throw new Error(`Unknown tier ${tier}`);
         const context = await browser.newContext({...shape, serviceWorkers: 'block'}), page = await context.newPage();
         await saveFixture(context, NAME_ASKED);
+        // PV22: the candidate version answers every page read under the live origin (the cook's CORS names that origin)
+        if (candidate !== undefined) await context.route(`${base}/**`, async route => {
+          const from = new URL(route.request().url());
+          try { await route.fulfill({response: await route.fetch({url: `${candidate}${from.pathname}${from.search}`})}); }
+          catch { await route.abort().catch(() => undefined); }
+        });
         /** @type {{url: string, status: number}[]} */ const reads = [];
         /** @type {string[]} */ const errors = [];
         context.on('requestfinished', request => { void request.response().then(answer => { reads.push({url: request.url(), status: answer?.status() ?? 0}); }); });
@@ -144,7 +155,7 @@ async function main() {
         results[slug][tier] = verdict;
         const why = tierFailure(verdict);
         if (why !== undefined) failed = true;
-        console.log(`${slug} ${tier}: ${!placed ? 'not placed on the live grid (NOT-IN-WORLD), not judged' : why === undefined ? 'pass' : `FAIL: ${why}`}; gameplay ${gameplayMs === null ? 'MISSED' : `${gameplayMs} ms`}, ${verdict.requests} reads (${verdict.fromCook} cook, ${verdict.zoneFromCook} of the zone; ${verdict.fromPage} page), zone art from the page ${verdict.zoneFromPage.length}, missing ${verdict.missing.length}`);
+        console.log(`${slug} ${tier}: ${!placed ? 'not placed on the live grid (NOT-IN-WORLD), not judged' : why === undefined ? 'pass' : `FAIL: ${why}`}; gameplay ${gameplayMs === null ? 'MISSED' : `${gameplayMs} ms`}, ${verdict.requests} reads (${verdict.fromCook} cook, ${verdict.zoneFromCook} of the zone; ${verdict.fromPage} page), zone art from the page ${verdict.zoneFromPage.length}, missing ${verdict.missing.length} (404 ${verdict.notFound.length}${verdict.notFound.length === 0 ? '' : `: ${verdict.notFound.slice(0, 4).join(' ')}`})`);
       }
     }
   } finally { await browser.close(); }

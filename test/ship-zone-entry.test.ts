@@ -45,6 +45,8 @@ describe('SF14: a tier\'s reads', () => {
     expect(tierReads(reads, {page: 'https://staging.wildshard.io', cook: 'https://cooked.wildshard.io/', zone: 'pine-hollow', ...known})).toEqual({
       requests: 5, fromCook: 1, zoneFromCook: 1, fromPage: 4, zoneFromPage: ['/assets/pine-hollow/tex/bark.ktx2'],
       missing: ['https://staging.wildshard.io/assets/sunscar-dunes/sand.png'],
+      // PV22: a 404 apart from a read that never answered
+      notFound: ['https://staging.wildshard.io/assets/sunscar-dunes/sand.png'],
     });
   });
 });

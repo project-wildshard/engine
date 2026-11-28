@@ -19,5 +19,7 @@ export function cookSkew(mainCookVersion: string, table: Pick<ZoneTable, 'cookVe
 export function mainCookVersion(root: string): string;
 export function mainCook(root: string): { version: string; hash: string };
 export function ownZoneTable(options: { channel: 'staging' | 'production'; build: string; serial: number; catalogue: { shards: readonly { slug: string; shardVersion?: string }[]; placements?: readonly { slug: string }[] }; cook: { version: string; hash: string } }): { table: ZoneTable; missing?: undefined } | { table?: undefined; missing: string[] };
-export function checkCooked(table: ZoneTable, options?: { read?: Read; origin?: string; page?: string; concurrency?: number }): Promise<{ zones: number; objects: number; missing: string[] }>;
+export function checkCooked(table: ZoneTable, options?: { read?: Read; origin?: string; page?: string; concurrency?: number; validator?: string }): Promise<{ zones: number; objects: number; missing: string[] }>;
+/** PV22: the shardfile validator a built page admits by. */
+export function pageValidator(html: string): string | undefined;
 export function borrowZoneTable(options: { release?: string; placements?: string; cookVersion: string; read?: Read; releaseKey?: string; placementKey?: string; catalogue?: PageCatalogue }): Promise<ZoneTable>;

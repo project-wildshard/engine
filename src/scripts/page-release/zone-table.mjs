@@ -8,10 +8,13 @@
 // PV1's checks prove the bytes the same, so preview reads staging's index.
 //
 // The go-live check (`check`) GETs every zone's index and HEADs every object it maps, as production-packs.mjs does for production;
-// one miss refuses the deploy, so preview never goes live into a 404.
+// one miss refuses the deploy, so preview never goes live into a 404. With `--validator-from=<index.html>` (PV22) every index must
+// also admit the page's own shardfile validator: the page refuses an index whose `verdict.revision` differs, so a page built on a
+// validator staging's cook never ran (main ahead of staging: engine 71e3ee183's preview on v0.1.102's cook, 11-28) would show
+// PV11's "a file is gone" card for every zone. Preview then keeps its live build until a staging release cooks that validator.
 //
 //   node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/zone-table.mjs build <out.json> [--release=<url>] [--placements=<url>] [--cook-version=<x.y.z>]
-//   node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/zone-table.mjs check <table.json> [--origin=<url>] [--page=<origin>]
+//   node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/zone-table.mjs check <table.json> [--origin=<url>] [--page=<origin>] [--validator-from=<index.html>]
 //   node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/zone-table.mjs own <out.json> --channel=<staging|production> --build=<sha>
 import {execFileSync} from 'node:child_process';
 import {appendFileSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
@@ -134,16 +137,23 @@ export function ownZoneTable({channel, build, serial, catalogue, cook}) {
   return {table: readZoneTable({version: 1, from: {channel, serial, engineBuild: build}, cookVersion: cook.version, cookHash: cook.hash, zones})};
 }
 
-const IndexObjects = v.object({objects: v.record(v.string(), v.string())});
+const IndexObjects = v.object({objects: v.record(v.string(), v.string()), verdict: v.optional(v.looseObject({revision: v.optional(v.string())}))});
+
+/** PV22: the shardfile validator a built page admits by (`__WS_SHARDFILE_VALIDATOR__`), or undefined for a page with none.
+ * @param {string} html @returns {string|undefined} */
+export function pageValidator(html) {
+  return /__WS_SHARDFILE_VALIDATOR__="([a-f0-9]{64})"/u.exec(html)?.[1];
+}
 
 /**
  * PV2's go-live check: every zone's index answers 200 and parses, and every object it maps under its own shard version answers 200
- * to a HEAD. Each miss is `<slug> <key> <status>`. Reads with the page's Origin, as the page will.
+ * to a HEAD. Each miss is `<slug> <key> <status>`. Reads with the page's Origin, as the page will. PV22: with `validator`, an index
+ * whose `verdict.revision` is another is a miss too (`<slug> admits validator <x>, the page <y>`): the page refuses it.
  * @param {ZoneTable} table
- * @param {{read?: Read, origin?: string, page?: string, concurrency?: number}} [options]
+ * @param {{read?: Read, origin?: string, page?: string, concurrency?: number, validator?: string}} [options]
  * @returns {Promise<{zones: number, objects: number, missing: string[]}>}
  */
-export async function checkCooked(table, {read = agentFetch, origin = COOKED_ORIGIN, page, concurrency = 32} = {}) {
+export async function checkCooked(table, {read = agentFetch, origin = COOKED_ORIGIN, page, concurrency = 32, validator} = {}) {
   const headers = page === undefined ? undefined : {Origin: page};
   /** @type {string[]} */ const missing = [];
   /** @type {{slug: string, key: string}[]} */ const heads = [];
@@ -161,6 +171,11 @@ export async function checkCooked(table, {read = agentFetch, origin = COOKED_ORI
     if (index.status !== 200) { missing.push(`${row.slug} ${row.index} ${said(index.status)}`); return; }
     const parsed = v.safeParse(IndexObjects, index.body);
     if (!parsed.success) { missing.push(`${row.slug} ${row.index} names no objects`); return; }
+    const revision = parsed.output.verdict?.revision;
+    if (validator !== undefined && revision !== validator) {
+      missing.push(`${row.slug} admits validator ${revision?.slice(0, 12) ?? 'none'}, the page ${validator.slice(0, 12)}`);
+      return;
+    }
     const own = cookedShardPrefix(zoneRef(table, row));
     for (const key of new Set(Object.values(parsed.output.objects))) {
       if (!key.startsWith(own)) { missing.push(`${row.slug} ${key} outside ${own}`); continue; }
@@ -280,8 +295,12 @@ async function main(argv) {
     const unserved = unservedPlacements(table, JSON.parse(readFileSync(resolve(baked), 'utf8')));
     if (unserved.length > 0) throw new ZoneTableRefusal(`the page's catalogue places ${unserved.length} zone(s) its zone table doesn't serve, so each boot's discovery answers 404: ${unserved.join(', ')}`);
   }
-  const page = flag('page');
-  const result = await checkCooked(table, {origin: flag('origin') ?? COOKED_ORIGIN, ...(page === undefined ? {} : {page})});
+  const page = flag('page'), validatorFrom = flag('validator-from');
+  const validator = validatorFrom === undefined ? undefined : pageValidator(readFileSync(resolve(validatorFrom), 'utf8'));
+  if (validatorFrom !== undefined && validator === undefined) throw new ZoneTableRefusal(`${validatorFrom} names no shardfile validator`);
+  const result = await checkCooked(table, {origin: flag('origin') ?? COOKED_ORIGIN, ...(page === undefined ? {} : {page}), ...(validator === undefined ? {} : {validator})});
+  const refused = result.missing.filter(line => line.includes(' admits validator '));
+  if (refused.length > 0) throw new ZoneTableRefusal(`the page would refuse ${refused.length} of ${result.zones} cooked zones (PV22): ${refused.slice(0, 4).join('; ')}; it was built on a validator staging's cook has not run, so it waits for a staging release that cooks it`);
   if (result.missing.length > 0) throw new ZoneTableRefusal(`${result.missing.length} cooked object(s) missing for ${result.zones} zones: ${result.missing.slice(0, 12).join('; ')}`);
   console.log(`PASS cooked: ${result.zones} zone indexes and ${result.objects} objects answer 200`);
 }

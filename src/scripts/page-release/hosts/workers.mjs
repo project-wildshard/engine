@@ -15,10 +15,11 @@
 import {createHash} from 'node:crypto';
 import {existsSync, readFileSync, readdirSync, rmSync} from 'node:fs';
 import {openReleaseRun} from '../../release-run.mjs';
-import {join} from 'node:path';
+import {join, relative, sep} from 'node:path';
 import {assertAssetLimits, describeAssetLimits, measureAssets} from '../../app-build/assetLimits.mjs';
 import {CLOUDFLARE_ACCOUNT} from '../packs.mjs';
 import {runRedacted} from '../redact.mjs';
+import {agentHeaders} from '../../agent-marker.mjs';
 
 export const CONFIG = 'pages/wrangler.jsonc';
 /** @type {Record<'preview'|'staging'|'production'|'explore', {env: string, worker: string}>} */
@@ -40,6 +41,14 @@ export function isVersionUrl(url, id, worker) {
   // Worker names and version ids are [a-z0-9-] only, so neither needs escaping inside the pattern.
   if (!/^[a-z0-9-]+$/u.test(worker) || !VERSION_ID.test(id)) return false;
   return new RegExp(`^https://${id.slice(0, 8)}-${worker}\\.[a-z0-9-]+\\.workers\\.dev$`, 'u').test(url);
+}
+
+/** PV22: every file under `directory` as a page path (`a/b.js`); the files the host reads itself are left out.
+ * @param {string} directory @returns {string[]} */
+export function servedPaths(directory) {
+  return readdirSync(directory, {recursive: true, withFileTypes: true}).filter(entry => entry.isFile())
+    .map(entry => relative(directory, join(entry.parentPath, entry.name)).split(sep).join('/'))
+    .filter(path => path !== '_headers' && path !== '_redirects' && path !== '.assetsignore').sort();
 }
 
 /**
@@ -143,6 +152,30 @@ export function workersHost({token, exec = runRedacted, fetch: get = fetch, log 
         digests.set(document, {algorithm: 'sha256', digest: createHash('sha256').update(bytes).digest('hex')});
       }
       return digests;
+    },
+    // PV22: v0.1.102's preview check compared four documents and passed a version whose page could not boot. Read every file the
+    // build wrote from the version itself, 32 at a time (776 files in about 3 s, 11-28).
+    async unserved(context) {
+      const {id, url} = context.deployment;
+      const {worker: name} = worker(context);
+      if (!VERSION_ID.test(id) || !isVersionUrl(url, id, name)) throw new Error(`${id} at ${url} is not a version of ${name}`);
+      const paths = servedPaths(join(context.root, 'dist'));
+      /** @type {string[]} */ const gone = [];
+      let next = 0;
+      await Promise.all(Array.from({length: Math.min(32, paths.length)}, async () => {
+        for (let at = next++; at < paths.length; at = next++) {
+          const path = paths[at] ?? '';
+          let status = 0;
+          try {
+            const response = await get(`${url}/${path.split('/').map(encodeURIComponent).join('/')}`, {method: 'HEAD', cache: 'no-store', redirect: 'manual', headers: agentHeaders(), signal: AbortSignal.timeout(30_000)});
+            status = response.status;
+          } catch { /* unread: status 0 */ }
+          // Workers' html_handling answers `a/index.html` and `b.html` with a redirect to `a/` and `b`: still served
+          const pretty = path.endsWith('.html') && (status === 307 || status === 308);
+          if (status !== 200 && !pretty) gone.push(`${path} ${status === 0 ? 'unread' : status}`);
+        }
+      }));
+      return gone.sort();
     },
     goLive(context) {
       process.stdout.write(wrangler(context, ['versions', 'deploy', `${context.deployment.id}@100%`, '--yes', '--message', `v${context.version} ${context.build.slice(0, 7)}`]));

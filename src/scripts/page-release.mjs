@@ -123,7 +123,7 @@ const npmDeps = {
     return run;
   },
   watch: async run => {
-    try { cli('gh', ['run', 'watch', String(run), '-R', ENGINE_REPO, '--exit-status', '--interval', '15']); } catch { /* the conclusion says why */ }
+    try { cli('gh', ['run', 'watch', String(run), '-R', ENGINE_REPO, '--exit-status', '--interval', '60']); } catch { /* the conclusion says why */ }
     return JSON.parse(cli('gh', ['run', 'view', String(run), '-R', ENGINE_REPO, '--json', 'conclusion'])).conclusion || 'unknown';
   },
   log, sleep: delay, now: () => Date.now(),

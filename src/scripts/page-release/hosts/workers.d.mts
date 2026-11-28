@@ -5,4 +5,6 @@ export const CONFIG: string;
 export const WORKERS: Record<'preview' | 'staging' | 'production' | 'explore', {env: string; worker: string}>;
 export function isVersionUrl(url: string, id: string, worker: string): boolean;
 export function stripSourceMaps(directory: string): number;
+/** PV22: every file under a directory as a page path, the host-read files left out. */
+export function servedPaths(directory: string): string[];
 export function workersHost(options: {token: () => string | undefined; exec?: typeof runRedacted; fetch?: typeof fetch; log?: (line: string) => void}): PageHost;

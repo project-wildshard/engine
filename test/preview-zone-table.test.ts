@@ -8,7 +8,7 @@ import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:
 // oxlint-disable-next-line import/no-nodejs-modules -- Confine the scratch root to this checkout.
 import {join, resolve} from 'node:path';
 import {afterEach, expect, test} from 'vitest';
-import {borrowZoneTable, buildZoneTable, checkCooked, cookSkew, ownZoneTable, unservedPlacements, zoneTableOf, STAGING_PLACEMENTS, STAGING_RELEASE} from '../src/scripts/page-release/zone-table.mjs';
+import {borrowZoneTable, buildZoneTable, checkCooked, cookSkew, pageValidator, ownZoneTable, unservedPlacements, zoneTableOf, STAGING_PLACEMENTS, STAGING_RELEASE} from '../src/scripts/page-release/zone-table.mjs';
 import {bakeZoneTable, zoneTableIn} from '../src/scripts/app-build/zoneTable.mjs';
 import {readZoneTable} from '../src/shared/game/grid/zoneTable.ts';
 import {COOKED_ORIGIN} from '../src/shared/game/shardfile/cookedPackPaths.ts';
@@ -127,6 +127,28 @@ test('the go-live check passes when every index and object answers 200, and name
   expect((await checkCooked(table, {read})).missing).toEqual([`driftwood-isle ${drift?.index ?? ''} 404`, `pine-hollow ${prefix('pine-hollow', '1.2.0')}common/cc 404`]);
   objects.set(pine?.index ?? '', {objects: {'a.json': `${prefix('driftwood-isle', '0.3.1')}common/aa`}});
   expect((await checkCooked(table, {read})).missing.some(line => line.includes('outside shards/pine-hollow/1.2.0/'))).toBe(true);
+});
+
+// PV22 (11-28): engine 71e3ee183's preview page admitted by validator 4076dcca…, staging's v0.1.102 cook by 4f8ad4ee…; the page refused
+// every cooked index and showed PV11's "a file is gone" card on every boot. The check now refuses an index the page would refuse.
+test('the go-live check refuses an index whose validator is not the page\'s', async () => {
+  const table = zoneTableOf(release(), null);
+  const [drift, pine] = table.zones;
+  const page = 'a'.repeat(64), cook = 'b'.repeat(64);
+  const objects = new Map<string, unknown>([
+    [drift?.index ?? '', {objects: {}, verdict: {revision: page}}],
+    [pine?.index ?? '', {objects: {}, verdict: {revision: cook}}],
+  ]);
+  const read = (url: string): Promise<Response> => {
+    const body = objects.get(url.slice(COOKED_ORIGIN.length));
+    return Promise.resolve(body === undefined ? new Response('', {status: 404}) : Response.json(body));
+  };
+  expect((await checkCooked(table, {read})).missing).toEqual([]);
+  expect((await checkCooked(table, {read, validator: page})).missing).toEqual([`pine-hollow admits validator ${cook.slice(0, 12)}, the page ${page.slice(0, 12)}`]);
+  objects.set(drift?.index ?? '', {objects: {}});
+  expect((await checkCooked(table, {read, validator: page})).missing).toContain(`driftwood-isle admits validator none, the page ${page.slice(0, 12)}`);
+  expect(pageValidator(`globalThis.__WS_SHARDFILE_VALIDATOR__="${page}";`)).toBe(page);
+  expect(pageValidator('<html></html>')).toBeUndefined();
 });
 
 const scratch: string[] = [];

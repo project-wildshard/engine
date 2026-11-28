@@ -11,7 +11,7 @@ import {afterEach, expect, test} from 'vitest';
 import {CHANNELS, CHECKED_DOCUMENTS, PHASES, PUBLIC_ROOMS, QA_LEGS, RELEASE_PUBLIC_KEY, qaGap, pinnedReleaseKey, RefusedError, runPhase, ownTablePath, type Channel, type Deps, type PageHost, type Phase} from '../src/scripts/page-release/flow.mjs';
 import {runRedacted} from '../src/scripts/page-release/redact.mjs';
 import {finishQaLeg} from '../src/scripts/page-release/staging-deploy.mjs';
-import {CONFIG, WORKERS, isVersionUrl, workersHost} from '../src/scripts/page-release/hosts/workers.mjs';
+import {CONFIG, WORKERS, isVersionUrl, servedPaths, workersHost} from '../src/scripts/page-release/hosts/workers.mjs';
 import {measureAssets} from '../src/scripts/app-build/assetLimits.mjs';
 
 const build = 'a'.repeat(40);
@@ -503,7 +503,7 @@ test('PV2: preview bakes its zone table and checks the cook before go-live; stag
   preview.deps.zoneTable = 'tmp/preview-zones/zone-table.json';
   await through(preview.deps, 'check');
   expect(seen[0]?.['WS_ZONE_TABLE']).toBe('tmp/preview-zones/zone-table.json');
-  const check = preview.calls.indexOf('run node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/zone-table.mjs check tmp/preview-zones/zone-table.json --page=https://preview.wildshard.io --catalogue=test/pins/catalogue.json');
+  const check = preview.calls.indexOf('run node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/zone-table.mjs check tmp/preview-zones/zone-table.json --page=https://preview.wildshard.io --catalogue=test/pins/catalogue.json --validator-from=/out/index.html');
   expect(check).toBeGreaterThan(preview.calls.indexOf('upload'));
   expect(check).toBeLessThan(preview.calls.indexOf('state check'));
   const plain = rig('preview'), envs: Record<string, string>[] = [], runPlain = plain.deps.run;
@@ -539,7 +539,7 @@ test('PV16: staging and production build zoneless from their own zone table, and
   const staging = rig('staging');
   staging.files.set(ownTablePath(staging.deps), Buffer.from('{}'));
   await through(staging.deps, 'check');
-  expect(staging.calls).toContain(`run node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/zone-table.mjs check ${ownTablePath(staging.deps)} --page=https://staging.wildshard.io --catalogue=test/pins/catalogue.json`);
+  expect(staging.calls).toContain(`run node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/zone-table.mjs check ${ownTablePath(staging.deps)} --page=https://staging.wildshard.io --catalogue=test/pins/catalogue.json --validator-from=/out/index.html`);
 });
 
 // SA35 (opus-place1, 2026-11-13): flow.mjs passed the borrowed catalogue in the environment, and `build:game` set its own on top,
@@ -608,7 +608,7 @@ function workersRig(channel: Channel = 'staging') {
   for (const [name, bytes] of local) writeFileSync(join(root, 'dist', name), bytes);
   writeFileSync(join(root, 'dist/assets/main.js'), 'export {};');
   writeFileSync(join(root, 'dist/assets/main.js.map'), '{}');
-  const served = new Map(local);
+  const served = new Map([...local, ['assets/main.js', Buffer.from('export {};')]]);
   const worker = WORKERS[channel].worker;
   const url = `https://${versionId.slice(0, 8)}-${worker}.raynos.workers.dev`;
   const wrangler: {args: string[], secrets: string[], env: NodeJS.ProcessEnv}[] = [];
@@ -887,6 +887,19 @@ test('production go-live stops on a content set that lacks what the page names, 
   deps.allowContentGaps = true;
   await runPhase('go-live', deps);
   expect(lines).toContain('NOTE production content after the alias move: the page or its set could not be read: content.json answered 500 (ALLOW_CONTENT_GAPS=1)');
+});
+
+// PV22 (11-28): preview version 1e82ce54 passed the four-document check, then broke every new session. The check also reads
+// every file the build wrote from the uploaded version and refuses before the alias moves.
+test('the Workers check refuses a version that does not serve a file the build wrote', async () => {
+  const {deps, served, wrangler} = workersRig('preview');
+  await through(deps, 'upload');
+  served.delete('assets/main.js');
+  await expect(runPhase('check', deps)).rejects.toThrow(new RegExp(`${versionId} does not serve 1 file\\(s\\) the build wrote \\(PV22\\): assets/main\\.js 404`, 'u'));
+  served.set('assets/main.js', Buffer.from('export {};'));
+  await runPhase('check', deps);
+  expect(verbs(wrangler)).not.toContain('versions deploy');
+  expect(servedPaths(join(deps.root, 'dist'))).toEqual(['assets/main.js', 'deploy-chunks.json', 'index.html', 'sw.js', 'version.json']);
 });
 
 // QA 11-26 row 90 (J505): v0.1.102 went live on production with npm latest left on 0.1.100. Production go-live ends with
