@@ -19,6 +19,7 @@ const PUSHES: { why: string; changed: string; tests?: string[]; static?: string 
   { why: 'loading card', changed: 'src/client/engine/ui/loading.css', tests: ['test/inline-shell-css.test.mjs'], static: 'check:inline-shell-css' },
   { why: 'chrome-keychain', changed: 'src/scripts/.kit/chromium-keychain.mjs', tests: ['src/test/.kit/chrome-keychain.test.mjs'] },
   { why: 'gate-related-tests', changed: 'src/scripts/gate-related-tests.mjs', tests: ['test/gate-related-tests.test.ts'] },
+  { why: 'model contract', changed: 'src/client/engine/render/lookLight.ts', tests: ['test/model-contract-paths.test.ts'] },
 ];
 
 const staticNames = [...staticChecks(), ...FS27_STATIC].map(task => task.name);
@@ -60,7 +61,8 @@ it('runs check-css, agent-markers and the host-ruler tables on every code push, 
   expect(staticNames).toContain('check-css');
   expect(staticNames).toContain('agent-markers');
   const plan = fs27Plan({ mode: 'related', files: ['src/client/engine/ui/hud.ts'] }, { split: true, slugs: [] });
-  expect(plan.tests).toEqual([...TABLE_TESTS]);
+  // a source file also runs the model contract, which reads every source file by path (meta QA 11-25 row 153)
+  expect(plan.tests).toEqual([...TABLE_TESTS, 'test/model-contract-paths.test.ts'].sort((a, b) => a.localeCompare(b)));
   expect(plan.tasks.map(task => task.name)).toEqual(['check-css', 'agent-markers']);
   expect(fs27Plan({ mode: 'docs', files: ['docs/dev.md'] }, { split: true, slugs: [] })).toEqual({ tasks: [], tests: [] });
   // The non-split full gate already runs the whole suite.

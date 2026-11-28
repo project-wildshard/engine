@@ -89,7 +89,7 @@ export const DONE = {
     'src/client/engine/player/firstPersonArms.ts': { why: "the player's own first-person arms, merged into one geometry: the player, not a thing in the world", counts: { mergeGeometries: 1 } },
     'src/client/engine/render/hoverboardGeometry.ts': { why: "NINE-DRAGON-BENCHMAX NB8: the board under you (and its Explorer specimen, models/hoverboard.ts) merged from its primitives, two draws: held gear, not a thing in the world", counts: { mergeGeometries: 1 } },
     'src/client/engine/render/graph/glslMaterial.ts': { why: "an instanced mesh's outline hull, mirroring the mesh it outlines: a material effect, never a new world thing", counts: { InstancedMesh: 1 } },
-    'src/client/engine/render/lookLight.ts': { why: 'look.light pools of light (85944cce, behind Debug): an effect', counts: { InstancedMesh: 1 } },
+    'src/client/engine/render/lookLight.ts': { why: 'look.light pools of light (85944cce, behind Debug) and, past a crowded look\'s light reserve, one additive glow card per declared lamp (meta QA 11-25 row 153): effects', counts: { InstancedMesh: 2 } },
     'src/client/engine/render/lookRender.ts': { why: 'meta SHARD-SOURCE M4.8 lamp halos: one additive billboard per declared lamp, an effect', counts: { InstancedMesh: 1 } },
     'src/client/game/ambient/crowdDraw.ts': { why: 'the ambient crowd draw from admitted rows: a population, like the flock in posedInstances', counts: { InstancedMesh: 1 } },
     'src/client/game/ambient/foragerDraw.ts': { why: 'the native forager population, one draw over its owner rows: a population, not placed world', counts: { InstancedMesh: 1 } },

@@ -40,6 +40,9 @@ export const PATH_EDGES = Object.freeze([
   // Tooling tests whose script changed.
   { why: 'chrome-keychain', pattern: /^src\/scripts\/\.kit\/chromium-keychain[^/]*\.mjs$/u, tests: ['src/test/.kit/chrome-keychain.test.mjs'] },
   { why: 'gate-related-tests', pattern: /^src\/scripts\/gate-related-tests\.mjs$/u, tests: ['test/gate-related-tests.test.ts'] },
+  // check-models reads every source file by path (its DONE counts): meta QA 11-25 row 153's second glow-card InstancedMesh
+  // in render/lookLight.ts passed the push and went red on main (run 46107927664)
+  { why: 'model contract', pattern: /^src\/(?!.*\.test\.)[^]*\.tsx?$/u, tests: ['test/model-contract-paths.test.ts'] },
 ]);
 
 /** Sim-state source: what a snapshot, and so Ring 1's step digest, is made of. FP53b (bd2db0ad9) changed it with no pin or
