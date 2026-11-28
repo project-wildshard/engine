@@ -556,12 +556,22 @@ class Landing{
   return true;
  }
 
+ /** Meta QA 11-26 row 15: nothing to land because the branch is already on main (an earlier land went through, or
+  * its commits arrived another way). --done still owes its cleanup: the worktree is landed, so cleanUp may remove it
+  * under its usual guards (on its branch at this SHA, clean, copied first).
+  * @param {string} detail @returns {number} */
+ onMain(detail){
+  this.say('nothing',detail);
+  this.landedSha=this.head();
+  return 0;
+ }
+
  /** @returns {Promise<number>} */
  run(){
   this.clean();
   const start=this.head();this.expected=start;
   const main=this.fetchMain();
-  if(start===main||isAncestor(this.root,start,main)){this.say('nothing',`${this.branch} ${short(start)} has nothing main lacks`);return Promise.resolve(0);}
+  if(start===main||isAncestor(this.root,start,main))return Promise.resolve(this.onMain(`${this.branch} ${short(start)} has nothing main lacks`));
   this.say('start',`${this.branch} ${short(start)} -> main ${short(main)} (repo ${this.repo})`);
   this.sizeWarning=this.options.mode==='push'?null:smallPlanWarning(this.root,this.branch);
   if(this.sizeWarning!==null){this.say('warning',this.sizeWarning);this.receipt(`small-plan warning: ${this.sizeWarning}`);}
@@ -569,7 +579,7 @@ class Landing{
   if(existsSync(this.installMarker()))this.install(['an earlier land\'s rebase']);
   if(!isAncestor(this.root,main,start)){
    this.rebase(main);
-   if(this.head()===main){this.say('nothing',`every commit on ${this.branch} is already on main`);return Promise.resolve(0);}
+   if(this.head()===main)return Promise.resolve(this.onMain(`every commit on ${this.branch} is already on main`));
   }
   // Build-max C4: an install behind the lockfile however it got there (made before a lock move, a by-hand rebase): the
   // pre-push's typecheck reads this node_modules, and on 2026-11-21 stale ones failed every gate for 2.5 h.
@@ -601,7 +611,7 @@ class Landing{
    main=this.fetchMain();
    this.say('moved',`main moved to ${short(main)}; rebasing and pushing again (round ${round})`);
    this.rebase(main);
-   if(this.head()===main){this.say('nothing',`every commit on ${this.branch} is already on main`);return 0;}
+   if(this.head()===main)return this.onMain(`every commit on ${this.branch} is already on main`);
    this.regenerate(this.pinsOnce());
   }
   this.receipt(`STOP gave up after ${this.options.rounds} tries; main kept moving`);

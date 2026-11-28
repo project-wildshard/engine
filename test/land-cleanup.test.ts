@@ -50,6 +50,27 @@ describe('land (J422): main-watch, the canonical checkout and cleanup after the 
     expect(spawnSync('git', ['rev-parse', '--verify', '--quiet', 'refs/heads/plan/foo'], { cwd: f.remote, env: f.env }).status).not.toBe(0);
   }, 60_000);
 
+  test('meta QA 11-26 row 15: --done after a land that already went through removes the clean, landed worktree', () => {
+    const f = fixture();
+    const wt = f.worktree('foo');
+    const tip = f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+    expect(f.land(wt, []).status).toBe(0);
+    expect(existsSync(wt)).toBe(true);
+    const result = f.land(wt, ['--done']);
+    expect(result.status, result.stdout).toBe(0);
+    expect(result.stdout).toMatch(new RegExp(`nothing\\s+plan/foo ${tip.slice(0, 10)} has nothing main lacks`, 'u'));
+    expect(result.stdout).toMatch(/cleaned\s+worktree and plan\/foo removed/u);
+    expect(existsSync(wt)).toBe(false);
+    expect(spawnSync('git', ['rev-parse', '--verify', '--quiet', 'refs/heads/plan/foo'], { cwd: f.repo, env: f.env }).status).not.toBe(0);
+    // Without --done, a branch already on main keeps its worktree as before.
+    const g = fixture();
+    const kept = g.worktree('bar');
+    g.commit(kept, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+    expect(g.land(kept, []).status).toBe(0);
+    expect(g.land(kept, []).stdout).not.toContain('cleaned');
+    expect(existsSync(kept)).toBe(true);
+  }, 60_000);
+
   test('J521: --done logs its local delete, and deletes origin\'s landed copy under a lease, logged', () => {
     const f = fixture();
     const wt = f.worktree('foo');
