@@ -12,6 +12,15 @@ export function gateWorkers(env = process.env, cores = availableParallelism()) {
   return workers;
 }
 
+/** Meta QA70: the full suite (a release or tag push, one at a time under the full-test lease) runs on half the cores.
+ * Each file still holds its own machine CPU grant, so other lanes keep their share. `WS_GATE_FULL_WORKERS` overrides. */
+export function fullSuiteWorkers(env = process.env, cores = availableParallelism()) {
+  const requested = env.WS_GATE_FULL_WORKERS;
+  if (requested === undefined) return Math.max(gateWorkers(env, cores), Math.floor(cores / 2));
+  if (!/^[1-9]\d*$/u.test(requested)) throw new Error('WS_GATE_FULL_WORKERS must be a positive integer');
+  return Number(requested);
+}
+
 /** Apply to gate children only. Node disallows --test-concurrency in NODE_OPTIONS. */
 export function gateTestEnvironment(env, vitestCeiling = Infinity) {
   const workers = gateWorkers(env);

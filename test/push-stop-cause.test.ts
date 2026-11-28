@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
 import { join, resolve } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
-import { parallelChecks, STUCK_LOAD_CAP, STUCK_RESAMPLE_MS, STUCK_STEP_SECONDS, STUCK_VITEST_SECONDS, stuckExtensionMs, stuckLimitMs } from '../.githooks/push-checks.mjs';
+import { fullStuckSeconds, parallelChecks, STUCK_LOAD_CAP, STUCK_RESAMPLE_MS, STUCK_STEP_SECONDS, STUCK_VITEST_SECONDS, stuckExtensionMs, stuckLimitMs, withProgressReporter } from '../.githooks/push-checks.mjs';
 import { prePushCause } from '../src/scripts/.kit/land.mjs';
 import { gateReport, printGateReport } from '../src/scripts/gate-report.mjs';
 
@@ -169,4 +169,36 @@ test('QA 11-24 row 33: load that rises after Vitest starts extends its watchdog,
   expect(stuckExtensionMs(vitest, base * 4, base * 4, {}, 32, 8)).toBe(0);
   // other steps never extend
   expect(stuckExtensionMs({ name: 'lint (kit + game)' }, STUCK_STEP_SECONDS * 1000, STUCK_STEP_SECONDS * 1000, {}, 32, 8)).toBe(0);
+});
+
+// Meta QA70: release/v0.1.101's full Vitest hit STUCK at 900 s twice and named no file. A Vitest step's STUCK line and
+// receipt now name the files still running and the slowest finished ones, read from its per-file progress.
+test('QA70: a stuck Vitest step names the files still running and the slowest finished', async () => {
+  mkdirSync('tmp', { recursive: true });
+  const work = mkdtempSync(resolve('tmp/push-stuck-files-'));
+  const receipts = join(work, 'receipts.log');
+  const lines: string[] = [];
+  vi.spyOn(console, 'error').mockImplementation((line: string) => { lines.push(line); });
+  vi.spyOn(console, 'log').mockImplementation(() => undefined);
+  const write = `const {appendFileSync}=require('node:fs'),p=process.env.WS_VITEST_PROGRESS,t=Date.now(),row=r=>appendFileSync(p,JSON.stringify(r)+'\\n');
+row({file:'test/quick.test.ts',at:t-5000,event:'start'});row({file:'test/quick.test.ts',at:t-2000,event:'end',state:'passed'});
+row({file:'test/held.test.ts',at:t-9000,event:'start'});setInterval(()=>{},1000);`;
+  try {
+    const result = await parallelChecks([
+      { name: 'vitest (full)', commands: [[process.execPath, '-e', write]], stuckSeconds: 1 },
+    ], { graceMs: 500, env: { ...ownEnv(), WS_LANE_RECEIPTS: receipts, WS_LANE_NAME: 'fixture-lane', GITHUB_ACTIONS: '' } });
+    expect(result.ok).toBe(false);
+    expect(lines).toContainEqual(expect.stringMatching(/STUCK in vitest \(full\) .+; 1 file\(s\) finished; still running: test\/held\.test\.ts 1\d s; slowest: test\/quick\.test\.ts 3 s$/u));
+    expect(readFileSync(receipts, 'utf8')).toMatch(/STUCK in vitest \(full\) .+still running: test\/held\.test\.ts/u);
+  } finally { rmSync(work, { recursive: true, force: true }); }
+});
+
+test('QA70: a full Vitest step is stuck at 2x the timings table\'s expected wall on its workers, never under 900 s', () => {
+  const table = Object.fromEntries(Array.from({ length: 100 }, (_, index) => [`test/f${index}.test.ts`, 60]));
+  expect(fullStuckSeconds(table, 9)).toBe(1334);
+  expect(fullStuckSeconds({ 'test/a.test.ts': 1 }, 9)).toBe(STUCK_VITEST_SECONDS);
+  expect(fullStuckSeconds(undefined, 9)).toBe(STUCK_VITEST_SECONDS);
+  expect(withProgressReporter([process.execPath, 'src/scripts/vitest-tmp.ts', 'run'])).toEqual([process.execPath, 'src/scripts/vitest-tmp.ts', 'run', '--reporter=default', `--reporter=${resolve('src/scripts/vitest-progress.mjs')}`]);
+  expect(withProgressReporter([process.execPath, 'src/scripts/vitest-tmp.ts', 'run', '--reporter=json']).slice(3)).toEqual(['--reporter=json', `--reporter=${resolve('src/scripts/vitest-progress.mjs')}`]);
+  expect(withProgressReporter(['pnpm', 'run', 'lint'])).toEqual(['pnpm', 'run', 'lint']);
 });

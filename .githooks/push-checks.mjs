@@ -3,7 +3,9 @@ import {availableParallelism,constants,getPriority,homedir,loadavg} from 'node:o
 import {appendFileSync,mkdirSync,readFileSync,rmSync} from 'node:fs';
 import {basename,dirname,join,resolve,delimiter} from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {gateTestEnvironment,gateWorkers} from './gate-workers.mjs';
+import {fullSuiteWorkers,gateTestEnvironment,gateWorkers} from './gate-workers.mjs';
+import {expectedSuiteSeconds,progressReport} from '../src/scripts/vitest-progress.mjs';
+import {readTimings} from '../src/scripts/test-timings.mjs';
 import {assertHeavyLease} from '../src/scripts/heavy-lane-lease.mjs';
 import {gateSlot} from '../src/scripts/push-gate-slot.mjs';
 import {PUSH_BUDGET, PUSH_PROFILE, SPLIT_PROFILE} from '../src/scripts/push-budget.mjs';
@@ -65,6 +67,24 @@ export function pushEnvironment(environment=process.env){
  * which refuses the push and keeps the commit. */
 export const STUCK_STEP_SECONDS=240,STUCK_VITEST_SECONDS=900;
 
+/** Meta QA70: the full suite is ~2,450 files, ~6,700 hosted seconds; 900 s was ~3x a related run, not ~3x the full one.
+ * A full Vitest step's stuck limit is 2x the timings table's expected wall on its workers, never under 900 s. Hosted
+ * seconds already run slow here: 6,686 / 9 workers is 743 s, and the measured MacBook full run took 449 s at load 6-14.
+ * @param {Record<string,number>|undefined} table @param {number} workers */
+export const FULL_STUCK_FACTOR=2;
+export function fullStuckSeconds(table,workers){
+  const expected=expectedSuiteSeconds(table,workers);
+  return expected===null?STUCK_VITEST_SECONDS:Math.max(STUCK_VITEST_SECONDS,Math.ceil(FULL_STUCK_FACTOR*expected));
+}
+
+/** Meta QA70: a Vitest step writes per-file progress so its end or STUCK line names the files that held it.
+ * @param {string[]} command */
+export function withProgressReporter(command){
+  if(!command[1]?.endsWith('vitest-tmp.ts'))return command;
+  const own=resolve('src/scripts/vitest-progress.mjs');
+  return [...command,...(command.some(arg=>arg.startsWith('--reporter'))?[]:['--reporter=default']),`--reporter=${own}`];
+}
+
 /** A step's unscaled stuck limit, in s. @param {{name:string,stuckSeconds?:number}} task @param {NodeJS.ProcessEnv} [env] */
 function stuckBaseSeconds(task,env=process.env){
   const override=Number(env.WS_PUSH_STUCK_S);
@@ -98,7 +118,7 @@ function stuckReceipt(line,env=process.env){
 }
 
 /** Run actual process groups, drain each one, and never start a later step after failure.
- * @param {{name:string,commands:string[][],stuckSeconds?:number}[]} tasks
+ * @param {{name:string,commands:string[][],stuckSeconds?:number,env?:NodeJS.ProcessEnv}[]} tasks
  * @param {{cwd?:string,env?:NodeJS.ProcessEnv,graceMs?:number,timeoutMs?:number,stuck?:boolean}} [options] */
 export async function parallelChecks(tasks,options={}) {
   if(options.timeoutMs!==undefined&&(!Number.isFinite(options.timeoutMs)||options.timeoutMs<=0))throw new Error('Invalid owned command deadline');
@@ -128,24 +148,29 @@ export async function parallelChecks(tasks,options={}) {
   let timedOut=false;
   const deadline=options.timeoutMs===undefined?undefined:setTimeout(()=>{timedOut=true;stop('the deadline');},options.timeoutMs);
   try {
-    await Promise.all(tasks.map(async task=>{
+    await Promise.all(tasks.map(async (task,index)=>{
       const at=Date.now();let output='',code=0,own=false,stuck=false;
+      // Meta QA70: a Vitest step's per-file progress, read when it ends or is stopped.
+      const progress=task.name.startsWith('vitest')?resolve('tmp',`vitest-progress-${process.pid}-${index}.jsonl`):undefined;
+      if(progress!==undefined){mkdirSync(dirname(progress),{recursive:true});rmSync(progress,{force:true});}
       // J505: the step's watchdog. Stuck is this step's own red; the others it stops name it.
-      const env=options.env??process.env,limit=options.stuck===false?undefined:stuckLimitMs(task,env);
+      const env={...(options.env??process.env),...task.env,...(progress===undefined?{}:{WS_VITEST_PROGRESS:progress})},limit=options.stuck===false?undefined:stuckLimitMs(task,env);
       let watchdog;
       const arm=ms=>{watchdog=setTimeout(()=>{
         if(refused)return;
         const more=limit===undefined?0:stuckExtensionMs(task,Date.now()-at,limit,env);
         if(more>0){arm(more);return;}
         const minutes=((Date.now()-at)/60_000).toFixed(1);stuck=true;
-        const line=`push gate: STUCK in ${task.name} after ${minutes} min (limit ${((limit??0)/1000).toFixed(0)} s, ~3x its normal time); stopped it, the push is refused and the commit is kept; rerun the push`;
+        const files=progressReport(progress);
+        const line=`push gate: STUCK in ${task.name} after ${minutes} min (limit ${((limit??0)/1000).toFixed(0)} s, ~3x its normal time); stopped it, the push is refused and the commit is kept; rerun the push${files?`; ${files}`:''}`;
         console.error(`  X ${line}`);stuckReceipt(line,env);
         stop(`STUCK in ${task.name} after ${minutes} min`);
       },ms);watchdog.unref?.();};
       if(limit!==undefined)arm(limit);
       for(const command of task.commands){
         if(refused){code=1;break;}
-        const child=spawn(command[0],command.slice(1),{cwd:options.cwd,env:options.env,detached:true,stdio:['ignore','pipe','pipe']});
+        const argv=progress===undefined?command:withProgressReporter(command);
+        const child=spawn(argv[0],argv.slice(1),{cwd:options.cwd,env:task.env===undefined&&progress===undefined?options.env:env,detached:true,stdio:['ignore','pipe','pipe']});
         active.add(child);child.stdout.on('data',data=>{output+=data;});child.stderr.on('data',data=>{output+=data;});
         code=await new Promise(resolveCode=>{
           child.once('error',error=>{output+=`${error}\n`;resolveCode(1);});
@@ -161,6 +186,7 @@ export async function parallelChecks(tasks,options={}) {
       if(process.env.GITHUB_ACTIONS)console.log(`::group::${task.name}`);
       if(output.trim())console.log(output.trim());
       console.error(`  - ${task.name} ${code===0?'green':stopped?'stopped':stuck?'STUCK':'RED'} in ${seconds.toFixed(1)} s${stopped?`: ${cause}`:''}`);
+      if(progress!==undefined){const files=progressReport(progress);if(files&&!stuck)console.error(`    ${task.name} files: ${files}`);rmSync(progress,{force:true});}
       if(process.env.GITHUB_ACTIONS)console.log('::endgroup::');
     }));
   } finally {clearTimeout(deadline);process.off('SIGINT',interrupted);process.off('SIGTERM',interrupted);}
@@ -295,10 +321,15 @@ async function main(){
   const report=localReport??(knownRed?resolve('tmp',`push-known-red-${process.pid}.json`):undefined);
   if(report!==undefined&&env.WS_PUSH_TIMINGS===undefined)mkdirSync(dirname(report),{recursive:true});
   const reporters=report===undefined?[]:['--reporter=default','--reporter=json',`--outputFile=${report}`];
+  // Meta QA70: the full suite gets half the cores (each file still holds its own machine CPU grant) and a stuck limit
+  // scaled from the timings table; the quarter-core cap (33c59458d) put a full run at ~1,670 hosted s on 4 workers.
+  const fullWorkers=fullSuiteWorkers(env);
+  const fullVitest=selection.mode==='full'?{env:{WS_VITEST_MAX_WORKERS:String(fullWorkers)},stuckSeconds:fullStuckSeconds(readTimings(env)?.full,fullWorkers)}:{};
+  if(selection.mode==='full'&&local===null)console.error(`  - full Vitest: ${fullWorkers} workers; stuck limit ${fullVitest.stuckSeconds} s`);
   const vitest=delta.eligible&&selection.mode==='docs'
     ?(selection.tests?.length?[{name:'vitest (incoming docs readers)',commands:[[process.execPath,'src/scripts/vitest-tmp.ts','run','--passWithNoTests=false',...selection.tests,...reporters]]}]:[])
     :local===null
-    ?[{name:`vitest (${selection.mode})`,commands:[[process.execPath,'src/scripts/vitest-tmp.ts',...(selection.mode==='related'?['related','--run','--passWithNoTests=false',...selection.files]:['run']),...reporters]]}]
+    ?[{name:`vitest (${selection.mode})`,commands:[[process.execPath,'src/scripts/vitest-tmp.ts',...(selection.mode==='related'?['related','--run','--passWithNoTests=false',...selection.files]:['run']),...reporters]],...fullVitest}]
     :local.length===0?[]:[{name:`vitest (split ${selection.mode}: ${local.length} local)`,commands:[[process.execPath,'src/scripts/vitest-tmp.ts','run','--passWithNoTests=false',...local,...reporters]]}];
   // With known reds on, Vitest runs beside the static lane, not inside it: a Vitest red must not stop the static checks,
   // since a known red still lets the push go when everything else is green.

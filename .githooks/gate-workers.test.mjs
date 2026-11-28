@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { gateTestCommand } from './gate-test-command.mjs';
-import { gateTestEnvironment, gateWorkers } from './gate-workers.mjs';
+import { fullSuiteWorkers, gateTestEnvironment, gateWorkers } from './gate-workers.mjs';
 
 const env = { WS_GATE_WORKERS: '4', WS_GATE_VITEST_WORKERS: '4' };
 
@@ -58,4 +58,13 @@ test('a nested shell runs real Node tests one file at a time when the gate asks 
   });
   assert.equal(result.status, 0, result.stderr + result.stdout);
   assert.match(result.stdout, /# pass 3/u);
+});
+
+// Meta QA70: the full suite runs on half the cores; its files still hold their own machine CPU grants.
+test('the full suite uses half the cores, never fewer than the gate, and validates its override', () => {
+  assert.equal(fullSuiteWorkers({}, 18), 9);
+  assert.equal(fullSuiteWorkers({}, 3), 1);
+  assert.equal(fullSuiteWorkers({ WS_GATE_WORKERS: '12' }, 18), 12);
+  assert.equal(fullSuiteWorkers({ WS_GATE_FULL_WORKERS: '6' }, 18), 6);
+  assert.throws(() => fullSuiteWorkers({ WS_GATE_FULL_WORKERS: '0' }, 18), /positive integer/u);
 });
