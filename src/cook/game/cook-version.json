@@ -1,6 +1,7 @@
 {
   "cookVersion": "1.21.0",
-  "cookHash": "9042bac84202da5c369409462d5ea88fb3a87c63105401ab4264f109d9757494",
+  "cookHash": "0525a4ee8e044d06da3970b2caeaa6dfbb4a2384c3c0705e6ac4773dc79674c5",
   "formatVersion": "0.1.0.6",
-  "goldenDigest": "c6dc1def664a17013fe689f0d15f3d164db4ac45c032601dcfb3e86fa38a23d5"
+  "goldenDigest": "c6dc1def664a17013fe689f0d15f3d164db4ac45c032601dcfb3e86fa38a23d5",
+  "sameOutputFrom": "9042bac84202da5c369409462d5ea88fb3a87c63105401ab4264f109d9757494"
 }

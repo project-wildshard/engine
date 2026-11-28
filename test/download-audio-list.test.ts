@@ -16,7 +16,8 @@ import { cookFilesOnly } from './filesOnlyCook';
 
 // Driftwood, Pine, Nalati, Nine Dragon, one Open Plot, Dunes and Far Reach, each with its engine music's file count
 // (AU18's derived list: title, its base slot's calm and tension, its stings). Counts, not names: a re-encode renames.
-const SHARDS = [['driftwood-isle', 4], ['pine-hollow', 6], ['nalati-grasslands', 4], ['nine-dragon-stack', 1],
+// SF23: Pine plays its own pine set, so only the title and the three stings are the engine's.
+const SHARDS = [['driftwood-isle', 4], ['pine-hollow', 4], ['nalati-grasslands', 4], ['nine-dragon-stack', 1],
   ['open-plot-alien-plain', 1], ['sunscar-dunes', 0], ['far-reach', 0]] as const;
 // SF24: an images-only zone mounts its own audio under its slug (/assets/<slug>/sfx/...), beside the engine's.
 const AUDIO = /^\/assets\/(?:[a-z0-9-]+\/)?(?:music|sfx)\/[^?]+\.(?:m4a|mp3|ogg|opus|wav|webm|flac)$/u;
@@ -82,8 +83,9 @@ for (const [shard, engineFiles] of SHARDS) {
       expect(music.filter(url => /^\/assets\/music\/(?:[a-z0-9-]+-)?(?:folk|orchestral)\//u.test(url))).toEqual([]);
       // The comparison bites each way: one more shipped recording, one fewer, or one twice fails it (the cook-side proof:
       // project/journal/2026-11-13-download-audio-list.md).
-      const extra = Object.keys(tables.bytes).find(url => AUDIO.test(url) && !want.includes(url)), gone = want[0];
-      if (extra === undefined) throw new Error('the build ships no recording outside this shard\'s list');
+      // SF23: the engine ships only its title and the stings, so a zone that plays all of them has no unlisted engine
+      // recording left; a made-up one stands in.
+      const extra = Object.keys(tables.bytes).find(url => AUDIO.test(url) && !want.includes(url)) ?? '/assets/sfx/unlisted-probe.m4a', gone = want[0];
       expect(audioDiff([...listed, `${extra}?v=12345678`], want)).toEqual({ ...clean, extra: [extra] });
       if (gone !== undefined) {
         expect(audioDiff(listed.filter(url => path(url) !== gone), want)).toEqual({ ...clean, missing: [gone] });
