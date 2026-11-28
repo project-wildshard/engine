@@ -281,7 +281,10 @@ export async function runPhase(phase, deps) {
     if (table !== undefined) {
       // PV2: no 404 at go-live. One missing index or object refuses, and preview keeps its last build.
       plan(`HEAD every cooked index and object ${table} names, with ${channel.origin}'s Origin (PV2, PV16)`);
-      if (!dry) deps.run('node', ['--import', './src/scripts/bake-loader.mjs', 'src/scripts/page-release/zone-table.mjs', 'check', table, `--page=${channel.origin}`], {});
+      // QA 82 follow-up: a catalogue may place a cell the table lacks (preview's borrowed table did); its discovery would 404 at
+      // every boot. Every channel checks the catalogue it bakes: preview's grid, or the pins.
+      const baked = [`--catalogue=${(channel.solo ? deps.catalogue : undefined) ?? 'test/pins/catalogue.json'}`];
+      if (!dry) deps.run('node', ['--import', './src/scripts/bake-loader.mjs', 'src/scripts/page-release/zone-table.mjs', 'check', table, `--page=${channel.origin}`, ...baked], {});
     }
     for (const line of deps.host.describe('deployedDigests', deployed)) plan(line);
     if (!dry) await checkDeployed(deps, deployed, refuse);

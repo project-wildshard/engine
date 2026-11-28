@@ -51,9 +51,11 @@ const bare = (/** @type {string} */ slug) => slug.replace(/^_/u, '');
 /**
  * The zone table of a release and its placement file: every shard the release serves, then every placed cell's slug the release
  * doesn't, each at its raw shard version under the release's cook. Refused when the release names no cook, or a zone no shard version.
- * @param {ReleaseFile} release @param {PlacementFile | null} placements @returns {ZoneTable}
+ * @param {ReleaseFile} release @param {PlacementFile | null} placements
+ * @param {PageCatalogue} [catalogue] the catalogue the page bakes: its placed cells join the table too
+ * @returns {ZoneTable}
  */
-export function zoneTableOf(release, placements) {
+export function zoneTableOf(release, placements, catalogue) {
   if (release.channel !== 'staging' && release.channel !== 'production') throw new ZoneTableRefusal(`a ${release.channel} release has no zones to borrow`);
   const {cook} = release;
   if (cook === undefined) throw new ZoneTableRefusal(`${release.channel}'s release (serial ${release.serial}, build ${release.engineBuild.slice(0, 10)}) names no cook version: its signer predates fix preview PV2`);
@@ -72,8 +74,24 @@ export function zoneTableOf(release, placements) {
     if (placements.channel !== release.channel) throw new ZoneTableRefusal(`the placement file is ${placements.channel}'s, not ${release.channel}'s`);
     for (const cell of placements.cells) add(cell.slug, cell.shardVersion);
   }
+  // QA 82 follow-up (opus-ship, 11-28): the page's catalogue also places cells of its own (the pins' hidden solo plots, such as
+  // open-plot-desert-ruin) that staging's release and placement file don't name; each reads its discovery from this table, so a
+  // cell missing here answered 404 and failed every preview boot (preview v78ae9605c). They join at the catalogue's shard version.
+  if (catalogue !== undefined) {
+    const versions = new Map(catalogue.shards.map(shard => [bare(shard.slug), shard.shardVersion]));
+    for (const cell of catalogue.placements ?? []) add(cell.slug, versions.get(bare(cell.slug)));
+  }
   if (unversioned.length > 0) throw new ZoneTableRefusal(`${release.channel}'s release and placements name no shard version for ${unversioned.length} zone(s): ${unversioned.join(', ')}`);
   return readZoneTable({version: 1, from: {channel: release.channel, serial: release.serial, engineBuild: release.engineBuild}, cookVersion: cook.version, cookHash: cook.hash, zones: rows});
+}
+
+/** @typedef {{shards: readonly {slug: string, shardVersion?: string}[], placements?: readonly {slug: string}[]}} PageCatalogue */
+
+/** The slugs a page's catalogue places that its zone table doesn't serve: each would answer 404 at boot (QA 82 follow-up).
+ * @param {Pick<ZoneTable, 'zones'>} table @param {PageCatalogue} catalogue @returns {string[]} */
+export function unservedPlacements(table, catalogue) {
+  const served = new Set(table.zones.map(row => row.slug));
+  return [...new Set((catalogue.placements ?? []).map(cell => bare(cell.slug)))].filter(slug => !served.has(slug)).sort();
 }
 
 /** PV2's skew check: a message naming both cook versions when main's differs from the table's, else undefined.
@@ -171,11 +189,12 @@ async function fetchText(url, read) {
 
 /**
  * Read staging's signed release and placements, build the table and check its cook version against main's.
- * @param {{release?: string, placements?: string, cookVersion: string, read?: Read, releaseKey?: string, placementKey?: string}} options
+ * @param {{release?: string, placements?: string, cookVersion: string, read?: Read, releaseKey?: string, placementKey?: string,
+ *   catalogue?: PageCatalogue}} options
  * @returns {Promise<ZoneTable>}
  */
 export async function borrowZoneTable({release = STAGING_RELEASE, placements = STAGING_PLACEMENTS, cookVersion, read = agentFetch,
-  releaseKey = RELEASE_PUBLIC_KEY, placementKey = PLACEMENT_PUBLIC_KEY}) {
+  releaseKey = RELEASE_PUBLIC_KEY, placementKey = PLACEMENT_PUBLIC_KEY, catalogue}) {
   const signed = readPublication(await fetchText(release, read), releaseKey);
   /** @type {PlacementFile | null} */
   let placed = null;
@@ -184,7 +203,7 @@ export async function borrowZoneTable({release = STAGING_RELEASE, placements = S
     // the API rewrites its file and never deletes it: only a 404 means "no cell placed"
     if (!(error instanceof ZoneTableRefusal && error.message.endsWith(' 404'))) throw error;
   }
-  const table = zoneTableOf(signed, placed);
+  const table = zoneTableOf(signed, placed, catalogue);
   const skew = cookSkew(cookVersion, table);
   if (skew !== undefined) throw new ZoneTableRefusal(skew, {main: cookVersion, table});
   return table;
@@ -244,9 +263,11 @@ async function main(argv) {
     console.log(`zone table: ${own.table.zones.length} zones for ${channel} serial ${serial}, cook ${own.table.cookVersion} ${own.table.cookHash.slice(0, 12)}; wrote ${file}`);
     return;
   }
-  if ((verb !== 'build' && verb !== 'check') || file === undefined) throw new Error('usage: zone-table.mjs build <out.json> [--release=<url>] [--placements=<url>] [--cook-version=<x.y.z>] | check <table.json> [--origin=<url>] [--page=<origin>]');
+  if ((verb !== 'build' && verb !== 'check') || file === undefined) throw new Error('usage: zone-table.mjs build <out.json> [--release=<url>] [--placements=<url>] [--cook-version=<x.y.z>] [--catalogue=<file>] | check <table.json> [--origin=<url>] [--page=<origin>] [--catalogue=<file>]');
   if (verb === 'build') {
-    const table = await buildZoneTable({release: flag('release') ?? STAGING_RELEASE, placements: flag('placements') ?? STAGING_PLACEMENTS, cookVersion: flag('cook-version') ?? mainCookVersion(process.cwd())});
+    const catalogue = JSON.parse(readFileSync(resolve(flag('catalogue') ?? 'test/pins/catalogue.json'), 'utf8'));
+    const table = await buildZoneTable({release: flag('release') ?? STAGING_RELEASE, placements: flag('placements') ?? STAGING_PLACEMENTS,
+      cookVersion: flag('cook-version') ?? mainCookVersion(process.cwd()), catalogue});
     for (const row of table.zones) console.log(`zone ${row.slug} ${row.shardVersion} ${row.index}`);
     mkdirSync(dirname(resolve(file)), {recursive: true});
     writeFileSync(resolve(file), `${JSON.stringify(table)}\n`);
@@ -254,6 +275,11 @@ async function main(argv) {
     return;
   }
   const table = readZoneTable(JSON.parse(readFileSync(resolve(file), 'utf8')));
+  const baked = flag('catalogue');
+  if (baked !== undefined) {
+    const unserved = unservedPlacements(table, JSON.parse(readFileSync(resolve(baked), 'utf8')));
+    if (unserved.length > 0) throw new ZoneTableRefusal(`the page's catalogue places ${unserved.length} zone(s) its zone table doesn't serve, so each boot's discovery answers 404: ${unserved.join(', ')}`);
+  }
   const page = flag('page');
   const result = await checkCooked(table, {origin: flag('origin') ?? COOKED_ORIGIN, ...(page === undefined ? {} : {page})});
   if (result.missing.length > 0) throw new ZoneTableRefusal(`${result.missing.length} cooked object(s) missing for ${result.zones} zones: ${result.missing.slice(0, 12).join('; ')}`);

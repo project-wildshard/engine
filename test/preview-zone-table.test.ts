@@ -8,7 +8,7 @@ import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:
 // oxlint-disable-next-line import/no-nodejs-modules -- Confine the scratch root to this checkout.
 import {join, resolve} from 'node:path';
 import {afterEach, expect, test} from 'vitest';
-import {borrowZoneTable, buildZoneTable, checkCooked, cookSkew, ownZoneTable, zoneTableOf, STAGING_PLACEMENTS, STAGING_RELEASE} from '../src/scripts/page-release/zone-table.mjs';
+import {borrowZoneTable, buildZoneTable, checkCooked, cookSkew, ownZoneTable, unservedPlacements, zoneTableOf, STAGING_PLACEMENTS, STAGING_RELEASE} from '../src/scripts/page-release/zone-table.mjs';
 import {bakeZoneTable, zoneTableIn} from '../src/scripts/app-build/zoneTable.mjs';
 import {readZoneTable} from '../src/shared/game/grid/zoneTable.ts';
 import {COOKED_ORIGIN} from '../src/shared/game/shardfile/cookedPackPaths.ts';
@@ -37,6 +37,20 @@ test('the table names each zone of the release and its placements once, at its s
   // PV4: a table may name its bucket: https anywhere, http on the loopback only (the headless proof's local bucket)
   for (const origin of ['https://cooked.wildshard.io/', 'http://127.0.0.1:4522/']) expect(readZoneTable({...table, origin}).origin).toBe(origin);
   for (const origin of ['http://cooked.example/', 'https://cooked.wildshard.io', 'javascript:alert(1)//']) expect(() => readZoneTable({...table, origin})).toThrow();
+});
+
+test('QA 82 follow-up: a cell only the page\'s catalogue places joins the table, and a check names any it still lacks', () => {
+  // preview v78ae9605c: the pins place a hidden solo plot staging's release and placement file don't name; its discovery
+  // answered 404 and every preview boot failed at app:selected-discovery
+  const catalogue = {shards: [{slug: 'open-plot-desert-ruin', shardVersion: '0.0.4'}, {slug: 'pine-hollow', shardVersion: '1.2.0'}],
+    placements: [{slug: 'open-plot-desert-ruin'}, {slug: 'pine-hollow'}]};
+  const borrowed = zoneTableOf(release(), null);
+  expect(unservedPlacements(borrowed, catalogue)).toEqual(['open-plot-desert-ruin']);
+  const table = zoneTableOf(release(), null, catalogue);
+  expect(table.zones.map(row => `${row.slug} ${row.shardVersion}`)).toEqual(['driftwood-isle 0.3.1', 'pine-hollow 1.2.0', 'open-plot-desert-ruin 0.0.4']);
+  expect(unservedPlacements(table, catalogue)).toEqual([]);
+  // a placed cell the catalogue gives no version is refused by name, never baked unserved
+  expect(() => zoneTableOf(release(), null, {shards: [], placements: [{slug: 'open-plot-thin-ice'}]})).toThrow(/open-plot-thin-ice/u);
 });
 
 test('a release with no cook, or a zone with no shard version, is refused by name', () => {

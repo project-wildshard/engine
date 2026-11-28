@@ -24,5 +24,8 @@ test('PV22: preview builds and checks the zone table borrowed from staging', () 
   expect(prepareAt).toBeGreaterThanOrEqual(0);
   expect(releaseAt).toBeGreaterThan(prepareAt);
   expect(lines[releaseAt]).toContain(`--zone-table=${table}`);
+  // QA 82 follow-up: the cells the baked grid places join the borrowed table, or each boot's discovery answers 404
+  expect(lines[prepareAt]).toContain('"${grid[@]}"');
+  expect(lines.slice(0, prepareAt).some(line => line.includes('grid=(--catalogue=tmp/preview-grid/catalogue.json)'))).toBe(true);
   expect(lines.find(line => line.includes('inputs=('))).toContain('src/cook/game/cook-version.json');
 });

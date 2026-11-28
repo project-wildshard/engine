@@ -149,7 +149,10 @@ jobs:
       # PV2: verify staging's signed release and its cook version before building the zone-free page.
       - name: Borrow staging's signed zone table
         if: steps.changed.outputs.deploy == 'true'
-        run: node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/zone-table.mjs build tmp/preview-zones/zone-table.json
+        # QA 82 follow-up: the cells the baked catalogue places join the table, or their discovery answers 404 at boot.
+        run: |
+          grid=(); [ -f tmp/preview-grid/catalogue.json ] && grid=(--catalogue=tmp/preview-grid/catalogue.json)
+          node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/zone-table.mjs build tmp/preview-zones/zone-table.json "${grid[@]}"
       # SENTRY-TRIAGE S5: the Workers host's package step sends the hidden maps to Sentry (release wildshard@<version>,
       # dist the build) with node src/scripts/sentry-maps.mjs dist --environment preview, then strips every map from dist/
       # (PZ1, OV4): a Sentry outage or a missing token never stops the preview, and no map reaches the CDN.

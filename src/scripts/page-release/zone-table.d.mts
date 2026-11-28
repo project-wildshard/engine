@@ -12,10 +12,12 @@ export const RECEIPTS_LOG: string;
 export function cookFilesSince(root: string, build: string): string[];
 export function skewReceipt(skew: { main: string; table: ZoneTable }, files: readonly string[], now?: Date): string;
 export function buildZoneTable(options: Parameters<typeof borrowZoneTable>[0] & { root?: string; receipts?: string; files?: (build: string) => string[] }): Promise<ZoneTable>;
-export function zoneTableOf(release: ReleaseFile, placements: PlacementFile | null): ZoneTable;
+export interface PageCatalogue { shards: readonly { slug: string; shardVersion?: string }[]; placements?: readonly { slug: string }[] }
+export function zoneTableOf(release: ReleaseFile, placements: PlacementFile | null, catalogue?: PageCatalogue): ZoneTable;
+export function unservedPlacements(table: Pick<ZoneTable, 'zones'>, catalogue: PageCatalogue): string[];
 export function cookSkew(mainCookVersion: string, table: Pick<ZoneTable, 'cookVersion' | 'from'>): string | undefined;
 export function mainCookVersion(root: string): string;
 export function mainCook(root: string): { version: string; hash: string };
 export function ownZoneTable(options: { channel: 'staging' | 'production'; build: string; serial: number; catalogue: { shards: readonly { slug: string; shardVersion?: string }[]; placements?: readonly { slug: string }[] }; cook: { version: string; hash: string } }): { table: ZoneTable; missing?: undefined } | { table?: undefined; missing: string[] };
 export function checkCooked(table: ZoneTable, options?: { read?: Read; origin?: string; page?: string; concurrency?: number }): Promise<{ zones: number; objects: number; missing: string[] }>;
-export function borrowZoneTable(options: { release?: string; placements?: string; cookVersion: string; read?: Read; releaseKey?: string; placementKey?: string }): Promise<ZoneTable>;
+export function borrowZoneTable(options: { release?: string; placements?: string; cookVersion: string; read?: Read; releaseKey?: string; placementKey?: string; catalogue?: PageCatalogue }): Promise<ZoneTable>;

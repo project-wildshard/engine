@@ -503,7 +503,7 @@ test('PV2: preview bakes its zone table and checks the cook before go-live; stag
   preview.deps.zoneTable = 'tmp/preview-zones/zone-table.json';
   await through(preview.deps, 'check');
   expect(seen[0]?.['WS_ZONE_TABLE']).toBe('tmp/preview-zones/zone-table.json');
-  const check = preview.calls.indexOf('run node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/zone-table.mjs check tmp/preview-zones/zone-table.json --page=https://preview.wildshard.io');
+  const check = preview.calls.indexOf('run node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/zone-table.mjs check tmp/preview-zones/zone-table.json --page=https://preview.wildshard.io --catalogue=test/pins/catalogue.json');
   expect(check).toBeGreaterThan(preview.calls.indexOf('upload'));
   expect(check).toBeLessThan(preview.calls.indexOf('state check'));
   const plain = rig('preview'), envs: Record<string, string>[] = [], runPlain = plain.deps.run;
@@ -539,7 +539,7 @@ test('PV16: staging and production build zoneless from their own zone table, and
   const staging = rig('staging');
   staging.files.set(ownTablePath(staging.deps), Buffer.from('{}'));
   await through(staging.deps, 'check');
-  expect(staging.calls).toContain(`run node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/zone-table.mjs check ${ownTablePath(staging.deps)} --page=https://staging.wildshard.io`);
+  expect(staging.calls).toContain(`run node --import ./src/scripts/bake-loader.mjs src/scripts/page-release/zone-table.mjs check ${ownTablePath(staging.deps)} --page=https://staging.wildshard.io --catalogue=test/pins/catalogue.json`);
 });
 
 // SA35 (opus-place1, 2026-11-13): flow.mjs passed the borrowed catalogue in the environment, and `build:game` set its own on top,
