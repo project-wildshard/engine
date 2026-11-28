@@ -1,7 +1,7 @@
 // @vitest-environment node
 import {expect, test, vi} from 'vitest';
 import {readFileSync} from 'node:fs';
-import {cookUnitGap, expectedCookUnit, hardenDue, hardenGateOf, preparationClientGap, selectCookRelease} from '../src/scripts/release-cook.mjs';
+import {awaitPreparationClient, cookUnitGap, expectedCookUnit, hardenDue, hardenGateOf, preparationClientGap, selectCookRelease} from '../src/scripts/release-cook.mjs';
 
 // v0.1.95: a pending reboot (VH5) held the harden that refreshes the box's rebuild.sh, so the cook move ran the pre-lean
 // copy and rolled back. Only rows whose fix could touch sshd, ufw or Tailscale hold an unattended apply.
@@ -25,7 +25,8 @@ test('the cook move requires the exact preparation client before touching the bo
   expect(read).toHaveBeenCalledWith(url, expect.objectContaining({method: 'HEAD', cache: 'no-store'}));
   const cook = readFileSync('src/scripts/release-cook.mjs', 'utf8');
   const main = cook.slice(cook.indexOf('async function main()'), cook.indexOf('\n}\n', cook.indexOf('async function main()')));
-  expect(main.indexOf('stop(archiveGap)')).toBeGreaterThan(main.indexOf('await preparationClientGap'));
+  expect(main.indexOf('stop(archiveGap)')).toBeGreaterThan(main.indexOf('await awaitPreparationClient'));
+  expect(main.indexOf('await awaitPreparationClient')).toBeGreaterThan(-1);
   expect(main.indexOf('stop(archiveGap)')).toBeLessThan(main.indexOf("const shown = box("));
 });
 
@@ -97,4 +98,23 @@ test('the cook unit check reads rebuild.sh and refuses the v0.1.91 box', () => {
   const dropIn = /^MemoryMax=(\d+)G$/mu.exec(apply.slice(at, apply.indexOf('\nEOF\n', at)))?.[1];
   expect(String(Number(dropIn) * 1024 ** 3)).toBe(expected.MemoryMax);
   expect(() => expectedCookUnit('CPUWeight=20\n')).toThrow('no COOK_CPUS');
+});
+
+// PV31: v0.1.101's staging go-live reached the cook move before the release's devserver-client job uploaded the archive
+// and stopped on a 404. The move now waits for it, and still stops once the bound passes.
+test('the cook move waits for the preparation client archive, then stops past its bound', async () => {
+  let clock = 0;
+  const wait = vi.fn(async (ms: number) => { clock += ms; });
+  const now = (): number => clock, note = vi.fn();
+  const late = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(null, {status: 404}))
+    .mockResolvedValueOnce(new Response(null, {status: 404})).mockResolvedValueOnce(new Response(null, {status: 200}));
+  expect(await awaitPreparationClient(build, {read: late, wait, now, everyMs: 20_000, limitMs: 60_000, note})).toBeNull();
+  expect(late).toHaveBeenCalledTimes(3);
+  expect(wait).toHaveBeenCalledTimes(2);
+  expect(note).toHaveBeenCalledWith(expect.stringContaining('returned HTTP 404'));
+  clock = 0;
+  const never = vi.fn<typeof fetch>(async () => new Response(null, {status: 404}));
+  const gap = await awaitPreparationClient(build, {read: never, wait, now, everyMs: 20_000, limitMs: 60_000});
+  expect(gap).toMatch(/returned HTTP 404; wait for .* \(waited 1 min\)$/u);
+  expect(never).toHaveBeenCalledTimes(4);
 });

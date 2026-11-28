@@ -6,3 +6,5 @@ export function expectedCookUnit(rebuild: string): CookUnit;
 export function cookUnitGap(expected: CookUnit, shown: string): string | null;
 export function hardenGateOf(out: string): string | null;
 export function preparationClientGap(build: string, read?: typeof fetch): Promise<string | null>;
+/** PV31: wait for the exact staging tag's preparation client archive; null once it answers, else the gap past the bound. */
+export function awaitPreparationClient(build: string, options?: {read?: typeof fetch; wait?: (ms: number) => Promise<unknown>; now?: () => number; everyMs?: number; limitMs?: number; note?: (line: string) => void}): Promise<string | null>;

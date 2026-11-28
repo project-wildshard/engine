@@ -91,6 +91,24 @@ export async function preparationClientGap(build, read = fetch) {
   }
 }
 
+/** PV31: the exact release's devserver-client job uploads the archive a few minutes after its ci goes green, and v0.1.101's
+ *  staging go-live reached the cook move first and stopped on a 404. Wait for it, every `everyMs` up to `limitMs`, and
+ *  name the wait when it still has not landed. A missing archive past the bound is still a stop.
+ * @param {string} build @param {{read?: typeof globalThis.fetch, wait?: (ms: number) => Promise<unknown>, now?: () => number,
+ *  everyMs?: number, limitMs?: number, note?: (line: string) => void}} [options] @returns {Promise<string | null>} */
+export async function awaitPreparationClient(build, {read = fetch, wait = ms => new Promise(done => setTimeout(done, ms)),
+  now = Date.now, everyMs = 20_000, limitMs = 20 * 60_000, note = () => undefined} = {}) {
+  const started = now();
+  for (;;) {
+    const gap = await preparationClientGap(build, read);
+    if (gap === null) return null;
+    const waited = now() - started;
+    if (waited >= limitMs) return `${gap} (waited ${String(Math.round(waited / 60_000))} min)`;
+    note(gap);
+    await wait(everyMs);
+  }
+}
+
 async function main() {
   const args = process.argv.slice(2), dry = args.includes('--dry-run'), stagingMove = args.includes('--staging');
   const expected = args.find(arg => arg.startsWith('--build='))?.slice('--build='.length);
@@ -100,7 +118,11 @@ async function main() {
   const staging = await served('staging'), production = stagingMove ? staging : await served('production');
   const tag = selectCookRelease(staging, production, stagingMove ? {build: expected ?? ''} : {tag: requested ?? ''}).tag;
   say('ok', `${stagingMove ? 'staging' : 'production and staging'} serve ${tag} (${production.build.slice(0, 8)})`);
-  const archiveGap = await preparationClientGap(production.build);
+  let noted = false;
+  const archiveGap = await awaitPreparationClient(production.build, {note: gap => {
+    if (!noted) say('wait', `${gap}; checking every 20 s for up to 20 min`);
+    noted = true;
+  }});
   if (archiveGap !== null) stop(archiveGap);
 
   const shown = box('sudo -n /usr/local/sbin/wildshard-config show cook');
