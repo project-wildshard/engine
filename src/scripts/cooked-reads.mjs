@@ -47,6 +47,27 @@ export async function cookedReader(table, {origin = table.origin ?? COOKED_ORIGI
       const key = cookedObjectKey(ref, address.objects, path);
       if (key !== undefined && !objects.has(`/${path}`)) objects.set(`/${path}`, new URL(key, root).href);
     }
+    // PV27: the cook packs a zone's sections (its edge, entryways, scenes) into the tier parts its whole-set manifests list,
+    // not the index's own table. v0.1.101's road bake read none of them and baked all 27 zones closed.
+    for (const manifest of Array.isArray(index.manifests) ? index.manifests : []) {
+      if (manifest?.set !== 'whole' || typeof manifest.url !== 'string') continue;
+      const key = cookedObjectKey(ref, address.objects, manifest.url);
+      if (key === undefined) throw new Error(`${row.index} maps no ${manifest.url}`);
+      const listed = await readObject(new URL(key, root).href);
+      if (listed === null) throw new Error(`No cooked manifest for ${row.slug} at ${key}`);
+      /** @type {{files?: {url: string, bytes: number, hash: string}[], parts?: {url: string, members?: [number, number][]}[]}} */
+      const {files = [], parts = []} = JSON.parse(new TextDecoder().decode(listed));
+      for (const part of parts) {
+        const partKey = cookedObjectKey(ref, address.objects, part.url);
+        if (partKey === undefined) throw new Error(`${row.index} maps no ${part.url}`);
+        for (const [at, offset] of part.members ?? []) {
+          const file = files[at];
+          if (file === undefined) throw new Error(`${key} lists no file ${at}`);
+          const path = decodeURIComponent(new URL(file.url, 'https://build.invalid/').pathname);
+          if (!objects.has(path) && !members.has(path)) members.set(path, {part: new URL(partKey, root).href, offset, bytes: file.bytes, hash: file.hash});
+        }
+      }
+    }
   }
   return {
     fetchFile: async path => {
