@@ -67,6 +67,7 @@ import { listProcesses, readFootprints, startSampler, webkitProcesses } from './
 import { IPHONE_13_MODEL, ledgerSplit, loadPhoneModel, phoneFromWebKit, phonePeakFromWebKit, rangeText, zoneOverRuns } from './phoneModel.mjs';
 import { allocationSites, CULLER, symbolizer, walkPeak, walkRoute } from './walk.mjs';
 import { enterZone, oneCellCatalogue, zoneHome } from '../zone-entry.mjs';
+import { grantLoopback } from '../loopback-grant.mjs';
 
 export const PROTOCOL = 'memory-run/1';
 /** The inspector modes (see the header). @type {readonly ['minimal', 'full']} */
@@ -711,11 +712,11 @@ async function chromiumLedger(page, open, timeoutMs) {
  * browser ("Permission was denied for this request to access the `loopback` address space"): the page sat at loading step
  * `server` on "Can't find the world", re-reading /release.json, until the 180 s timeout, on every memory-footprint run.
  * A real page reads its release file from a public origin, so only the harness needs this grant; WebKit has no such check.
- * Chromium contexts on an online rig grant `local-network-access` to the page's origin, as the cooked-zone proofs do.
+ * Chromium contexts on an online rig grant the page's origin loopback leave (loopback-grant.mjs), as the cooked-zone proofs do.
  * @param {{grantPermissions:(permissions:string[],options:{origin:string})=>Promise<void>}} context @param {string} url
  * @param {{release:string, key:string} | null} world */
 export async function loopbackWorld(context, url, world) {
-  if (world !== null) await context.grantPermissions(['local-network-access'], { origin: new URL(url).origin });
+  if (world !== null) await grantLoopback(context, url);
 }
 
 /** STR18 [S]: one cold online phone boot in headless Chromium (ANGLE Metal), settled (a GC, `settleMs` idle), then the zone's

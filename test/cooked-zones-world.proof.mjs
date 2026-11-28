@@ -17,6 +17,7 @@ import { KEYCHAIN_ARGS } from '../src/scripts/.kit/chromium-keychain.mjs';
 import { PLAY_FLAGS, intoWorld, openRig } from '../src/scripts/online-rig.mjs';
 import { saveFixture } from '../src/scripts/debug-settings.mjs';
 import { enterZone } from '../src/scripts/zone-entry.mjs';
+import { grantLoopback } from '../src/scripts/loopback-grant.mjs';
 import { bootObservation } from '../src/scripts/parity/boot-smoke.mjs';
 import { isZoneFile, roadServerParts } from '../src/scripts/app-build/zoneless.mjs';
 import { shardNames } from '../src/scripts/page-size.mjs';
@@ -67,7 +68,7 @@ test(`a world page enters ${ZONE} from the cook, at 402x874`, { timeout: 900_000
           else if (url.origin === page.origin && isZoneFile(url.pathname.slice(1), shards, road)) fromPage.push(url.pathname);
         });
         tab.on('pageerror', error => { errors.push(error.message.slice(0, 240)); });
-        if (name === 'chromium') await context.grantPermissions(['local-network-access'], { origin: page.origin });
+        await grantLoopback(context, page.origin);
         await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
         await enterZone(tab, { zone: ZONE, base: rig.base, flags: PLAY_FLAGS });
         await tab.locator('#ws-name-box input').waitFor({ timeout: 150_000 });

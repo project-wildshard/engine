@@ -29,6 +29,7 @@ import {enterZone} from './zone-entry.mjs';
 import {bootObservation} from './parity/boot-smoke.mjs';
 import {isArt} from './public-verdicts.mjs';
 import {NAME_ASKED,saveFixture} from './debug-settings.mjs';
+import {grantLoopback} from './loopback-grant.mjs';
 
 const {values:o}=parseArgs({options:{slug:{type:'string'},tarball:{type:'string'},out:{type:'string',default:'tmp/zone-cook-entry'},
   reuse:{type:'string'},keep:{type:'boolean',default:false},tiers:{type:'string',default:'desktop,phone'},settle:{type:'string',default:'8000'},
@@ -147,7 +148,7 @@ try{
     const shape=shapes[/** @type {'desktop'|'phone'} */ (tier)];if(shape===undefined)throw new Error(`Unknown tier ${tier}`);
     const context=await launched.newContext({...shape,serviceWorkers:'block'}),page=await context.newPage();
     // The page reads the cook from a second loopback origin, which Chromium's local network access asks leave for.
-    await context.grantPermissions(['local-network-access'],{origin:page0});await saveFixture(context,NAME_ASKED);
+    await grantLoopback(context,page0);await saveFixture(context,NAME_ASKED);
     /** @type {{url:string,status:number,failure?:string}[]} */ const requests=[];/** @type {string[]} */ const errors=[];
     context.on('requestfinished',(/** @type {import('playwright').Request} */ request)=>{void request.response().then((/** @type {import('playwright').Response|null} */ answer)=>{requests.push({url:request.url(),status:answer?.status()??0});});});
     context.on('requestfailed',(/** @type {import('playwright').Request} */ request)=>{requests.push({url:request.url(),status:-1,failure:request.failure()?.errorText});});

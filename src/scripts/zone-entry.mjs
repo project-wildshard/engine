@@ -10,6 +10,7 @@
 //                                                                              WebKit inspector): run it on the origin, then open /
 import { pathToFileURL } from 'node:url';
 import { tapRecord, tapSessionDocument } from '../client/engine/boot/tapRecord.ts';
+import { grantLoopback } from './loopback-grant.mjs';
 
 /** The game's save prefix (src/client/game/identity.ts `savePrefix`, epoch 2; zone-entry.test.mjs keeps them equal). */
 export const SAVE_PREFIX = 'wildshard.save.v2@2.';
@@ -91,6 +92,8 @@ export async function enterZone(page, { zone, base, flags, mode = 'enter', name,
     await page.evaluate(({ key, raw }) => { sessionStorage.setItem(key, raw); },
       { key: `${prefix}session`, raw: tapDocument({ zone, mode, ...(name === undefined ? {} : { name }), held: await page.evaluate(k => sessionStorage.getItem(k), `${prefix}session`) }) });
   } else {
+    // A routed page has no address, so Chromium counts it public and denies its loopback reads (QA 11-26 row 80).
+    await grantLoopback(page.context(), origin);
     await page.route(home, async route => {
       const response = await route.fetch();
       await route.fulfill({ response, body: oneCellPage(await response.text(), zone, { unplaced }) });

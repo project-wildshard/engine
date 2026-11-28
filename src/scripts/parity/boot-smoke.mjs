@@ -9,6 +9,7 @@ import { registerCaptureTrace } from './capture-trace.mjs';
 import { serve } from './serve.mjs';
 import { NAME_ASKED, saveFixture } from '../debug-settings.mjs';
 import { initScript, oneCellPage } from '../zone-entry.mjs';
+import { grantLoopback } from '../loopback-grant.mjs';
 import { captureBootFrame } from './black-frame.mjs';
 import { observeTitleCapture } from './title-trace.mjs';
 import { gridBootWaitHistory } from './grid-boot-waits.mjs';
@@ -536,7 +537,7 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
     const home = (/** @type {URL} */ at) => at.origin === url.origin && at.pathname === '/';
     if (mode === 'alone') {
       url.searchParams.set('skipintro', '1'); // a one-cell world boots straight in; the intro would hold it at the title
-      await page.context().grantPermissions(['local-network-access'], { origin: url.origin });
+      await grantLoopback(page.context(), url.origin);
       await page.route(home, async route => { const response = await route.fetch(); await route.fulfill({ response, body: oneCellPage(await response.text(), shard) }); });
     }
     // NINE-DRAGON-BENCHMAX NB6: a standalone load whose props stage sits idle with no named wait is refused at control

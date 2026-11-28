@@ -13,6 +13,7 @@ import { extname, join, resolve, sep } from 'node:path';
 import { chromium, webkit } from '../src/scripts/browser-playwright.mjs';
 import { KEYCHAIN_ARGS } from '../src/scripts/.kit/chromium-keychain.mjs';
 import { enterZone } from '../src/scripts/zone-entry.mjs';
+import { grantLoopback } from '../src/scripts/loopback-grant.mjs';
 import { bootObservation } from '../src/scripts/parity/boot-smoke.mjs';
 import { isZoneFile, roadServerParts } from '../src/scripts/app-build/zoneless.mjs';
 import { shardNames } from '../src/scripts/page-size.mjs';
@@ -67,7 +68,7 @@ test(`${ZONE} enters from the cook and again offline, at 402x874`, { timeout: 90
           else if (url.port === String(PAGE_PORT) && isZoneFile(url.pathname.slice(1), shards, road)) fromPage.push(url.pathname);
         });
         const pageOrigin = `http://127.0.0.1:${String(PAGE_PORT)}`;
-        if (name === 'chromium') await context.grantPermissions(['local-network-access'], {origin: pageOrigin});
+        await grantLoopback(context, pageOrigin);
         const tab = await context.newPage();
         tab.on('console', message => {
           if (message.type() === 'error' || /\[grid\] cooked zones|cooked zones not read/u.test(message.text()))
