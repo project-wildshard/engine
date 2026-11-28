@@ -31,6 +31,7 @@ import { leftByPlayer } from '../boot/dropNotice';
 import { showFailure, clearFailure, noteWorldBoot, noteWorldStep } from '../telemetry/runtime';
 import { copyText, setDiagnosticsSource } from './diagnosticsCopy';
 import { holdLoadingPassSplit } from '../render/passSplit';
+import { holdLoadingUploadChecks } from '../render/compressedUpload';
 import { graphicsMode } from '../core/graphicsMode';
 import './loading.css';
 import { replaceFresh } from '../boot/freshPage';
@@ -248,6 +249,9 @@ export class Loading {
     this.lean = mode.inset !== true && leanLoadingCard();
     // MG9 (passSplit.ts): the card's frames draw in split Metal passes; an inset card sits over live play and leaves it
     if (mode.inset !== true) this.scope.onDispose(holdLoadingPassSplit());
+    // QA 11-25 row 151: compressed uploads under a card that covers the world (a boot's, the grid's too, which draws frames
+    // under it) are checked once a batch; an inset card sits over live play, whose uploads keep skipping the round trip
+    if (mode.inset !== true) this.scope.onDispose(holdLoadingUploadChecks());
     if (!this.scoped && document.documentElement.classList.contains('boot-menu')) {
       this.scope.onDispose(() => { document.documentElement.classList.remove('boot-menu'); });
     }

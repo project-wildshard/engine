@@ -59,7 +59,11 @@ export async function prepareRoadSurfaceMaps(admission: PlatformRenderAdmission,
       texture.needsUpdate = true;
       await upload(texture, () => !owner.disposed && !owner.disposing);
     }))]);
-    if (results === false || results.some(result => result.status === 'rejected') || owner.disposed || owner.disposing) { owner.dispose(); return false; }
+    if (results === false || owner.disposed || owner.disposing) { owner.dispose(); return false; }
+    // QA 11-25 row 151: a refused map (a read, or a graphics error on its upload naming the texture) is said, not
+    // swallowed; the procedural maps still draw the road
+    const refused = results.flatMap((result): unknown[] => result.status === 'rejected' ? [result.reason as unknown] : []);
+    if (refused.length > 0) { console.warn('[grid] road surface maps refused; the procedural maps draw the road:', ...refused); owner.dispose(); return false; }
     for (const [id, texture] of textures) maps.hold(id, texture);
     shared = true;
     admission.shrink?.('road.surface-maps', gpuBytes);

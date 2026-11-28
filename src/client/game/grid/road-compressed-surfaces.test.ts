@@ -44,10 +44,13 @@ test('unsupported, partially failed and retired preparations leave the procedura
   try {
     expect(await prepareRoadSurfaceMaps(skipped.admission, skipped.maps, {supported: false, read: () => { throw new Error('must not load'); }})).toBe(false);
     let disposed = 0;
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     expect(await prepareRoadSurfaceMaps(skipped.admission, skipped.maps, {supported: true,
       read: url => { if (url.includes('junction')) return Promise.reject(new Error('offline')); const t = native(url); t.addEventListener('dispose', () => { disposed++; }); return Promise.resolve(t); },
       upload: () => Promise.resolve()})).toBe(false);
     expect(disposed).toBe(1); expect(skipped.maps.has('road.asphalt')).toBe(false); expect(skipped.maps.has('road.junctions')).toBe(false);
+    expect(warn).toHaveBeenCalledWith('[grid] road surface maps refused; the procedural maps draw the road:', new Error('offline'));
+    warn.mockRestore();
   } finally { skipped.scope.dispose(); }
   const retired = rig();
   try {
@@ -79,4 +82,15 @@ test('session disposal immediately cancels a stalled optional preparation', asyn
     read: (_url, signal) => { signals.push(signal); return new Promise(() => { /* Deliberately stalled reader. */ }); }});
   r.scope.dispose(); expect(await result).toBe(false);
   expect(signals.every(signal => signal.aborted)).toBe(true);
+});
+
+test('a refused upload is said, naming its texture, and the procedural maps keep the road (QA 11-25 row 151)', async () => {
+  const r = rig(), warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  const refusal = new Error('Graphics error 1280 after compressed texture 37812 (#10, 1024x512, 11 mips), the last of 1 boot upload checked together');
+  try {
+    expect(await prepareRoadSurfaceMaps(r.admission, r.maps, {supported: true, read: url => Promise.resolve(native(url)),
+      upload: texture => texture.image.height === 512 ? Promise.reject(refusal) : Promise.resolve()})).toBe(false);
+    expect(warn).toHaveBeenCalledWith('[grid] road surface maps refused; the procedural maps draw the road:', refusal);
+    expect(r.maps.has('road.asphalt')).toBe(false); expect(r.maps.has('road.junctions')).toBe(false);
+  } finally { warn.mockRestore(); r.scope.dispose(); }
 });
