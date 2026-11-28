@@ -1,7 +1,7 @@
 // J476 smoke: real gates into the eight featured shards. J451's full route stays available by hand.
 import { agentFetch as fetch } from './agent-requests.mjs';
 import { setTimeout as delay } from 'node:timers/promises';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { keepReleaseProof, openReleaseRun } from './release-run.mjs';
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
@@ -361,9 +361,85 @@ export function portalExitPlan(entries, center, incoming) {
   return entry === undefined ? null : {walk:entry.route.map(([x, , z]) => ({x:center.x+x,z:center.z+z})), decks};
 }
 
+/** @typedef {{origin?:string, zones:readonly {slug:string, index:string}[]}} CookedTable */
+/** @typedef {(url:string) => Promise<Uint8Array | null>} CookedRead */
+
+/** PV30: a cooked page (one that carries `ws-zone-table`) serves no loose `/shardfiles/<slug>/sections/…`: the cook packs a
+ *  zone's sections into the parts its whole-set manifests list. v0.1.101's J476 read Nine Dragon's portal rows at the page
+ *  origin, got a 404, walked straight north from the plaza into the fronts block (z 20 to 26) and held three times.
+ *  Reads `path` from `slug`'s cook, hash-checked; null when the table or the cook has no such file.
+ * @param {CookedTable} table @param {string} slug @param {string} path a page path, `/shardfiles/<slug>/…` @param {CookedRead} read
+ * @returns {Promise<Uint8Array | null>} */
+export async function cookedZoneFile(table, slug, path, read) {
+  const row = table.zones.find(zone => zone.slug === slug);
+  if (row === undefined) return null;
+  const root = (table.origin ?? 'https://cooked.wildshard.io').replace(/\/?$/u, '/');
+  const prefix = `shards/${slug}/`;
+  /** @param {string} key */
+  const json = async key => {
+    const bytes = await read(new URL(key, root).href);
+    if (bytes === null) throw new Error(`No cooked ${key}`);
+    return JSON.parse(new TextDecoder().decode(bytes));
+  };
+  const index = await json(row.index);
+  /** @type {Record<string, unknown>} */ const objects = index.objects ?? {};
+  /** @param {string} page */
+  const keyOf = page => {
+    const key = objects[decodeURIComponent(new URL(page, 'https://build.invalid/').pathname).slice(1)];
+    if (key === undefined) return undefined;
+    if (typeof key !== 'string' || !key.startsWith(prefix) || key.split('/').includes('..')) throw new Error(`Cook object outside ${slug}: ${page}`);
+    return key;
+  };
+  const own = keyOf(path);
+  if (own !== undefined) return read(new URL(own, root).href);
+  for (const manifest of Array.isArray(index.manifests) ? index.manifests : []) {
+    if (manifest?.set !== 'whole' || typeof manifest.url !== 'string') continue;
+    const key = keyOf(manifest.url);
+    if (key === undefined) throw new Error(`${row.index} maps no ${manifest.url}`);
+    /** @type {{files?: {url:string, bytes:number, hash:string}[], parts?: {url:string, members?: [number, number][]}[]}} */
+    const {files = [], parts = []} = await json(key);
+    const at = files.findIndex(file => decodeURIComponent(new URL(file.url, 'https://build.invalid/').pathname) === path);
+    const file = files[at];
+    if (file === undefined) continue;
+    for (const part of parts) {
+      const member = (part.members ?? []).find(([fileAt]) => fileAt === at);
+      if (member === undefined) continue;
+      const partKey = keyOf(part.url);
+      if (partKey === undefined) throw new Error(`${row.index} maps no ${part.url}`);
+      const bytes = await read(new URL(partKey, root).href);
+      if (bytes === null) throw new Error(`No cooked part ${partKey}`);
+      const out = bytes.subarray(member[1], member[1]+file.bytes);
+      if (createHash('sha256').update(out).digest('hex') !== file.hash) throw new Error(`${path} fails its hash in ${partKey}`);
+      return out;
+    }
+  }
+  return null;
+}
+
+/** @type {CookedRead} */
+async function readCooked(url) {
+  const response = await fetch(url, {redirect: 'error', signal: AbortSignal.timeout(30_000)});
+  if (response.status === 404) { await response.body?.cancel(); return null; }
+  if (!response.ok) throw new Error(`${url} answered ${response.status}`);
+  return new Uint8Array(await response.arrayBuffer());
+}
+
+/** @param {{entryways?: {portal?:PortalExit}[]}} edge @returns {PortalExit[]} */
+const portalRows = edge => (edge.entryways ?? []).flatMap(row => row.portal === undefined ? [] : [row.portal]);
+
 /** The same content set the served page reads. Portal routes are optional product data.
  * @param {Page} page @param {string} slug @param {boolean} [missingIsEmpty] @returns {Promise<PortalExit[]>} */
 async function portalExits(page, slug, missingIsEmpty = false) {
+  // PV30: a cooked page reads its zones from the cook its inline zone table names
+  const table = await page.evaluate(() => document.getElementById('ws-zone-table')?.textContent ?? null);
+  if (table !== null) {
+    const parsed = /** @type {CookedTable} */ (JSON.parse(table));
+    if (parsed.origin !== undefined && !/^http:\/\/127\.0\.0\.1:\d+\/?$/u.test(parsed.origin)) throw new Error('Unexpected cooked origin');
+    const bytes = await cookedZoneFile(parsed, slug, `/shardfiles/${slug}/sections/world/edge.json`, readCooked);
+    if (bytes !== null) return portalRows(JSON.parse(new TextDecoder().decode(bytes)));
+    if (missingIsEmpty) return [];
+    throw new Error(`The cook has no portal rows for ${slug}`);
+  }
   const path = await page.evaluate(slug_ => {
     const bank = JSON.parse(document.getElementById('boot-module-files')?.textContent ?? '{}');
     const home = bank.spawnManifests?.home, baked = home?.shards?.includes(slug_);
@@ -381,8 +457,7 @@ async function portalExits(page, slug, missingIsEmpty = false) {
   const response = await fetch(address, {signal: AbortSignal.timeout(10_000)});
   if (missingIsEmpty && response.status === 404) return [];
   if (!response.ok) throw new Error(`Could not read the portal rows (HTTP ${response.status})`);
-  const edge = /** @type {{entryways?: {portal?:PortalExit}[]}} */ (await response.json());
-  return (edge.entryways ?? []).flatMap(row => row.portal === undefined ? [] : [row.portal]);
+  return portalRows(/** @type {{entryways?: {portal?:PortalExit}[]}} */ (await response.json()));
 }
 
 /** Walk the shard's declared inland route to its portal, and identify the road deck it leads to.

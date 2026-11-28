@@ -1,7 +1,7 @@
 import {readFileSync} from 'node:fs';
 import {expect,test,vi} from 'vitest';
 import {parseGridCatalogue} from '../src/shared/game/grid/catalogue';
-import {stepCheckpoints,settleControl,untilControl,untilAfterBootAudio,refusal,ledgerByKind,stats,dumpsInOrder,bootURL,bootOf,isServerWorker,webkitLines,PROTOCOL,ladderParts,ledgerTotal,ladderLines,ledgerParity,predictFootprint,categoryRemainder,addCategories,builtGridCell,placeOffGrid,ringThree} from '../src/scripts/memory/measure.mjs';
+import {stepCheckpoints,settleControl,untilControl,stallReport,bootZoneEntry,untilAfterBootAudio,refusal,ledgerByKind,stats,dumpsInOrder,bootURL,bootOf,isServerWorker,webkitLines,PROTOCOL,ladderParts,ledgerTotal,ladderLines,ledgerParity,predictFootprint,categoryRemainder,addCategories,builtGridCell,placeOffGrid,ringThree} from '../src/scripts/memory/measure.mjs';
 
 const procs=[{pid:1,role:'webcontent',name:'wc'},{pid:2,role:'gpu',name:'gpu'},{pid:3,role:'networking',name:'net'}];
 const sample=(seq:number,t:number,wc:[number,number],gpu:[number,number])=>({seq,t,p:{'1':wc,'2':gpu,'3':[9e9,9e9] as [number,number]}});
@@ -175,6 +175,43 @@ test('a page that names no after-control audio reads as settled', async () => {
   } finally {
     Reflect.set(globalThis, 'window', before);
   }
+});
+
+test('a boot that never reaches control times out naming the step it stalled at (QA 11-26 row 71)', async () => {
+  const state = { now: 200_000, steps: [[1_000, 'loading'], [5_000, 'modules']] as [number, string][], trace: [[6_000, 'zone.parts']] as [number, string][],
+    errors: ['boom'], resources: [{ name: '/assets/a.js', end: 4_000 }, { name: '/assets/spawn/parts/b.pack.br', end: 7_000 }], files: 12 };
+  const page = {
+    waitForFunction: () => { const error = new Error('page.waitForFunction: Timeout 180000ms exceeded.'); error.name = 'TimeoutError'; throw error; },
+    evaluate: () => state,
+  };
+  const error = await untilControl(page, 180_000).catch((caught: unknown) => caught);
+  expect(error).toBeInstanceOf(Error);
+  expect(error).toMatchObject({ name: 'TimeoutError', // callers that read a timeout as a failed run still do
+    message: 'page.waitForFunction: Timeout 180000ms exceeded. Stalled at step modules (began 195.0 s ago);'
+      + ' steps loading > modules; boot trace at zone.parts (194.0 s ago); errors boom; 12 files fetched, the last'
+      + ' /assets/spawn/parts/b.pack.br (193.0 s ago) after /assets/a.js' });
+  expect(stallReport(null)).toBe('Stalled: the page could not be read.');
+  expect(stallReport({ ...state, steps: [], trace: [], errors: [], resources: [], files: 0 })).toBe('Stalled at step none (the loading card never showed);'
+    + ' steps none; boot trace at none; errors none; 0 files fetched, the last none');
+});
+
+test('instrument minimal turns Network off only after the measured document commits (QA 11-26 row 71)', () => {
+  // Network.disable on the warm-up /version.json page's session left the boot document's module scripts unrun in headless
+  // WebKit: every armed boot sat at its first loading step until the 180 s timeout. Off after commit, the same build boots.
+  const source = readFileSync('src/scripts/memory/measure.mjs', 'utf8');
+  const body = (name: string) => { const from = source.indexOf(`export async function ${name}(`); return source.slice(from, source.indexOf('\nexport ', from + 1)); };
+  const boot = body('webkitBoot');
+  expect(boot.indexOf('await bootZone(page, url, chunk)')).toBeGreaterThan(0);
+  expect(boot.indexOf('minimiseInspector(page)')).toBeGreaterThan(boot.indexOf('await bootZone(page, url, chunk)'));
+  const rung = body('webkitRung'), title = rung.slice(rung.indexOf("if (rung === 'title') {"));
+  expect(title.indexOf('minimiseInspector(page)')).toBeGreaterThan(title.indexOf("page.goto(title.href, { waitUntil: 'commit' })"));
+  expect(title.indexOf("page.goto(title.href, { waitUntil: 'commit' })")).toBeGreaterThan(0);
+});
+
+test('a measured boot seats an armed zone the grid no longer places, as the hidden open plots are (QA 11-26 row 71)', () => {
+  const entry=bootZoneEntry('http://127.0.0.1:1/?mute=1','open-plot-desert-ruin');
+  expect(entry).toMatchObject({zone:'open-plot-desert-ruin',unplaced:true});
+  // zone-entry's own test holds what unplaced does: an off-grid zone seated at the origin, a placed zone in its own cell
 });
 
 test('Chromium control waits for a draw from the game that signalled control-ready', async () => {

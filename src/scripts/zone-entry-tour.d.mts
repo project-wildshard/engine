@@ -46,3 +46,5 @@ export function unstick(attempt: number): {key: 'Space' | 'KeyD' | 'KeyA'; ms: n
 export function spawnApproach(slug: string, at: Point, center: Point, dx: number, dz: number): (Point & {ride: boolean})[];
 export function walkZoneEntryTour(page: Page, origin: Point, result: Tour, save: () => void,
   options: {restart:()=>Promise<Page>;resume?:{proof:unknown;build:string;from:number}}): Promise<void>;
+/** PV30: `path` from `slug`'s cook (the part its whole-set manifest lists), hash-checked; null when absent. */
+export function cookedZoneFile(table: {origin?: string; zones: readonly {slug: string; index: string}[]}, slug: string, path: string, read: (url: string) => Promise<Uint8Array | null>): Promise<Uint8Array | null>;

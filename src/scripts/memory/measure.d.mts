@@ -24,6 +24,7 @@ export function dumpsInOrder(events:readonly unknown[]):{id:string;processes:Dum
 export const BOOT_FLAGS:string;
 export function bootURL(url:string):string;
 export function bootZone(page:unknown,url:string,chunk:string):Promise<void>;
+export function bootZoneEntry(url:string,chunk:string):{zone:string;base:string;flags:string;unplaced:true};
 export type Boot = 'online'|'standalone';
 export interface WorldStamp {release:string;key:string}
 export function isServerWorker(url:string):boolean;
@@ -59,6 +60,9 @@ export function ladderLines(result:LadderParts&{rungs:Record<string,{k:Stats;wc:
 export function ledgerParity(checkpoint:{ledger?:Record<string,Record<string,number>>|null;processes:{role:string;alloc:Record<string,number>}[]}):{ledgerGpu:number;ledgerBuffers:number;angleMetal:number;webglBuffers:number}|null;
 export function phoneContext(context:unknown,options?:{route?:boolean}):Promise<void>;
 export function untilControl(page:unknown,timeoutMs:number,requireSettledFrame?:boolean):Promise<string|null>;
+export interface BootState {now:number;steps:[number,string][];trace:[number,string][];errors:string[];resources:{name:string;end:number}[];files:number}
+export function bootState(page:unknown):Promise<BootState>;
+export function stallReport(state:BootState|null):string;
 export function untilAfterBootAudio(page:unknown,timeoutMs:number):Promise<string|null>;
 export interface Counters {gpu?:Record<string,number>;ram?:Record<string,number>;workers?:Record<string,number>}
 export interface CalibrationHost {baselineMB:{webcontent:number;gpu:number};kinds:Record<string,{slope:number;interceptMB:number;lands:string;roles?:Record<string,{slope:number;interceptMB:number}>}>}
