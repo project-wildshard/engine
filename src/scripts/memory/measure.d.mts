@@ -82,6 +82,7 @@ export function ledgerPeakLines(chunk:string,ledger:{peak:LedgerRow;control:Ledg
 export function summaryMarkdown(chunk:string,webkit:readonly unknown[],summary:unknown,ledger:{peak:LedgerRow;control:LedgerRow}|null):string;
 export interface WalkSampled {host:'chromium';boot:Boot;chunk:string;ready:boolean;failure:string|null;errors:string[];seconds?:number;route?:WalkRecord;
   bytesPerSecond?:number;cullerBytesPerSecond?:number;sampledBytes?:number;owners?:SiteRow[];stacks?:{bytes:number;stack:string[]}[];sites?:SiteRow[]}
+export function loopbackWorld(context:{grantPermissions:(permissions:string[],options:{origin:string})=>Promise<void>},url:string,world:WorldStamp|null):Promise<void>;
 export function chromiumWalk(options:{url:string;chunk:string;world:WorldStamp|null;seconds:number;timeoutMs?:number;settleMs?:number;intervalBytes?:number;top?:number;dist?:string;profileOut?:string;jsFlags?:string}):Promise<WalkSampled>;
 export interface WalkSummary {complete:boolean;peakAboveSettled:Stats;gpuPeakAboveSettled:Stats;walkPeak:Stats;bytesPerSecond:Stats;cullerBytesPerSecond:Stats;stuck:number[]}
 export function walkSummary(webkit:readonly unknown[],walks:readonly unknown[]):WalkSummary;

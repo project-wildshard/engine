@@ -692,6 +692,18 @@ async function chromiumLedger(page, open, timeoutMs) {
   return { host: 'chromium', ready: failure === null, failure, gpuDetail, checkpoints, timeline };
 }
 
+/** Meta QA 11-26 row 75: the online rig serves the page, its signed release file and its world on three loopback ports, so
+ * the page reads release.json cross-origin on loopback. Chromium's Local Network Access check denies that in a headless
+ * browser ("Permission was denied for this request to access the `loopback` address space"): the page sat at loading step
+ * `server` on "Can't find the world", re-reading /release.json, until the 180 s timeout, on every memory-footprint run.
+ * A real page reads its release file from a public origin, so only the harness needs this grant; WebKit has no such check.
+ * Chromium contexts on an online rig grant `local-network-access` to the page's origin, as the cooked-zone proofs do.
+ * @param {{grantPermissions:(permissions:string[],options:{origin:string})=>Promise<void>}} context @param {string} url
+ * @param {{release:string, key:string} | null} world */
+export async function loopbackWorld(context, url, world) {
+  if (world !== null) await context.grantPermissions(['local-network-access'], { origin: new URL(url).origin });
+}
+
 /** STR18 [S]: one cold online phone boot in headless Chromium (ANGLE Metal), settled (a GC, `settleMs` idle), then the zone's
  * walk (walk.mjs) for `seconds` under V8's sampling heap profiler with objects collected by minor and major GCs kept:
  * the walk's allocation traffic in bytes per second and its largest stacks. Traffic, never a peak; the WebKit walk carries
@@ -706,6 +718,7 @@ export async function chromiumWalk({ url, chunk, world, seconds, timeoutMs = 240
   try {
     const context = await owned.browser.newContext({ ...PHONE_VIEW });
     await phoneContext(context, { route: false });
+    await loopbackWorld(context, url, world);
     await context.addInitScript(WORKER_LOG);
     if (world !== null) await context.addInitScript((stamp) => { Reflect.set(globalThis, '__WS_WORLD__', stamp); }, world);
     const page = await context.newPage(); page.setDefaultTimeout(timeoutMs);

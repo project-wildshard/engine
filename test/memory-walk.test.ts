@@ -1,6 +1,8 @@
 import {expect,test} from 'vitest';
 import {allocationSites,CULLER,frameName,routeFor,walkPeak,WALK_ROUTES} from '../src/scripts/memory/walk.mjs';
-import {walkSummary} from '../src/scripts/memory/measure.mjs';
+import {loopbackWorld,walkSummary} from '../src/scripts/memory/measure.mjs';
+// oxlint-disable-next-line import/no-nodejs-modules -- the walk's own sources, read as text
+import {readFileSync} from 'node:fs';
 
 // MEMORY-STRUCTURE STR18: the walk meter's pure parts. A profile node's self bytes count once, under its own stack; the
 // owner is the innermost engine (`src/`) frame, so a three.js leaf is charged to the engine call that reached it.
@@ -92,4 +94,23 @@ test('the committed walk baseline parses: Nine, online, its rate recorded in bud
   expect(baseline.zone).toBe('nine-dragon-stack');
   expect(baseline.runs).toBeGreaterThanOrEqual(3);
   expect(readBaselines().baselines[`walk/${baseline.zone}/rate`]).toMatchObject({contentKey:expect.stringMatching(/^nine-dragon-stack@\d+$/u)});
+});
+
+// Meta QA 11-26 row 75: Chromium's Local Network Access check denied the online page's cross-origin loopback read of the rig's
+// release.json, so every hosted walk sat at loading step `server` until its timeout, and walk-ci only warned. The walk's
+// Chromium context grants the page origin `local-network-access` before its page opens, and a walk that never completed fails.
+test('QA 11-26 row 75: the online walk grants loopback access before its page, and an incomplete walk is a red',async()=>{
+  const grants:[string[],{origin:string}][]=[];
+  const context={grantPermissions:async(permissions:string[],options:{origin:string})=>{grants.push([permissions,options]);}};
+  await loopbackWorld(context,'http://127.0.0.1:51930/',{release:'http://127.0.0.1:51931/release.json',key:'k'});
+  expect(grants).toEqual([[['local-network-access'],{origin:'http://127.0.0.1:51930'}]]);
+  await loopbackWorld(context,'http://127.0.0.1:51930/',null);
+  expect(grants,'a standalone boot reads nothing cross-origin').toHaveLength(1);
+  const measure=readFileSync('src/scripts/memory/measure.mjs','utf8');
+  const walk=measure.slice(measure.indexOf('export async function chromiumWalk'));
+  expect(walk.indexOf('await loopbackWorld(context, url, world)')).toBeGreaterThan(0);
+  expect(walk.indexOf('await loopbackWorld(context, url, world)')).toBeLessThan(walk.indexOf('context.newPage()'));
+  const ci=readFileSync('src/scripts/memory/walk-ci.mjs','utf8');
+  expect(ci).toMatch(/if \(first === null\) \{[\s\S]{0,400}?process\.exitCode = 1;/u);
+  expect(ci).not.toMatch(/::warning title=walk ratchet::\$\{baseline\.zone\} walk did not complete/u);
 });
