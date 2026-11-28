@@ -3,7 +3,7 @@ import {mkdtempSync, rmSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {expect, test} from 'vitest';
-import {adminToken, channelHeads, journalCommand, main, notifyCommand, notifyToken, revisionOf, tallyJournal} from '../src/scripts/admin.mjs';
+import {FORMAT_CHANNELS, adminToken, channelHeads, journalCommand, main, notifyCommand, notifyToken, revisionOf, tallyJournal} from '../src/scripts/admin.mjs';
 
 const HASH = 'a'.repeat(64), OTHER = 'b'.repeat(64), TOKEN = ['planted', 'notify', 'value', '0123456789'].join('-');
 const catalogue = {shards: [
@@ -106,6 +106,9 @@ test('format re-runs a channel move with the admin token, and refuses a bad chan
   const fetch = (url, init) => { calls.push({url: String(url), init}); return Promise.resolve(new Response(JSON.stringify({queued: 3}), {status: 202})); };
   await expect(main(['format', 'prod', '0.1.0.4'], {fetch, env: {ADMIN_TOKEN: TOKEN}})).rejects.toThrow(/usage/u);
   await expect(main(['format', 'staging', '0.1.0.4; drop'], {fetch, env: {ADMIN_TOKEN: TOKEN}})).rejects.toThrow(/usage/u);
+  // meta QA 11-26 rows 9 and 10: preview follows staging, so nothing here moves it (the API would answer 409)
+  await expect(main(['format', 'preview', '0.1.0.4'], {fetch, env: {ADMIN_TOKEN: TOKEN}})).rejects.toThrow(/preview follows staging: move staging/u);
+  expect(FORMAT_CHANNELS.has('preview')).toBe(false);
   expect(calls).toEqual([]);
   expect(await main(['format', 'staging', '0.1.0.4', '--drop', 'a,b'], {fetch, env: {ADMIN_TOKEN: TOKEN}})).toEqual({channel: 'staging', format: '0.1.0.4', status: 202, answer: {queued: 3}});
   expect(calls[0]?.url).toBe('https://api.wildshard.io/api/channels/staging/format');

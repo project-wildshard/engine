@@ -98,9 +98,10 @@ export function adminToken(env = process.env, file = join(homedir(), '.config/wi
   return token;
 }
 
-/** The format a channel move takes (api-server's FORMAT), and the channels it knows. */
+/** The format a channel move takes (api-server's FORMAT), and the channels a move can name. Preview is not one: it follows staging's
+ * pointers and format, and the API answers a preview move with 409 (meta QA 11-26 rows 9 and 10). Move staging instead. */
 const FORMAT = /^(?:0|[1-9]\d{0,3})\.(?:0|[1-9]\d{0,3})(?:\.(?:0|[1-9]\d{0,3})\.(?:0|[1-9]\d{0,3}))?$/u;
-const FORMAT_CHANNELS = new Set(['preview', 'staging', 'production']);
+export const FORMAT_CHANNELS = new Set(['staging', 'production']);
 
 /** @typedef {(command: string, input?: string) => string} Run */
 /** @typedef {{shards: {slug: string, live?: {revision?: number, hash: string}, preview?: {revision?: number, hash: string}, channels?: Record<string, {raw?: string, revision?: number}>}[]}} Catalogue */
@@ -145,7 +146,8 @@ export async function main(argv, ports = {}) {
   if (verb === 'format') {
     if (rest.length === 0) return json(read, `${API}/api/format`);
     const [channel = '', format = ''] = rest, drop = option('--drop')?.split(',').filter(Boolean);
-    if (!FORMAT_CHANNELS.has(channel) || !FORMAT.test(format)) throw new Error('usage: admin.mjs format [<preview|staging|production> <X.Y.B.A> [--drop a,b]]');
+    if (channel === 'preview') throw new Error('preview follows staging: move staging (admin.mjs format staging <X.Y.B.A>)');
+    if (!FORMAT_CHANNELS.has(channel) || !FORMAT.test(format)) throw new Error('usage: admin.mjs format [<staging|production> <X.Y.B.A> [--drop a,b]]');
     const response = await read(`${API}/api/channels/${channel}/format`, {method: 'PUT', redirect: 'error', signal: AbortSignal.timeout(60_000),
       headers: {authorization: `Bearer ${adminToken(ports.env)}`, 'content-type': 'application/json'}, body: JSON.stringify(drop === undefined ? {format} : {format, drop})});
     const text = await response.text();

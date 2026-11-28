@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readTar, writeTar } from '@wildshard/format/tar';
-import { belowLines, channelPointers, compareFormat, declaredFormat, originalFormat, pointersBelowFloor } from '../src/scripts/format-floor-pointers.mjs';
+import { CHANNELS, belowLines, channelPointers, compareFormat, declaredFormat, originalFormat, pointersBelowFloor } from '../src/scripts/format-floor-pointers.mjs';
 import { formatApiFailures } from '../src/scripts/format-api-gate.mjs';
 
 // Meta QA 11-25 row 143: FP24's floor 0.1.0.1 shipped while production's open-plot-desert-ruin and open-plot-thin-ice
@@ -40,11 +40,14 @@ test('a shard.json declares its format, or the legacy version beside the layout 
   expect(() => declaredFormat({ formatVersion: 3 })).toThrow(/declares no format/u);
 });
 
-test('every production, staging and preview pointer is listed with its revision', () => {
+test('every production and staging pointer is listed with its revision; preview, which follows staging, never is', () => {
   const pointers = channelPointers(catalogue, shardfiles);
-  expect(pointers).toHaveLength(9);
+  expect(pointers).toHaveLength(6);
   expect(pointers).toContainEqual({ channel: 'production', slug: 'open-plot-desert-ruin', hash: RUIN_R1, revision: 1 });
-  expect(pointers).toContainEqual({ channel: 'preview', slug: 'open-plot-thin-ice', hash: ICE_R4, revision: 4 });
+  expect(pointers).toContainEqual({ channel: 'staging', slug: 'open-plot-thin-ice', hash: ICE_R4, revision: 4 });
+  // meta QA 11-26 rows 9 and 10: preview's pointers are staging's, so a low one is listed once and its fix is staging's
+  expect(CHANNELS).not.toContain('preview');
+  expect(pointers.filter(row => row.channel === 'preview')).toEqual([]);
 });
 
 test('the desert-ruin and thin-ice shape: a floor of 0.1.0.1 lists production\'s r1 pointers, each original read once', async () => {

@@ -3,8 +3,8 @@
 // whose shard.json declares the two-part 0.1. Nothing looked until v0.1.96's server release refused production play
 // 25/27, and the release lane flipped both pointers by hand.
 //
-// A floor reaches engine as a shard-format pin move, so the pin move is where it is checked: every production,
-// staging and preview pointer the API names is read for the format its original declares (the bytes, never the
+// A floor reaches engine as a shard-format pin move, so the pin move is where it is checked: every production
+// and staging pointer the API names is read for the format its original declares (the bytes, never the
 // ledger key: CP16's stored-floor tool moves that key and leaves shard.json as uploaded), and a pointer below the new
 // pin's floor is listed. The pre-push refuses with that list (format-api-gate.mjs); the fix is the API's format move or
 // a flip, made before the pin moves. Each original's format is cached by its hash, so a pin move reads only new ones.
@@ -17,7 +17,9 @@ import { dirname, join, resolve } from 'node:path';
 import { markedFetch } from './agent-requests.mjs';
 
 export const FLOOR_API = 'https://api.wildshard.io';
-export const CHANNELS = /** @type {const} */ (['production', 'staging', 'preview']);
+/** The pointers that move. Preview follows staging (meta QA 11-26 rows 9 and 10): its pointers are staging's, so it is never listed
+ *  twice, and its fix is staging's. */
+export const CHANNELS = /** @type {const} */ (['production', 'staging']);
 /** shard-format's legacy layout marker: its `formatVersion` is this number and `version` holds the format. */
 const LEGACY_LAYOUT = 2;
 const FORMAT = /^\d{1,4}\.\d{1,4}(?:\.\d{1,4}\.\d{1,4})?$/u;
