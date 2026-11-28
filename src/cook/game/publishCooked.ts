@@ -37,7 +37,8 @@ export async function readVersionedCook(store: Pick<ImmutablePackStore, 'get'>, 
 
 export interface PublishCookedOptions {
   readonly store: ImmutablePackStore;
-  readonly headers: (path: string) => ObjectHeaders;
+  /** CK1: called with the object key (`common/<sha256>.jpg`), never the page path, so a content-named key reads as one. */
+  readonly headers: (key: string) => ObjectHeaders;
   readonly reserve?: (objects: readonly {readonly key: string; readonly bytes: number}[]) => Promise<void>;
   readonly parallel: <T>(items: readonly T[], job: (item: T) => Promise<void>) => Promise<void>;
 }
@@ -58,8 +59,8 @@ export async function publishCooked(options: PublishCookedOptions, ref: CookedSh
     outputDigest: digestOfOutput, ...(members === undefined ? {} : {members}), ...(mounts.size === 0 ? {} : {mounts: ordered(mounts)})};
   readCookedIndexAddress(index);
   await options.reserve?.(plan);
-  await options.parallel(plan, async ({key, at, path}) => {
-    await options.store.putImmutable(key, readFileSync(at), options.headers(path));
+  await options.parallel(plan, async ({key, at}) => {
+    await options.store.putImmutable(key, readFileSync(at), options.headers(key));
   });
   await writeVersionedCook(options.store, ref, index);
   return index;

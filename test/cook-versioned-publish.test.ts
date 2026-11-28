@@ -17,7 +17,8 @@ import {checkShardfile} from '../src/server/host/checkShardfile';
 import {readServerPack} from '../src/shared/game/shardfile/serverPack';
 import {publishCooked, readVersionedCook, verifyCookReuse} from '../src/cook/game/publishCooked';
 import {sourceOnlyParts} from '../src/cook/game/cookObjectProvenance';
-import type {CookIndex} from '../src/cook/game/cookWorker';
+import {objectHeaders, type CookIndex} from '../src/cook/game/cookWorker';
+import type {ObjectHeaders} from '../src/cook/game/packStore';
 import {checkedCookedMember, cookedIndexKey, cookedObjectKey} from '../src/shared/game/shardfile/cookedPackPaths';
 import {releaseCookedPack} from '../src/server/host/dedicated/packReader';
 import {readSpawnManifest, type SpawnManifest} from '../src/shared/game/shardfile/spawnManifest';
@@ -57,6 +58,32 @@ test('two cook versions keep the same shardfile files once and resolve generated
   if (shared === undefined) throw new Error('Missing shared object');
   await expect(async () => {await store.putImmutable(shared, Buffer.from('other bytes'), options.headers());}).rejects.toThrow('Cook object bytes differ');
   expect(readFileSync(join(root, 'r2', shared), 'utf8')).toBe('from the shardfile');
+});
+
+test('CK1: headers come from the object key, so content-named copies are immutable', async () => {
+  const at = join(root, 'ck1'), store = folderStore(join(at, 'r2')), seen = new Map<string, ObjectHeaders>();
+  const asked: string[] = [];
+  const options = {store: {...store, putImmutable: async (key: string, body: Uint8Array, headers: ObjectHeaders) => {
+    seen.set(key, headers); await store.putImmutable(key, body, headers);
+  }}, headers: (key: string) => {asked.push(key); return objectHeaders(key);},
+  parallel: async <T,>(rows: readonly T[], run: (row: T) => Promise<void>) => {await Promise.all(rows.map(run));}};
+  const jpg = 'assets/fixture/baked/tex/clouds.jpg', part = 'assets/spawn/parts/0123456789abcdef.pack.br';
+  for (const [path, body] of [[jpg, 'cloud pixels'], [part, 'part bytes'], [generated, 'from the cook']] as const) {
+    const file = join(at, path); mkdirSync(dirname(file), {recursive: true}); writeFileSync(file, body);
+  }
+  const index = legacyDouble<CookIndex>({slug: identity.slug, hash, check: {...legacyDouble<NonNullable<CookIndex['check']>>({pass: true})}});
+  const out = await publishCooked(options, identity, index, outputDigest, at, [
+    {path: jpg, file: jpg, common: true, mount: true}, {path: part, file: part}, {path: generated, file: generated}]);
+  const key = (path: string): string => out.objects[path] ?? '';
+  expect(key(jpg)).toBe(`shards/fixture/0.2.0/common/${digest('cloud pixels')}.jpg`);
+  expect(asked.sort()).toEqual(Object.values(out.objects).sort());
+  expect(seen.get(key(jpg))).toEqual({type: 'image/jpeg', cache: 'public, max-age=31536000, immutable'});
+  expect(seen.get(key(part))?.cache).toBe('public, max-age=31536000, immutable');
+  expect(seen.get(key(generated))?.cache).toBe('public, max-age=300');
+  // An index stays short-lived: the versioned carry may replace one in place when a newer validator judges the same bytes.
+  expect(seen.get(cookedIndexKey(identity))?.cache).toBe('public, max-age=300');
+  // The page path alone is not content-named: asking by it was the bug (142 live objects at max-age=300, 11-28).
+  expect(objectHeaders(jpg).cache).toBe('public, max-age=300');
 });
 
 test('the full part digest can be rebuilt only with original members', () => {
