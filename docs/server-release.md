@@ -288,7 +288,13 @@ The page upload puts the build's road strips and grid-only book on
 checks. The check phase verifies the cooked road bytes and channel CORS.
 After `ROOMS_VERSIONED_COOK=1`, the room logs `road.pack` with
 `source: "cooked"` when the road loads. The build ID in the book must
-match the room's release.
+match the room's release. Both channels run `ROOMS_VERSIONED_COOK=1`
+from v0.1.101 (production set 11-28 with `--production`). A release
+whose signed file has a cook needs it: without it the room logs
+`release.failed` "Missing server input shard.json" and keeps the old
+build. A rollback to a release with no cook (v0.1.100 or older) sets it
+to 0 first, or the room throws "A versioned room needs a signed cook
+address".
 
 The `server-release.yml` author-client job builds
 `devserver-client.tar.gz` and `preparation-client.tar.gz` from the
