@@ -15,6 +15,7 @@
 // the spawn by grid-crossing-walk-proof.mjs's route. Staging's fresh boot can't be placed, so its playingMB is reported, not held.
 // J451: `--walk-all --expected-build=<sha>` walks the phone tour. `--resume=<held zone-entry.json> --from=33`
 // continues at crossing 33 and uses a fresh `--out`. Omit `--from` to take the next crossing from the held report.
+// `--shots` keeps each named screenshot in `--out` beside the verdict, for a look A/B between two builds (QA 11-28 row 82).
 import { agentFetch as fetch } from './agent-requests.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
@@ -30,7 +31,7 @@ import { keepReleaseProof, openReleaseRun } from './release-run.mjs';
 
 /** @param {string} name @param {string} fallback */
 const flag = (name, fallback) => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
-const base = flag('base', '').replace(/\/$/u, ''), proof = absolute(flag('out', '')), engineName = flag('engine', 'chromium'), device = flag('device', ''), fire = process.argv.includes('--fire');
+const base = flag('base', '').replace(/\/$/u, ''), proof = absolute(flag('out', '')), engineName = flag('engine', 'chromium'), device = flag('device', ''), fire = process.argv.includes('--fire'), keepShots = process.argv.includes('--shots');
 const deploy = process.argv.includes('--deploy'), reenter = process.argv.includes('--reenter');
 const liveTour = process.argv.includes('--walk-all'), expectedBuild = flag('expected-build', '');
 const resumeFile = flag('resume', ''), fromFlag = flag('from', '');
@@ -443,7 +444,8 @@ finally {
   try {
     if (liveTour) saveTour();
     writeFileSync(join(out, `${tag}-zone-gate.json`), `${JSON.stringify(result, null, 2)}\n`);
-    keepReleaseProof(out, proof, [`${tag}-zone-gate.json`, 'zone-entry.json']);
+    // QA 82 (11-28): --shots keeps each named screenshot beside the verdict, for a look A/B between builds.
+    keepReleaseProof(out, proof, [`${tag}-zone-gate.json`, 'zone-entry.json', ...(keepShots ? result.shots.map(shot => `${tag}-${String(shot.name)}.png`) : [])]);
   } finally {
     try { await runningBrowser?.close(); }
     finally { scratch.close(); }
