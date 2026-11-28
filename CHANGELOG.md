@@ -13,6 +13,11 @@ it into main while other lanes continue landing.
 `src/scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.101 (2026-11-27)
+
+- Load staging zones from the dedicated cooked-pack store.
+- Keep staging room and page packs aligned with the signed release.
+
 ## v0.1.100 (2026-11-27)
 
 - Fix the figure atlas that held the online crossing into Nalati Grasslands.
