@@ -220,7 +220,6 @@ class View {
   private readonly buffered: boolean;
   private readonly turn = new THREE.Quaternion();
   private readonly lastTurn = new THREE.Quaternion();
-  private readonly expanded = new THREE.Sphere();
   private margin = 0;
   /** this view's move (metres) and turn (cos of half its angle) thresholds when padded (VIEW_SPREAD) */
   private readonly move: number;
@@ -294,10 +293,18 @@ class View {
   }
   /** the casting cascades' frusta for this choice (`CullOptions.casters`) */
   readonly shadows: THREE.Frustum[] = [];
-  /** the sphere is in the camera's view or a casting cascade's @frame */
+  /** the sphere, grown by this view's margin, is in the camera's view; or the sphere is in a casting cascade's @frame */
   sees(sphere: THREE.Sphere): boolean {
-    this.expanded.copy(sphere); this.expanded.radius += this.margin;
-    if (this.frustum.intersectsSphere(this.expanded)) return true;
+    // Meta QA 11-26 row 81: the view's six planes tested here, the grown radius a local (Frustum.intersectsSphere's test).
+    // Copying the sphere into a held one, growing its radius and handing that to intersectsSphere allocated on every copy
+    // tested: 4.6 MB/s of Nine's online walk (19.4 MB/s [S]) under `level`; this writes no field.
+    const planes = this.frustum.planes, c = sphere.center, reach = -(sphere.radius + this.margin);
+    let inside = true;
+    for (let k = 0; k < 6; k++) {
+      const plane = planes[k] as THREE.Plane, n = plane.normal;
+      if (n.x * c.x + n.y * c.y + n.z * c.z + plane.constant < reach) { inside = false; break; }
+    }
+    if (inside) return true;
     // STR19: a loop, not `some` and an arrow (a closure per copy tested, each frame the view moved)
     for (let k = 0; k < this.shadows.length; k++) if (this.shadows[k]?.intersectsSphere(sphere) === true) return true;
     return false;

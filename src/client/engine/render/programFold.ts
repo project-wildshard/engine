@@ -107,15 +107,21 @@ export function installEnvironmentFold(renderer: THREE.WebGLRenderer, height: ()
   const wrap = (name: 'render' | 'compile' | 'compileAsync'): (() => void) => {
     const own = Object.getOwnPropertyDescriptor(renderer, name);
     const call = Reflect.get(renderer, name) as Call;
+    // Meta QA 11-26 row 81: the call passed on as it came, with no argument list built (an array and a spread per draw: the
+    // fold was 2.6 MB/s of Nine's online walk [S])
+    // @frame
+    const pass = (scene: THREE.Object3D, camera: THREE.Camera, target: THREE.Object3D | null | undefined): unknown =>
+      target === undefined ? call.call(renderer, scene, camera) : call.call(renderer, scene, camera, target);
+    /** the renderer's own call inside the fold, on every draw @frame */
     const folded: Call = function folded(scene, camera, target) {
       const lit = target ?? scene;
       const at = height();
-      if (!isScene(lit) || lit.environment !== null || foldExempt(lit) || !usableHeight(at)) { depth++; try { return Reflect.apply(call, renderer, [scene, camera, ...target === undefined ? [] : [target]]); } finally { depth--; } }
+      if (!isScene(lit) || lit.environment !== null || foldExempt(lit) || !usableHeight(at)) { depth++; try { return pass(scene, camera, target); } finally { depth--; } }
       // the atlas is cleared between draws only, never inside another draw's state
       const environment = depth === 0 || blacks.has(at) ? blackEnvironment(renderer, at) : null;
       if (environment !== null) lit.environment = environment;
       depth++;
-      try { return Reflect.apply(call, renderer, [scene, camera, ...target === undefined ? [] : [target]]); } finally {
+      try { return pass(scene, camera, target); } finally {
         depth--;
         if (environment !== null && lit.environment === environment) lit.environment = null;
       }
