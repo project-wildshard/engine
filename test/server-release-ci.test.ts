@@ -271,6 +271,31 @@ test('J234: both channels sign a build only after its server book and parts are 
   } finally { client.destroy(); server.closeAllConnections(); await new Promise<void>(resolve => { server.close(() => { resolve(); }); }); }
 });
 
+test('PV25: a cooked release signs on a grid-only book once each zone\'s server pack is in its cook', async () => {
+  // v0.1.101 held on "has no pine-hollow": PV17's book carries the grid only, and its rooms read zones from the signed cook.
+  const cook = { version: '1.19.0', hash: 'c'.repeat(64) }, prefix = 'shards/driftwood-isle/0.0.14/';
+  const indexKey = `${prefix}cooks/1.19.0/${cook.hash}/index.json`, packKey = `${prefix}common/${'d'.repeat(64)}.json`;
+  const grid = { url: `/assets/spawn/server/${'e'.repeat(16)}.pack.br`, bytes: 1, hash: 'b'.repeat(64), wireBytes: 1, files: [] };
+  const bucket = new Map([[`assets/spawn/server-${sha}.json`, JSON.stringify({ book: 'server', build: sha, shards: {}, grid })], [grid.url.slice(1), 'part']]);
+  const client = { send: async (command: { input: { Key: string } }) => {
+    const body = bucket.get(command.input.Key);
+    if (body === undefined) throw new Error(`fixture has no ${command.input.Key}`);
+    return { Body: { transformToString: async () => body } };
+  } } as unknown as S3Client;
+  const index = { build: sha, slug: 'driftwood-isle', shardVersion: '0.0.14', cookVersion: cook.version, cookHash: cook.hash, hash: 'f'.repeat(64),
+    objects: { 'assets/spawn/server-driftwood-isle-0123456789abcdef.json': packKey }, serverPack: { index: '/assets/spawn/server-driftwood-isle-0123456789abcdef.json' } };
+  const cooked = new Map([[indexKey, JSON.stringify(index)], [packKey, '{}']]);
+  const read = async (key: string): Promise<string | null> => cooked.get(key) ?? null;
+  const row: ReleaseFile = { ...release(sha), shards: [{ slug: 'driftwood-isle', revision: 14, shardVersion: '0.0.14' }], cook };
+  expect(await serverPacksReady(client, 'packs', row, { client, bucket: 'releases' }, read)).toBeNull();
+  // A legacy release still needs the zone in its book, and a cooked one needs the zone's index and server pack.
+  expect(await serverPacksReady(client, 'packs', { ...release(sha) }, { client, bucket: 'releases' }, read)).toBe(`assets/spawn/server-${sha}.json has no driftwood-isle`);
+  cooked.delete(packKey);
+  expect(await serverPacksReady(client, 'packs', row, { client, bucket: 'releases' }, read)).toBe(`no cooked server pack index at ${packKey}`);
+  cooked.delete(indexKey);
+  expect(await serverPacksReady(client, 'packs', row, { client, bucket: 'releases' }, read)).toBe(`no cooked index at ${indexKey}`);
+});
+
 test('GO7: a release of every pin opens every grid cell, under the slug the grid reads', () => {
   const pins = JSON.parse(readFileSync('test/pins/shardfiles.json', 'utf8')) as { shards: { slug: string; uploadNumber: number; shardVersion?: string }[] };
   // PV2: a pin that names its shard version carries it into the release (SF24 pins Driftwood's images-only upload with one).

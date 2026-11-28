@@ -15,7 +15,10 @@ export interface PublishOptions {
   align?: boolean;
 }
 export const RELEASE_BUCKET: 'wildshard-releases';
-export function serverPacksReady(client: S3Client, bucket: string, release: ReleaseFile, items?: {client: S3Client; bucket: string}): Promise<string | null>;
+/** One cooked-bucket object's text, or null when it is missing. */
+export type CookedRead = (key: string) => Promise<string | null>;
+export function serverPacksReady(client: S3Client, bucket: string, release: ReleaseFile, items?: {client: S3Client; bucket: string}, cooked?: CookedRead): Promise<string | null>;
+export function cookedServerReady(slug: string, shardVersion: string, cook: {version: string; hash: string}, read: CookedRead): Promise<string | null>;
 export function publishChannel(options: PublishOptions): Promise<{
   status: string; release: ReleaseFile; signed: string; reason?: string;
 }>;

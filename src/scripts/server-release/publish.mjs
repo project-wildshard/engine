@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client, S3ServiceException } from '@aws-sdk/client-s3';
 import * as v from 'valibot';
-import { readServerPackBook, serverPackBookPath } from '../../shared/game/shardfile/serverPack.ts';
+import { readCookedServerIndex, readServerPackBook, serverPackBookPath } from '../../shared/game/shardfile/serverPack.ts';
 import { bundleDescriptor, COMMIT, DEFAULT_SERVER_SHARDS, publication, readPublication, releaseCook, releasePublicKey, releaseShards, signRelease } from './sign.mjs';
 import { copyItemCatalogue, itemBytesMatch } from './items.mjs';
 import { preparedReleaseFollows } from './history.mjs';
@@ -21,13 +21,43 @@ export const RELEASE_BUCKET = 'wildshard-releases';
 /** @param {unknown} error @returns {boolean} */
 const missing = error => error instanceof S3ServiceException && (error.name === 'NoSuchKey' || error.name === 'NotFound' || error.$metadata.httpStatusCode === 404);
 
+/** One cooked-bucket object's text, or null when it is missing. @typedef {(key: string) => Promise<string | null>} CookedRead */
+/** @type {CookedRead} */
+const publicCookedRead = async key => {
+  const response = await fetch(new URL(key, 'https://cooked.wildshard.io/'), { redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(30_000) });
+  if (response.status === 404) { await response.body?.cancel(); return null; }
+  if (!response.ok) throw new Error(`${key} answered ${response.status}`);
+  return response.text();
+};
+const COOKED_SEGMENT = /^[a-z0-9][a-z0-9._-]*$/u;
+
+/** Null when the zone's index sits at the signed cook address and names a server pack whose index the cook stored under that
+ *  shard version: what a versioned room reads (serverFolder.ts versionedServerPack). Else why not. The keys follow
+ *  cookedPackPaths.ts, written out here because that file is a cook input and this publisher runs under plain node.
+ * @param {string} slug @param {string} shardVersion @param {{version: string, hash: string}} cook @param {CookedRead} read
+ * @returns {Promise<string | null>} */
+export async function cookedServerReady(slug, shardVersion, cook, read) {
+  if (![slug, shardVersion, cook.version].every(part => COOKED_SEGMENT.test(part)) || !/^[a-f0-9]{64}$/u.test(cook.hash)) return `${slug} has no valid cook address`;
+  const shard = `shards/${slug}/${shardVersion}/`, key = `${shard}cooks/${cook.version}/${cook.hash}/index.json`;
+  const text = await read(key);
+  if (text === null) return `no cooked index at ${key}`;
+  const input = JSON.parse(text);
+  if (input?.slug !== slug || input.shardVersion !== shardVersion || input.cookVersion !== cook.version || input.cookHash !== cook.hash) return `${key} is not ${slug}'s index under this cook`;
+  const { serverPack } = readCookedServerIndex(input);
+  if (serverPack === undefined) return `${key} names no server pack`;
+  const packKey = typeof input.objects === 'object' && input.objects !== null && Object.hasOwn(input.objects, serverPack.index.slice(1)) ? input.objects[serverPack.index.slice(1)] : undefined;
+  if (typeof packKey !== 'string' || !packKey.startsWith(shard) || packKey.split('/').some(part => part === '..' || part === '')) return `${key} maps no ${serverPack.index}`;
+  if (await read(packKey) === null) return `no cooked server pack index at ${packKey}`;
+  return null;
+}
+
 /** Every channel's order (J234, Jake 2026-11-10: "we never switch a build whose files aren't uploaded"): packs first, the signed
  *  file last. The server preloads the
  *  named build's book and parts before its grace and stays on its old build while they are missing, so a file naming a build with
  *  no book strands every check behind it. Null when the book and every part the release's shards and grid need are in the bucket.
  * @param {S3Client} client @param {string} bucket @param {ReleaseFile} release
- * @param {{client: S3Client, bucket: string}} [items] @returns {Promise<string | null>} */
-export async function serverPacksReady(client, bucket, release, items = { client, bucket }) {
+ * @param {{client: S3Client, bucket: string}} [items] @param {CookedRead} [cooked] @returns {Promise<string | null>} */
+export async function serverPacksReady(client, bucket, release, items = { client, bucket }, cooked = publicCookedRead) {
   if (release.items !== undefined) {
     let body;
     try { body = await (await items.client.send(new GetObjectCommand({ Bucket: items.bucket, Key: release.items.path }))).Body?.transformToByteArray(); }
@@ -45,7 +75,14 @@ export async function serverPacksReady(client, bucket, release, items = { client
   const parts = new Set();
   for (const row of release.shards) {
     const pack = book.shards[row.slug];
-    if (pack === undefined) return `${key} has no ${row.slug}`;
+    if (pack === undefined) {
+      // Fix preview PV16, PV17: a release that signs a cook ships a grid-only book, and its rooms read each zone's server pack
+      // from that cook (ROOMS_VERSIONED_COOK). v0.1.101's signer held here on "has no pine-hollow" (opus-ship, PV25).
+      if (release.cook === undefined || row.shardVersion === undefined) return `${key} has no ${row.slug}`;
+      const problem = await cookedServerReady(row.slug.replace(/^_/u, ''), row.shardVersion, release.cook, cooked);
+      if (problem !== null) return problem;
+      continue;
+    }
     for (const part of [pack, ...pack.more ?? []]) parts.add(part.url.slice(1));
   }
   if (book.grid !== undefined) for (const part of [book.grid, ...book.grid.more ?? []]) parts.add(part.url.slice(1));
