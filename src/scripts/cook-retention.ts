@@ -64,10 +64,11 @@ export function keepCookIndexes(current: Retained, channels: readonly ChannelInd
 }
 
 export async function pruneCookedStore(store: PackStore, read: typeof fetch, currentIndexes: readonly string[],
-  options: Readonly<{now: number; dryRun: boolean; origins?: Readonly<Record<Channel, string>>}>): Promise<CookPrunePlan> {
+  options: Readonly<{now: number; dryRun: boolean; force?: boolean; origins?: Readonly<Record<Channel, string>>}>): Promise<CookPrunePlan> {
   const held = await store.get(SNAPSHOT);
   const prior = held === undefined ? undefined : v.parse(snapshot, JSON.parse(new TextDecoder().decode(held)) as unknown);
-  if (!options.dryRun && prior !== undefined && options.now - prior.generatedAt < DAY_MS) {
+  // PV29: `force` (a store near its budget before a recook) sweeps even when the nightly one ran in the last day
+  if (!options.dryRun && options.force !== true && prior !== undefined && options.now - prior.generatedAt < DAY_MS) {
     return {keptIndexes: Object.keys(prior.keepUntil), keptObjects: 0, indexes: [], objects: [], bytes: 0};
   }
   const channels = await carriedCookIndexes(read, options.origins);

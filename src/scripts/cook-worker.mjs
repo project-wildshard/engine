@@ -113,8 +113,8 @@ const worker = () => createCookWorker({ alarm: cookAlarm, ...(listingFile === un
   },
 });
 
-/** @param {boolean} dryRun */
-const versionedGc = async dryRun => {
+/** @param {boolean} dryRun @param {boolean} [force] */
+const versionedGc = async (dryRun, force = false) => {
   if (recipe === undefined) throw new Error('Cook pruning needs a versioned store');
   const stages = /** @type {const} */ (['live', 'staging', 'preview']);
   const current = (await Promise.all(stages.map(stage => publicSource.heads(stage)))).flat();
@@ -122,9 +122,21 @@ const versionedGc = async dryRun => {
     if (head.shardVersion === undefined) throw new Error(`Cook prune cannot identify ${head.slug}`);
     return cookedIndexKey({slug: head.slug, shardVersion: head.shardVersion, ...recipe});
   });
-  const plan = await pruneCookedStore(store, fetch, protectedKeys, {now: Date.now(), dryRun});
+  const plan = await pruneCookedStore(store, fetch, protectedKeys, {now: Date.now(), dryRun, force});
   return {dryRun, keptIndexes: plan.keptIndexes.length, keptObjects: plan.keptObjects, indexes: plan.indexes.length,
     objects: plan.objects.length, bytes: plan.bytes};
+};
+
+/** PV29: PV26's prefill at 1.21.0 failed Nalati on the 4 GB budget (J89) with 1.0 GB of retired cook versions still held,
+ *  since a versioned store swept only nightly. A versioned recook first sweeps the store when it is past this share of
+ *  the budget, whenever the nightly one last ran. */
+const PRUNE_BEFORE_SHARE = 0.85;
+const pruneIfFull = async () => {
+  if (!versioned) return;
+  const used = (await store.list('shards/')).reduce((sum, row) => sum + row.bytes, 0);
+  if (used <= packBudget * PRUNE_BEFORE_SHARE) return;
+  console.log(`cooked store ${used} of ${packBudget} B before a recook: sweeping now`);
+  console.log(JSON.stringify({cookedPrune: await versionedGc(false, true)}));
 };
 
 if (command === 'serve') {
@@ -137,7 +149,8 @@ if (command === 'serve') {
   console.log(`cook worker polls the catalogue every ${everyMs / 1000} s`);
   // Meta QA 11-24 row 43 (MA13): with a recorder named, the record pass runs first and the boot recook waits for it, so a
   // render change ends `cooked, prepared by cook`; the poll (new uploads) starts at once beside it.
-  const boot = bootCook(cook, { everyMs, log: line => { console.log(line); }, before: record() });
+  const boot = bootCook(cook, { everyMs, log: line => { console.log(line); }, before: Promise.all([record(), cook.maintain(pruneIfFull).catch((/** @type {unknown} */ error) => {
+    console.warn(`cooked store sweep failed: ${error instanceof Error ? error.message : String(error)}`); })]) });
   // J505: the nightly protected collection (a publish also runs it under 15% headroom)
   const nightly = async () => {
     try {
@@ -171,6 +184,7 @@ if (command === 'serve') {
   if (!Number.isSafeInteger(expected) || expected <= 0 || heads.length !== expected || heads.some(head => head.shardVersion === undefined)) {
     throw new Error(`Need ${expected} live heads with raw shardVersion; got ${heads.length}, ${heads.filter(head => head.shardVersion === undefined).length} missing shardVersion`);
   }
+  await pruneIfFull();
   const cook = worker();
   const rows = await Promise.all(heads.map(head => cook.cook(head)));
   const refusal = uncookedLiveRefusal(need('WILDSHARD_BUILD'), rows);
@@ -178,6 +192,7 @@ if (command === 'serve') {
   console.log(JSON.stringify({bucket: COOKED_BUCKET, heads: rows.length, cooked: rows.filter(row => row.state === 'cooked').length}));
 } else if (command === 'recook') {
   await record();
+  await pruneIfFull();
   const cook = worker(), rows = await cook.recook(['live']), preview = await cook.recook(['preview', 'staging']);
   console.log(JSON.stringify([...rows, ...preview]));
   // J29: a build takes no traffic with a live shard it couldn't cook. A refused head is already live, so it stops a deploy

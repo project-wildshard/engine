@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {cookedIndexKey, cookedShardPrefix, type CookedShardRef} from '../shared/game/shardfile/cookedPackPaths.ts';
 import {carriedCookIndexes, keepCookIndexes, pruneCookedStore} from './cook-retention.ts';
+import {PREFILL_KEEP_MS} from '../cook/game/cookedPrune.ts';
 import type {ObjectHeaders, PackStore, StoredObject} from '../cook/game/packStore.ts';
 
 const day = 86_400_000, now = Date.UTC(2026, 10, 26), older = now - 3 * day;
@@ -84,4 +85,32 @@ await test('a missing kept index prevents any delete', async () => {
   seedIndex(store, gone);
   await assert.rejects(pruneCookedStore(store, read, [cookedIndexKey(active)], {dryRun: false, origins, now}), /keep index missing/u);
   assert.deepEqual(store.removed, []);
+});
+
+// PV29: PV26 prefilled the next release's cook (1.21.0) a day before any channel named it; the nightly prune kept only named
+// indexes and those under a day old, so it would have taken the prefill. A retired version (older than every named one) goes.
+await test('a prefill of a newer cook version stays seven days, and a retired version goes', async () => {
+  const store = new MemoryStore();
+  const prefill = {...active, cookVersion: '1.21.0', cookHash: 'e'.repeat(64)}, retired = {...active, cookVersion: '0.9.0', cookHash: 'f'.repeat(64)};
+  seedIndex(store, active); seedIndex(store, carried);
+  const prefillPart = `${cookedShardPrefix(prefill)}cooks/1.21.0/${prefill.cookHash}/piece.ktx2`, retiredPart = `${cookedShardPrefix(retired)}cooks/0.9.0/${retired.cookHash}/piece.ktx2`;
+  store.seed(prefillPart, 'prefill bytes'); store.seed(retiredPart, 'retired bytes');
+  store.seed(cookedIndexKey(prefill), {...prefill, hash, objects: {'assets/fixture/piece.ktx2': prefillPart}});
+  store.seed(cookedIndexKey(retired), {...retired, hash, objects: {'assets/fixture/piece.ktx2': retiredPart}});
+  const plan = await pruneCookedStore(store, read, [cookedIndexKey(active)], {dryRun: true, origins, now});
+  assert.ok(plan.keptIndexes.includes(cookedIndexKey(prefill)));
+  assert.deepEqual(new Set([...plan.indexes, ...plan.objects].map(row => row.key)), new Set([cookedIndexKey(retired), retiredPart]));
+  // past seven days the prefill is no longer ahead of a release: it goes too
+  const late = await pruneCookedStore(store, read, [cookedIndexKey(active)], {dryRun: true, origins, now: older + PREFILL_KEEP_MS + 1});
+  assert.ok(late.indexes.some(row => row.key === cookedIndexKey(prefill)));
+});
+
+await test('a forced sweep runs even when the nightly one ran within the day', async () => {
+  const store = new MemoryStore();
+  seedIndex(store, active); seedIndex(store, carried); const oldPart = seedIndex(store, gone);
+  await store.put('retained-indexes.json', new TextEncoder().encode(JSON.stringify({generatedAt: now - 60_000, keepUntil: {}})), {type: 'application/json', cache: 'private, no-store'});
+  const skipped = await pruneCookedStore(store, read, [cookedIndexKey(active)], {dryRun: false, origins, now});
+  assert.deepEqual(skipped.indexes, []); assert.equal(store.removed.length, 0);
+  await pruneCookedStore(store, read, [cookedIndexKey(active)], {dryRun: false, force: true, origins, now});
+  assert.ok(store.removed.includes(cookedIndexKey(gone)) && store.removed.includes(oldPart));
 });
