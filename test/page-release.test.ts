@@ -888,3 +888,26 @@ test('production go-live stops on a content set that lacks what the page names, 
   await runPhase('go-live', deps);
   expect(lines).toContain('NOTE production content after the alias move: the page or its set could not be read: content.json answered 500 (ALLOW_CONTENT_GAPS=1)');
 });
+
+// QA 11-26 row 90 (J505): v0.1.102 went live on production with npm latest left on 0.1.100. Production go-live ends with
+// npm latest at the tag; a miss refuses after the alias move, so the release never reads as done.
+test('production go-live is not done until npm latest names the tag', async () => {
+  const {deps, calls} = rig('production');
+  const asked: string[] = [];
+  let fail = true;
+  deps.npmFinal = tag => { asked.push(tag); return fail ? Promise.reject(new Error('npm-publish run 9 for v0.1.10 ended failure')) : Promise.resolve(); };
+  await through(deps, 'check');
+  deps.qa = qaOn();
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/npm latest after the alias move: npm-publish run 9 for v0\.1\.10 ended failure \(the alias has moved; the release is not done until npm latest is 0\.1\.10/u);
+  expect(calls).toContain('goLive');
+  expect(asked).toEqual(['v0.1.10']);
+  fail = false;
+  await runPhase('go-live', deps);
+  expect(asked).toEqual(['v0.1.10', 'v0.1.10']);
+
+  // staging never asks npm for latest
+  const staging = rig('staging');
+  staging.deps.npmFinal = tag => { asked.push(`staging ${tag}`); return Promise.resolve(); };
+  await through(staging.deps, 'go-live');
+  expect(asked).toEqual(['v0.1.10', 'v0.1.10']);
+});

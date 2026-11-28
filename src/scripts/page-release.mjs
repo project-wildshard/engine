@@ -39,6 +39,7 @@ import {r2Packs} from './page-release/packs.mjs';
 import {deployStaging} from './page-release/staging-deploy.mjs';
 import {openReleaseRun} from './release-run.mjs';
 import {phaseTable} from './page-release/phase-times.mjs';
+import {npmFinal} from './page-release/npm-final.mjs';
 
 /** SQ15: the staging-qa verdict.json, or why it could not be read. @param {string} file */
 function readQa(file) {
@@ -105,6 +106,29 @@ async function fetch200(url) {
 
 const host = workersHost({token: () => cloudflareToken, log});
 
+const ENGINE_REPO = 'project-wildshard/engine';
+const cli = (/** @type {string} */ file, /** @type {string[]} */ argv, /** @type {string|undefined} */ input = undefined) =>
+  execFileSync(file, argv, {cwd: root, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], ...(input === undefined ? {} : {input})}).trim();
+/** QA 11-26 row 90: npm latest and the npm-publish.yml dispatch, through npm and gh. @type {import('./page-release/npm-final.mjs').NpmFinalDeps} */
+const npmDeps = {
+  latest: async () => { try { return cli('npm', ['view', '@wildshard/engine@latest', 'version', '--prefer-online']) || undefined; } catch { return undefined; } },
+  existingRun: async tag => {
+    const runs = JSON.parse(cli('gh', ['run', 'list', '-R', ENGINE_REPO, '--workflow', 'npm-publish.yml', '--event', 'workflow_dispatch', '--limit', '50', '--json', 'displayTitle,databaseId,conclusion']));
+    return runs.find((/** @type {{displayTitle: string, conclusion: string}} */ run) => run.displayTitle === `npm latest ${tag}` && run.conclusion !== 'failure' && run.conclusion !== 'cancelled')?.databaseId;
+  },
+  dispatch: async tag => {
+    const answer = cli('gh', ['workflow', 'run', 'npm-publish.yml', '-R', ENGINE_REPO, '--ref', 'main', '--json'], JSON.stringify({publish_final: tag}));
+    const run = Number(/actions\/runs\/(\d+)/u.exec(answer)?.[1]);
+    if (!Number.isSafeInteger(run) || run <= 0) throw new Error(`could not confirm the npm-publish dispatch for ${tag}`);
+    return run;
+  },
+  watch: async run => {
+    try { cli('gh', ['run', 'watch', String(run), '-R', ENGINE_REPO, '--exit-status', '--interval', '15']); } catch { /* the conclusion says why */ }
+    return JSON.parse(cli('gh', ['run', 'view', String(run), '-R', ENGINE_REPO, '--json', 'conclusion'])).conclusion || 'unknown';
+  },
+  log, sleep: delay, now: () => Date.now(),
+};
+
 let phase = '';
 /** @type {ReturnType<typeof openReleaseRun>|undefined} */
 let scratch;
@@ -135,6 +159,8 @@ async function run(step, generatedQa) {
       // FR-A17: production moves only when every advertised head has packs for this build.
       productionPacks: channel === 'production' ? missingProductionPacks : undefined,
       allowMissingPacks: process.env.ALLOW_MISSING_PACKS === '1',
+      // QA 11-26 row 90 (J505): production go-live ends with npm latest at this tag (npm-publish.yml publish_final).
+      npmFinal: channel === 'production' ? async tag => { await npmFinal(tag, npmDeps); } : undefined,
       readFile: path => readFileSync(path),
       state: {
         read: name => readState()[name],

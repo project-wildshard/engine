@@ -128,6 +128,8 @@ export function pinnedReleaseKey(configured) {
  *   tables and spawn books name is in the set's index and answers with the page's CORS, and holds the bytes staging QA
  *   played (`stagingBase`, the verdict's `contentBase`): before the alias moves (the local build) and after (the live page).
  * @property {boolean} [allowContentGaps]  ALLOW_CONTENT_GAPS=1 (J381).
+ * @property {(tag: string) => Promise<void>} [npmFinal]  QA 11-26 row 90 (J505): after production's alias move, npm latest must
+ *   equal the tag (npm-final.mjs dispatches `npm-publish.yml publish_final` when it is behind); a miss leaves the release not done.
  * @property {(path: string) => Uint8Array} readFile
  * @property {{read: (phase: Phase) => any, write: (phase: Phase, value: object) => void}} state
  * @property {{clean: () => boolean, head: () => string, remoteTag: (tag: string) => string|undefined}} git
@@ -344,6 +346,12 @@ export async function runPhase(phase, deps) {
   await rooms('after the alias move');
   if (channel.channel === 'production') await contentGate('after', deps, refuse);
   deps.state.write('go-live', {build: deps.build, channel: channel.channel, deployment, ...(gate.serial === undefined ? {} : {serial: gate.serial})});
+  // QA 11-26 row 90 (J505): v0.1.102 went live with npm latest left on 0.1.100. Production is done only when npm says so.
+  if (channel.channel === 'production' && deps.npmFinal !== undefined) {
+    const tag = `v${deps.manifest.version}`;
+    try { await deps.npmFinal(tag); }
+    catch (error) { refuse(`npm latest after the alias move: ${error instanceof Error ? error.message : String(error)} (the alias has moved; the release is not done until npm latest is ${deps.manifest.version}: rerun go-live or dispatch npm-publish.yml publish_final=${tag})`); }
+  }
   deps.log(`PASS ${channel.origin} -> ${deps.build} ${deployment.id} after matching serial ${gate.serial}${channel.solo ? ' (solo)' : ''} (alias last)`);
   deps.log(channel.solo ? `next: node src/scripts/e7-doctor-proof.mjs ${channel.origin} ${deps.build} --human-static`
     : channel.channel === 'staging'

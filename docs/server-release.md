@@ -87,6 +87,9 @@ Run the same command to continue a partial delivery from the same lane
 session. It reuses the published branch and any existing exact npm run.
 It resumes a held J451 tour from the failed crossings. Tag, production
 and npm latest use their normal release gates.
+Production go-live ends with npm latest: it dispatches `npm-publish.yml`
+`publish_final=vX.Y.Z` when npm is behind and refuses until npm latest
+names the tag (QA 11-26 row 90, J505).
 
 The channel pages ship with one committed script, in four phases, from
 one clean release clone per channel at the exact SHA (never a worktree

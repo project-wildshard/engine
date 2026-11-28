@@ -46,6 +46,8 @@ export interface Deps {
   contentReach?: (when: 'before' | 'after', stagingBase: string | undefined) => Promise<{ summary: string; problems: string[] }>;
   /** ALLOW_CONTENT_GAPS=1 (J381). */
   allowContentGaps?: boolean;
+  /** QA 11-26 row 90: production go-live ends with npm latest at this tag. */
+  npmFinal?: (tag: string) => Promise<void>;
   readFile: (path: string) => Uint8Array;
   state: { read: (phase: Phase) => unknown; write: (phase: Phase, value: object) => void };
   git: { clean: () => boolean; head: () => string; remoteTag: (tag: string) => string | undefined };
