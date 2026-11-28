@@ -1,0 +1,57 @@
+name: content-prune
+
+# Fix preview PV15 (meta docs/plans/MULTI-REPO-SAGA/2026-11-26-opus-fix-preview-PLAN.md): the old page content sets
+# (`content/<set>/` in wildshard-packs) and the C8 root leftovers (`shardfiles/<slug>/`, `programs/`) go once no live
+# page, retained build or cook index reads them, a day after a run first saw them unread. src/scripts/content-prune.mjs
+# reads every channel's index.html and deploy-chunks.json first and deletes nothing when any read fails; the step
+# summary lists each reader that still blocks. When the run says nothing is left, this job and the script retire.
+on:
+  schedule:
+    - cron: '23 10 * * *'
+  workflow_dispatch:
+
+env:
+  WS_AGENT_UA: WildshardAgent/1 (ci-content-prune)
+
+permissions:
+  contents: read
+
+concurrency:
+  group: content-prune
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            pnpm-workspace.yaml
+      - uses: ./.github/actions/org-deps
+      - run: pnpm install --frozen-lockfile --config.ci=false
+      - name: Reader and selection tests
+        run: pnpm exec vitest run test/content-prune.test.ts
+      - name: Delete content sets and leftovers unread for a day
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_PACKS_ACCESS_KEY_ID: ${{ secrets.R2_PACKS_ACCESS_KEY_ID }}
+          R2_PACKS_SECRET_ACCESS_KEY: ${{ secrets.R2_PACKS_SECRET_ACCESS_KEY }}
+        run: |
+          set -o pipefail
+          node src/scripts/content-prune.mjs --delete 2>&1 | tee prune.txt
+      - name: Summary
+        if: always()
+        run: |
+          { echo '### Content prune'; echo '```'; grep -v '^unread since' prune.txt 2>/dev/null || echo 'no prune output'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

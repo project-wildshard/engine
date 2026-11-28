@@ -586,3 +586,28 @@ test('the main publisher admits an unmerged release head and refuses unreachable
     expect(invoke('production').status).toBe(1);
   } finally { repo.cleanup(); }
 });
+
+test('fix preview PV15: content-prune.yml deletes daily with the packs keys, read-only repo, no soft failure', () => {
+  const workflow = readFileSync('.github/workflows/content-prune.yml', 'utf8');
+  expect(workflow).toMatch(/\non:\n {2}schedule:\n {4}- cron: '[^']+'\n {2}workflow_dispatch:\n/u);
+  expect(workflow).toMatch(/\npermissions:\n {2}contents: read\n\n/u);
+  expect(workflow).not.toMatch(/continue-on-error/u);
+  expect(workflow).toContain('WS_AGENT_UA: WildshardAgent/1 (ci-content-prune)');
+  for (const line of workflow.split('\n').filter(row => /^\s+(- )?uses: /u.test(row) && !row.includes('uses: ./'))) expect(line).toMatch(/@[0-9a-f]{40} # v/u);
+  // Every run line and run block: values reach the shell through env, never spliced in.
+  const lines = workflow.split('\n'), runs = lines.flatMap((line, at) => {
+    const head = /^(\s+)(?:- )?run: ?(.*)$/u.exec(line);
+    if (head === null) return [];
+    const indent = (head[1] ?? '').length, block: string[] = [head[2] ?? ''];
+    for (let next = at + 1; next < lines.length && ((lines[next] ?? '').trim() === '' || (lines[next] ?? '').search(/\S/u) > indent); next++) block.push(lines[next] ?? '');
+    return block;
+  });
+  expect(runs.join('\n')).toContain('content-prune.mjs --delete');
+  expect(runs.join('\n')).not.toContain('${{');
+  const prune = workflow.slice(workflow.indexOf('- name: Delete content sets and leftovers unread for a day'), workflow.indexOf('- name: Summary'));
+  expect(prune).toContain('node src/scripts/content-prune.mjs --delete');
+  for (const name of ['R2_ACCOUNT_ID', 'R2_PACKS_ACCESS_KEY_ID', 'R2_PACKS_SECRET_ACCESS_KEY']) expect(prune).toContain(`${name}: \${{ secrets.${name} }}`);
+  expect(workflow.indexOf('pnpm exec vitest run test/content-prune.test.ts')).toBeLessThan(workflow.indexOf('content-prune.mjs --delete'));
+  // The packs keys reach only the prune step: the tests and the summary run without them.
+  expect(workflow.match(/secrets\./gu)?.length).toBe(3);
+});
