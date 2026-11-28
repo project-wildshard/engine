@@ -8,6 +8,9 @@
 //
 //   node src/scripts/memory/iphone/phone-queue.mjs submit --priority driftwood-fps -- src/scripts/memory/iphone/warm-return.mjs \
 //     --base https://staging.wildshard.io/ [--zone driftwood-isle] [--arms hop,hop,hop] [--nav replace|load] [--hold 40] [--out <dir>]
+//     [--slot <device key>=<value> ...]
+// `--slot` writes a device slot for the arm (meta QA 11-24 row 30: `--slot debug.cacheShaderSources=false`); each boot keeps
+// its loading stages' spans (`stages.shaders`: Shaders ms) and the device slots its document read at control.
 // `--nav replace` (default) leaves each page with `location.replace`, as the game leaves its own; `load` is a typed load.
 //
 // Per round it writes <out>/round-<n>/: the filtered device log (WebKit, RunningBoard, jetsam lines), the WebContent pids at
@@ -57,6 +60,40 @@ export function kernelKills(lines) {
   }
   return out;
 }
+
+/** Meta QA 11-24 row 30: an arm's device slots from `--slot key=value` (`--slot debug.cacheShaderSources=false`): the value
+ * is JSON when it parses (`false`, `0`, `"low"`), else the text itself.
+ * @param {string[]} list @returns {Record<string, unknown>} */
+export function parseSlots(list) {
+  /** @type {Record<string, unknown>} */ const slots = {};
+  for (const item of list) {
+    const at = item.indexOf('=');
+    assert.ok(at > 0, `--slot ${item}: expected key=value`);
+    const key = item.slice(0, at), text = item.slice(at + 1);
+    try { slots[key] = JSON.parse(text); } catch { slots[key] = text; }
+  }
+  return slots;
+}
+
+/** Meta QA 11-24 row 30: each loading stage's longest finished span in ms (`stage:shaders` -> `shaders`), from a document's
+ * boot timing rows (`window.__bootTiming.entries`, as engine's bootSteps.ts reads them).
+ * @param {unknown} entries @returns {Record<string, number>} */
+export function stageSpans(entries) {
+  /** @type {Record<string, number>} */ const spans = {};
+  if (!Array.isArray(entries)) return spans;
+  for (const entry of entries) {
+    const { operation, start, end } = /** @type {{ operation?: unknown, start?: unknown, end?: unknown }} */ (entry ?? {});
+    if (typeof operation !== 'string' || !operation.startsWith('stage:') || typeof start !== 'number' || typeof end !== 'number') continue;
+    const key = operation.slice('stage:'.length), ms = Math.round(end - start);
+    spans[key] = Math.max(spans[key] ?? 0, ms);
+  }
+  return spans;
+}
+
+/** The boot timing rows and the device slots this document reads, at control. */
+const TIMING = `const device = JSON.parse(localStorage.getItem('wildshard.save.v2@2.device') || '{}').keys || {};
+  const slots = {}; for (const [k, v] of Object.entries(device)) slots[k] = v && typeof v === 'object' && 'data' in v ? v.data : v;
+  return JSON.stringify({ entries: (window.__bootTiming && window.__bootTiming.entries) || [], slots });`;
 
 /** The visible pid at a host time, from a timeline on the phone's local clock (the Mac's zone).
  * @param {[string, number][]} timeline @param {Date} when @returns {number | null} */
@@ -145,6 +182,7 @@ async function settled(call, tries = 6) {
 
 /** @typedef {import('./inspector.d.mts').InspectedSafari} Page */
 /** @typedef {{ outcome?: string, clickToControlMs?: number | null, error?: string | null, controlAt?: string, timeOrigin?: number,
+ *   stages?: Record<string, number>, slots?: Record<string, unknown>,
  *   hold?: { seconds: number, answered: number, lost: { at: string, why: string } | null } }} Boot */
 
 /** Leave for `url` the way the game leaves its own page (`location.replace`: no back-forward entry), or as a typed load.
@@ -193,8 +231,13 @@ async function boot(page, base, zone, nav, via = `/slug/${zone}`) {
   const result = await waitForControl(driver, start, 180_000, () => undefined);
   // entering may move the page (the slug page to /), so the boot's document is the one at control
   const atControl = await life(page);
+  // QA 11-24 row 30: the stage spans (Shaders ms) and the slots the entered document read
+  /** @type {{ stages: Record<string, number>, slots: Record<string, unknown> } | { error: string }} */ let timing;
+  try { const read = JSON.parse(String(await settled(() => page.evaluate(TIMING), 2))); timing = { stages: stageSpans(read.entries), slots: read.slots }; }
+  catch (error) { timing = { error: String(error) }; }
   return { outcome: result.outcome, clickToControlMs: result.controlAt === null ? null : result.controlAt - start, error: result.state?.error ?? null,
-    controlAt: new Date().toISOString(), timeOrigin: Number(await page.evaluate('return performance.timeOrigin;')), firstOrigin, life: atControl };
+    controlAt: new Date().toISOString(), timeOrigin: Number(await page.evaluate('return performance.timeOrigin;')), firstOrigin, life: atControl,
+    ...timing };
 }
 
 /** Ask the warm page every second for `seconds`: a kill shows as no answer, or Safari's reload as another document.
@@ -232,16 +275,16 @@ async function main() {
   assert.ok(process.env.WS_PHONE_JOB, 'warm-return runs through the MD1 phone queue (phone-queue.mjs submit)');
   const { values } = parseArgs({ options: { base: { type: 'string' }, zone: { type: 'string', default: 'driftwood-isle' },
     arms: { type: 'string', default: 'hop,hop,hop' }, hold: { type: 'string', default: '40' }, out: { type: 'string' },
-    nav: { type: 'string', default: 'replace' } } });
+    nav: { type: 'string', default: 'replace' }, slot: { type: 'string', multiple: true, default: [] } } });
   assert.ok(values.base !== undefined, '--base <origin> is required');
   const base = new URL(values.base), zone = values.zone, arms = values.arms.split(',');
   assert.ok(arms.every(arm => arm === 'hop' || arm === 'direct' || arm === 'leave'), '--arms is a list of hop, direct and leave');
-  const nav = /** @type {'replace' | 'load'} */ (values.nav);
+  const nav = /** @type {'replace' | 'load'} */ (values.nav), slots = parseSlots(values.slot);
   assert.ok(nav === 'replace' || nav === 'load', '--nav is replace or load');
   const out = resolve(values.out ?? `tmp/warm-return/${new Date().toISOString().replaceAll(/[:.]/gu, '-')}`);
   mkdirSync(out, { recursive: true });
   /** @type {Record<string, unknown> & { rounds: Record<string, unknown>[] }} */
-  const report = { job: process.env.WS_PHONE_JOB, base: base.href, zone, nav, startedAt: new Date().toISOString(), rounds: [] };
+  const report = { job: process.env.WS_PHONE_JOB, base: base.href, zone, nav, slots, startedAt: new Date().toISOString(), rounds: [] };
   const save = () => { writeFileSync(join(out, 'report.json'), `${JSON.stringify(report, null, 2)}\n`); };
   report.phone = doctor({ udid: UDID, sharedPort: '4444' });
   for (const [index, arm] of arms.entries()) {
@@ -261,7 +304,7 @@ async function main() {
         try { await resetOrigin(fresh, base); break; }
         catch (error) { if (attempt >= 3) throw error; console.error(`round ${String(index + 1)}: origin reset try ${String(attempt)}:`, String(error)); await pause(2000); }
       }
-      await fresh.evaluate(`const write = (${writeSaveFixture.toString()}); for (const f of arguments[0]) write(f); return true;`, [phoneSlots({ graphics: 'low' })]);
+      await fresh.evaluate(`const write = (${writeSaveFixture.toString()}); for (const f of arguments[0]) write(f); return true;`, [phoneSlots({ graphics: 'low', ...slots })]);
       round.pidsStart = webContentPids(join(dir, 'pids-start.json'));
       round.cold = await boot(fresh, base, zone, nav);
       round.pidsCold = webContentPids(join(dir, 'pids-cold.json')); save();
@@ -294,7 +337,7 @@ async function main() {
       await inspector.stop();
       save();
       console.log(JSON.stringify({ round: index + 1, arm, cold: round.cold?.outcome ?? null, warm: round.warm?.outcome ?? null,
-        warmMs: round.warm?.clickToControlMs ?? null, held: round.warm?.hold ?? null, visible: { cold: round.visible.cold, warm: round.visible.warm },
+        warmMs: round.warm?.clickToControlMs ?? null, shadersMs: { cold: round.cold?.stages?.shaders ?? null, warm: round.warm?.stages?.shaders ?? null }, held: round.warm?.hold ?? null, visible: { cold: round.visible.cold, warm: round.visible.warm },
         killed: [...killed.map(k => `${k.name}[${String(k.pid)}] ${String(Math.round(k.bytes / 1_048_576))} MB ${k.reason}`),
           ...round.kernelKills.map((/** @type {[string, number, number | null, string]} */ k) => `${k[0]} kernel: ${k[3]}${k[2] === null ? '' : ` ${String(k[2])} KB`}`)], pass: round.pass, error: round.error ?? null }));
     }
