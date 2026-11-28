@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths stay under the repository's tmp directory.
 import { dirname, join, resolve } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { mapRoots, SENTRY_CLI, sentryMapPlan, sentryToken } from '../src/scripts/sentry-maps.mjs';
+import { mapRoots, releaseScopeGap, SENTRY_CLI, sentryMapPlan, sentryToken, sentryTokenSource } from '../src/scripts/sentry-maps.mjs';
 import { browserErrorDist, browserErrorRelease } from '../src/client/engine/telemetry/browserErrors';
 import { WILDSHARD_IDENTITY } from '../src/client/game/identity';
 import preview from '../.github/workflows/preview.yml?raw';
@@ -74,4 +74,18 @@ test('preview releases through the Workers host, which sends the maps before it 
   expect(upload).toBeGreaterThan(0);
   expect(upload).toBeLessThan(workersHost.indexOf('stripSourceMaps(dist)'));
   expect(SENTRY_CLI).toMatch(/^@sentry\/cli@\d+\.\d+\.\d+$/u);
+});
+
+// PV28: v0.1.101's staging build got a bare 403 from `releases new` with a read-only user token.
+test('a token that cannot make a release is refused by name and missing scope', () => {
+  const read = ['alerts:read', 'event:read', 'member:read', 'org:read', 'project:read', 'team:read'];
+  expect(releaseScopeGap(read, '~/.config/wildshard/sentry-auth-token')).toBe('sentry-maps: the Sentry token from ' +
+    '~/.config/wildshard/sentry-auth-token has alerts:read, event:read, member:read, org:read, project:read, team:read; ' +
+    'a release needs project:releases (a user token) or org:ci (an organization token). Replace it, then rebuild');
+  expect(releaseScopeGap(['org:ci'], 'x')).toBeNull();
+  expect(releaseScopeGap([...read, 'project:releases'], 'x')).toBeNull();
+  expect(releaseScopeGap(undefined, 'x')).toBeNull();
+  expect(releaseScopeGap([], 'SENTRY_AUTH_TOKEN')).toContain('has no scopes');
+  expect(sentryTokenSource({SENTRY_AUTH_TOKEN: 't'}, '/x/token')).toBe('SENTRY_AUTH_TOKEN');
+  expect(sentryTokenSource({}, '/x/token')).toBe('/x/token');
 });

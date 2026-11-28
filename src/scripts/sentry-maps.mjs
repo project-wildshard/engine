@@ -66,7 +66,34 @@ export function sentryToken(env = process.env, file = join(homedir(), '.config/w
   return existsSync(file) ? readFileSync(file, 'utf8').trim() : '';
 }
 
-function main() {
+/** Where `sentryToken` found the token, for a refusal that names it (never the token). */
+export function sentryTokenSource(env = process.env, file = join(homedir(), '.config/wildshard/sentry-auth-token')) {
+  return (env.SENTRY_AUTH_TOKEN ?? '').trim() !== '' ? 'SENTRY_AUTH_TOKEN' : file.replace(homedir(), '~');
+}
+
+/** A user token needs `project:releases`; an organization token (`sntrys_`) carries `org:ci`, which covers releases and maps. */
+export const RELEASE_SCOPES = Object.freeze(['project:releases', 'org:ci']);
+
+/** PV28: v0.1.101's staging build got a bare 403 from `releases new`: the machine's token was a read-only user token
+ *  (alerts, event, member, org, project and team read). Null when `scopes` can make a release, else the refusal.
+ * @param {readonly string[] | undefined} scopes the token's scopes from `GET /api/0/`, undefined when unreadable @param {string} source */
+export function releaseScopeGap(scopes, source) {
+  if (scopes === undefined || scopes.some(scope => RELEASE_SCOPES.includes(scope))) return null;
+  return `sentry-maps: the Sentry token from ${source} has ${scopes.length === 0 ? 'no scopes' : scopes.join(', ')}; ` +
+    'a release needs project:releases (a user token) or org:ci (an organization token). Replace it, then rebuild';
+}
+
+/** The token's scopes, or undefined when Sentry does not say. @param {string} token */
+async function tokenScopes(token) {
+  try {
+    const answer = await fetch('https://sentry.io/api/0/', {headers: {authorization: `Bearer ${token}`}, signal: AbortSignal.timeout(15_000)});
+    if (!answer.ok) return undefined;
+    const scopes = /** @type {{auth?: {scopes?: unknown}}} */ (await answer.json()).auth?.scopes;
+    return Array.isArray(scopes) ? scopes.map(String) : undefined;
+  } catch { return undefined; }
+}
+
+async function main() {
   const [dir, flag, environment = ''] = process.argv.slice(2);
   if (dir === undefined || flag !== '--environment') {
     throw new Error('usage: node src/scripts/sentry-maps.mjs <dist> --environment preview|staging|production');
@@ -77,6 +104,8 @@ function main() {
     console.log('sentry-maps: no SENTRY_AUTH_TOKEN and no ~/.config/wildshard/sentry-auth-token: nothing uploaded');
     return;
   }
+  const gap = releaseScopeGap(await tokenScopes(token), sentryTokenSource());
+  if (gap !== null) throw new Error(gap);
   const version = String(JSON.parse(readFileSync('package.json', 'utf8')).version ?? '');
   const build = String(JSON.parse(readFileSync(join(root, 'version.json'), 'utf8')).build ?? '');
   const plan = sentryMapPlan({ dir: root, version, build, environment, roots: mapRoots(root) });
@@ -91,4 +120,4 @@ function main() {
   console.log(`sentry-maps: uploaded ${plan.release} maps for ${environment}`);
 }
 
-if (process.argv[1] !== undefined && resolve(process.argv[1]) === import.meta.filename) main();
+if (process.argv[1] !== undefined && resolve(process.argv[1]) === import.meta.filename) await main();
