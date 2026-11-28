@@ -24,6 +24,7 @@ export function dumpsInOrder(events:readonly unknown[]):{id:string;processes:Dum
 export const BOOT_FLAGS:string;
 export function bootURL(url:string):string;
 export function bootZone(page:unknown,url:string,chunk:string):Promise<void>;
+export function bootZoneEntry(url:string,chunk:string):{zone:string;base:string;flags:string;unplaced:true};
 export type Boot = 'online'|'standalone';
 export interface WorldStamp {release:string;key:string}
 export function isServerWorker(url:string):boolean;

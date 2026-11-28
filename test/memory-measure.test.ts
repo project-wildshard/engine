@@ -1,7 +1,7 @@
 import {readFileSync} from 'node:fs';
 import {expect,test,vi} from 'vitest';
 import {parseGridCatalogue} from '../src/shared/game/grid/catalogue';
-import {stepCheckpoints,settleControl,untilControl,stallReport,untilAfterBootAudio,refusal,ledgerByKind,stats,dumpsInOrder,bootURL,bootOf,isServerWorker,webkitLines,PROTOCOL,ladderParts,ledgerTotal,ladderLines,ledgerParity,predictFootprint,categoryRemainder,addCategories,builtGridCell,placeOffGrid,ringThree} from '../src/scripts/memory/measure.mjs';
+import {stepCheckpoints,settleControl,untilControl,stallReport,bootZoneEntry,untilAfterBootAudio,refusal,ledgerByKind,stats,dumpsInOrder,bootURL,bootOf,isServerWorker,webkitLines,PROTOCOL,ladderParts,ledgerTotal,ladderLines,ledgerParity,predictFootprint,categoryRemainder,addCategories,builtGridCell,placeOffGrid,ringThree} from '../src/scripts/memory/measure.mjs';
 
 const procs=[{pid:1,role:'webcontent',name:'wc'},{pid:2,role:'gpu',name:'gpu'},{pid:3,role:'networking',name:'net'}];
 const sample=(seq:number,t:number,wc:[number,number],gpu:[number,number])=>({seq,t,p:{'1':wc,'2':gpu,'3':[9e9,9e9] as [number,number]}});
@@ -206,6 +206,12 @@ test('instrument minimal turns Network off only after the measured document comm
   const rung = body('webkitRung'), title = rung.slice(rung.indexOf("if (rung === 'title') {"));
   expect(title.indexOf('minimiseInspector(page)')).toBeGreaterThan(title.indexOf("page.goto(title.href, { waitUntil: 'commit' })"));
   expect(title.indexOf("page.goto(title.href, { waitUntil: 'commit' })")).toBeGreaterThan(0);
+});
+
+test('a measured boot seats an armed zone the grid no longer places, as the hidden open plots are (QA 11-26 row 71)', () => {
+  const entry=bootZoneEntry('http://127.0.0.1:1/?mute=1','open-plot-desert-ruin');
+  expect(entry).toMatchObject({zone:'open-plot-desert-ruin',unplaced:true});
+  // zone-entry's own test holds what unplaced does: an off-grid zone seated at the origin, a placed zone in its own cell
 });
 
 test('Chromium control waits for a draw from the game that signalled control-ready', async () => {

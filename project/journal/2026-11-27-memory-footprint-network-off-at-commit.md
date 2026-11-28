@@ -14,3 +14,8 @@
 - The guard for the next timeout: `untilControl` now names where a stalled boot stopped (its last loading step and when
   it began, the boot-trace checkpoint, page errors, files fetched and the last ones), read from the page itself because
   minimal leaves Playwright no request events. This red took two days to read because the log said nothing.
+- With the boots back, the first run on main (memory-footprint 46096480330, `760ab187d`) measured eight armed zones and then
+  refused `open-plot-desert-ruin`: "the build's catalogue has 0 cells". Desert Ruin and Thin Ice are armed but off the grid
+  (hidden), so `footprintBootFor` sends them standalone, and the standalone boot's one-cell cut (CP12, `alone`) needs a grid
+  cell. `bootZone` now passes zone-entry's `unplaced`, which seats an off-grid zone at the origin; a placed zone keeps its
+  own cell. A test on `bootZoneEntry` holds it. The stalls had hidden this since CP12: no run reached those zones.

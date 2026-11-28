@@ -215,11 +215,17 @@ function bootFlags(url) {
 /** The address a run opens: the build's `/` with the run's flags, never a zone. @param {string} url */
 export function bootURL(url) { return zoneHome(new URL(url).origin, bootFlags(url)); }
 /** Boot `chunk` as a measured zone (Q1 (a)): a one-cell world of it (zone-entry's `alone`), so its numbers stay comparable
- *  with the zone-alone readings; an empty chunk opens the page's own inline shard (`wildshard prepare`).
+ *  with the zone-alone readings; an empty chunk opens the page's own inline shard (`wildshard prepare`). An armed zone the
+ *  grid no longer places (a hidden open plot) is still built and still measured, seated at the origin (QA 11-26 row 71).
  *  @param {any} page @param {string} url @param {string} chunk */
 export async function bootZone(page, url, chunk) {
   if (chunk === '') { await page.goto(bootURL(url), { waitUntil: 'commit' }); return; }
-  await enterZone(page, { zone: chunk, base: url, flags: bootFlags(url), alone: true, waitUntil: 'commit' });
+  await enterZone(page, { ...bootZoneEntry(url, chunk), alone: true, waitUntil: 'commit' });
+}
+/** enterZone's options for a measured boot of `chunk`, besides `alone` (the call names it for chunk-param-guard).
+ *  @param {string} url @param {string} chunk */
+export function bootZoneEntry(url, chunk) {
+  return { zone: chunk, base: url, flags: bootFlags(url), unplaced: true };
 }
 
 /** Init script: every `new Worker` URL the page makes, in `window.__workersMade` (mini-pinemem6). */
