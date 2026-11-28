@@ -226,6 +226,7 @@ HOST=127.0.0.1
 PORT=$port
 WORLD_CELLS=driftwood-isle
 WORLD_WORKERS=$workers
+# J409: seats per cell, not one cap on the whole world
 WORLD_SEATS=$seats
 SEAT_SECRET=$(openssl rand -hex 32)
 EOF

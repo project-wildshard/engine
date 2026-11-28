@@ -156,7 +156,7 @@ export interface WorldOptions {
   readonly cells: readonly string[];
   /** C4's key. */
   readonly secret: string;
-  /** J182, J185: workers, and the most players the grid holds, a held body counted, in every cell together. Startup settings. */
+  /** J185: workers; J409: the most players one cell holds, a held body counted (seats per cell, not one cap on the grid). Startup settings. */
   readonly workers: number; readonly seats: number;
   /** ONE-FORMAT OF31h2: what each cell's own shard file declares about its worker; a cell with none keeps the table's measured row. */
   readonly declared?: DeclaredCells;
@@ -201,7 +201,8 @@ export interface WorldOptions {
   /** Monotonic connection-budget clock, overridable by local boundary tests. */
   readonly now?: () => number;
 }
-interface PendingSeat { readonly end: SocketTransport }
+/** A client loading into `cell`: its seat counts against that cell's cap (J409). */
+interface PendingSeat { readonly end: SocketTransport; readonly cell: string }
 interface ConnectAttempt { readonly at: number }
 /** Every reason a socket was turned away, counted: the row E7.7 asks for. */
 export type Refusals = Record<string, number>;
@@ -230,8 +231,8 @@ export class World {
   private readonly ends = new Set<SocketTransport>();
   /** Links whose player quit (`ready` with `LEAVE_FLAG`) before a body was theirs. */
   private readonly quits = new WeakSet<SocketTransport>();
-  /** FM7b2: a full world's waiting line (seatQueue.ts). */
-  private readonly queue = new SeatQueue();
+  /** FM7b2, J409: each full cell's waiting line (seatQueue.ts), by cell: a full cell queues, and an empty one admits. */
+  private readonly queues = new Map<string, SeatQueue>();
   /** DEVICE-TELEMETRY DT4: each socket's device word and the player its hello named, until the one `client.device` line is written. */
   private readonly devices = new WeakMap<SocketTransport, { said?: DeviceSnapshot; who?: DeviceWho; done: boolean }>();
   private readonly actors = new WeakMap<SocketTransport, SocketActor>();
@@ -699,8 +700,19 @@ export class World {
     try { await this.hello(end, bytes, goto, spawn); }
     catch (error) { if (!end.isOpen) return; this.options.log({ at: 'world.join', error: String(error) }); this.refuse(error instanceof SaveNewerError ? 'save-newer' : 'join-failed'); end.close(error instanceof SaveQuarantinedError ? 'refused' : 'retry'); }
   }
-  /** Everyone in the grid or on their way: the cap counts all of them, whichever cell they stand in (J182). */
-  private get taken(): number { return this.seated.size + this.pending.size; }
+  /** J409: everyone in `cell` or on their way into it, a held body counted. The cap is per cell, never one on the grid. */
+  private takenIn(cell: string): number {
+    let taken = 0;
+    for (const at of this.seated.values()) if (at === cell) taken++;
+    for (const row of this.pending.values()) if (row.cell === cell) taken++;
+    return taken;
+  }
+  /** J409: the waiting line of one cell. */
+  private queueOf(cell: string): SeatQueue {
+    let line = this.queues.get(cell);
+    if (line === undefined) { line = new SeatQueue(); this.queues.set(cell, line); }
+    return line;
+  }
   /** The worker a cell runs on, or (GC15) whose road a name is. */
   /** GC15 (3): every worker's road hears which cells on the other workers a walker can stand in, and drops its walls round them. */
   private openRoads(): void {
@@ -925,26 +937,28 @@ export class World {
       if (mover) this.leaveHeld(holding, { device, name, body, doc: null, seq: 0, held: true }, bytes.slice(0));
       else if (found.held) { this.seat(holding, end, { device, name, body, doc: null, seq: 0, held: true }, bytes); return; }
     }
-    // FM7b2: Title from a full world's line is the page's clean quit; its ticket goes at once
-    if (this.quits.has(end)) { this.queue.leave(device); return; }
+    // FM7b2: Title from a full cell's line is the page's clean quit; its ticket goes at once
+    if (this.quits.has(end)) { for (const line of this.queues.values()) line.leave(device); return; }
     if (!end.isOpen || this.draining) return;
+    // J409: the cap is per cell, so the door finds the cell before it counts: where Shard select sent them, else where they last stood
+    const last = await saves.where(device);
+    if (!end.isOpen || this.draining) return;
+    const slug = this.cellFor(last, aim);
     this.pending.get(device)?.end.close('replaced');
-    // FM7b2: a full world's line, in the door's order; a freed seat is held for its head. The place rides FM7b1's close facts.
-    // (`taken` still counts a mover's own seat until its old cell's `left` arrives)
-    const turn = mover ? { admit: true } as const : this.queue.turn(device, this.options.seats - this.taken, Date.now());
+    // FM7b2: a full cell's line, in the door's order; a freed seat is held for its head. The place rides FM7b1's close facts.
+    // (a mover's own seat still counts in its old cell until that cell's `left` arrives)
+    const turn = mover ? { admit: true } as const : this.queueOf(slug).turn(device, this.options.seats - this.takenIn(slug), Date.now());
     if (!turn.admit) {
       this.refuse('full');
       end.close('full', { code: 'queue', ...(turn.position === undefined ? {} : { position: turn.position }), ...(turn.etaMs === undefined ? {} : { etaMs: turn.etaMs }) });
       return;
     }
-    this.pending.set(device, { end });
+    this.pending.set(device, { end, cell: slug });
     end.onClose(() => { if (this.pending.get(device)?.end === end) this.pending.delete(device); });
     // MP2.4: the Name everyone reads is the claimed one, never the hello's, so a refused or duplicate Name reaches no client.
     const name = saves.name === undefined ? typed : await saves.name(device, typed);
     if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
-    const last = await saves.where(device);
-    if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
-    const slug = this.cellFor(last, aim), saved = await (saves.readWitness?.(device,cellShard(slug)) ?? saves.read(device,cellShard(slug))), at = arrival?.at; // preserve ZE9's entry continuation
+    const saved = await (saves.readWitness?.(device,cellShard(slug)) ?? saves.read(device,cellShard(slug))), at = arrival?.at; // preserve ZE9's entry continuation
     if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
     const { spawn: stand } = await this.ask(slug, device, end);
     if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;

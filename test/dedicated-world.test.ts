@@ -77,7 +77,7 @@ test('an empty grid cell takes no ticks, wakes where it stopped, and keeps its w
   expect(room(SHARD), 'J328: a grid cell never starts over').toBe(first);
 });
 
-test('two cells on two workers: each player stands in theirs, the cap is the grid\'s, and a cell with nobody in it sleeps', { timeout: 120_000 }, async () => {
+test('two cells on two workers: each player stands in theirs, the cap is each cell\'s (J409), and a cell with nobody in it sleeps', { timeout: 120_000 }, async () => {
   const saves = memoryPlayerSaves();
   saves.write({ player: 'device:nalati', name: 'N', shard: OTHER, build: 'bench', saveVersion: 0, seq: 1, reason: 'test', doc: null, receipts: [] });
   bench = await roomBench({ cells: [SHARD, OTHER], saves, seats: 2 });
@@ -92,7 +92,17 @@ test('two cells on two workers: each player stands in theirs, the cap is the gri
   expect(JSON.parse(there.resume ?? '{}')).toMatchObject({ shard: OTHER });
   expect(bench.world.health()).toMatchObject({ awake: 2, players: 2 });
   await vi.waitFor(() => { expect(nalati?.host.state.tick).toBeGreaterThan(still ?? 0); });
-  expect(await bot(bench.url, 'bench', 'device:third').ended(), 'J182: per grid, not per cell').toBe('full');
+  // J409 (it replaced J182's one cap on the grid): seats are per cell. Driftwood fills (2 of 2) while Nalati holds 1 of 2: a new player
+  // bound for Driftwood waits in Driftwood's line, and one bound for Nalati walks in. Production's 33rd player is this third, at 32.
+  expect(await bot(bench.url, 'bench', 'device:here-too').arrived()).toBe(true);
+  const full = bot(bench.url, 'bench', 'device:third');
+  expect(await full.ended(), 'J409: Driftwood is full').toBe('full');
+  expect(full.closedWith, 'queued in Driftwood\'s own line').toEqual({ code: 'queue', position: 1 });
+  saves.write({ player: 'device:nalati-too', name: 'M', shard: OTHER, build: 'bench', saveVersion: 0, seq: 1, reason: 'test', doc: null, receipts: [] });
+  const other = bot(bench.url, 'bench', 'device:nalati-too');
+  expect(await other.arrived(), 'J409: Nalati has a seat, whatever Driftwood\'s line holds').toBe(true);
+  expect(JSON.parse(other.resume ?? '{}')).toMatchObject({ shard: OTHER });
+  expect(bench.world.health(), '2 per cell, 4 on the grid').toMatchObject({ players: 4 });
   expect(bench.crashes).toEqual([]);
 });
 

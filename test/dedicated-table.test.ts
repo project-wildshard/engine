@@ -68,7 +68,7 @@ test('the same cells give the same table, whatever order they were listed in', (
   expect(workerTable([...GRID].reverse(), 4, DECLARED)).toEqual(workerTable(GRID, 4, DECLARED));
 });
 
-test('each channel starts on its own count and cap, and the bench\'s answer is one env var', () => {
+test('each channel starts on its own count and seats per cell (J409: production 32 in each cell), and the bench\'s answer is one env var', () => {
   expect(worldSettings('production', {})).toEqual({ workers: 4, seats: 32 });
   expect(worldSettings('staging', {})).toEqual({ workers: 2, seats: 16 });
   expect(worldSettings('production', { WORLD_WORKERS: '8', WORLD_SEATS: '50' })).toEqual({ workers: 8, seats: 50 });

@@ -6,10 +6,11 @@
  *  (cell-mem-bench, 2026-11-14). Every shard declares its own (`admission.serverBudget.awakeMicros`, OF31h3); the engine
  *  keeps no table of shards. */
 const UNMEASURED = 0.206;
-/** What each channel starts on (J185). Production tries 4 and goes to 8 only if the bench says it doesn't fit. Staging runs on pinned CPUs. The cap is per grid (J182). */
+/** What each channel starts on (J185). Production tries 4 and goes to 8 only if the bench says it doesn't fit. Staging runs on pinned CPUs.
+ *  `seats` (`WORLD_SEATS`) is the cap per cell: 32 seats in each cell (J409, which replaced J182's one cap on the grid). */
 const SETTINGS: Readonly<Record<string, { readonly workers: number; readonly seats: number }>> = { production: { workers: 4, seats: 32 }, staging: { workers: 2, seats: 16 } };
 
-/** A channel's worker count and cap: each one env var from the bench's answer. */
+/** A channel's worker count and its seats per cell (J409): each one env var from the bench's answer. */
 export function worldSettings(channel: string, env: Readonly<Record<string, string | undefined>>): { readonly workers: number; readonly seats: number } {
   const start = SETTINGS[channel];
   if (start === undefined) throw new Error(`No game server on ${channel}`); // J183: preview runs standalone
