@@ -63,9 +63,10 @@ export interface SpawnDownloadPorts {
   readonly whole?: boolean;
   /** A non-authoritative packed-member hint. Every member still passes its own native response/length check. */
   readonly held?: {readonly read: () => Promise<HeldParts>; readonly write: (index: HeldParts) => Promise<void>};
-  /** SF29: on a page no worker controls, a code file the page's own module loader already read. Its bytes are in the
-   *  page's HTTP cache, which a fetch of it does not hit in WebKit (the loader's request is keyed apart), so it is not
-   *  fetched again; the worker precaches it once it controls a page (DL1). */
+  /** SF29: on a page no worker controls, a code file the page's own module loader reads: one it already read, or optional
+   *  code it imports on demand. A fetch of it does not hit the loader's HTTP cache entry in WebKit, nor the loader a
+   *  fetch's (each request is keyed apart), so the download leaves it to the loader; the worker precaches it once it
+   *  controls a page (DL1). */
   readonly loaded?: (url: string) => boolean;
 }
 export type HeldParts = Readonly<Record<string, readonly string[]>>;
@@ -1234,20 +1235,30 @@ function nativeCacheCall<T>(read: () => Promise<T>): Promise<T> {
   void work.then(() => nativeCacheWork.delete(work), () => nativeCacheWork.delete(work));
   return work;
 }
-/** SF29: the page's module loader (or a stylesheet link) already read this code file over HTTP: a resource entry for its
- *  URL that no fetch made. A fetch's entry (the download's own, a worker's) is no proof the loader holds it. */
-export function pageLoadedCode(url: string, entries: readonly Pick<PerformanceResourceTiming, 'name' | 'initiatorType'>[]): boolean {
+/** SF29: the page's module loader reads this code file itself: it already read it over HTTP (a resource entry for its URL
+ *  that no fetch made; a fetch's entry, the download's own or a worker's, is no proof the loader holds it), or it is the
+ *  bank's optional code, which the loader imports on demand (Nalati's two startup chunks at control). */
+export function pageLoadedCode(url: string, entries: readonly Pick<PerformanceResourceTiming, 'name' | 'initiatorType'>[], optional: ReadonlySet<string> = new Set()): boolean {
   if (!spawnCode(url)) return false;
   const page = typeof location === 'undefined' ? undefined : location.href, want = new URL(url, page);
+  if (optional.has(want.pathname) && (page === undefined || want.origin === new URL(page).origin)) return true;
   return entries.some(entry => {
     if (entry.initiatorType === 'fetch' || entry.initiatorType === 'xmlhttprequest' || entry.initiatorType === 'beacon') return false;
     const seen = new URL(entry.name, page);
     return seen.origin === want.origin && seen.pathname === want.pathname;
   });
 }
+/** The boot bank's optional code paths (`optional.files`), empty on a page without a bank. */
+export function optionalCodePaths(bank: string | null | undefined): ReadonlySet<string> {
+  if (bank === null || bank === undefined || bank === '') return new Set();
+  let files: unknown;
+  try { files = get(get(JSON.parse(bank), 'optional'), 'files'); } catch { return new Set(); }
+  return new Set(Array.isArray(files) ? files.flatMap((row: unknown) => Array.isArray(row) && typeof row[0] === 'string' ? [row[0]] : []) : []);
+}
 function downloadPorts(cacheName: unknown, packs: boolean): SpawnDownloadPorts {
   const store = typeof caches === 'undefined' ? null : typeof cacheName === 'string' ? nativeCacheCall(() => caches.open(cacheName)) : null;
   const controller = navigator.serviceWorker?.controller;
+  const optional = optionalCodePaths(typeof document === 'undefined' ? null : document.getElementById('boot-module-files')?.textContent);
   return {
     fetch: (url, signal, init) => downloadFetch()(url, {...init, signal}),
     cached: url => nativeCacheCall(async () => typeof caches === 'undefined' ? undefined : store === null ? caches.match(url, {ignoreVary: true}) : (await store).match(url, {ignoreVary: true})),
@@ -1256,7 +1267,7 @@ function downloadPorts(cacheName: unknown, packs: boolean): SpawnDownloadPorts {
     ...(store === null || controller !== undefined && controller !== null ? {} : {store: (url: string, response: Response) => nativeCacheCall(async () => {await (await store).put(url, response);})}),
     ...(store === null || !packs ? {} : {packs: true, keep: (url: string, response: Response) => nativeCacheCall(async () => {await (await store).put(url, response);})}),
     ...(packs ? {whole: true} : {}),
-    ...(controller !== undefined && controller !== null || typeof performance === 'undefined' ? {} : {loaded: url => pageLoadedCode(url, performance.getEntriesByType('resource') as PerformanceResourceTiming[])}),
+    ...(controller !== undefined && controller !== null || typeof performance === 'undefined' ? {} : {loaded: url => pageLoadedCode(url, performance.getEntriesByType('resource') as PerformanceResourceTiming[], optional)}),
     ...(store === null || !packs ? {} : {held: {
       read: () => nativeCacheCall(async () => readHeldParts(await (await store).match(HELD_PARTS))),
       write: (index: HeldParts) => nativeCacheCall(async () => {await (await store).put(HELD_PARTS, Response.json(index));}),

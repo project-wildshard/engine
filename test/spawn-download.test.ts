@@ -1,5 +1,5 @@
 import {expect, test, vi} from 'vitest';
-import {downloadSpawnManifest, pageLoadedCode, type SpawnDownloadSnapshot} from '../src/client/game/boot/spawnDownload';
+import {downloadSpawnManifest, optionalCodePaths, pageLoadedCode, type SpawnDownloadSnapshot} from '../src/client/game/boot/spawnDownload';
 import {readSpawnManifest} from '../src/shared/game/shardfile/spawnManifest';
 
 const files = [{url: `/shardfiles/example/blobs/bin/${'a'.repeat(64)}.bin`, bytes: 4, hash: 'a'.repeat(64)},
@@ -277,4 +277,18 @@ test('the page holds a code file only when its loader read it, not a fetch, and 
   expect(pageLoadedCode(code, [{name: code, initiatorType: 'fetch'}])).toBe(false);
   expect(pageLoadedCode(code, [{name: 'https://other.test/builds/shared/late-session-Ab12.js', initiatorType: 'script'}])).toBe(false);
   expect(pageLoadedCode(`${page}shardfiles/z/blobs/image/a.png`, [{name: `${page}shardfiles/z/blobs/image/a.png`, initiatorType: 'img'}])).toBe(false);
+});
+
+// SF29: optional code is the loader's to import on demand; a download that fetched it first sent Nalati's two startup chunks
+// twice on WebKit (the loader missed the fetch's cache entry at control).
+test('an uncontrolled page leaves the bank\'s optional code to its loader', () => {
+  const page = typeof location === 'undefined' ? 'https://example.test/' : new URL('/', location.href).href, chunk = '/builds/shared/control-0-0-9hc-startup-CRSl.js';
+  const bank = JSON.stringify({common: [], optional: {files: [[chunk, 25_660], ['/builds/shared/other-Ab.js', 10]], groups: {}}});
+  const optional = optionalCodePaths(bank);
+  expect([...optional]).toEqual([chunk, '/builds/shared/other-Ab.js']);
+  expect(pageLoadedCode(`${page}${chunk.slice(1)}`, [], optional)).toBe(true);
+  expect(pageLoadedCode(`${page}builds/shared/late-session-Ab12.js`, [], optional)).toBe(false);
+  expect(optionalCodePaths(undefined).size).toBe(0);
+  expect(optionalCodePaths('not json').size).toBe(0);
+  expect(optionalCodePaths(JSON.stringify({optional: {files: 'x'}})).size).toBe(0);
 });

@@ -13,8 +13,11 @@ So the download asks first. On an uncontrolled page, a code file the page alread
 its URL that no fetch made, `pageLoadedCode`) is credited as cached and not fetched or stored. The worker precaches it
 once it controls a page (DL1), which keeps it off the level download. The rest of the code list downloads as before.
 
-After, the same boot: Pine 0 files sent twice (code 5.46 to 3.99 MB), Nalati 2 (9.8 kB). Those two are the other order:
-two startup chunks the download fetched before the loader read them at control. WebKit misses that way too.
+After, the same boot: Pine 0 files sent twice (code 5.46 to 3.99 MB), Nalati 2 (9.8 kB). Those two were the other order:
+two optional startup chunks the download fetched before the loader imported them at control, which WebKit misses too.
+So an uncontrolled page also leaves the boot bank's optional code (`#boot-module-files` `optional.files`) to its loader,
+which imports what it needs on demand; the worker precaches the rest after control. Then Nalati sent 0 twice as well.
 
 Guard: `test/spawn-download.test.ts` (an uncontrolled page never fetches a code file its loader read, never stores it,
-and still completes; only a loader's entry counts, never a fetch's, another origin's or a content file's).
+and still completes; only a loader's entry counts, never a fetch's, another origin's or a content file's; the bank's
+optional code is the loader's).
