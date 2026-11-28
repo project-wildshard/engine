@@ -1,0 +1,40 @@
+name: production-placements
+
+# Meta fix-preview PV32 (QA 11-28): production's placed zones (the API's grid cells, not the release file's shards) reach
+# production only by a production flip, and the flip token lives only here and in server-release's production-pointers
+# job. The release lane dispatches this with the placed slugs to promote; each moves to the hash staging's signed placement
+# file places, and the job fails unless production's placement file then matches staging for every named slug.
+on:
+  workflow_dispatch:
+    inputs:
+      slugs:
+        description: Comma-separated placed slugs to promote to staging's placed revision (e.g. mossgate,mirror-salt)
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-placements
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - name: Flip production placements to staging's
+        env:
+          PRODUCTION_FLIP_TOKEN: ${{ secrets.PRODUCTION_FLIP_TOKEN }}
+          SLUGS: ${{ inputs.slugs }}
+          WS_LANE_NAME: production-placements
+        run: node src/scripts/server-release/production-placements.mjs --slugs "$SLUGS"

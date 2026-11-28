@@ -19,6 +19,7 @@ import { worldCells } from '../src/server/host/dedicated/gridCells';
 import { publishChannel, serverPacksReady } from '../src/scripts/server-release/publish.mjs';
 import { copyItemCatalogue } from '../src/scripts/server-release/items.mjs';
 import { preparedReleaseFollows } from '../src/scripts/server-release/history.mjs';
+import { placedCells, placementMoves } from '../src/scripts/server-release/production-placements.mjs';
 import { readReleaseFile } from '../src/server/host/dedicated/releaseFile';
 import { readSignedRelease } from '../src/client/host/online/release';
 import type { ReleaseFile } from '../src/shared/host/releaseRows';
@@ -348,10 +349,35 @@ test('meta QA 11-25 rows 127 and 135: only the production-pointers job reads the
       return [...text.matchAll(new RegExp(`secrets\\.${secret}\\b`, 'gu'))].map(match => ({ name, at: match.index }));
     });
   expect(readers('ADMIN_TOKEN')).toEqual([]);
+  // Fix-preview PV32: production-placements.yml is the token's second reader, dispatch-only, in the production environment.
+  const placements = readFileSync('.github/workflows/production-placements.yml', 'utf8');
   const flip = readers('PRODUCTION_FLIP_TOKEN');
-  expect(flip).toEqual([{ name: 'server-release.yml', at: workflow.indexOf('secrets.PRODUCTION_FLIP_TOKEN') }]);
-  expect(flip[0]?.at).toBeGreaterThan(start);
-  expect(flip[0]?.at).toBeLessThan(end);
+  expect(flip).toEqual([
+    { name: 'production-placements.yml', at: placements.indexOf('secrets.PRODUCTION_FLIP_TOKEN') },
+    { name: 'server-release.yml', at: workflow.indexOf('secrets.PRODUCTION_FLIP_TOKEN') },
+  ]);
+  expect(flip[1]?.at).toBeGreaterThan(start);
+  expect(flip[1]?.at).toBeLessThan(end);
+  expect(placements).toMatch(/\non:\n {2}workflow_dispatch:\n/u);
+  expect(placements).not.toMatch(/\n {2}(push|workflow_run|schedule|pull_request)/u);
+  expect(placements).toMatch(/\n {4}environment: production\n/u);
+  expect(placements).toContain('run: node src/scripts/server-release/production-placements.mjs --slugs "$SLUGS"');
+  expect(placements).not.toMatch(/continue-on-error/u);
+  // The slugs reach the script through the environment, never spliced into the shell line.
+  expect(placements.split('\n').filter(line => line.includes('run:')).join('\n')).not.toContain('${{');
+});
+
+test('fix-preview PV32: production placements move to the hash staging places, only for the named slugs', () => {
+  const hash = (n: number): string => String(n).repeat(64).slice(0, 64);
+  const staging = [{ slug: 'mossgate', hash: hash(1), shardVersion: '0.1.23' }, { slug: 'glowfen', hash: hash(2) }, { slug: 'brasscap-mesa', hash: hash(3) }];
+  const production = [{ slug: 'mossgate', hash: hash(4) }, { slug: 'glowfen', hash: hash(2) }, { slug: 'brasscap-mesa', hash: hash(5) }];
+  expect(placementMoves(['mossgate', 'glowfen'], staging, production)).toEqual([{ slug: 'mossgate', from: hash(4), to: hash(1), shardVersion: '0.1.23' }]);
+  expect(() => placementMoves(['nalati-grasslands'], staging, production)).toThrow(/staging places no such zone/u);
+  expect(() => placementMoves([], staging, production)).toThrow(/name the placed slugs/u);
+  expect(() => placementMoves(['Bad Slug'], staging, production)).toThrow(/not a shard slug/u);
+  const signed = { body: JSON.stringify({ channel: 'production', cells: production }) };
+  expect(placedCells(signed, 'production')).toEqual(production);
+  expect(() => placedCells(signed, 'staging')).toThrow(/not a signed staging placement file/u);
 });
 
 test('FS28: signing and client archives queue independently for the exact release', () => {

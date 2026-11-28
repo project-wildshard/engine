@@ -275,6 +275,14 @@ and upload may run once the build is green. Run `production check`,
 then `production go-live --qa=<the staging go-live verdict.json>`,
 then the static Doctor with `--human-static` (J205).
 
+Placed zones (the API's grid cells, which the release file does not
+name) reach production only by a production flip. The release lane owns
+that: after a production release, it dispatches
+`gh workflow run production-placements.yml -f slugs=<a,b>` for each
+placed zone staging has moved ahead (fix preview PV32). The job flips
+each slug to the hash staging's signed placement file places, then fails
+unless production's placement file matches.
+
 The cook follows production: `node src/scripts/release-cook.mjs vX.Y.Z`
 moves it through `wildshard-agent` and `wildshard-config cook` (J355).
 Finish from primary main with `release.sh vX.Y.Z --merge-back`: merge
