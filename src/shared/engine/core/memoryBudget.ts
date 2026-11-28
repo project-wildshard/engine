@@ -60,6 +60,8 @@ export const CACHE_BYTE_LIMITS = {
   gridEdges: { owner: 'grid/edge-cache', bytes: 4_194_304 },
   packedFallback: { owner: 'boot/spawn-quota-cache', bytes: 33_554_432 },
   packedIndexes: { owner: 'boot/spawn-index-cache', bytes: 8_388_608 },
+  // QA 11-28 row 2: the cooked parts a page's member reads share (a Pine part is up to 11.4 MB)
+  cookedParts: { owner: 'boot/cooked-part-cache', bytes: 16_777_216 },
   bakedImages: { owner: 'engine/baked-image-cache', bytes: 50_331_648 },
   bakedCommon: { owner: 'engine/baked-common-cache', bytes: 8_388_608 },
   gridContinuation: { owner: 'grid/continuations', bytes: 33_570_816 },

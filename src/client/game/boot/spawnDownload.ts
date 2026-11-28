@@ -214,8 +214,16 @@ function installMemberLayer(): boolean {
     if (!isContentOrigin(url.origin)) return network(input, init);
     const member = cookedMember(url.pathname);
     if (member !== undefined) {
-      return readCookedResponse(url, member, native(member.part, {credentials: 'omit',
-        ...(signal === undefined || signal === null ? {} : {signal}), ...(cache === undefined ? {} : {cache})}));
+      // A retry reaches the origin for its own copy of the part, as before.
+      if (cache === 'reload' || cache === 'no-store') {
+        return readCookedResponse(url, member, native(member.part, {credentials: 'omit', cache, ...(signal === undefined || signal === null ? {} : {signal})}));
+      }
+      // QA 11-28 row 2: a cold Pine boot fetched one 2.87 MB desktop part 33 times, once per member read (121 MB of
+      // repeats). A member comes from this tier's own part first (read once, its members kept), else from the index's
+      // part, which every reader of its members shares.
+      const packed = await partMember(url);
+      if (packed !== null) return packed;
+      return sharedCookedMember(url, member, () => native(member.part, {credentials: 'omit'}), signal ?? undefined);
     }
     // SF11: a cooked zone's file past this page's download (its music, a file past its fence) is read from its part
     if (url.pathname.startsWith('/assets/') && cookedZoneSlug(url.pathname.split('/')[2] ?? '')) return await partMember(url) ?? network(input, init);
@@ -327,6 +335,43 @@ function memberResponse(url: URL, bytes: Uint8Array<ArrayBuffer>): Response {
   if (loadGc()) return lentResponse(bytes.slice(), typeOf(url.pathname)); // IP31: one copy, the reader's
   return new Response(bytes, { headers: { 'content-type': typeOf(url.pathname), 'content-length': String(bytes.byteLength) } });
 }
+/** QA 11-28 row 2: one read of a cooked part at a time, and the last few parts kept, so the readers of its members share it. */
+const cookedPartReads = new Map<string, Promise<ArrayBuffer | number>>();
+let heldCookedParts = new ResidentByteCache<string, ArrayBuffer>(CACHE_BYTE_LIMITS.cookedParts);
+function cookedPartBytes(part: string, read: () => Promise<Response>): Promise<ArrayBuffer | number> {
+  const held = heldCookedParts.get(part);
+  if (held !== undefined) return Promise.resolve(held);
+  const pending = cookedPartReads.get(part);
+  if (pending !== undefined) return pending;
+  const reading = (async (): Promise<ArrayBuffer | number> => {
+    const response = await read();
+    if (!response.ok) { void response.body?.cancel().catch(() => undefined); return response.status; }
+    const bytes = adoptBuffer(await response.arrayBuffer(), {owner: heldCookedParts.limit.owner, asset: part, kind: 'wire'});
+    heldCookedParts.set(part, bytes, bytes.byteLength);
+    return bytes;
+  })();
+  cookedPartReads.set(part, reading);
+  const settled = (): void => { if (cookedPartReads.get(part) === reading) cookedPartReads.delete(part); };
+  void reading.then(settled, settled);
+  return reading;
+}
+/** A reader's abort ends its own wait, never the shared read. */
+async function untilAborted<T>(work: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+  if (signal === undefined) return work;
+  signal.throwIfAborted();
+  const scope = new Scope('cooked-part-reader');
+  const aborted = new Promise<never>((_resolve, reject) => {
+    scope.listen(signal, 'abort', () => { reject(signal.reason instanceof Error ? signal.reason : new DOMException('Aborted', 'AbortError')); });
+  });
+  try { return await Promise.race([work, aborted]); } finally { scope.dispose(); }
+}
+async function sharedCookedMember(url: URL, member: CookedPartMember, read: () => Promise<Response>, signal: AbortSignal | undefined): Promise<Response> {
+  const part = await untilAborted(cookedPartBytes(member.part, read), signal);
+  if (typeof part === 'number') return new Response(null, {status: part});
+  return memberResponse(url, await checkedCookedMember(new Uint8Array(part, 0, part.byteLength), member));
+}
+/** Test seam: forget the shared cooked parts (a page has one set for its life). */
+export function forgetCookedParts(): void { cookedPartReads.clear(); heldCookedParts = new ResidentByteCache<string, ArrayBuffer>(CACHE_BYTE_LIMITS.cookedParts); }
 async function readCookedResponse(url: URL, member: CookedPartMember, pending: Promise<Response>): Promise<Response> {
   const response = await pending;
   if (!response.ok) return response;
@@ -349,6 +394,9 @@ async function partMember(url: URL): Promise<Response | null> {
     const held = await partRow(slug, url.pathname);
     if (held === null) return null;
     if (held.row.part === undefined) return await looseMember(url, held.row.file, held.table, slug);
+    // QA 11-28 row 2: a member the store already keeps is read from it, not by fetching its whole part again
+    const kept = await heldPartMember(url);
+    if (kept !== null) return kept;
     const fallback = (await readMembersOf(held.row.part, held.table)).get(url.pathname);
     return fallback === undefined ? await heldPartMember(url) : memberResponse(url, fallback);
   } catch { return null; }
