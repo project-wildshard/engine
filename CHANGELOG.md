@@ -13,6 +13,13 @@ it into main while other lanes continue landing.
 `src/scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.103 (2026-11-28)
+
+- Each zone now holds up to 32 players, instead of one seat cap shared by the whole world.
+- A one-cell page boots Nalati on a phone again.
+- Pine Hollow and the island drop the engine's placeholder music.
+- Walking through busy zones makes less garbage, so frames hitch less.
+
 ## v0.1.102 (2026-11-28)
 
 - Zones are cooked at cook version 1.21.0, so phones fetch each cooked image once, in the form they read.
