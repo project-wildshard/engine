@@ -28,6 +28,39 @@ export function spawnGroundCell(drawn: string | null, registered: boolean, ownGr
   return drawn !== null && !registered && !ownGround ? drawn : null;
 }
 
+/**
+ * QA 82 (staging v0.1.101, phone 402x874): the entered cell's ground is never optional work. Its tile views were admitted
+ * only through the neighbours' optional path (`render`: speculative reads that fit the headroom, never evict). On the phone's
+ * 1.0 GB envelope, already past it with Pine's 504 MB measured home, nothing fits, so the admission deferred for good: no
+ * L1 / L0 tile, the far proxy never masked, and its shell enclosed the camera as a beige V with no ground under it. When the
+ * optional path defers, the admission is made as required (it evicts for the ground under the player, as an entry does).
+ */
+export async function admitEnteredGround(render: () => Promise<boolean>, required: (() => Promise<void>) | undefined): Promise<boolean> {
+  if (await render()) return true;
+  if (required === undefined) return false;
+  await required();
+  return true;
+}
+
+/** QA 82: in play, the cell the player stands in whose ground is its ring tiles (`spawnGroundCell`) is admitted as required
+ *  work once per entry; the fixed step reports the cell every step, and leaving (null) lets the next entry ask again. */
+export class EnteredGroundAdmission {
+  private asked: string | null = null;
+  private readonly required: (instance: string) => Promise<void>;
+  private readonly failed: (instance: string, error: unknown) => void;
+  constructor(required: (instance: string) => Promise<void>, failed: (instance: string, error: unknown) => void) {
+    this.required = required; this.failed = failed;
+  }
+  step(instance: string | null): void {
+    if (instance === this.asked) return;
+    this.asked = instance;
+    if (instance !== null) void this.ask(instance);
+  }
+  private async ask(instance: string): Promise<void> {
+    try { await this.required(instance); } catch (error: unknown) { this.failed(instance, error); }
+  }
+}
+
 /** What one hold needs from the grid session. */
 export interface SpawnGroundPorts {
   readonly instance: string;

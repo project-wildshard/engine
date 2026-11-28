@@ -61,7 +61,7 @@ import { spawnHeld } from '../boot/spawnDownload';
 import { gridCells, pageGridInstance } from '../plugin/context';
 import { prepareHomeMetadata, withInitialHomeMetadata } from './homeMetadata';
 import { bootSteppedTiles, stepRingsUntil } from './loadingRings';
-import { holdSpawnGround, L1_QUADRANTS, spawnGroundCell, type SpawnGround } from './spawnGround';
+import { admitEnteredGround, EnteredGroundAdmission, holdSpawnGround, L1_QUADRANTS, spawnGroundCell, type SpawnGround } from './spawnGround';
 import type { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 import type { PageResidency } from './pageResidency';
 import { PlatformRenderResidency } from './renderResidency';
@@ -418,6 +418,8 @@ export class GridSession {
   private readonly admitNeighbour: ((cell: GridCell, required?: boolean) => Promise<void>) | undefined;
   private readonly approachNeighbour: ((cell: GridCell) => void) | undefined;
   private readonly admitNeighbourRender: ((cell: GridCell) => Promise<boolean>) | undefined;
+  /** QA 82: the entered cell's own ground tiles, admitted as required work once per entry */
+  private readonly enteredGround: EnteredGroundAdmission | undefined;
   /** G222 playtest #7: each neighbour's declared doors and gates, shown exactly when its region has them standing */
   private readonly panels: NeighbourPanels;
   private readonly softWalls: { readonly step: () => void; readonly state: () => SoftWallState };
@@ -996,6 +998,9 @@ export class GridSession {
     this.admitNeighbour = neighbourAdmission?.complete;
     this.approachNeighbour = neighbourAdmission?.approach;
     this.admitNeighbourRender = neighbourAdmission?.render;
+    const complete = neighbourAdmission?.complete;
+    this.enteredGround = complete === undefined ? undefined : new EnteredGroundAdmission(id => complete(this.assembly.cell(id), true),
+      (id, error) => { if (!host.scope.disposed) console.warn(`[grid] ${id} ground tiles not admitted:`, error); });
     host.scope.onDispose(() => {
       this.clientTiles.dispose(); this.rings.dispose();
       for (const root of roots.values()) root.removeFromParent();
@@ -1286,6 +1291,8 @@ export class GridSession {
     // home re-read ~225 of its files after control for it); leaving starts it while the runtime is still resident. A
     // runtime whose ground is those tiles (D189: Pine) still admits them, or its far proxy stays over the spawn
     const drawn = this.live?.runtimeDrawnCell() ?? null;
+    // QA 82: and admits them as required work; the optional approach below never fit a phone budget already past its envelope
+    this.enteredGround?.step(drawn === null ? null : spawnGroundCell(drawn, this.clientTiles.owns(drawn), findShard(this.assembly.cell(drawn).slug)?.cellGround === 'world'));
     const reach = 400 + Math.min(speed, 60) * 4;
     if (this.initialFarReady && this.host.backgroundReady?.() !== false) for (const cell of this.neighbours) {
       if (cell.instance === drawn && !admitsCellTiles(cell.instance, drawn, this.clientTiles.owns(cell.instance), findShard(cell.slug)?.cellGround === 'world')) continue;
@@ -1428,7 +1435,7 @@ export class GridSession {
    *  proxy (Pine: its ring tiles, admitted now rather than after T10's background opens), or the ceiling. A cell that
    *  draws its own ground, or none drawn by a runtime, holds nothing. */
   async prepareSpawnGround(limitMs?: number): Promise<SpawnGround> {
-    const live = this.live, render = this.admitNeighbourRender, drawn = live?.runtimeDrawnCell() ?? null;
+    const live = this.live, render = this.admitNeighbourRender, complete = this.admitNeighbour, drawn = live?.runtimeDrawnCell() ?? null;
     if (live === null || render === undefined || drawn === null) return 'none';
     const cell = this.assembly.cell(drawn);
     const instance = spawnGroundCell(drawn, this.clientTiles.owns(drawn), findShard(cell.slug)?.cellGround === 'world');
@@ -1436,7 +1443,7 @@ export class GridSession {
     const feet = live.worldFeet(), start = { x: feet.x - cell.origin.x, z: feet.z - cell.origin.z };
     const owner = this.host.scope.child(`grid.spawn-ground.${instance}`), prepareOffered = this.clientTiles.prepareOffered;
     try {
-      return await holdSpawnGround({ instance, admit: () => render(cell), require: (id, keys, level) => this.rings.require(id, keys, level),
+      return await holdSpawnGround({ instance, admit: () => admitEnteredGround(() => render(cell), complete === undefined ? undefined : () => complete(cell, true)), require: (id, keys, level) => this.rings.require(id, keys, level),
         ...(prepareOffered === undefined ? {} : { spawn: () => prepareOffered(instance, owner, start) }),
         pump: entry => stepRingsUntil(entry, { frames: () => this.lateFrames,
           step: () => { if (!this.host.scope.disposed) { const at = this.world(); this.rings.step({ x: at.x, z: at.z, vx: 0, vz: 0 }); } },
