@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest';
-import { approachBudget, featuredZoneEntry, proofHeading, settledDeck, rejoinLegs, spawnApproach, portalExitPlan, unstick, resumeZoneEntry, retrySmokeEntries, retryZoneEntry, roadApproach, smokeBatches, smokeGap, stagedTourProof, walkZoneEntryTour, zoneEntryCorridor, zoneEntryTour, type Tour } from '../src/scripts/zone-entry-tour.mjs';
+import { approachBudget, cookedZoneFile, featuredZoneEntry, proofHeading, settledDeck, rejoinLegs, spawnApproach, portalExitPlan, unstick, resumeZoneEntry, retrySmokeEntries, retryZoneEntry, roadApproach, smokeBatches, smokeGap, stagedTourProof, walkZoneEntryTour, zoneEntryCorridor, zoneEntryTour, type Tour } from '../src/scripts/zone-entry-tour.mjs';
 import { zoneEntryGap } from '../src/scripts/page-release/flow.mjs';
 import { TOUR_FEATURED as curated } from '../src/scripts/zone-entry-featured.mjs';
 
@@ -308,4 +308,32 @@ test("a fresh Brasscap guest leaves town around the canyon wall before taking th
     {x:-487.5, z:-517.5, ride:false},
     {x:-437.5, z:-562.5, ride:false},
     {x:-327.5, z:-562.5, ride:false}]);
+});
+
+test('PV30: a cooked page reads a zone portal rows from the part its whole manifest lists, hash-checked', async () => {
+  const { createHash } = await import('node:crypto');
+  const edge = new TextEncoder().encode(JSON.stringify({entryways:[{portal:{road:{at:[0, 0, 236]}, route:[[0, 125, 30]]}}]}));
+  const pad = new Uint8Array(7), part = new Uint8Array([...pad, ...edge]);
+  const hash = createHash('sha256').update(edge).digest('hex');
+  const v = 'shards/nine/0.0.12/cooks/1.19.0/h/', common = 'shards/nine/0.0.12/common/';
+  const store = new Map<string, Uint8Array>([
+    [`https://cooked.test/${v}index.json`, new TextEncoder().encode(JSON.stringify({
+      objects:{'assets/spawn/whole.json':`${v}whole.json`, 'assets/spawn/parts/p.pack.br':`${common}p.pack.br`},
+      manifests:[{url:'/assets/spawn/entry.json', set:'entry'}, {url:'/assets/spawn/whole.json', set:'whole'}]}))],
+    [`https://cooked.test/${v}whole.json`, new TextEncoder().encode(JSON.stringify({
+      files:[{url:'/shardfiles/nine/shard.json', bytes:1, hash:'x'}, {url:'/shardfiles/nine/sections/world/edge.json?v=1', bytes:edge.length, hash}],
+      parts:[{url:'/assets/spawn/parts/p.pack.br', members:[[1, pad.length]]}]}))],
+    [`https://cooked.test/${common}p.pack.br`, part],
+  ]);
+  const read = async (url: string): Promise<Uint8Array | null> => store.get(url) ?? null;
+  const table = {origin:'https://cooked.test', zones:[{slug:'nine', index:`${v}index.json`}]};
+  const bytes = await cookedZoneFile(table, 'nine', '/shardfiles/nine/sections/world/edge.json', read);
+  expect(JSON.parse(new TextDecoder().decode(bytes ?? new Uint8Array()))).toEqual(JSON.parse(new TextDecoder().decode(edge)));
+  expect(await cookedZoneFile(table, 'other', '/shardfiles/other/sections/world/edge.json', read)).toBeNull();
+  expect(await cookedZoneFile(table, 'nine', '/shardfiles/nine/sections/world/none.json', read)).toBeNull();
+  part[pad.length] = 0x5b;
+  await expect(cookedZoneFile(table, 'nine', '/shardfiles/nine/sections/world/edge.json', read)).rejects.toThrow(/fails its hash/u);
+  store.set(`https://cooked.test/${v}index.json`, new TextEncoder().encode(JSON.stringify({objects:{'assets/spawn/whole.json':'shards/elsewhere/whole.json'},
+    manifests:[{url:'/assets/spawn/whole.json', set:'whole'}]})));
+  await expect(cookedZoneFile(table, 'nine', '/shardfiles/nine/sections/world/edge.json', read)).rejects.toThrow(/outside nine/u);
 });
