@@ -12,3 +12,9 @@ export function staticChecks(lintThreads?:number):CheckTask[];
 export function fullStuckSeconds(table:Record<string,number>|undefined,workers:number):number;
 export function withProgressReporter(command:readonly string[]):string[];
 export const FULL_STUCK_FACTOR:number;
+export const FULL_FALLBACK_SECONDS:number;
+export interface FullAdmission {workers:number;stuckSeconds:number;free:number;wait:boolean}
+export function fullSuiteAdmission(table:Record<string,number>|undefined,env:NodeJS.ProcessEnv,load:number,cores:number):FullAdmission;
+export const FULL_WAIT_SECONDS:number;
+export const FULL_WAIT_SAMPLE_MS:number;
+export function admitFullSuite(table:Record<string,number>|undefined,env:NodeJS.ProcessEnv,io?:{load?:()=>number;cores?:number;sleep?:(ms:number)=>Promise<void>;say?:(line:string)=>void;now?:()=>number}):Promise<FullAdmission&{load:number;waited:number}>;

@@ -70,11 +70,55 @@ export const STUCK_STEP_SECONDS=240,STUCK_VITEST_SECONDS=900;
 /** Meta QA70: the full suite is ~2,450 files, ~6,700 hosted seconds; 900 s was ~3x a related run, not ~3x the full one.
  * A full Vitest step's stuck limit is 2x the timings table's expected wall on its workers, never under 900 s. Hosted
  * seconds already run slow here: 6,686 / 9 workers is 743 s, and the measured MacBook full run took 449 s at load 6-14.
+ * Meta QA77: with no table (a fresh machine, a failed fetch) the estimate is FULL_FALLBACK_SECONDS, not 900 s: a full run
+ * held to 900 s is the very STUCK QA70 fixed.
  * @param {Record<string,number>|undefined} table @param {number} workers */
-export const FULL_STUCK_FACTOR=2;
+export const FULL_STUCK_FACTOR=2,FULL_FALLBACK_SECONDS=6_700;
 export function fullStuckSeconds(table,workers){
-  const expected=expectedSuiteSeconds(table,workers);
-  return expected===null?STUCK_VITEST_SECONDS:Math.max(STUCK_VITEST_SECONDS,Math.ceil(FULL_STUCK_FACTOR*expected));
+  const expected=expectedSuiteSeconds(table,workers)??FULL_FALLBACK_SECONDS/Math.max(1,workers);
+  return Math.max(STUCK_VITEST_SECONDS,Math.ceil(FULL_STUCK_FACTOR*expected));
+}
+
+/** Meta QA77 (J505, 11-28): release/v0.1.101's full Vitest was admitted at load 10.7 and went STUCK at 15 min twice. A
+ * full run takes its workers from the cores the 1-minute load leaves free at admission: never more than fullSuiteWorkers
+ * (half the cores), never fewer than gateWorkers (a quarter). Its stuck limit is fullStuckSeconds on the workers it got,
+ * so a run started on fewer workers gets the longer wall those workers need. When the load leaves fewer free cores than
+ * that floor, the run waits for the load to fall (`wait`). `WS_GATE_FULL_WORKERS` pins the workers and never waits.
+ * @param {Record<string,number>|undefined} table @param {NodeJS.ProcessEnv} env @param {number} load @param {number} cores
+ * @returns {{workers:number,stuckSeconds:number,free:number,wait:boolean}} */
+export function fullSuiteAdmission(table,env,load,cores){
+  const most=fullSuiteWorkers(env,cores),pinned=env.WS_GATE_FULL_WORKERS!==undefined;
+  const least=pinned?most:Math.min(most,gateWorkers(env,cores));
+  const free=Math.max(0,Math.floor(cores-load));
+  const workers=pinned?most:Math.max(least,Math.min(most,free));
+  return {workers,stuckSeconds:fullStuckSeconds(table,workers),free,wait:!pinned&&free<least};
+}
+
+/** How long a full run waits for the load to fall before it starts anyway on its floor (`WS_GATE_FULL_WAIT_S`; 0 never
+ * waits), and how often it samples the load meanwhile. */
+export const FULL_WAIT_SECONDS=600,FULL_WAIT_SAMPLE_MS=30_000;
+
+/** Meta QA77: admit a full Vitest run, waiting up to FULL_WAIT_SECONDS while the load leaves too few cores; then it starts
+ * on its floor with the limit that floor needs (J505: bounded, never a refusal). Hosted CI never waits.
+ * @param {Record<string,number>|undefined} table @param {NodeJS.ProcessEnv} env
+ * @param {{load?:()=>number,cores?:number,sleep?:(ms:number)=>Promise<void>,say?:(line:string)=>void,now?:()=>number}} [io]
+ * @returns {Promise<{workers:number,stuckSeconds:number,free:number,wait:boolean,load:number,waited:number}>} */
+export async function admitFullSuite(table,env,io={}){
+  const load=io.load??(()=>loadavg()[0]??0),cores=io.cores??availableParallelism(),now=io.now??Date.now;
+  const sleep=io.sleep??(ms=>new Promise(done=>{setTimeout(done,ms);})),say=io.say??(line=>{console.error(line);});
+  const requested=Number(env.WS_GATE_FULL_WAIT_S);
+  const limit=env.GITHUB_ACTIONS==='true'?0:env.WS_GATE_FULL_WAIT_S!==undefined&&Number.isFinite(requested)&&requested>=0?requested:FULL_WAIT_SECONDS;
+  const began=now();
+  for(;;){
+    const sampled=load(),admission=fullSuiteAdmission(table,env,sampled,cores),waited=(now()-began)/1000;
+    if(!admission.wait||waited>=limit){
+      const why=admission.wait?`; waited ${waited.toFixed(0)} s and the load stayed high, so it starts on its floor`:waited>=1?`; waited ${waited.toFixed(0)} s for the load`:'';
+      say(`  - full Vitest: ${admission.workers} workers at load ${sampled.toFixed(1)} on ${cores} cores (${admission.free} free); stuck limit ${admission.stuckSeconds} s${why}`);
+      return {...admission,load:sampled,waited};
+    }
+    say(`  - full Vitest waits: load ${sampled.toFixed(1)} leaves ${admission.free} of ${cores} cores free, under its floor of ${admission.workers} workers; sampling again in ${FULL_WAIT_SAMPLE_MS/1000} s (up to ${limit} s)`);
+    await sleep(FULL_WAIT_SAMPLE_MS);
+  }
 }
 
 /** Meta QA70: a Vitest step writes per-file progress so its end or STUCK line names the files that held it.
@@ -323,9 +367,9 @@ async function main(){
   const reporters=report===undefined?[]:['--reporter=default','--reporter=json',`--outputFile=${report}`];
   // Meta QA70: the full suite gets half the cores (each file still holds its own machine CPU grant) and a stuck limit
   // scaled from the timings table; the quarter-core cap (33c59458d) put a full run at ~1,670 hosted s on 4 workers.
-  const fullWorkers=fullSuiteWorkers(env);
-  const fullVitest=selection.mode==='full'?{env:{WS_VITEST_MAX_WORKERS:String(fullWorkers)},stuckSeconds:fullStuckSeconds(readTimings(env)?.full,fullWorkers)}:{};
-  if(selection.mode==='full'&&local===null)console.error(`  - full Vitest: ${fullWorkers} workers; stuck limit ${fullVitest.stuckSeconds} s`);
+  // Meta QA77: those workers and that limit follow the load at admission; a run short of free cores waits for them.
+  const admitted=selection.mode==='full'&&local===null?await admitFullSuite(readTimings(env)?.full,env):null;
+  const fullVitest=admitted===null?{}:{env:{WS_VITEST_MAX_WORKERS:String(admitted.workers)},stuckSeconds:admitted.stuckSeconds};
   const vitest=delta.eligible&&selection.mode==='docs'
     ?(selection.tests?.length?[{name:'vitest (incoming docs readers)',commands:[[process.execPath,'src/scripts/vitest-tmp.ts','run','--passWithNoTests=false',...selection.tests,...reporters]]}]:[])
     :local===null

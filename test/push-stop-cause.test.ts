@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
 import { join, resolve } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
-import { fullStuckSeconds, parallelChecks, STUCK_LOAD_CAP, STUCK_RESAMPLE_MS, STUCK_STEP_SECONDS, STUCK_VITEST_SECONDS, stuckExtensionMs, stuckLimitMs, withProgressReporter } from '../.githooks/push-checks.mjs';
+import { admitFullSuite, FULL_FALLBACK_SECONDS, FULL_WAIT_SAMPLE_MS, fullStuckSeconds, fullSuiteAdmission, parallelChecks, STUCK_LOAD_CAP, STUCK_RESAMPLE_MS, STUCK_STEP_SECONDS, STUCK_VITEST_SECONDS, stuckExtensionMs, stuckLimitMs, withProgressReporter } from '../.githooks/push-checks.mjs';
 import { prePushCause } from '../src/scripts/.kit/land.mjs';
 import { gateReport, printGateReport } from '../src/scripts/gate-report.mjs';
 
@@ -197,8 +197,47 @@ test('QA70: a full Vitest step is stuck at 2x the timings table\'s expected wall
   const table = Object.fromEntries(Array.from({ length: 100 }, (_, index) => [`test/f${index}.test.ts`, 60]));
   expect(fullStuckSeconds(table, 9)).toBe(1334);
   expect(fullStuckSeconds({ 'test/a.test.ts': 1 }, 9)).toBe(STUCK_VITEST_SECONDS);
-  expect(fullStuckSeconds(undefined, 9)).toBe(STUCK_VITEST_SECONDS);
+  // Meta QA77: no table is no reason for the 900 s floor that STUCK the full run; it falls back to the suite's size.
+  expect(fullStuckSeconds(undefined, 9)).toBe(Math.ceil(2 * FULL_FALLBACK_SECONDS / 9));
   expect(withProgressReporter([process.execPath, 'src/scripts/vitest-tmp.ts', 'run'])).toEqual([process.execPath, 'src/scripts/vitest-tmp.ts', 'run', '--reporter=default', `--reporter=${resolve('src/scripts/vitest-progress.mjs')}`]);
   expect(withProgressReporter([process.execPath, 'src/scripts/vitest-tmp.ts', 'run', '--reporter=json']).slice(3)).toEqual(['--reporter=json', `--reporter=${resolve('src/scripts/vitest-progress.mjs')}`]);
   expect(withProgressReporter(['pnpm', 'run', 'lint'])).toEqual(['pnpm', 'run', 'lint']);
+});
+
+// Meta QA77: release/v0.1.101's full Vitest was admitted at load 10.7 on 18 cores and went STUCK at 15 min twice. The
+// admission rule: workers are the cores the load leaves free (between a quarter and half the cores), the stuck limit is 2x
+// the table's wall on those workers, and a run that would get fewer free cores than its floor waits for the load.
+test('QA77: a full run takes the workers the load leaves free and the limit those workers need', () => {
+  const table = Object.fromEntries(Array.from({ length: 100 }, (_, index) => [`test/f${index}.test.ts`, 60]));
+  expect(fullSuiteAdmission(table, {}, 2, 18)).toEqual({ workers: 9, stuckSeconds: 1334, free: 16, wait: false });
+  expect(fullSuiteAdmission(table, {}, 10.7, 18)).toEqual({ workers: 7, stuckSeconds: 1715, free: 7, wait: false });
+  expect(fullSuiteAdmission(table, {}, 15, 18)).toEqual({ workers: 4, stuckSeconds: 3000, free: 3, wait: true });
+  // WS_GATE_FULL_WORKERS pins the workers and never waits
+  expect(fullSuiteAdmission(table, { WS_GATE_FULL_WORKERS: '9' }, 30, 18)).toEqual({ workers: 9, stuckSeconds: 1334, free: 0, wait: false });
+  // at every load, the run that starts has at least 2x its expected wall on the workers it got, and waits only under its floor
+  for (let load = 0; load <= 40; load += 0.5) {
+    const admitted = fullSuiteAdmission(table, {}, load, 18);
+    expect(admitted.workers).toBeGreaterThanOrEqual(4);
+    expect(admitted.workers).toBeLessThanOrEqual(9);
+    expect(admitted.stuckSeconds * admitted.workers).toBeGreaterThanOrEqual(2 * 6000);
+    expect(admitted.wait).toBe(18 - load < 4);
+  }
+});
+
+test('QA77: a full run waits for the load to fall, bounded, and hosted CI never waits', async () => {
+  const table = { 'test/a.test.ts': 3600 };
+  const clock = (loads: number[]) => {
+    let at = 0;
+    const said: string[] = [];
+    return { said, io: { cores: 18, load: () => loads.shift() ?? 17, now: () => at, sleep: async (ms: number) => { at += ms; }, say: (line: string) => { said.push(line); } } };
+  };
+  const falls = clock([16, 15, 9]);
+  expect(await admitFullSuite(table, {}, falls.io)).toMatchObject({ workers: 9, wait: false, load: 9, waited: 2 * FULL_WAIT_SAMPLE_MS / 1000 });
+  expect(falls.said.filter(line => line.includes('full Vitest waits'))).toHaveLength(2);
+  expect(falls.said.at(-1)).toMatch(/full Vitest: 9 workers at load 9\.0 on 18 cores \(9 free\); stuck limit 900 s; waited 60 s for the load$/u);
+  const stays = clock([]);
+  expect(await admitFullSuite(table, { WS_GATE_FULL_WAIT_S: '60' }, stays.io)).toMatchObject({ workers: 4, stuckSeconds: 1800, wait: true, waited: 60 });
+  expect(stays.said.at(-1)).toMatch(/starts on its floor$/u);
+  expect(await admitFullSuite(table, { GITHUB_ACTIONS: 'true' }, clock([]).io)).toMatchObject({ workers: 4, waited: 0 });
+  expect(await admitFullSuite(table, { WS_GATE_FULL_WAIT_S: '0' }, clock([]).io)).toMatchObject({ workers: 4, waited: 0 });
 });
