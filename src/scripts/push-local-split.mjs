@@ -93,10 +93,12 @@ export function hostedOnlyReason(file,seconds){
 
 /** The local Vitest files for a split gate. Seconds come from main's last measured
  * run (src/scripts/test-timings.mjs, LS2); an unmeasured file stays local.
+ * A full selection keeps the declared native files and every test the changed modules did select (meta QA 11-26
+ * row 87: a full fallback once ran none of them, and engine 0c3e3df8c's two broken fakes reached main).
  * @param {{mode:'full'|'related'|'docs',tests?:string[]}} selection
  * @param {Record<string,number>} [seconds] */
 export function splitLocalTests(selection,seconds=readWeights('full')){
- const candidates=selection.mode==='related'?selection.tests??[]:selection.mode==='full'?[...NATIVE_TESTS]:[];
+ const candidates=selection.mode==='related'?selection.tests??[]:selection.mode==='full'?[...NATIVE_TESTS,...selection.tests??[]]:[];
  /** @type {string[]} */const local=[];/** @type {{file:string,reason:string}[]} */const hosted=[];
  for(const file of [...new Set(candidates)].sort()){
   const reason=hostedOnlyReason(file,seconds);

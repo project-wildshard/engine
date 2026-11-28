@@ -12,11 +12,12 @@ import { parseAudioData } from '@wildshard/format/audio';
 import * as settings from '@wildshard/engine/ui/Settings';
 import { ENGINE_MUSIC_STYLE } from '@wildshard/engine/audio/bootAudio';
 
+// SF23 (shard-format 0.82.9): only `title` plays from the engine style; a zone carries island and pine as its own set
 const source = { audio: {
   cues: [],
   music: { id: 'fixture.score', base: 'island', slots: ['island', 'pine'], bootSlots: ['title', 'island', 'pine'], controlTension: 'late',
     lifecycle: { persistent: false, dispose: true, logChanges: false }, synthLead: 'marimba', minFade: 0, source: null,
-    sets: { island: 'base', pine: 'base' }, selection: [{ slots: ['island'], when: [] }], selectMode: 'first',
+    sets: { island: 'fixture', pine: 'fixture' }, selection: [{ slots: ['island'], when: [] }], selectMode: 'first',
     catalogue: { mode: 'bank', extraStings: [], stingSets: {} } },
   samples: { bed: 'fixture', set: 'fixture', loopGains: { fixture: 0.5 },
     catalogue: { inventoryOmitSlots: [], loopOrder: ['fixture'], overlaySamples: true, ownMusic: false, priorityOwn: false } },

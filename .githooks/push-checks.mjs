@@ -11,6 +11,7 @@ import {gateSlot} from '../src/scripts/push-gate-slot.mjs';
 import {PUSH_BUDGET, PUSH_PROFILE, SPLIT_PROFILE} from '../src/scripts/push-budget.mjs';
 import {BROWSER_TESTS,TIMING_TESTS,logHostedOnly,planBaseRefs,splitLocalTests,splitRequested} from '../src/scripts/push-local-split.mjs';
 import {pushSelection} from '../src/scripts/push-selection.mjs';
+import {dependencyReaders} from '../src/scripts/push-dependency-readers.mjs';
 import {capturePushTree,pushProofDisposition,readPushProof,writePushProof} from '../src/scripts/push-proof-cache.mjs';
 import {gateEnvironment} from '../src/scripts/push-environment.mjs';
 import {gateReport,printGateReport} from '../src/scripts/gate-report.mjs';
@@ -338,7 +339,16 @@ async function main(){
   const pins=selection.mode==='docs'?{pins:[],ring:[]}:pinChanges(refs,process.cwd());
   /** @type {string[]|null} */let local=null;
   if(split){
-    const plan=splitLocalTests(selection);
+    // Meta QA 11-26 row 88: a dependency bump (package.json makes it full) runs the tests that import what it changed.
+    /** @type {string[]} */let dependencyTests=[];
+    if(selection.mode==='full'){
+      try{
+        const readers=dependencyReaders(refs,process.cwd());
+        dependencyTests=readers.tests;
+        for(const note of readers.notes)console.error(`  - dependency readers: ${note}`);
+      }catch(error){console.error(`  !! dependency readers unavailable: ${error instanceof Error?error.message:String(error)}`);}
+    }
+    const plan=splitLocalTests({...selection,tests:[...selection.tests??[],...dependencyTests]});
     // Browser and exclusive timing proofs keep their hosted runners. Pin
     // readers bypass the normal file-cost cutoff: a replay can be slow and
     // still need to catch a stale save or physics digest before the push.

@@ -109,7 +109,7 @@ describe('phone frames enter a zone alone (J522 (4), QA 11-25 row 99)', () => {
   const HTML = `<html><head><script type="application/json" id="ws-catalogue">${JSON.stringify(CATALOGUE)}</script></head></html>`;
 
   function fakeBrowser() {
-    const seen = { addresses: [] as string[], served: [] as Cell[][], tapped: false };
+    const seen = { addresses: [] as string[], served: [] as Cell[][], tapped: false, grants: [] as string[] };
     const session = new Map<string, string>();
     let frame = 0, cells: Cell[] = [], inside = '';
     const game = {
@@ -131,7 +131,7 @@ describe('phone frames enter a zone alone (J522 (4), QA 11-25 row 99)', () => {
     const routes: { match: string | ((url: URL) => boolean); handler: (route: unknown) => Promise<void> }[] = [];
     let address = 'about:blank';
     const page = {
-      on() { /* no page errors */ }, url: () => address,
+      on() { /* no page errors */ }, url: () => address, context: () => context,
       async route(match: string | ((url: URL) => boolean), handler: (route: unknown) => Promise<void>) { routes.unshift({ match, handler }); },
       async unroute(match: unknown) { routes.splice(routes.findIndex(row => row.match === match), 1); },
       async goto(url: string) {
@@ -159,7 +159,9 @@ describe('phone frames enter a zone alone (J522 (4), QA 11-25 row 99)', () => {
         throw new Error('page.waitForFunction: never settled (the 235 s timeout of budgets run 45755470720)');
       },
     };
-    const context = { addInitScript: async () => { /* fixtures */ }, newPage: async () => page, close: async () => { /* closed */ } };
+    // QA 11-26 row 80: enterZone grants the routed one-cell page's origin loopback leave before it routes it
+    const context = { addInitScript: async () => { /* fixtures */ }, newPage: async () => page, close: async () => { /* closed */ },
+      async grantPermissions(permissions: string[], { origin }: { origin: string }) { seen.grants.push(`${permissions.join(',')} ${origin}`); } };
     return { seen, browser: { newContext: async () => context } as unknown as Parameters<typeof readPhoneFrames>[0] };
   }
 
@@ -171,6 +173,7 @@ describe('phone frames enter a zone alone (J522 (4), QA 11-25 row 99)', () => {
     // glowfen has no cell in the build (meta MZ26), so it is seated at the origin
     expect(seen.served).toEqual([[{ instance: slug, slug, cell: [0, 0] }]]);
     expect(seen.tapped).toBe(false);
+    expect(seen.grants).toEqual(['local-network-access http://127.0.0.1:4401']);
     expect(seen.addresses.every(url => new URL(url).pathname === '/' && !url.includes(slug))).toBe(true);
   });
 });

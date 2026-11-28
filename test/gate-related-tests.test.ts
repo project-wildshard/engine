@@ -7,6 +7,7 @@ import {existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync}
 import {join, resolve} from 'node:path';
 import {BROWSER_TESTS, LOCAL_FILE_SECONDS, MAIN_PUSH_SPLIT, NATIVE_TESTS, TIMING_TESTS, hostedOnlyReason, landMainMode, logHostedOnly, mainPushed, planBaseRefs, splitLocalTests, splitRequested} from '../src/scripts/push-local-split.mjs';
 import {provesCode} from '../src/scripts/ci-proof-jobs.mjs';
+import {completePushSelection} from '../src/scripts/push-related.mjs';
 import { capRelated, folderReaderTests, scriptScenarioTests, pushGuards, forceRerunTriggers } from '../src/scripts/gate-related-tests.mjs';
 
 const durations = new Map([['test/slow.test.ts', 40], ['test/cheap.test.ts', 1], ['test/mid.test.ts', 8], ['test/cover-grid.test.ts', 30]]);
@@ -185,6 +186,34 @@ it('browser, timing and slow files go to hosted CI; an unmeasured file stays loc
   for (const file of native.local) expect(NATIVE_TESTS).toContain(file);
   for (const file of native.local) expect(hostedOnlyReason(file, seconds)).toBeNull();
   expect(splitLocalTests({mode: 'docs'}, seconds).local).toEqual([]);
+  // Meta QA 11-26 row 87: a full fallback still runs locally what the changed modules selected.
+  const fallback = splitLocalTests({mode: 'full', tests: [quick, browser]}, seconds);
+  expect(fallback.local).toContain(quick);
+  expect(fallback.local).not.toContain(browser);
+});
+
+// Meta QA 11-26 row 87: engine 0c3e3df8c changed zone-entry.mjs (read by nine-load and phone-frame-budgets) beside a
+// script no test imports. The script turned the push full, the split gate ran only the native files, and main went red.
+it('a full fallback keeps every test the other changed modules selected', async () => {
+  const graph: Record<string, string[]> = {
+    'src/scripts/zone-entry.mjs': ['test/nine-load.test.ts', 'test/phone-frame-budgets.test.ts'],
+    'src/scripts/phone-memory-card-proof.mjs': [],
+  };
+  const files = Object.keys(graph);
+  const selected = await completePushSelection({mode: 'related', files, reason: 'fixture'}, {related: async file => graph[file] ?? []});
+  expect(selected.mode).toBe('full');
+  expect(selected.reason).toBe('Zero tests selected for src/scripts/phone-memory-card-proof.mjs; complete full-suite fallback');
+  expect(selected.tests).toEqual(['test/nine-load.test.ts', 'test/phone-frame-budgets.test.ts']);
+  // An unprovable graph and a missing module fall back the same way, still carrying what was found.
+  const unproven = await completePushSelection({mode: 'related', files: ['src/scripts/zone-entry.mjs', 'src/scripts/push-related.mjs'], reason: 'fixture'},
+    {related: async file => { if (file === 'src/scripts/push-related.mjs') throw new Error('no graph'); return graph[file] ?? []; }});
+  expect(unproven).toMatchObject({mode: 'full', tests: ['test/nine-load.test.ts', 'test/phone-frame-budgets.test.ts']});
+  expect(unproven.reason).toMatch(/^Cannot prove import-graph coverage for src\/scripts\/push-related\.mjs/u);
+  const missing = await completePushSelection({mode: 'related', files: ['src/scripts/zone-entry.mjs', 'src/scripts/gone.mjs'], reason: 'fixture'}, {related: async file => graph[file] ?? []});
+  expect(missing).toMatchObject({mode: 'full', tests: ['test/nine-load.test.ts', 'test/phone-frame-budgets.test.ts']});
+  // Every module selecting a test stays related.
+  const whole = await completePushSelection({mode: 'related', files: ['src/scripts/zone-entry.mjs'], reason: 'fixture'}, {related: async file => graph[file] ?? []});
+  expect(whole).toMatchObject({mode: 'related', tests: ['test/nine-load.test.ts', 'test/phone-frame-budgets.test.ts']});
 });
 
 it('every Vitest file that launches a real browser is on the browser list', () => {

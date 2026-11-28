@@ -25,7 +25,10 @@ test.each([false,true])('Nine readiness failure retains its cause and timeline (
   }
   let closed=false,detached=false;
   const profile={send:()=>Promise.resolve(),detach:()=>{detached=true;return Promise.resolve();}};
-  const profilingContext={browser:()=>({browserType:()=>({name:()=>'chromium'})}),newCDPSession:()=>Promise.resolve(profile)};
+  // QA 11-26 row 80: the routed one-cell page is granted loopback leave first (grantLoopback), on its own origin
+  const grants:string[]=[];
+  const profilingContext={browser:()=>({browserType:()=>({name:()=>'chromium'})}),newCDPSession:()=>Promise.resolve(profile),
+    grantPermissions:(permissions:string[],{origin}:{origin:string})=>{grants.push(`${permissions.join(',')} ${origin}`);return Promise.resolve();}};
   // The page's own read runs here against happy-dom's document; every other evaluate returns the boot timeline.
   // J522: the load enters Nine alone (a one-cell world routed into `/`), and its address names no zone
   const opened:string[]=[],routed:string[]=[];
@@ -45,6 +48,7 @@ test.each([false,true])('Nine readiness failure retains its cause and timeline (
     expect(closed&&detached).toBe(true);
     expect(opened).toEqual(['http://127.0.0.1:1234/?skipintro=1&tier=phone&touch=1&mute=1&nolock=1&sw=0']);
     expect(routed).toEqual(opened);
+    expect(grants).toEqual(['local-network-access http://127.0.0.1:1234']);
   }finally{document.body.replaceChildren();rmSync(out,{recursive:true,force:true});}
 });
 
