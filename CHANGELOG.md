@@ -13,6 +13,13 @@ it into main while other lanes continue landing.
 `src/scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.102 (2026-11-28)
+
+- Zones are cooked at cook version 1.21.0, so phones fetch each cooked image once, in the form they read.
+- The page fetches its game code once, not twice, on the way in.
+- The cook store reclaims retired cook versions and keeps a prefill for the next release.
+- Lamps past the light reserve show soft glow cards instead of going dark.
+
 ## v0.1.101 (2026-11-27)
 
 - Load staging zones from the dedicated cooked-pack store.
