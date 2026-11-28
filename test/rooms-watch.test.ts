@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { DOWN_AFTER, ROOMS, emptyState, step, watchPlist } from '../src/scripts/rooms-watch.mjs';
+import { DOWN_AFTER, ROOMS, SENTRY_OK, emptyState, readOutages, step, watchPlist } from '../src/scripts/rooms-watch.mjs';
 
 // FR-A15 part 3 (meta QA 11-25 row 31): both rooms hosts answered 521 from 10:11 UTC 11-25 and no agent heard of it.
 const [prod = '', staging = ''] = ROOMS, start = Date.parse('2026-11-25T10:11:00Z'), minute = 60_000;
@@ -38,6 +38,34 @@ test('each newly open Sentry outage issue is red once; without a token the issue
   expect(step(opened.state, {...reads(200), outages: [issue]}, start + minute).lines).toEqual([]);
   expect(step(opened.state, reads(200), start + minute).state.outages).toEqual(['86']);
   expect(step(opened.state, {...reads(200), outages: []}, start + minute).state.outages).toEqual([]);
+});
+
+// Meta QA 11-25 row 32: the Sentry half went quietly off (no token, then nothing said when a read failed).
+test('a failing Sentry read is red once, names why without the token, and is back once', () => {
+  const failed = step(emptyState(), {...reads(200), sentry: 'HTTP 401'}, start);
+  expect(failed.lines).toEqual(['NOTE RED builder: rooms-watch cannot read Sentry outage issues: HTTP 401 (read-only token: ~/.config/wildshard/sentry-auth-token; QA 11-25 row 32)']);
+  expect(step(failed.state, {...reads(200), sentry: 'HTTP 401'}, start + minute).lines).toEqual([]);
+  const back = step(failed.state, {...reads(200), outages: [], sentry: SENTRY_OK}, start + 2 * minute);
+  expect(back.lines).toEqual(['rooms-watch reads Sentry outage issues again']);
+  expect(step(back.state, {...reads(200), outages: [], sentry: SENTRY_OK}, start + 3 * minute).lines).toEqual([]);
+});
+
+test('the Sentry read sends the token only in its header and maps each issue', async () => {
+  const token = 'fixture-token';
+  const calls: {url: string, auth: string}[] = [];
+  const answer = (body: unknown, status = 200) => (async (url: string | URL | Request, init?: RequestInit) => {
+    calls.push({url: `${url}`, auth: `${(init?.headers as Record<string, string>)['authorization']}`});
+    return new Response(JSON.stringify(body), {status});
+  }) as typeof fetch;
+  const issue = {id: 86, shortId: 'WILDSHARD-GAME-86', title: 'Downtime detected', status: 'unresolved'};
+  expect(await readOutages(token, {fetcher: answer([issue])})).toEqual({sentry: SENTRY_OK, outages: [{id: '86', shortId: 'WILDSHARD-GAME-86', title: 'Downtime detected', status: 'unresolved'}]});
+  expect(calls[0]?.url).toBe('https://sentry.io/api/0/organizations/wildshard/issues/?statsPeriod=24h&query=is%3Aunresolved%20issue.category%3Aoutage');
+  expect(calls[0]?.auth).toBe(`Bearer ${token}`);
+  const refused = await readOutages(token, {fetcher: answer({detail: 'bad'}, 401)});
+  expect(refused).toEqual({sentry: 'HTTP 401'});
+  expect(JSON.stringify(refused)).not.toContain(token);
+  expect((await readOutages(token, {fetcher: answer({detail: 'x'})})).sentry).toBe('an answer that is not an issue list');
+  expect((await readOutages(undefined)).sentry).toBe('no token at ~/.config/wildshard/sentry-auth-token');
 });
 
 test('the LaunchAgent runs one read every 60 s from the canonical checkout', () => {

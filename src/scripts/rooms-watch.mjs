@@ -8,7 +8,12 @@
 // `hc send`s it to the builder's terminal (main-watch's lookup); a host back gives one `rooms back` line. It never pages
 // Jake: phone, mail and Signal routing are his call. The disabled Sentry monitors stay off (one free uptime seat).
 //
+// The Sentry half reads with Jake's read-only token (meta QA 11-25 row 32; never printed). A read that fails (no token,
+// an HTTP error, a bad answer) is red once and back once, so the half can't go quietly off again.
+//
 //   node src/scripts/rooms-watch.mjs --once       one read (the LaunchAgent runs this every 60 s)
+//   node src/scripts/rooms-watch.mjs --check      one read printed, nothing written: the hosts, the Sentry read, the
+//                                                 open outage issues and the last 14 days' outage issues of any status
 //   node src/scripts/rooms-watch.mjs --install    MacBook only, from the landed canonical checkout: the 60 s LaunchAgent
 import {execFileSync} from 'node:child_process';
 import {appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync} from 'node:fs';
@@ -21,12 +26,16 @@ import {BUILDER_LABEL} from './main-watch.mjs';
 export const ROOMS = Object.freeze(['https://rooms.wildshard.io/up', 'https://rooms-staging.wildshard.io/up']);
 /** Reads in a row a host must fail before it is called down (one 60 s flap is not an outage). */
 export const DOWN_AFTER = 2;
-const SENTRY_ISSUES = 'https://sentry.io/api/0/organizations/wildshard/issues/?statsPeriod=24h&query=';
+const SENTRY_ISSUES = 'https://sentry.io/api/0/organizations/wildshard/issues/';
 const OUTAGE_QUERY = 'is:unresolved issue.category:outage';
+/** The Sentry read status of a good read; anything else names why it failed. */
+export const SENTRY_OK = 'ok';
+const TOKEN_FILE = '~/.config/wildshard/sentry-auth-token';
 const LABEL = 'io.wildshard.rooms-watch';
 
-/** @typedef {{fails: Record<string, number>, downSince: Record<string, number>, outages: string[]}} WatchState */
-/** @typedef {{rooms: {url: string, status: number}[], outages?: {id: string, shortId: string, title: string}[]}} WatchRead */
+/** @typedef {{fails: Record<string, number>, downSince: Record<string, number>, outages: string[], sentry?: string}} WatchState */
+/** @typedef {{id: string, shortId: string, title: string, status?: string}} OutageIssue */
+/** @typedef {{rooms: {url: string, status: number}[], outages?: OutageIssue[], sentry?: string}} WatchRead */
 
 /** @returns {WatchState} */
 export const emptyState = () => ({fails: {}, downSince: {}, outages: []});
@@ -64,6 +73,12 @@ export function step(state, read, now) {
     }
     next.outages = [...open].sort();
   }
+  if (read.sentry !== undefined) {
+    const was = state.sentry ?? SENTRY_OK;
+    if (read.sentry !== SENTRY_OK && was === SENTRY_OK) lines.push(`NOTE RED builder: rooms-watch cannot read Sentry outage issues: ${read.sentry} (read-only token: ${TOKEN_FILE}; QA 11-25 row 32)`);
+    if (read.sentry === SENTRY_OK && was !== SENTRY_OK) lines.push('rooms-watch reads Sentry outage issues again');
+    next.sentry = read.sentry;
+  }
   return {state: next, lines};
 }
 
@@ -96,16 +111,34 @@ async function readStatus(url) {
   catch { return 0; }
 }
 
-/** @param {string|undefined} token @returns {Promise<WatchRead['outages']>} */
-async function outages(token) {
-  if (token === undefined) return undefined;
+/**
+ * The outage issues one Sentry query finds, and the read's status: `ok`, or why it failed (never the token).
+ * @param {string|undefined} token @param {{query?: string, period?: string, fetcher?: typeof fetch}} [options]
+ * @returns {Promise<{outages?: OutageIssue[], sentry: string}>}
+ */
+export async function readOutages(token, {query = OUTAGE_QUERY, period = '24h', fetcher = fetch} = {}) {
+  if (token === undefined) return {sentry: `no token at ${TOKEN_FILE}`};
   try {
-    const response = await fetch(`${SENTRY_ISSUES}${encodeURIComponent(OUTAGE_QUERY)}`, {headers: {authorization: `Bearer ${token}`}, signal: AbortSignal.timeout(15_000)});
-    if (!response.ok) return undefined;
-    /** @type {{id: unknown, shortId: unknown, title: unknown}[]} */
+    const url = `${SENTRY_ISSUES}?statsPeriod=${period}&query=${encodeURIComponent(query)}`;
+    const response = await fetcher(url, {headers: {authorization: `Bearer ${token}`}, signal: AbortSignal.timeout(15_000)});
+    if (!response.ok) return {sentry: `HTTP ${response.status}`};
+    /** @type {unknown} */
     const issues = await response.json();
-    return issues.map(({id, shortId, title}) => ({id: `${id}`, shortId: `${shortId}`, title: `${title}`}));
-  } catch { return undefined; }
+    if (!Array.isArray(issues)) return {sentry: 'an answer that is not an issue list'};
+    return {sentry: SENTRY_OK, outages: issues.map(({id, shortId, title, status}) => ({id: `${id}`, shortId: `${shortId}`, title: `${title}`, status: `${status}`}))};
+  } catch (error) { return {sentry: `no answer (${error instanceof Error ? error.name : 'error'})`}; }
+}
+
+/** `--check`: one read printed, nothing written. @param {string} home */
+async function check(home) {
+  const token = sentryToken(home);
+  for (const url of ROOMS) console.log(`${url} ${await readStatus(url)}`);
+  const open = await readOutages(token);
+  console.log(`Sentry read: ${open.sentry}`);
+  if (open.outages === undefined) { process.exitCode = 1; return; }
+  console.log(`open outage issues (24 h): ${open.outages.length}${open.outages.map(issue => ` ${issue.shortId}`).join('')}`);
+  const recent = await readOutages(token, {query: 'issue.category:outage', period: '14d'});
+  console.log(`outage issues of any status (14 d): ${recent.outages?.map(issue => `${issue.shortId} ${issue.status}`).join(', ') || recent.sentry}`);
 }
 
 /** @param {string} home */
@@ -120,8 +153,9 @@ function builder(home) {
 
 /** @param {string[]} args */
 export async function main(args) {
-  if (args.length !== 1 || !['--once', '--install'].includes(args[0] ?? '')) throw new Error('Usage: rooms-watch.mjs --once|--install');
+  if (args.length !== 1 || !['--once', '--check', '--install'].includes(args[0] ?? '')) throw new Error('Usage: rooms-watch.mjs --once|--check|--install');
   const root = resolve(import.meta.dirname, '..', '..'), home = homedir();
+  if (args[0] === '--check') return await check(home);
   if (args[0] === '--install') {
     if (process.platform !== 'darwin') throw new Error('The rooms watch installs only on the MacBook');
     const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {cwd: root, encoding: 'utf8'}).trim();
@@ -139,7 +173,7 @@ export async function main(args) {
   let state = emptyState();
   try { state = {...emptyState(), ...JSON.parse(readFileSync(stateFile, 'utf8'))}; } catch { /* first run */ }
   const now = Date.now();
-  const read = {rooms: await Promise.all(ROOMS.map(async url => ({url, status: await readStatus(url)}))), outages: await outages(sentryToken(home))};
+  const read = {rooms: await Promise.all(ROOMS.map(async url => ({url, status: await readStatus(url)}))), ...await readOutages(sentryToken(home))};
   const result = step(state, read, now);
   mkdirSync(dirname(stateFile), {recursive: true});
   writeFileSync(`${stateFile}.tmp`, `${JSON.stringify(result.state)}\n`); renameSync(`${stateFile}.tmp`, stateFile);
