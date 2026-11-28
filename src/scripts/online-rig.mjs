@@ -66,8 +66,11 @@ export async function intoWorld(page) {
  * the local chaos proxy): `/release.json` is the world's and `/__release.json` the page's (the proxy's page route), so `pageView`
  * can run the page's ahead of the world's; `retain` serves a signed `/code-retention.json` on the page origin; `move` carries the
  * world and the page origin to the other build, as a deploy does.
- * @param {{ dist: string, nextDist?: string, work: string, keyFile: string, pgBin?: string, pgData?: string, saves?: 'memory', shard?: string, seats?: number, more?: string[], cells?: string, socket?: string, workers?: number, origins?: string[], channel?: string, isolated?: boolean, port?: 0, gridRoot?: string, placement?: {url:string,key:string} }} options */
-export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin = '', pgData = '', shard = 'driftwood-isle', seats, more = [], cells = shard, socket = `ws://127.0.0.1:${String(WORLD_PORT)}/`, workers, origins = [], channel = 'production', isolated = false, port, gridRoot = ROOT, placement }) {
+ * Meta QA 11-26 row 79: `catalogue` is a catalogue file the server is built with (build-server's `--catalogue`), for a page
+ * whose inline catalogue is not the checkout's pins (a tool's one-cell world): a frame names its cell by catalogue order, so a
+ * server reading other cells than the page's names another cell, and the page's player never takes its owner block.
+ * @param {{ dist: string, nextDist?: string, work: string, keyFile: string, pgBin?: string, pgData?: string, saves?: 'memory', shard?: string, seats?: number, more?: string[], cells?: string, socket?: string, workers?: number, origins?: string[], channel?: string, isolated?: boolean, port?: 0, gridRoot?: string, placement?: {url:string,key:string}, catalogue?: string }} options */
+export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin = '', pgData = '', shard = 'driftwood-isle', seats, more = [], cells = shard, socket = `ws://127.0.0.1:${String(WORLD_PORT)}/`, workers, origins = [], channel = 'production', isolated = false, port, gridRoot = ROOT, placement, catalogue }) {
   if (origins.some(origin => new URL(origin).origin !== origin || new URL(origin).hostname !== '127.0.0.1')) throw new Error('A rig lets in loopback page origins only');
   const { memory } = rigOptions({ saves, pgBin, pgData, socket });
   if (port !== undefined && port !== 0) throw new Error('A rig port option must be zero; use WS_RIG_PORTS for legacy named ports');
@@ -99,7 +102,7 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
   rmSync(join(work, 'packs'), { recursive: true, force: true });
   run(['src/scripts/server-origin.mjs', origin, build, `--grid=${absolute(gridRoot)}`, ...books], 'the server book');
   if (nextBuild !== '') run(['src/scripts/server-origin.mjs', origin, nextBuild, `--grid=${absolute(gridRoot)}`, ...books], 'the next server book');
-  run(['src/scripts/build-server.mjs', '--build', build, '--out', server], 'the server build');
+  run(['src/scripts/build-server.mjs', '--build', build, '--out', server, ...(catalogue === undefined ? [] : ['--catalogue', absolute(catalogue)])], 'the server build');
 
   let signed = '', pageSigned = '', current = { serial: 1, engineBuild: build, channel };
   /** @param {{ serial: number, engineBuild: string, channel: string }} row @param {string} [named] the socket the file names */

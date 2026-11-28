@@ -66,7 +66,7 @@ import { bootTimelineEntries } from '../loading-flow/stalls.mjs';
 import { listProcesses, readFootprints, startSampler, webkitProcesses } from './footprint.mjs';
 import { IPHONE_13_MODEL, ledgerSplit, loadPhoneModel, phoneFromWebKit, phonePeakFromWebKit, rangeText, zoneOverRuns } from './phoneModel.mjs';
 import { allocationSites, CULLER, symbolizer, walkPeak, walkRoute } from './walk.mjs';
-import { enterZone, zoneHome } from '../zone-entry.mjs';
+import { enterZone, oneCellCatalogue, zoneHome } from '../zone-entry.mjs';
 
 export const PROTOCOL = 'memory-run/1';
 /** The inspector modes (see the header). @type {readonly ['minimal', 'full']} */
@@ -261,6 +261,17 @@ export function isServerWorker(url) { return /serverWorker/u.test(new URL(url, '
  *  @param {readonly {boot?: string}[]} runs */
 export function bootOf(runs) { return [...new Set(runs.map((r) => r.boot ?? 'standalone'))].sort().join('+'); }
 
+/** Meta QA 11-26 row 79: the catalogue the online boot's server is built with, the one-cell world bootZone cuts from the
+ *  built page (`bootZoneEntry`'s options). A frame names its cell by its place in the catalogue (gridCells.ts on the server,
+ *  `inCell` in clientWorker.ts on the page); a server built with the checkout's whole grid named Nine's cell 7 to a page
+ *  whose only cell is 1, so the page never took its owner block and its player stood still (0 m on the walk).
+ *  @param {string} html the built page @param {string} chunk */
+export function rigCatalogue(html, chunk) {
+  const text = CATALOGUE_ELEMENT.exec(html)?.[1];
+  if (text === undefined) throw new Error('the built page inlines no ws-catalogue, so the online boot has no world to give its server');
+  return oneCellCatalogue(JSON.parse(text), chunk, { unplaced: bootZoneEntry('http://127.0.0.1/', chunk).unplaced });
+}
+
 /** STR1 (J415): the online boot's world. online-rig.mjs's signed dedicated server for the built client folder `dist` (memory
  *  saves, one cell, `chunk`) on loopback, with a fresh fixture key under `scratch`; `url` is its page origin and `stamp` the
  *  `__WS_WORLD__` a page carries to join it. The same origin serves a standalone boot when the page has no stamp.
@@ -274,7 +285,10 @@ export async function openOnlineBoot({ dist, chunk, scratch }) {
   const key = pair.publicKey.export({ type: 'spki', format: 'der' }).toString('hex');
   const keyFile = join(dir, 'key.json');
   writeFileSync(keyFile, JSON.stringify({ public: key, private: pair.privateKey.export({ type: 'pkcs8', format: 'pem' }) }), { mode: 0o600 });
-  const rig = await openRig({ port: 0, dist: resolvePath(dist), work: join(dir, 'rig'), keyFile, saves: 'memory', shard: chunk, workers: 1 });
+  // meta QA 11-26 row 79: the server reads the one-cell world bootZone gives the page, so their frames name the same cell
+  const catalogue = join(dir, 'catalogue.json');
+  writeFileSync(catalogue, JSON.stringify(rigCatalogue(readFileSync(join(dist, 'index.html'), 'utf8'), chunk)));
+  const rig = await openRig({ port: 0, dist: resolvePath(dist), work: join(dir, 'rig'), keyFile, saves: 'memory', shard: chunk, workers: 1, catalogue });
   const close = async () => { try { await rig.close(); } finally { rmSync(dir, { recursive: true, force: true }); } };
   try {
     for (let attempt = 0; attempt < 300; attempt++) {
@@ -1074,7 +1088,7 @@ async function main(argv) {
   }
   const phone13 = webkit.length === 0 ? null : iphone13Line(loadPhoneModel());
   if (phone13 !== null) console.log(`  ${phone13}`);
-  const walked = walk > 0 ? walkSummary(webkit, walks) : null;
+  const walked = walk > 0 ? walkSummary(webkit, walks, walk) : null;
   if (walked) for (const line of walkSummaryLines(walked)) console.log(line);
   const microscope = args.microscope || args['ledger-only'] ? await chromiumMicroscope({
     url: args.url, chunk: args.chunk, timeoutMs, plantRetainedBuffer: Boolean(args['plant-retained-buffer']),
@@ -1110,12 +1124,21 @@ export function walkLines(run, sampled) {
   return lines;
 }
 
-/** STR18: the walk over its runs: the median, range and spread of each reading. A run with no reading makes it incomplete.
- * @param {readonly any[]} webkit @param {readonly any[]} walks */
-export function walkSummary(webkit, walks) {
+/** Meta QA 11-26 row 79: the slowest walk that counts, in metres per walked second. Nine's 11-19 baseline walked 225 m [K]
+ *  and 249 m [S] in 60 s; a player who never moved (the rig's frames naming another cell) read 0 m and its idle traffic
+ *  was judged as the walk's. */
+export const MIN_WALK_METRES_PER_SECOND = 1;
+
+/** STR18: the walk over its runs: the median, range and spread of each reading. A run with no reading makes it incomplete,
+ * and so does a walk shorter than MIN_WALK_METRES_PER_SECOND × `seconds` (`short` lists their metres).
+ * @param {readonly any[]} webkit @param {readonly any[]} walks @param {number} [seconds] the walk's length */
+export function walkSummary(webkit, walks, seconds = 0) {
   const kernel = webkit.filter((r) => !r.refused && r.walk?.aboveSettled), sampled = walks.filter((w) => w.ready);
+  const least = seconds * MIN_WALK_METRES_PER_SECOND;
+  const short = least <= 0 ? [] : [...kernel.map((r) => r.walk.route?.metres), ...sampled.map((w) => w.route?.metres)].filter((m) => !(typeof m === 'number' && m >= least));
   return {
-    complete: kernel.length === webkit.length && sampled.length === walks.length && webkit.length > 0,
+    complete: kernel.length === webkit.length && sampled.length === walks.length && webkit.length > 0 && short.length === 0,
+    short, leastMetres: least,
     peakAboveSettled: stats(kernel.map((r) => r.walk.aboveSettled.webcontent)),
     gpuPeakAboveSettled: stats(kernel.map((r) => r.walk.aboveSettled.gpu)),
     walkPeak: stats(kernel.map((r) => r.walk.peak.webcontent)),
@@ -1129,7 +1152,8 @@ export function walkSummary(webkit, walks) {
 export function walkSummaryLines(s) {
   const r = (/** @type {{median:number,min:number,max:number,n:number}} */ v) => `${(v.median / MB).toFixed(0)} (${(v.min / MB).toFixed(0)}-${(v.max / MB).toFixed(0)}), n ${v.n}`;
   return [`walk WebContent peak above settled median ${r(s.peakAboveSettled)} MB [K]; GPU ${r(s.gpuPeakAboveSettled)} MB [K]`,
-    `walk allocation median ${(s.bytesPerSecond.median / MB).toFixed(2)} MB/s (${(s.bytesPerSecond.min / MB).toFixed(2)}-${(s.bytesPerSecond.max / MB).toFixed(2)}), culler ${(s.cullerBytesPerSecond.median / MB).toFixed(3)} MB/s, n ${s.bytesPerSecond.n} [S]${s.complete ? '' : ' INCOMPLETE'}`];
+    `walk allocation median ${(s.bytesPerSecond.median / MB).toFixed(2)} MB/s (${(s.bytesPerSecond.min / MB).toFixed(2)}-${(s.bytesPerSecond.max / MB).toFixed(2)}), culler ${(s.cullerBytesPerSecond.median / MB).toFixed(3)} MB/s, n ${s.bytesPerSecond.n} [S]${s.complete ? '' : ' INCOMPLETE'}`,
+    ...(s.short.length === 0 ? [] : [`walk SHORT: ${s.short.map(String).join(', ')} m, under the ${String(s.leastMetres)} m a walk must cover (meta QA 11-26 row 79)`])];
 }
 
 /** EM12 (a): the ledger [L] at each checkpoint of one boot (the counters the page publishes), its largest total and its

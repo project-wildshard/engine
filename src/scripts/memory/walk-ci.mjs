@@ -6,6 +6,7 @@
 // one-off spike: a QA row, not a red). The peak is reported, not judged, while it is bimodal. A first walk that never
 // completed (runner, browser, a boot short of control) fails the step: meta QA 11-26 row 75 found every sampled run
 // from 11-26 on with its Chromium walk stalled at loading step `server`, only a warning, so nothing was judged for days.
+// So does a walk shorter than measure.mjs MIN_WALK_METRES_PER_SECOND allows (row 79: the rig's player stood still).
 // A re-measure that never completed leaves the first reading's spike verdict.
 //   node src/scripts/memory/walk-ci.mjs <preview root> <output dir> [--record]
 // Every completed walk writes <output dir>/budget-measures.json with the table; `node src/scripts/budgets/cli.mjs record
@@ -38,7 +39,9 @@ async function walk(name) {
   const code = await new Promise((resolve, reject) => { child.once('error', reject); child.once('close', resolve); });
   const data = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null;
   if (data?.walk?.complete !== true) {
-    console.log(`${name}: ${baseline.zone} walk did not complete (measure exited ${String(code)}); no reading`);
+    // QA 11-26 row 79: a walk under the least distance is no walk; its idle traffic is never judged as the walk's
+    const short = data?.walk?.short?.length > 0 ? `, walked ${data.walk.short.join(', ')} m of the ${String(data.walk.leastMetres)} m a walk must cover` : '';
+    console.log(`${name}: ${baseline.zone} walk did not complete (measure exited ${String(code)}${short}); no reading`);
     return null;
   }
   const peaks = /** @type {number[]} */ (data.webkit.map((/** @type {any} */ r) => r.walk?.aboveSettled?.webcontent).filter((/** @type {unknown} */ v) => typeof v === 'number'));

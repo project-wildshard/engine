@@ -25,6 +25,7 @@ export const BOOT_FLAGS:string;
 export function bootURL(url:string):string;
 export function bootZone(page:unknown,url:string,chunk:string):Promise<void>;
 export function bootZoneEntry(url:string,chunk:string):{zone:string;base:string;flags:string;unplaced:true};
+export function rigCatalogue(html:string,chunk:string):{grid:{cells:{slug:string;instance?:string;cell:[number,number]}[]}};
 export type Boot = 'online'|'standalone';
 export interface WorldStamp {release:string;key:string}
 export function isServerWorker(url:string):boolean;
@@ -84,7 +85,8 @@ export interface WalkSampled {host:'chromium';boot:Boot;chunk:string;ready:boole
   bytesPerSecond?:number;cullerBytesPerSecond?:number;sampledBytes?:number;owners?:SiteRow[];stacks?:{bytes:number;stack:string[]}[];sites?:SiteRow[]}
 export function loopbackWorld(context:{grantPermissions:(permissions:string[],options:{origin:string})=>Promise<void>},url:string,world:WorldStamp|null):Promise<void>;
 export function chromiumWalk(options:{url:string;chunk:string;world:WorldStamp|null;seconds:number;timeoutMs?:number;settleMs?:number;intervalBytes?:number;top?:number;dist?:string;profileOut?:string;jsFlags?:string}):Promise<WalkSampled>;
-export interface WalkSummary {complete:boolean;peakAboveSettled:Stats;gpuPeakAboveSettled:Stats;walkPeak:Stats;bytesPerSecond:Stats;cullerBytesPerSecond:Stats;stuck:number[]}
-export function walkSummary(webkit:readonly unknown[],walks:readonly unknown[]):WalkSummary;
+export interface WalkSummary {complete:boolean;peakAboveSettled:Stats;gpuPeakAboveSettled:Stats;walkPeak:Stats;bytesPerSecond:Stats;cullerBytesPerSecond:Stats;stuck:number[];short:unknown[];leastMetres:number}
+export const MIN_WALK_METRES_PER_SECOND:number;
+export function walkSummary(webkit:readonly unknown[],walks:readonly unknown[],seconds?:number):WalkSummary;
 export function walkSummaryLines(summary:WalkSummary):string[];
 export function walkLines(run:unknown,sampled:unknown):string[];

@@ -1,6 +1,6 @@
 import {expect,test} from 'vitest';
 import {allocationSites,CULLER,frameName,routeFor,walkPeak,WALK_ROUTES} from '../src/scripts/memory/walk.mjs';
-import {loopbackWorld,walkSummary} from '../src/scripts/memory/measure.mjs';
+import {bootZoneEntry,loopbackWorld,MIN_WALK_METRES_PER_SECOND,rigCatalogue,walkSummary,walkSummaryLines} from '../src/scripts/memory/measure.mjs';
 // oxlint-disable-next-line import/no-nodejs-modules -- the walk's own sources, read as text
 import {readFileSync} from 'node:fs';
 
@@ -113,4 +113,35 @@ test('QA 11-26 row 75: the online walk grants loopback access before its page, a
   const ci=readFileSync('src/scripts/memory/walk-ci.mjs','utf8');
   expect(ci).toMatch(/if \(first === null\) \{[\s\S]{0,400}?process\.exitCode = 1;/u);
   expect(ci).not.toMatch(/::warning title=walk ratchet::\$\{baseline\.zone\} walk did not complete/u);
+});
+
+// Meta QA 11-26 row 79: the online boot cut the page's catalogue to the zone's one cell (bootZone), but the rig built its server
+// with the checkout's whole grid. A frame names its cell by catalogue order, so the server's frames named Nine cell 7 to a page
+// whose only cell is 1: the page never took its owner block, sent no commands, and its player stood still for the whole walk.
+// The rig's server now reads the page's one-cell world, and a walk under a metre a second is refused, never judged.
+test('QA 11-26 row 79: the online boot\'s server reads the page\'s one-cell world, and a walk that stood still is refused',async()=>{
+  // zone-entry.mjs has no declarations: its own test is plain JS
+  const entry:string='../src/scripts/zone-entry.mjs';
+  const {oneCellPage}=await import(entry) as {oneCellPage:(html:string,zone:string,options:{unplaced:boolean})=>string};
+  const cells=['pine-hollow','driftwood-isle','nine-dragon-stack'].map((slug,at)=>({instance:slug,slug,cell:[at,at-1]}));
+  const html=`<html><script type="application/json" id="ws-catalogue">${JSON.stringify({version:1,placements:[],grid:{pitch:256,cells}})}</script></html>`;
+  const page=oneCellPage(html,'nine-dragon-stack',{unplaced:bootZoneEntry('http://127.0.0.1/','nine-dragon-stack').unplaced});
+  const pageCatalogue:unknown=JSON.parse(/id="ws-catalogue">([^<]*)</u.exec(page)?.[1] ?? 'null');
+  expect(rigCatalogue(html,'nine-dragon-stack'),'the server\'s cells are the page\'s, in the page\'s order').toEqual(pageCatalogue);
+  expect(rigCatalogue(html,'nine-dragon-stack').grid.cells).toEqual([{instance:'nine-dragon-stack',slug:'nine-dragon-stack',cell:[0,0]}]);
+  expect(()=>rigCatalogue('<html></html>','nine-dragon-stack')).toThrow(/no ws-catalogue/u);
+  const measure=readFileSync('src/scripts/memory/measure.mjs','utf8');
+  const boot=measure.slice(measure.indexOf('export async function openOnlineBoot'));
+  expect(boot.slice(0,boot.indexOf('\n}\n'))).toMatch(/openRig\(\{[^}]*\bcatalogue \}\)/u);
+  expect(readFileSync('src/scripts/online-rig.mjs','utf8')).toMatch(/'src\/scripts\/build-server\.mjs'[^\n]*'--catalogue', absolute\(catalogue\)/u);
+  const run=(metres:number)=>({refused:null,walk:{aboveSettled:{webcontent:100,gpu:1},peak:{webcontent:700},route:{metres,stuck:[]}}});
+  const sampled=(metres:number)=>({ready:true,bytesPerSecond:10,cullerBytesPerSecond:1,route:{metres,stuck:[]}});
+  expect(walkSummary([run(225)],[sampled(249)],60).complete).toBe(true);
+  const still=walkSummary([run(0)],[sampled(0)],60);
+  expect(still.complete).toBe(false);
+  expect(still.short).toEqual([0,0]);
+  expect(still.leastMetres).toBe(60*MIN_WALK_METRES_PER_SECOND);
+  expect(walkSummaryLines(still).at(-1)).toMatch(/walk SHORT: 0, 0 m, under the 60 m/u);
+  expect(walkSummary([run(225)],[sampled(59)],60).short).toEqual([59]);
+  expect(measure).toContain('walkSummary(webkit, walks, walk)');
 });
