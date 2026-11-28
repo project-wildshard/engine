@@ -358,6 +358,46 @@ export function sameInspectorSession(page, session) { return page?._connection?.
 /** Wait for control or the error card. The Chromium ledger also needs a completed draw after control-ready.
  * @param {any} page @param {number} timeoutMs @param {boolean} [requireSettledFrame] */
 export async function untilControl(page, timeoutMs, requireSettledFrame = false) {
+  try { await waitControl(page, timeoutMs, requireSettledFrame); } catch (error) {
+    if (!(error instanceof Error) || error.name !== 'TimeoutError') throw error;
+    // QA 11-26 row 71: a stalled boot said only "Timeout 180000ms exceeded" for two days; say where it stopped
+    const stalled = new Error(`${error.message} ${stallReport(await bootState(page).catch(() => null))}`, { cause: error });
+    stalled.name = 'TimeoutError';
+    throw stalled;
+  }
+  return /** @type {string | null} */ (await page.evaluate(() => document.querySelector('#wserr .msg')?.textContent ?? null));
+}
+
+/** What a boot that never reached control was doing: its loading steps, its boot-trace checkpoints, its own errors and
+ * the last files it finished fetching, read from the page (instrument minimal turns the inspector's Network domain off,
+ * so Playwright's request events say nothing). @param {any} page
+ * @returns {Promise<{now:number, steps:[number, string][], trace:[number, string][], errors:string[], resources:{name:string, end:number}[], files:number}>} */
+export async function bootState(page) {
+  return page.evaluate(() => {
+    const run = Reflect.get(window, '__memoryRun') ?? {}, now = performance.timeOrigin + performance.now();
+    const loaded = /** @type {PerformanceResourceTiming[]} */ (performance.getEntriesByType('resource'));
+    return { now, steps: (run.steps ?? []).map((/** @type {any[]} */ row) => [row[0], String(row[1])]),
+      trace: (run.trace ?? []).map((/** @type {any[]} */ row) => [row[0], String(row[1])]), errors: [...(run.errors ?? [])].slice(0, 5),
+      resources: loaded.slice(-5).map((entry) => ({ name: new URL(entry.name).pathname, end: performance.timeOrigin + entry.responseEnd })), files: loaded.length };
+  });
+}
+
+/** One line naming the stalled phase: the last loading step and boot-trace checkpoint with how long ago each began, and
+ * the page's errors and last fetches. @param {Awaited<ReturnType<typeof bootState>> | null} state */
+export function stallReport(state) {
+  if (state === null) return 'Stalled: the page could not be read.';
+  const ago = (/** @type {number} */ t) => `${((state.now - t) / 1000).toFixed(1)} s ago`;
+  const step = state.steps.at(-1), mark = state.trace.at(-1), last = state.resources.at(-1);
+  return [`Stalled at step ${step ? `${step[1]} (began ${ago(step[0])})` : 'none (the loading card never showed)'};`,
+    `steps ${state.steps.map((row) => row[1]).join(' > ') || 'none'};`,
+    `boot trace at ${mark ? `${mark[1]} (${ago(mark[0])})` : 'none'};`,
+    `errors ${state.errors.length > 0 ? state.errors.join(' | ') : 'none'};`,
+    `${String(state.files)} files fetched, the last ${last ? `${last.name} (${ago(last.end)})` : 'none'}`,
+    ...(state.resources.length > 1 ? [`after ${state.resources.slice(0, -1).map((row) => row.name).join(', ')}`] : [])].join(' ');
+}
+
+/** @param {any} page @param {number} timeoutMs @param {boolean} requireSettledFrame */
+async function waitControl(page, timeoutMs, requireSettledFrame) {
   await page.waitForFunction((/** @type {boolean} */ needFrame) => {
     if (document.querySelector('#wserr .msg')?.textContent) return true;
     const game = Reflect.get(window, '__wildshard')?.world?.game;
@@ -367,7 +407,6 @@ export async function untilControl(page, timeoutMs, requireSettledFrame = false)
     return run?.controlFrame?.game.deref() === game && game.frameCount > run.controlFrame.frame
       && run.steps.some((/** @type {StepRow} */ row) => row[1] === 'control' && row[2]);
   }, requireSettledFrame, { timeout: timeoutMs, polling: 250 });
-  return /** @type {string | null} */ (await page.evaluate(() => document.querySelector('#wserr .msg')?.textContent ?? null));
 }
 
 /** The settled reading (section 5 of the method): `gcs` forced collections 1 s apart, `settleMs` idle, then the median
@@ -412,7 +451,7 @@ export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_
     page.on('pageerror', (error) => { errors.push(error.message); });
     // a small same-origin file first, so WebContent exists (and a cross-origin swap cannot move the page) before the boot
     await page.goto(new URL('/version.json', url).href);
-    let inspector = instrument === 'minimal' ? await minimiseInspector(page) : null;
+    /** @type {any} */ let inspector = null;
     const build = await page.evaluate(() => { try { return JSON.parse(document.body.textContent ?? '').build ?? null; } catch { return null; } });
     /** @type {Map<number, BrowserProcess>} */
     const procs = new Map(webkitProcesses().map((p) => [p.pid, p]));
@@ -427,7 +466,10 @@ export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_
       // QA 11-23-b row 25: the game document sends COOP and /version.json does not, so WebKit swaps the page into a new
       // WebContent at this navigation, and its new inspector session has the Network domain on again (every run read
       // `minimal-lost`). Turn the new session down at commit, before the boot's fetches; `kept` below checks this one.
-      if (inspector !== null && !sameInspectorSession(page, inspector)) inspector = await minimiseInspector(page);
+      // QA 11-26 row 71: only this one. Network turned off on the warm-up page's session as well left the boot document's
+      // module scripts unrun (the card sat at its first step with no error until the 180 s timeout, every armed boot since
+      // engine ad1a3ab8b). Console off there boots, and so does Network off here, after commit.
+      if (instrument === 'minimal') inspector = await minimiseInspector(page);
       // an online page asks for the player's Name before it joins: answer it as a player would
       const named = world === null ? null : answerName(page);
       try { failure = await untilControl(page, timeoutMs); } finally { await named?.stop(); }
@@ -799,9 +841,11 @@ export async function webkitRung({ rung, calibUrl, gameUrl, settleMs = 2000, gcs
     const page = await context.newPage(); page.setDefaultTimeout(timeoutMs);
     if (rung === 'title') {
       await page.goto(new URL('/version.json', gameUrl).href);
-      if (instrument === 'minimal') await minimiseInspector(page);
       const title = new URL(gameUrl); for (const [key, value] of Object.entries({ mute: '1', nolock: '1', sw: '0' })) title.searchParams.set(key, value);
-      await page.goto(title.href); // no skipintro: with it and no chunk the page boots straight into a zone
+      // no skipintro: with it and no chunk the page boots straight into a zone. Network goes off at the title's commit, never on
+      // the warm-up page before it (QA 11-26 row 71: that left the next document's modules unrun)
+      await page.goto(title.href, { waitUntil: 'commit' });
+      if (instrument === 'minimal') await minimiseInspector(page);
       await page.locator('.ws-main-select').waitFor({ state: 'visible' });
     } else {
       await page.goto(`${calibUrl}?kind=${rung === 'webgl' ? 'glbuffer' : 'none'}&mb=0`, { waitUntil: 'commit' });
