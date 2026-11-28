@@ -1,6 +1,6 @@
 import type {CookedPartMember} from '@wildshard/engine/boot/tables';
 import {checkedCookedMember} from '../../../shared/game/shardfile/cookedPackPaths';
-import {joinSpawnManifest, packsBookPath, readSpawnCodeList, readSpawnManifest, readSpawnManifestAddress, type SpawnManifest, type SpawnManifestAddress, type SpawnPart} from '../../../shared/game/shardfile/spawnManifest';
+import {joinSpawnManifest, packsBookPath, readSpawnCodeList, spawnCode, readSpawnManifest, readSpawnManifestAddress, type SpawnManifest, type SpawnManifestAddress, type SpawnPart} from '../../../shared/game/shardfile/spawnManifest';
 import {assetCacheName} from '@wildshard/engine/pwa/cacheNames';
 import {jsonSlot} from '@wildshard/engine/saves/slots';
 import { bootMark,bootProgress,bootTiming,downloadShown } from '@wildshard/engine/boot/timing';
@@ -63,6 +63,10 @@ export interface SpawnDownloadPorts {
   readonly whole?: boolean;
   /** A non-authoritative packed-member hint. Every member still passes its own native response/length check. */
   readonly held?: {readonly read: () => Promise<HeldParts>; readonly write: (index: HeldParts) => Promise<void>};
+  /** SF29: on a page no worker controls, a code file the page's own module loader already read. Its bytes are in the
+   *  page's HTTP cache, which a fetch of it does not hit in WebKit (the loader's request is keyed apart), so it is not
+   *  fetched again; the worker precaches it once it controls a page (DL1). */
+  readonly loaded?: (url: string) => boolean;
 }
 export type HeldParts = Readonly<Record<string, readonly string[]>>;
 
@@ -734,6 +738,11 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
       const looseLanes = Promise.all(Array.from({length: Math.min(8, loose.length)}, async () => {
         for (let next = await nextLoose(); next !== undefined; next = await nextLoose()) {
           const {file} = next;
+          if (ports.loaded?.(file.url) === true) {
+            completedBytes += file.bytes; cachedBytes += file.bytes; wireCompleted += file.wireBytes; wireCached += file.wireBytes; filesDone++;
+            settleFile(file.url, false); landed(file.url); inFlight.delete(file.url); active--; if (demandedFlight.delete(file.url)) demandsActive--; publish(); nudge();
+            continue;
+          }
           try {
           try {
             let received = 0, credited = 0;
@@ -1225,6 +1234,17 @@ function nativeCacheCall<T>(read: () => Promise<T>): Promise<T> {
   void work.then(() => nativeCacheWork.delete(work), () => nativeCacheWork.delete(work));
   return work;
 }
+/** SF29: the page's module loader (or a stylesheet link) already read this code file over HTTP: a resource entry for its
+ *  URL that no fetch made. A fetch's entry (the download's own, a worker's) is no proof the loader holds it. */
+export function pageLoadedCode(url: string, entries: readonly Pick<PerformanceResourceTiming, 'name' | 'initiatorType'>[]): boolean {
+  if (!spawnCode(url)) return false;
+  const page = typeof location === 'undefined' ? undefined : location.href, want = new URL(url, page);
+  return entries.some(entry => {
+    if (entry.initiatorType === 'fetch' || entry.initiatorType === 'xmlhttprequest' || entry.initiatorType === 'beacon') return false;
+    const seen = new URL(entry.name, page);
+    return seen.origin === want.origin && seen.pathname === want.pathname;
+  });
+}
 function downloadPorts(cacheName: unknown, packs: boolean): SpawnDownloadPorts {
   const store = typeof caches === 'undefined' ? null : typeof cacheName === 'string' ? nativeCacheCall(() => caches.open(cacheName)) : null;
   const controller = navigator.serviceWorker?.controller;
@@ -1236,6 +1256,7 @@ function downloadPorts(cacheName: unknown, packs: boolean): SpawnDownloadPorts {
     ...(store === null || controller !== undefined && controller !== null ? {} : {store: (url: string, response: Response) => nativeCacheCall(async () => {await (await store).put(url, response);})}),
     ...(store === null || !packs ? {} : {packs: true, keep: (url: string, response: Response) => nativeCacheCall(async () => {await (await store).put(url, response);})}),
     ...(packs ? {whole: true} : {}),
+    ...(controller !== undefined && controller !== null || typeof performance === 'undefined' ? {} : {loaded: url => pageLoadedCode(url, performance.getEntriesByType('resource') as PerformanceResourceTiming[])}),
     ...(store === null || !packs ? {} : {held: {
       read: () => nativeCacheCall(async () => readHeldParts(await (await store).match(HELD_PARTS))),
       write: (index: HeldParts) => nativeCacheCall(async () => {await (await store).put(HELD_PARTS, Response.json(index));}),

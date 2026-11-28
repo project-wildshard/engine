@@ -1,5 +1,5 @@
 import {expect, test, vi} from 'vitest';
-import {downloadSpawnManifest, type SpawnDownloadSnapshot} from '../src/client/game/boot/spawnDownload';
+import {downloadSpawnManifest, pageLoadedCode, type SpawnDownloadSnapshot} from '../src/client/game/boot/spawnDownload';
 import {readSpawnManifest} from '../src/shared/game/shardfile/spawnManifest';
 
 const files = [{url: `/shardfiles/example/blobs/bin/${'a'.repeat(64)}.bin`, bytes: 4, hash: 'a'.repeat(64)},
@@ -254,4 +254,27 @@ test('a manifest reads a placed neighbour\'s loose file from the build, and only
     expect(await run('example'), 'a neighbour: the build\'s own copy').toEqual([`${base}shardfiles/neighbour/discovery.json?v=b649bfae`]);
     expect(await run('neighbour'), 'its own slug: the upload').toEqual([`${loose}shardfiles/neighbour/discovery.json?v=b649bfae`]);
   } finally { clearPlacedSpawns(); }
+});
+
+// SF29: on a page no worker controls, the module loader already read the page's code over HTTP; a fetch of the same file
+// misses that cache entry in WebKit, so the download fetching it again sent Pine's code twice (2.2 MB).
+test('an uncontrolled page never fetches again a code file its module loader read, and still completes', async () => {
+  const reads: string[] = [], stored: string[] = [];
+  const download = downloadSpawnManifest(address, {cached: () => Promise.resolve(undefined),
+    fetch: url => {reads.push(new URL(url).pathname); return Promise.resolve(new Response(url.endsWith('.json') ? text : new Uint8Array(url.endsWith('.js') ? 3 : 4)));},
+    store: async url => {stored.push(new URL(url).pathname);},
+    loaded: url => new URL(url).pathname === '/assets/code-12345678.js'}, base);
+  await download.ready;
+  expect(reads).toEqual([address.url, files[0]?.url]);
+  expect(stored).not.toContain('/assets/code-12345678.js');
+  expect(download.snapshot()).toMatchObject({complete: true, completedBytes: 7, cachedBytes: 3, filesDone: 2, error: null});
+});
+
+test('the page holds a code file only when its loader read it, not a fetch, and never a content file', () => {
+  const page = 'https://example.test/', code = `${page}builds/shared/late-session-Ab12.js`;
+  expect(pageLoadedCode(code, [{name: code, initiatorType: 'script'}])).toBe(true);
+  expect(pageLoadedCode(`${page}builds/shared/style-Cr0i.css`, [{name: `${page}builds/shared/style-Cr0i.css`, initiatorType: 'link'}])).toBe(true);
+  expect(pageLoadedCode(code, [{name: code, initiatorType: 'fetch'}])).toBe(false);
+  expect(pageLoadedCode(code, [{name: 'https://other.test/builds/shared/late-session-Ab12.js', initiatorType: 'script'}])).toBe(false);
+  expect(pageLoadedCode(`${page}shardfiles/z/blobs/image/a.png`, [{name: `${page}shardfiles/z/blobs/image/a.png`, initiatorType: 'img'}])).toBe(false);
 });
