@@ -165,6 +165,18 @@ function fenceHints(shard: OpenShardfile): {readonly hashes: ReadonlySet<string>
   return {hashes, mounts: downloaded(shard).filter(row => hashes.has(row.hash)).map(row => row.url)};
 }
 
+/** The image URLs a glTF document names (`images[].uri`, resolved against its own URL; never a `data:` URI). */
+export function gltfImageUrls(url: string, bytes: Uint8Array): readonly string[] {
+  try {
+    const document: unknown = JSON.parse(new TextDecoder().decode(bytes));
+    const images = typeof document === 'object' && document !== null && Array.isArray(Reflect.get(document, 'images')) ? Reflect.get(document, 'images') as unknown[] : [];
+    return images.flatMap(image => {
+      const uri: unknown = typeof image === 'object' && image !== null ? Reflect.get(image, 'uri') : undefined;
+      return typeof uri !== 'string' || uri.startsWith('data:') ? [] : [decodeURI(new URL(uri, `https://cook.invalid${url}`).pathname)];
+    });
+  } catch { return []; }
+}
+
 /** SF4: a zone's own far view (`/assets/<slug>/baked/far.json`, `far.glb`, `far-impostor.png`), which the grid's far ring reads. */
 export const ownFarView = (url: string, slug: string): boolean => url.startsWith(`/assets/${slug.replace(/^_/u, '')}/baked/far`) && /\/baked\/far(?:-impostor)?\.(?:json|glb|png)$/u.test(url);
 /** SF11: a zone's own sound-effect set folders (`/assets/<slug>/sfx/<set>/`, each beside its `sfx.json`). With no pin
@@ -289,6 +301,10 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, folder: st
   const ownBytes = blobs?.discovery ?? imageBytes;
   const phone = tiers.phone === true && ownBytes !== undefined ? phoneTier(ownBytes, url => cooked.get(url) ?? mountOf(url), undefined, tiers.encode) : undefined;
   const tieredBytes = phone?.discovery ?? ownBytes;
+  // the images each `.gltf` mount names by URI: its loader fetches them as they are, never through the KTX2 table
+  const mountUrls = new Set(mounts.map(row => row.url));
+  const gltfTextures = new Map(mounts.filter(row => row.url.endsWith('.gltf')).map(row => [row.url, gltfImageUrls(row.url, shard.read(row.path)).filter(url => mountUrls.has(url))] as const));
+  const gltfImages = new Set([...gltfTextures.values()].flat());
   // S12f2b1: a splat ground's own phone layers (product blobs) get 6×6 files too, named in the same table
   const layers = tiers.phone === true && tiers.encode !== undefined && tieredBytes !== undefined ? splatPhoneTier(tieredBytes, folder, splatPhoneLayers(shard, prefix), tiers.encode) : undefined;
   const documentBytes = layers?.discovery ?? tieredBytes;
@@ -323,7 +339,11 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, folder: st
    *  an image mount brings its cooked files, the desktop's KTX2 on the desktop and the phone's 6x6 files on the phone. */
   const tiered = (tier: CookTier, url: string): readonly string[] => {
     if (tier === 'desktop') return [url, ...(images?.desktopTargets.get(url) ?? []).map(target => `cooked:${target}`)];
-    const own = !tierRows.has(url) ? [url] : phone?.kept.has(url) === true ? [url, `tier:${url}`] : [`tier:${url}`];
+    // a phone samples a cooked image mount's KTX2 and never fetches its source (the load estimate charges it so too, SF25),
+    // but two readers fetch the image raw: the grid's far ring (session.ts decodes far-impostor.png) and a glTF's loader
+    const cookedOnly = (images?.phoneTargets.get(url)?.length ?? 0) > 0 && !ownFarView(url, shard.slug) && !gltfImages.has(url);
+    const rawRead = phone?.kept.has(url) === true || gltfImages.has(url);
+    const own = !tierRows.has(url) ? (cookedOnly ? [] : [url]) : rawRead ? [url, `tier:${url}`] : [`tier:${url}`];
     return [...own, ...(images?.phoneTargets.get(url) ?? []).map(target => (tierRows.has(target) ? `tier:${target}` : `cooked:${target}`))];
   };
   /** SF16: the cooked files of the texture blobs a set reads (every one for a whole set): the desktop's KTX2, or the phone's 6x6. */
@@ -367,8 +387,11 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, folder: st
       // SF11: and every phone-only mount past its fence (Pine's `baked/rain.phone.bin`, its props' `.phone.glb` LODs): no desktop
       // set carries a phone-only file and no pin copies it under public/ any more, so outside this set no phone could read it.
       const phoneOnly = (url: string): boolean => onTier(url, 'phone') && !onTier(url, 'desktop');
-      const urls = wholeSet(tier, set) ? mounts.map(row => row.url).filter(url => onTier(url, tier))
+      const picked = wholeSet(tier, set) ? mounts.map(row => row.url).filter(url => onTier(url, tier))
         : set === 'whole' ? [...new Set([...fence.mounts, ...mounts.map(row => row.url).filter(url => (ownFarView(url, shard.slug) || ownScore(url) || ownSfx(url) || phoneOnly(url)) && onTier(url, tier))])] : fence.mounts;
+      // a listed glTF brings the images it names: a fence that recorded the document alone left its loader fetching them
+      // from the page (Pine's props, 15 textures in a WebKit phone boot)
+      const urls = [...new Set([...picked, ...picked.flatMap(url => gltfTextures.get(url) ?? [])])];
       // A phone file whose target no phone list names (a fence shard's file read past its fence) rides in the phone's whole
       // set: no other tier's part holds it, and it costs less than the target a phone read from a desktop part before.
       const textures = blobRows(tier, wholeSet(tier, set) ? undefined : fence.hashes);
